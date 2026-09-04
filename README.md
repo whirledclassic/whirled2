@@ -4,7 +4,7 @@ A browser remake of the *idea* of [Whirled](https://en.wikipedia.org/wiki/Whirle
 
 **This is not official Three Rings software.** Classic Whirled / msoy source and assets belong to their owners. This repo is original TypeScript + PixiJS work for a new public world in that spirit.
 
-Maintainer: Josh (`thanatosspirit` / josh.awe99@gmail.com)
+Maintainer: Josh (`whirledclassic` / josh.awe99@gmail.com)
 
 ## Two tracks
 
