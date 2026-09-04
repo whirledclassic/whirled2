@@ -32,8 +32,9 @@ Read these before opening a “how do I build Whirled” issue:
 3. [docs/FIXES.md](docs/FIXES.md) — every public msoy issue we mapped, and what actually works
 4. [docs/FLASH-AND-RUFFLE.md](docs/FLASH-AND-RUFFLE.md) — why the public room is not a SWF wrapper
 5. [docs/SOURCES.md](docs/SOURCES.md) — field notes from people who shipped this class of world
-6. [docs/LINKS.md](docs/LINKS.md) — source trees, wiki, museums, Ruffle, OVH rules
-7. [docs/ROADMAP.md](docs/ROADMAP.md) — Whirled 2 order of work
+6. [docs/RELATED.md](docs/RELATED.md) — other people’s work (html5-msoy, Shadowsych docs). Not ours.
+7. [docs/LINKS.md](docs/LINKS.md) — source trees, wiki, museums, Ruffle, OVH rules
+8. [docs/ROADMAP.md](docs/ROADMAP.md) — Whirled 2 order of work
 
 ## Stack (Whirled 2)
 
