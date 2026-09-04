@@ -45,7 +45,7 @@ Official whirled.com is gone.
 - MADE Discord (Alex Handy, 2026-09-03): https://discord.gg/UEJZHSJDT
 - Virtual Worlds Museum: https://www.virtualworlds.museum/
 - XR Guild: https://www.xrguild.org/
-- Virtual World Society: https://www.virtualworlds.society.org/
+- Virtual World Society: https://www.virtualworldsociety.org/
 
 ## Flash / AIR / Ruffle
 
