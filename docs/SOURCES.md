@@ -128,24 +128,6 @@ Register: https://us.ovhcloud.com/startup-program/
 
 ---
 
-## Pam Griffith (Metaplace)
-
-Mail, 2026-09-02.
-
-- Cannot contribute time. Thought the project was cool. Localhost links are useless to anyone else — send a public URL.
-- Metaplace → Playdom history is a sibling of “browser UGC world that went away.”
-
----
-
-## Jason Scott (textfiles / Internet Archive)
-
-Mail, 2026-09-02.
-
-- Sent a Discord friend request after the first note. Public handle people know: SketchCow / textfiles.
-- Frame is software preservation, not a grant ask to IA.
-
----
-
 ## Lab facts from the machine (maintainer notes, 2026-09-02/03)
 
 These are from the Linux lab, not from a vendor.
