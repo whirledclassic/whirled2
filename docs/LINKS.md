@@ -1,6 +1,6 @@
 # Links that actually matter
 
-Public URLs only. Last sweep: 2026-09-03.
+Public URLs only. Last sweep: 2026-09-04.
 
 ## This project
 
@@ -16,12 +16,18 @@ Public URLs only. Last sweep: 2026-09-03.
 - https://github.com/greyhavens/whirled-projects
 - https://github.com/greyhavens/thane
 - https://github.com/FelixWolf/whirled-api
-- https://github.com/pravatbhusal/html5-msoy — earlier HTML5 rewrite attempt
 
 Upstream build / status threads:
 
 - https://github.com/greyhavens/msoy/issues/38
 - https://github.com/greyhavens/msoy/issues/31
+
+## Related work (not this repo)
+
+Full notes: [RELATED.md](RELATED.md)
+
+- https://github.com/pravatbhusal/html5-msoy — Pravat Bhusal’s HTML5 / React + Django rewrite. Not ours. Not the stack we ship.
+- [archive/shadowsych-whirled-docs.md](archive/shadowsych-whirled-docs.md) — Shadowsych’s msoy / Synced Online setup guide, archived so it is not only a Drive link. Not written here.
 
 ## Community host and wiki
 
@@ -39,7 +45,7 @@ Official whirled.com is gone.
 - MADE Discord (Alex Handy, 2026-09-03): https://discord.gg/UEJZHSJDT
 - Virtual Worlds Museum: https://www.virtualworlds.museum/
 - XR Guild: https://www.xrguild.org/
-- Virtual World Society: https://www.virtualworldsociety.org/
+- Virtual World Society: https://www.virtualworlds.society.org/
 
 ## Flash / AIR / Ruffle
 
