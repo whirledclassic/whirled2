@@ -28,10 +28,11 @@ Issue labels: `whirled` = classic lab. `whirled2` = this repo.
 Read these before opening a “how do I build Whirled” issue:
 
 1. [docs/CLASSIC-LAB.md](docs/CLASSIC-LAB.md) — original stack
-2. [docs/FLASH-AND-RUFFLE.md](docs/FLASH-AND-RUFFLE.md) — why the public room is not a SWF wrapper
-3. [docs/SOURCES.md](docs/SOURCES.md) — field notes from people who shipped this class of world
-4. [docs/LINKS.md](docs/LINKS.md) — source trees, wiki, museums, Ruffle, OVH rules
-5. [docs/ROADMAP.md](docs/ROADMAP.md) — Whirled 2 order of work
+2. [docs/FIXES.md](docs/FIXES.md) — every public msoy issue we mapped, and what actually works
+3. [docs/FLASH-AND-RUFFLE.md](docs/FLASH-AND-RUFFLE.md) — why the public room is not a SWF wrapper
+4. [docs/SOURCES.md](docs/SOURCES.md) — field notes from people who shipped this class of world
+5. [docs/LINKS.md](docs/LINKS.md) — source trees, wiki, museums, Ruffle, OVH rules
+6. [docs/ROADMAP.md](docs/ROADMAP.md) — Whirled 2 order of work
 
 ## Stack (Whirled 2)
 
