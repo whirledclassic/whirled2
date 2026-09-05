@@ -15,9 +15,7 @@ Run the original Flash + Java stack as a **private server** — historic world, 
 
 You can do this. [SETUP.md](SETUP.md) is the checklist. [VM-GUIDE.md](VM-GUIDE.md) is one machine that worked.
 
-David Hoover (who lived in this stack) thinks digging AS3 / old Flash back up as a *product* is probably a bad idea, and that nostalgia is about the people, not the JAR. Fair warning. Not a ban. Full note: [SOURCES.md](SOURCES.md).
-
-If you want a room people can join in a normal browser with no Flash, that is [Whirled 2](../whirled2/README.md).
+A private original server is a preservation / play project. It is not a plan to ship AS3 to the public internet in 2026. If you want a room people can join in a normal browser with no Flash, that is [Whirled 2](../whirled2/README.md).
 
 ---
 
@@ -38,8 +36,6 @@ Confirmed on a Debian-class Linux VM (VirtualBox), 2026-09:
 | HTML files in `dist/lib` pretending to be jars | Dead Maven bootstrap. Incomplete Three Rings deps. |
 | `NamedEvent`, `ObserverList`, `PropertySetEvent` | narya stack not built first. |
 | Server starts, no binary | You are in the wrong tree. Find `msoyserver` under msoy. |
-
-Kyler Eastridge (2026-09-01): Windows Ant pain is usually his Docker setup with different paths. He lives on Linux.
 
 ---
 
@@ -75,8 +71,6 @@ $$;
 
 See [FLASH-AND-RUFFLE.md](FLASH-AND-RUFFLE.md).
 
-Andrew Frost, Harman/Wipro AIR support, 2026-09-03: enterprise packaged Flash Player is an expensive Flex license; old AIR SDK ≤ ~v19 is vulnerable and should not be redistributed; Ruffle is possible for some Flash, unproven for a full social world.
-
 Whirled 2 does not wrap a SWF. Classic keeps the original client on the private server.
 
 ---
@@ -95,3 +89,4 @@ Community host already up (not us): https://www.whirled.club
 
 - Player data, shop dumps, original client binaries
 - VM hostnames and home-router port maps
+- Private emails, paraphrases of private emails, and personal addresses that were not published by their owners
