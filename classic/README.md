@@ -13,14 +13,13 @@ Issue label: `whirled` / `classic`.
 
 Those three pages are the whole path. Start at SETUP. You can run a private server. We are.
 
-David Hoover, who shipped this stack, thinks you probably *shouldn't* — wrong-era tooling, and the thing people miss is the friends, not the JAR. That is his perspective. It is not a rule. Notes: [SOURCES.md](SOURCES.md).
-
 Also in this folder:
 
 - [FIXES.md](FIXES.md) — mapped greyhavens/msoy issues
 - [FLASH-AND-RUFFLE.md](FLASH-AND-RUFFLE.md)
 - [LINKS.md](LINKS.md)
 - [RELATED.md](RELATED.md)
+- [SOURCES.md](SOURCES.md) — public sources only
 - [archive/README.md](archive/README.md)
 
 ---
@@ -37,7 +36,7 @@ What success looks like:
 1. `msoyserver` starts.
 2. The original client can talk to that server.
 3. It can be a **private world**, not only localhost.
-4. Notes stay public. Player dumps and shop packs stay off this GitHub.
+4. Notes stay public. Player dumps, shop packs, and private mail stay off this GitHub.
 
 What success is *not*: claiming whirled.com, pretending this is official Three Rings, wrapping the SWF and calling it Whirled 2.
 
@@ -70,4 +69,4 @@ Debian 13 XFCE in VirtualBox (~3 GB RAM, NAT): Java 8, Ant, Postgres. Launcher i
 
 ## Keep off this GitHub
 
-Player data, shop dumps, original client binaries. File Pixi / W2 VPS work on `whirled2` issues, not here.
+Player data, shop dumps, original client binaries, and private correspondence. File Pixi / W2 VPS work on `whirled2` issues, not here.
