@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 120" role="img" aria-label="Whirled Classic">
+  <g fill="none">
+    <ellipse cx="110" cy="48" rx="38" ry="36" fill="#b9dff3" stroke="#fff" stroke-width="4"/>
+    <path d="M98 34c10-10 28-4 28 10 0 14-16 16-16 26 8-2 16 4 12 14-8 16-32 6-28-8 4-10 16-10 16-20-8 0-16-8-12-22z" fill="#7eb8d8"/>
+    <path d="M20 20c20 8 18 28 8 36 16-4 28 10 18 24-18 22-52 8-40-16 8-16 28-10 24-24-12 2-24-8-10-20z" fill="#cfefff" opacity=".9"/>
+    <path d="M200 22c-20 8-18 28-8 36-16-4-28 10-18 24 18 22 52 8 40-16-8-16-28-10-24-24 12 2 24-8 10-20z" fill="#cfefff" opacity=".9"/>
+  </g>
+  <text x="110" y="86" text-anchor="middle" font-family="Trebuchet MS, Arial, sans-serif" font-weight="800" font-size="22" fill="#0b3a5a" stroke="#fff" stroke-width="5" paint-order="stroke">Whirled</text>
+  <text x="110" y="108" text-anchor="middle" font-family="Trebuchet MS, Arial, sans-serif" font-weight="800" font-size="20" fill="#0b3a5a" stroke="#fff" stroke-width="5" paint-order="stroke">Classic</text>
+</svg>
