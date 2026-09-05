@@ -139,6 +139,32 @@ History / mirrors (Synced Online, Glowbe, UnWhirled): https://en.wikipedia.org/w
 - MADE — Museum of Art and Digital Entertainment: https://www.themade.org
 - MADE Discord (Alex Handy, 2026-09-03): https://discord.gg/UEJZHSJDT
 - XR Guild: https://www.xrguild.org/
-- Virtual World Society: https://www.virtualworlds.society.org/
+- Virtual World Society: https://www.virtualworldsociety.org/
 
-Wait I must not invent - original was virtualworldsociety.org
+---
+
+## Flash / AIR / Ruffle (lab questions, not the product)
+
+- Ruffle: https://github.com/ruffle-rs/ruffle
+- AIR runtime discussions: https://github.com/airsdk/Adobe-Runtime-Support/discussions
+- See [FLASH-AND-RUFFLE.md](FLASH-AND-RUFFLE.md)
+
+---
+
+## Hosting
+
+- OVH US startup program (VPS **not** eligible; need a public-cloud instance + US entity + live site): https://us.ovhcloud.com/startup-program/
+
+---
+
+## Sibling worlds / context
+
+- Overte (self-hosted UGC worlds, different stack): https://overte.org
+
+---
+
+## What not to treat as a source
+
+- Localhost URLs (`127.0.0.1:8080`) mailed to strangers. They only load on the lab box.
+- Job-board and merch inboxes. Bounces are not feedback.
+- Original whirled.com shop dumps, leaked member DBs, or redistributed Flash Player / AIR SDK binaries.
