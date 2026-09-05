@@ -1,0 +1,421 @@
+/* =============================================================================
+   Whirled 2 mock — layout + visual tokens
+   -----------------------------------------------------------------------------
+   WHY THIS FILE EXISTS
+   The original Whirled UI was a Flash stage wrapped in HTML chrome
+   (top tabs, bottom chat bar, HTML sidebar). whirled.club's public page
+   is a sky-blue login splash with orange buttons and a cartoon banner.
+
+   This remake does NOT copy that splash art or the 2008 blue/orange skin.
+   Josh locked a different palette: cream / ink / coral, high-contrast,
+   editorial. Same *product verbs* (room, walk, profile, feed), new chrome.
+
+   Nothing in here is a CSS framework. A later TypeScript app can keep
+   these custom properties as the theme file.
+   ============================================================================= */
+
+:root {
+  --cream: #f3eee4;
+  --cream-dark: #e7e0d2;
+  --paper: #fbf8f1;
+  --ink: #1c1914;
+  --ink-soft: #5c564c;
+  --line: #cfc6b6;
+  --coral: #d4533f;
+  --coral-deep: #b33d2c;
+  --moss: #3f6b4e;
+  --room-night: #2a3340;
+  --room-floor: #6b5340;
+  --shadow: 0 10px 30px rgba(28, 25, 20, 0.12);
+
+  --tab-h: 48px;
+  --bar-h: 56px;
+  --rail-w: 300px;
+  --font: "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
+  --ui: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--ui);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--tab-h);
+  padding: 0 12px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+  margin-right: 12px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.brand strong {
+  font-family: var(--font);
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.brand span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+}
+
+.tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font: 600 13px/1 var(--ui);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--ink); background: var(--cream-dark); }
+
+.tab.is-on {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.tab[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.who b { color: var(--ink); }
+
+.coin {
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--cream);
+}
+
+.disclaimer {
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding: 6px 14px;
+  background: var(--cream-dark);
+  border-bottom: 1px solid var(--line);
+}
+
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) var(--rail-w);
+  min-height: 0;
+}
+
+.panel {
+  background: var(--paper);
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+
+.panel--rail {
+  border-right: 0;
+  border-left: 1px solid var(--line);
+}
+
+.panel h2 {
+  margin: 0;
+  padding: 12px 14px 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.occupant {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--moss);
+  flex-shrink: 0;
+}
+
+.dot--you { background: var(--coral); }
+
+.stage-wrap {
+  position: relative;
+  background: var(--room-night);
+  min-height: 360px;
+}
+
+#room-stage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+}
+
+.room-name {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  background: rgba(251, 248, 241, 0.92);
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.room-name b { font-family: var(--font); font-size: 15px; display: block; }
+
+.hint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  color: #f3eee4;
+  font-size: 12px;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+}
+
+.landing {
+  position: absolute;
+  inset: 18px;
+  z-index: 3;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 28px 32px;
+  overflow: auto;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.landing.hidden { display: none; }
+
+.kicker {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--coral-deep);
+  margin: 0 0 8px;
+}
+
+.landing h1 {
+  font-family: var(--font);
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 400;
+  margin: 0 0 12px;
+  line-height: 1.1;
+}
+
+.landing p { color: var(--ink-soft); line-height: 1.55; max-width: 58ch; }
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 8px;
+}
+
+button.coral, a.coral {
+  appearance: none;
+  border: 0;
+  background: var(--coral);
+  color: #fff;
+  font: 650 14px/1 var(--ui);
+  padding: 12px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+button.coral:hover, a.coral:hover { background: var(--coral-deep); }
+
+button.ghost {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font: 650 14px/1 var(--ui);
+  padding: 11px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.facts div {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.facts b { display: block; color: var(--ink); font-size: 14px; margin-bottom: 4px; }
+
+.profile {
+  padding: 0 14px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.avatar-chip {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--coral);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: var(--font);
+  font-size: 22px;
+}
+
+.profile h3 { margin: 10px 0 0; font-family: var(--font); font-size: 20px; }
+.profile .meta { color: var(--ink-soft); font-size: 12px; margin: 2px 0 8px; }
+.profile p { font-size: 13px; line-height: 1.45; margin: 0; }
+
+.status-form {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.status-form input {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--cream);
+  padding: 8px 10px;
+  font: 13px var(--ui);
+  color: var(--ink);
+}
+
+.status-form button {
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 8px 10px;
+  font: 650 12px var(--ui);
+  cursor: pointer;
+}
+
+.feed-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.feed-item time {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+.bar {
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--ink);
+  color: var(--cream);
+  flex-shrink: 0;
+}
+
+.bar input {
+  flex: 1;
+  max-width: 420px;
+  border: 0;
+  padding: 8px 10px;
+  background: #2a2620;
+  color: var(--cream);
+  font: 14px var(--ui);
+}
+
+.bar button {
+  appearance: none;
+  border: 0;
+  background: #2a2620;
+  color: var(--cream);
+  padding: 8px 10px;
+  font: 650 12px var(--ui);
+  cursor: pointer;
+}
+
+.bar button.primary { background: var(--coral); color: #fff; }
+
+.bar .spacer { flex: 1; }
+
+.placeholder {
+  display: none;
+  padding: 40px 24px;
+  max-width: 52ch;
+}
+
+.placeholder.is-on { display: block; }
+
+.placeholder h1 { font-family: var(--font); font-weight: 400; }
+
+@media (max-width: 860px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(280px, 48vh) auto;
+  }
+  .panel { border: 0; border-bottom: 1px solid var(--line); max-height: 160px; }
+  .panel--rail { max-height: none; border-left: 0; }
+  .facts { grid-template-columns: 1fr; }
+  .landing { inset: 8px; padding: 18px; }
+}
