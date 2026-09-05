@@ -13,18 +13,18 @@
     });
   }
   var PEOPLE = []; // real occupants only — filled from presence API / session
-  var STUFF = [
-    { kind: "avatar", name: "Inkcoat default", creator: "you", owned: true, coins: 0 },
-    { kind: "furniture", name: "Oak table", creator: "studio", owned: true, coins: 40 },
-    { kind: "backdrop", name: "Loft wall", creator: "you", owned: true, coins: 0 }
-  ];
-  var SHOP = [
-    { kind: "avatar", name: "Paper fox", creator: "shop", owned: false, coins: 80 },
-    { kind: "furniture", name: "Window seat", creator: "studio", owned: false, coins: 60 },
-    { kind: "backdrop", name: "Two-moon night", creator: "shop", owned: false, coins: 120 },
-    { kind: "toy", name: "Click-plant", creator: "shop", owned: false, coins: 20 }
-  ];
+  var STUFF_KEY = "whirled2.stuff";
+  var SHOP_KEY = "whirled2.shop";
   var FEED = [];
+  function loadStuff() {
+    try { return JSON.parse(localStorage.getItem(STUFF_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveStuff(items) {
+    localStorage.setItem(STUFF_KEY, JSON.stringify(items.slice(0, 200)));
+  }
+  function loadShop() {
+    try { return JSON.parse(localStorage.getItem(SHOP_KEY) || "[]"); } catch (e) { return []; }
+  }
   var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
@@ -81,6 +81,22 @@
   function card(item) {
     var tone = item.kind === "backdrop" ? "night" : item.kind === "avatar" ? "fox" : "";
     return '<article class="card"><div class="swatch ' + tone + '"></div><div class="body"><h3>' + esc(item.name) + '</h3><p class="meta">' + esc(item.kind) + " · " + esc(item.creator) + '</p><div class="price">' + (item.owned ? "owned" : item.coins + " coins") + "</div></div></article>";
+  }
+  function stuffPage() {
+    var items = loadStuff();
+    if (!items.length) {
+      return '<section class="page"><div class="page-head"><div><h1>Stuff</h1><p>What you already own.</p></div></div>'
+        + '<div class="panel"><p class="meta">Your inventory is empty. Nothing fake here — items you create or earn will show up in this list.</p></div></section>';
+    }
+    return catalog("Stuff", "What you already own.", items);
+  }
+  function shopPage() {
+    var items = loadShop();
+    if (!items.length) {
+      return '<section class="page"><div class="page-head"><div><h1>Shop</h1><p>Coins are labels only. No payments.</p></div></div>'
+        + '<div class="panel"><p class="meta">No listings yet. The shop stays empty until real catalog packs are published — we will not invent fake items.</p></div></section>';
+    }
+    return catalog("Shop", "Coins are labels only. No payments.", items);
   }
   function catalog(title, blurb, items) {
     return '<section class="page"><div class="page-head"><div><h1>' + esc(title) + '</h1><p>' + esc(blurb) + '</p></div></div><div class="grid">' + items.map(card).join('') + '</div></section>';
@@ -421,10 +437,10 @@
     if (!main) return;
     if (tab === "rooms") main.innerHTML = rooms();
     else if (tab === "me") main.innerHTML = mePage();
-    else if (tab === "stuff") main.innerHTML = catalog("Stuff", "What you already own.", STUFF);
-    else if (tab === "shop") main.innerHTML = catalog("Shop", "Coins are labels only.", SHOP);
-    else if (tab === "games") main.innerHTML = '<section class="page"><h1>Games</h1><p class="meta">Play from a room toy. Not this cycle.</p></section>';
-    else main.innerHTML = '<section class="page"><h1>Groups</h1><p class="meta">Shared whirleds.</p></section>';
+    else if (tab === "stuff") main.innerHTML = stuffPage();
+    else if (tab === "shop") main.innerHTML = shopPage();
+    else if (tab === "games") main.innerHTML = '<section class="page"><h1>Games</h1><p class="meta">No games listed yet. Room toys arrive with the engine track.</p></section>';
+    else main.innerHTML = '<section class="page"><h1>Groups</h1><p class="meta">No groups yet. Shared whirleds come later.</p></section>';
     refreshChatLog();
     exposeBridge();
     if (session()) ensureNoticeBar();
