@@ -55,9 +55,9 @@ People who were not on the Three Rings payroll:
 
 - kept [whirled.club](https://www.whirled.club) and the [wiki](https://wiki.whirled.club) up so the verbs and the stories were not just a 404
 - published and patched Grey Havens `msoy` so a private original server is even possible
-- wrote the lab notes we still read (including Shadowsych’s old dedicated-box guide — history, not our recipe)
+- wrote public lab notes (including Shadowsych’s old dedicated-box guide — history, not our recipe)
 - already tried browser remakes ([lulzsun/whirled2](https://github.com/lulzsun/whirled2), [html5-msoy](https://github.com/pravatbhusal/html5-msoy)) so we are not pretending this title appeared in a vacuum
-- answered mail, Discord, and “is whirled.com dead?” for a decade
+- answered public issues and “is whirled.com dead?” for a decade
 
 Whirled 2 is possible because that work exists. A modern user-generated platform in a normal browser is the piece that is still missing: **anyone** can join without a Flash plugin, a museum VM, or an invite to a private lab. That is the tool. The community is the reason it is worth building.
 
@@ -94,7 +94,7 @@ If / when we ask the public for money, the rules are:
 6. **Pick one pipe.** Open Collective / Ko-fi / a single campaign page — public ledger. Not five unofficial links.
 7. **Refunds and failure.** If the room does not ship, leftover host money goes back or to a named preservation target (wiki / museum listing), written down before anyone pays.
 
-Virtual Worlds Museum offered a listing and an ask-for-funds line on the existing Whirled exhibit. That is a pointer, not a grant. Museum does not fund this project.
+Virtual Worlds Museum has a public Whirled exhibit. That is a pointer, not a grant. Museum does not fund this project.
 
 ---
 
@@ -104,9 +104,9 @@ How this project talks to the rest of the internet without turning into a spam a
 
 - **GitHub is the log.** Issues labeled `whirled2` or `whirled`. If it is not in an issue, it is a rumor.
 - **Do not harvest old player lists.** No scraped emails, no “we found your 2012 account.” People who want in will find the repo.
+- **Do not publish private mail.** No quotes, paraphrases, or personal addresses from private threads unless the sender said the text could be public.
 - **whirled.club is not us.** Link it. Do not impersonate it. Do not tell their players we are the official sequel.
-- **MADE Discord** (Museum of Art and Digital Entertainment) is a place Alex Handy pointed at. Slow room. Useful people. Invite in [../classic/SOURCES.md](../classic/SOURCES.md).
-- **Virtual Worlds Museum** will list the effort if we stay real. Engage with the exhibit page; do not demand a grant.
+- **Public preservation sites:** [MADE](https://www.themade.org), [NeoHabitat](https://neohabitat.org), [Virtual Worlds Museum](https://www.virtualworlds.museum/). Link the public pages. Do not speak for them.
 - **Other remakes are colleagues, not enemies.** Jimmy Quach’s whirled2 is a different stack. Say so. Link it.
 - **Press / podcasts / wiki edits:** one maintainer voice (Josh). No fake “team of 40.” We are not Three Rings.
 - **When a public demo exists:** one HTTPS URL. Not a home IP. Not ten Discord “try this ngrok.”
@@ -120,7 +120,7 @@ Networking that matters after the room exists: embed a room on a page, send a li
 - Flash is dead. The public product cannot depend on it.
 - A UGC world without people is an empty canvas. Community first, shop never-first.
 - Millions of dollars already failed once on this idea. We win by staying cheap and shipping a room.
-- Credit the makers of the *old* world without stealing their files.
+- Credit the makers of the *old* world without stealing their files or publishing their private mail.
 - If a rights holder hates the name, we rename. The work stays.
 - Money in public, or no money talk.
 
