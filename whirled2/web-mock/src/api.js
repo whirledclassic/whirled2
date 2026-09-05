@@ -103,7 +103,19 @@
       }
     },
 
-    logout: function () { saveSession(null); },
+    logout: function () {
+      var session = loadSession();
+      var base = apiBase();
+      if (base && session && session.token) {
+        try {
+          fetch(base + "/api/logout", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + session.token, "Content-Type": "application/json" }
+          }).catch(function () {});
+        } catch (e) {}
+      }
+      saveSession(null);
+    },
 
     async saveProfile(patch) {
       var session = loadSession();
@@ -165,6 +177,34 @@
       }
     },
 
+
+    async occupants(room) {
+      try {
+        return await request("/api/rooms/" + encodeURIComponent(room) + "/occupants");
+      } catch (err) {
+        // offline: only the local signed-in user counts as present
+        var session = loadSession();
+        if (!session || !session.user) return { occupants: [] };
+        return {
+          occupants: [{
+            id: session.user.id,
+            name: session.user.name,
+            initials: session.user.initials || String(session.user.name).slice(0, 1).toUpperCase(),
+            online: true,
+            room: session.user.room || "Studio Loft",
+            you: true
+          }]
+        };
+      }
+    },
+
+    async heartbeat(room) {
+      try {
+        return await request("/api/rooms/" + encodeURIComponent(room) + "/occupants", { method: "POST", body: "{}" });
+      } catch (err) {
+        return this.occupants(room);
+      }
+    },
     async pollChat(room, since) {
       try {
         var q = since ? ("?since=" + encodeURIComponent(since)) : "";

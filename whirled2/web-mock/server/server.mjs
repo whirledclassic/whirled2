@@ -10,7 +10,7 @@ const DATA = path.join(__dirname, "data.json");
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 
-function emptyDb() { return { users: {}, sessions: {}, messages: [] }; }
+function emptyDb() { return { users: {}, sessions: {}, messages: [], presence: {} }; }
 function load() {
   try { return Object.assign(emptyDb(), JSON.parse(fs.readFileSync(DATA, "utf8"))); }
   catch { return emptyDb(); }
@@ -70,6 +70,50 @@ function authUser(db, req) {
   return db.users[session.userId] || null;
 }
 
+
+function touchPresence(db, user, room) {
+  if (!user) return;
+  const roomId = room || user.room || "loft";
+  if (!db.presence) db.presence = {};
+  if (!db.presence[roomId]) db.presence[roomId] = {};
+  db.presence[roomId][user.id] = Date.now();
+  user.room = roomId === "loft" ? "Studio Loft" : roomId;
+  db.users[user.id] = user;
+}
+function occupantsInRoom(db, room) {
+  const roomId = room === "Studio Loft" ? "loft" : room;
+  const STALE_MS = 45000;
+  const now = Date.now();
+  if (!db.presence) db.presence = {};
+  const map = db.presence[roomId] || {};
+  // also count active sessions whose user.room matches
+  const activeUserIds = new Set();
+  for (const [token, sess] of Object.entries(db.sessions || {})) {
+    const u = db.users[sess.userId];
+    if (!u) continue;
+    const uRoom = (u.room === "Studio Loft" || !u.room) ? "loft" : u.room;
+    if (uRoom === roomId) {
+      // refresh from session activity window (15 min)
+      if (now - (sess.at || 0) < 15 * 60 * 1000) {
+        map[u.id] = Math.max(map[u.id] || 0, sess.at || now);
+      }
+    }
+  }
+  db.presence[roomId] = map;
+  const list = [];
+  for (const [uid, seen] of Object.entries(map)) {
+    if (now - seen > STALE_MS) {
+      delete map[uid];
+      continue;
+    }
+    const u = db.users[uid];
+    if (!u) continue;
+    list.push({ id: u.id, name: u.name, initials: publicUser(u).initials, online: true, room: u.room || "Studio Loft" });
+  }
+  list.sort((a, b) => a.name.localeCompare(b.name));
+  return list;
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, {});
@@ -88,6 +132,7 @@ const server = http.createServer(async (req, res) => {
       db.users[id] = { id, name, bio: "Home room is the profile.", room: "Studio Loft", coins: 0, ...secret };
       const token = crypto.randomBytes(18).toString("hex");
       db.sessions[token] = { userId: id, at: Date.now() };
+      touchPresence(db, db.users[id], "loft");
       save(db);
       return send(res, 201, { token, user: publicUser(db.users[id]) });
     }
@@ -100,6 +145,7 @@ const server = http.createServer(async (req, res) => {
       if (check.hash !== row.hash) return send(res, 401, { error: "Name or password is wrong." });
       const token = crypto.randomBytes(18).toString("hex");
       db.sessions[token] = { userId: id, at: Date.now() };
+      touchPresence(db, row, "loft");
       save(db);
       return send(res, 200, { token, user: publicUser(row) });
     }
@@ -138,6 +184,51 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { message });
       }
     }
+
+    const occMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/occupants$/);
+    if (occMatch) {
+      const room = decodeURIComponent(occMatch[1]);
+      if (req.method === "GET") {
+        const user = authUser(db, req);
+        if (user) {
+          touchPresence(db, user, room === "Studio Loft" ? "loft" : room);
+          // bump session activity
+          const header = req.headers.authorization || "";
+          const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+          if (token && db.sessions[token]) db.sessions[token].at = Date.now();
+          save(db);
+        }
+        return send(res, 200, { occupants: occupantsInRoom(db, room) });
+      }
+      if (req.method === "POST") {
+        const user = authUser(db, req);
+        if (!user) return send(res, 401, { error: "Sign in first." });
+        touchPresence(db, user, room === "Studio Loft" ? "loft" : room);
+        const header = req.headers.authorization || "";
+        const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+        if (token && db.sessions[token]) db.sessions[token].at = Date.now();
+        save(db);
+        return send(res, 200, { occupants: occupantsInRoom(db, room) });
+      }
+    }
+    // logout clears session presence
+    if (req.method === "POST" && url.pathname === "/api/logout") {
+      const header = req.headers.authorization || "";
+      const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+      const sess = token && db.sessions[token];
+      if (sess) {
+        const uid = sess.userId;
+        delete db.sessions[token];
+        if (db.presence) {
+          for (const roomId of Object.keys(db.presence)) {
+            if (db.presence[roomId]) delete db.presence[roomId][uid];
+          }
+        }
+        save(db);
+      }
+      return send(res, 200, { ok: true });
+    }
+
     if (url.pathname.startsWith("/api/")) return send(res, 404, { error: "Unknown endpoint." });
   } catch (err) {
     return send(res, 400, { error: err.message || "Bad request." });

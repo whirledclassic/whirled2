@@ -12,11 +12,7 @@
       return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
     });
   }
-  var PEOPLE = [
-    { name: "Brittney", initials: "B", online: true, room: "Studio Loft" },
-    { name: "Agent Vortex", initials: "AV", online: true, room: "Studio Loft" },
-    { name: "Pletou", initials: "P", online: true, room: "Secret Glade" }
-  ];
+  var PEOPLE = []; // real occupants only — filled from presence API / session
   var STUFF = [
     { kind: "avatar", name: "Inkcoat default", creator: "you", owned: true, coins: 0 },
     { kind: "furniture", name: "Oak table", creator: "Brittney", owned: true, coins: 40 },
@@ -28,13 +24,12 @@
     { kind: "backdrop", name: "Two-moon night", creator: "Vortex", owned: false, coins: 120 },
     { kind: "toy", name: "Click-plant", creator: "Cleaver", owned: false, coins: 20 }
   ];
-  var FEED = [
-    { who: "Brittney", text: "walked into Studio Loft", place: "room", ago: "2m" },
-    { who: "Agent Vortex", text: "commented: needs a plant", place: "comments", ago: "1h" }
-  ];
+  var FEED = [];
   var ROOM = "Studio Loft";
   var chat = [];
+  var liveOccupants = [];
   var pollTimer = null;
+  var occTimer = null;
   var listeners = { chat: [], occupants: [] };
   function session() { return window.WhirledApi ? window.WhirledApi.session() : null; }
   function you() {
@@ -64,10 +59,21 @@
   }
   function rooms() {
     var me = you();
-    var here = [{ name: me.name, initials: me.initials, online: true, room: ROOM, you: true }].concat(PEOPLE.filter(function (p) { return p.room === ROOM; }));
+    var here = liveOccupants.slice();
+    if (!here.some(function (p) { return p.you || (session() && p.id === session().user.id); })) {
+      here = [{ id: session() && session().user && session().user.id, name: me.name, initials: me.initials, online: true, room: ROOM, you: true }].concat(here);
+    } else {
+      here = here.map(function (p) {
+        if (session() && p.id === session().user.id) return Object.assign({}, p, { you: true, initials: p.initials || me.initials });
+        return p;
+      });
+    }
+    var empty = here.length === 0;
     return ''
       + '<div class="workspace">'
-      +   '<aside class="rail"><h2>In this room</h2>' + here.map(personRow).join('') + '</aside>'
+      +   '<aside class="rail"><h2>In this room</h2>'
+      +     (empty ? '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>' : here.map(personRow).join(''))
+      +   '</aside>'
       +   '<section class="stage-wrap">'
       +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span><span class="room-owner">owner: ' + esc(me.name) + '</span></div>'
       +     '<div class="subtabs" aria-label="Chat channels">'
@@ -179,8 +185,7 @@
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
   }
   function occupants() {
-    var me = you();
-    return [{ id: session() && session().user.id, name: me.name, you: true }].concat(PEOPLE.filter(function (p) { return p.room === ROOM; }));
+    return liveOccupants.slice();
   }
   async function pushChat(text) {
     var result = await window.WhirledApi.postChat("loft", text);
@@ -194,6 +199,44 @@
     chat = result.messages || [];
     refreshChatLog();
   }
+
+  function refreshOccupantRail() {
+    var rail = document.querySelector(".rail");
+    if (!rail || !document.querySelector(".workspace")) return;
+    var me = you();
+    var here = liveOccupants.slice();
+    if (session() && !here.some(function (p) { return p.id === session().user.id; })) {
+      here.unshift({ id: session().user.id, name: me.name, initials: me.initials, online: true, room: ROOM, you: true });
+    } else {
+      here = here.map(function (p) {
+        if (session() && p.id === session().user.id) return Object.assign({}, p, { you: true });
+        return p;
+      });
+    }
+    rail.innerHTML = "<h2>In this room</h2>" + (here.length ? here.map(personRow).join("") : '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>');
+    listeners.occupants.forEach(function (fn) { try { fn(here); } catch (e) {} });
+  }
+  async function loadOccupants() {
+    if (!session()) { liveOccupants = []; return; }
+    var result = await window.WhirledApi.heartbeat("loft");
+    liveOccupants = (result.occupants || []).map(function (p) {
+      return {
+        id: p.id,
+        name: p.name,
+        initials: p.initials || String(p.name).slice(0, 1).toUpperCase(),
+        online: true,
+        room: p.room || ROOM,
+        you: session() && p.id === session().user.id
+      };
+    });
+    refreshOccupantRail();
+  }
+  function startOccPoll() {
+    if (occTimer) clearInterval(occTimer);
+    loadOccupants();
+    occTimer = setInterval(function () { if (session()) loadOccupants(); }, 5000);
+  }
+
   function startPoll() {
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(async function () {
@@ -205,7 +248,7 @@
   }
   function boot() {
     paint(session() ? "rooms" : "");
-    if (session()) { loadHistory(); startPoll(); }
+    if (session()) { loadHistory(); startPoll(); startOccPoll(); }
     try { window.__whirledBoot = true; } catch (e) {}
   }
 
@@ -221,6 +264,7 @@
     }
     loadHistory();
     startPoll();
+    startOccPoll();
   }
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") onVisible();
