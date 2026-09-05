@@ -7,13 +7,21 @@ Issue label: `whirled` / `classic`.
 
 ## Run the original server yourself
 
-→ **[Self-host guide: docs/SETUP.md](../docs/SETUP.md)** (Track B — clone, Java 8, Ant, Postgres, `msoyserver`)  
-→ **[Machine we actually used: docs/VM-GUIDE.md](../docs/VM-GUIDE.md)**  
-→ **[What boots / what dies: docs/CLASSIC-LAB.md](../docs/CLASSIC-LAB.md)**
+→ **[Self-host guide: SETUP.md](SETUP.md)** (Track B — clone, Java 8, Ant, Postgres, `msoyserver`)  
+→ **[Machine we actually used: VM-GUIDE.md](VM-GUIDE.md)**  
+→ **[What boots / what dies: CLASSIC-LAB.md](CLASSIC-LAB.md)**
 
 Those three pages are the whole path. Start at SETUP. You can run a private server. We are.
 
-David Hoover, who shipped this stack, thinks you probably *shouldn't* — wrong-era tooling, and the thing people miss is the friends, not the JAR. That is his perspective. It is not a rule. Notes: [../docs/SOURCES.md](../docs/SOURCES.md).
+David Hoover, who shipped this stack, thinks you probably *shouldn't* — wrong-era tooling, and the thing people miss is the friends, not the JAR. That is his perspective. It is not a rule. Notes: [SOURCES.md](SOURCES.md).
+
+Also in this folder:
+
+- [FIXES.md](FIXES.md) — mapped greyhavens/msoy issues
+- [FLASH-AND-RUFFLE.md](FLASH-AND-RUFFLE.md)
+- [LINKS.md](LINKS.md)
+- [RELATED.md](RELATED.md)
+- [archive/shadowsych-whirled-docs.md](archive/shadowsych-whirled-docs.md)
 
 ---
 
