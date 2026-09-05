@@ -174,3 +174,16 @@ body { font-family: var(--ui); color: var(--ink); background: #d7eaf6; }
   .tabs { flex-wrap: wrap; }
   .brand .logo { height: 40px; max-width: 120px; }
 }
+
+
+/* mobile touch */
+@media (max-width: 900px) {
+  .tab { padding: 10px 12px; font-size: 12px; min-height: 40px; }
+  .bar { height: auto; min-height: 52px; padding: 6px 8px; flex-wrap: wrap; }
+  .bar input { max-width: none; width: 100%; min-height: 40px; font-size: 16px; }
+  .bar button.send { min-height: 40px; min-width: 64px; }
+  .gate-card { padding: 18px 14px; }
+  .gate-grid input, .gate-grid button { min-height: 44px; font-size: 16px; }
+  .brand .logo, .gate-logo { max-width: 100%; height: auto; }
+  .gate-logo { max-height: 96px; }
+}

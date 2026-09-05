@@ -2,17 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Whirled 2 — demo</title>
-  <link rel="stylesheet" href="./src/styles.css" />
-  <link rel="stylesheet" href="./src/demo.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#e8f4fb" />
+  <meta http-equiv="Cache-Control" content="no-cache" />
+  <title>Whirled Classic</title>
+  <link rel="stylesheet" href="./src/styles.css?v=20260905c" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260905c" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
   <script>
     window.WHIRLED_API = window.WHIRLED_API || "";
+    window.__whirledBoot = false;
+    window.addEventListener("error", function (ev) {
+      var el = document.getElementById("app");
+      if (!el || window.__whirledBoot) return;
+      var msg = (ev && ev.message) ? ev.message : "Script error";
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260905c">Tap to reload fresh</a></p></div></section>';
+    });
+    setTimeout(function () {
+      var el = document.getElementById("app");
+      if (!el || window.__whirledBoot) return;
+      if (el.textContent.indexOf("Loading chrome") === -1) return;
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Phone/desktop cache may be holding an old script. Use the link below.</p><p><a href="./?v=20260905c">Reload fresh build</a></p></div></section>';
+    }, 2500);
   </script>
-  <script src="./src/api.js"></script>
-  <script src="./app.js"></script>
+  <script src="./src/api.js?v=20260905c"></script>
+  <script src="./app.js?v=20260905c"></script>
+  <script>
+    // app.js paints #app on success; mark boot if gate/shell appeared
+    (function mark() {
+      var el = document.getElementById("app");
+      if (el && el.querySelector && (el.querySelector(".gate") || el.querySelector(".topbar"))) {
+        window.__whirledBoot = true;
+      }
+    })();
+    setTimeout(function () {
+      var el = document.getElementById("app");
+      if (el && el.querySelector && (el.querySelector(".gate") || el.querySelector(".topbar"))) {
+        window.__whirledBoot = true;
+      }
+    }, 0);
+  </script>
 </body>
 </html>

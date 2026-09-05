@@ -152,6 +152,7 @@
   function boot() {
     paint(session() ? "rooms" : "");
     if (session()) { loadHistory(); startPoll(); }
+    try { window.__whirledBoot = true; } catch (e) {}
   }
 
   function onVisible() {
