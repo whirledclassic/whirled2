@@ -4,14 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!--
-    PAGE CHROME ONLY. TypeScript source is in src/.
-    No Pixi / click-to-walk on this page.
+    PAGE CHROME ONLY. Do not import Pixi here.
+    Engine developer mounts into #stage-slot via window.WhirledChrome.
   -->
-  <title>Whirled 2 — page chrome</title>
+  <title>Whirled 2 — demo</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
+  <script>
+    window.WHIRLED_API = window.WHIRLED_API || "";
+  </script>
+  <script src="./src/api.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
