@@ -11,7 +11,7 @@ This GitHub account runs **two separate efforts**. They share a name family and 
 | Server | Original Java `msoyserver` on a box we control | New, small, later. Not a patch on msoy |
 | Network | Private server (invite / known players). Not whirled.com | Cheap VPS + HTTPS when the room exists |
 | Issue label | `whirled` / `classic` | `whirled2` |
-| Run it yourself | **[docs/SETUP.md](docs/SETUP.md)** (Track B) + **[docs/VM-GUIDE.md](docs/VM-GUIDE.md)** | This repo, `whirled2/` when the room is committed |
+| Run it yourself | **[classic/SETUP.md](classic/SETUP.md)** + **[classic/VM-GUIDE.md](classic/VM-GUIDE.md)** | This repo, `whirled2/` when the room is committed |
 
 Read this table first. Then pick a folder.
 
@@ -25,10 +25,10 @@ Maintainer: Josh (`whirledclassic` / josh.awe99@gmail.com)
 
 Start here, in order:
 
-1. **[docs/SETUP.md](docs/SETUP.md)** — clone list, Java 8, Ant, Postgres, build order (`msoyserver`)
-2. **[docs/VM-GUIDE.md](docs/VM-GUIDE.md)** — one working machine (VirtualBox + Debian) so you are not guessing hardware
-3. **[docs/CLASSIC-LAB.md](docs/CLASSIC-LAB.md)** — what actually boots and what fails
-4. **[docs/FIXES.md](docs/FIXES.md)** — mapped greyhavens/msoy issues
+1. **[classic/SETUP.md](classic/SETUP.md)** — clone list, Java 8, Ant, Postgres, build order (`msoyserver`)
+2. **[classic/VM-GUIDE.md](classic/VM-GUIDE.md)** — one working machine (VirtualBox + Debian) so you are not guessing hardware
+3. **[classic/CLASSIC-LAB.md](classic/CLASSIC-LAB.md)** — what actually boots and what fails
+4. **[classic/FIXES.md](classic/FIXES.md)** — mapped greyhavens/msoy issues
 
 That is the self-host path for a **private original server**. Folder overview: [`classic/`](classic/).
 
@@ -53,9 +53,9 @@ Classic = the artifact, privately hosted. Whirled 2 = a 2026 browser room that d
 
 ## Status (2026-09-04)
 
-- **Classic:** stack is booting on a Debian 13 XFCE VM (VirtualBox, NAT, Java 8). Next step on this track is treating that box as a **private server**, not a screenshot museum. Guide for repeating the build: [docs/SETUP.md](docs/SETUP.md).
+- **Classic:** stack is booting on a Debian 13 XFCE VM (VirtualBox, NAT, Java 8). Next step on this track is treating that box as a **private server**, not a screenshot museum. Guide for repeating the build: [classic/SETUP.md](classic/SETUP.md).
 - **Whirled 2:** public repo is open. First ship is one click-to-walk room. That is [issue #1](https://github.com/whirledclassic/whirled2/issues/1).
-- Money: volunteer now. Credit always. Pay only if a world actually makes money and the maintainer can pay from that. [docs/ARTISTS.md](docs/ARTISTS.md).
+- Money: volunteer now. Credit always. Pay only if a world actually makes money and the maintainer can pay from that. [whirled2/ARTISTS.md](whirled2/ARTISTS.md).
 
 ---
 
@@ -64,33 +64,46 @@ Classic = the artifact, privately hosted. Whirled 2 = a 2026 browser room that d
 ```
 .
 ├─ README.md                 ← you are here (both tracks)
-├─ classic/                  ← original Whirled private-server revival
-│   └─ README.md
-├─ whirled2/                 ← new browser product
+├─ classic/                  ← original Whirled private-server revival + its guides
 │   ├─ README.md
-│   └─ SAME-AND-DIFFERENT.md
-└─ docs/                     ← shared reference + self-host guide
+│   ├─ SETUP.md
+│   ├─ VM-GUIDE.md
+│   ├─ CLASSIC-LAB.md
+│   ├─ FIXES.md
+│   ├─ FLASH-AND-RUFFLE.md
+│   ├─ SOURCES.md
+│   ├─ LINKS.md
+│   ├─ RELATED.md
+│   └─ archive/
+└─ whirled2/                 ← new browser product + its guides
+    ├─ README.md
+    ├─ SAME-AND-DIFFERENT.md
+    ├─ ROADMAP.md
+    └─ ARTISTS.md
 ```
 
-Shared:
+There is no leftover `docs/` dump. Classic notes live under [`classic/`](classic/). Whirled 2 notes live under [`whirled2/`](whirled2/).
 
-1. [docs/SETUP.md](docs/SETUP.md) — **self-host original Whirled** + Whirled 2 checklist
-2. [docs/LINKS.md](docs/LINKS.md)
-3. [docs/RELATED.md](docs/RELATED.md)
-4. [CONTRIBUTING.md](CONTRIBUTING.md)
+Root:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Classic:
 
-- [docs/VM-GUIDE.md](docs/VM-GUIDE.md)
-- [docs/CLASSIC-LAB.md](docs/CLASSIC-LAB.md)
-- [docs/FIXES.md](docs/FIXES.md)
-- [docs/FLASH-AND-RUFFLE.md](docs/FLASH-AND-RUFFLE.md)
-- [docs/SOURCES.md](docs/SOURCES.md)
+- [classic/SETUP.md](classic/SETUP.md) — self-host original Whirled (also has a short Whirled 2 checklist)
+- [classic/VM-GUIDE.md](classic/VM-GUIDE.md)
+- [classic/CLASSIC-LAB.md](classic/CLASSIC-LAB.md)
+- [classic/FIXES.md](classic/FIXES.md)
+- [classic/FLASH-AND-RUFFLE.md](classic/FLASH-AND-RUFFLE.md)
+- [classic/SOURCES.md](classic/SOURCES.md)
+- [classic/LINKS.md](classic/LINKS.md)
+- [classic/RELATED.md](classic/RELATED.md)
 
 Whirled 2:
 
-- [docs/ROADMAP.md](docs/ROADMAP.md)
-- [docs/ARTISTS.md](docs/ARTISTS.md)
+- [whirled2/ROADMAP.md](whirled2/ROADMAP.md)
+- [whirled2/ARTISTS.md](whirled2/ARTISTS.md)
+- [whirled2/SAME-AND-DIFFERENT.md](whirled2/SAME-AND-DIFFERENT.md)
 
 ---
 
