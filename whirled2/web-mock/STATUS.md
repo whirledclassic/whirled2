@@ -12,12 +12,10 @@ Date: 2026-09-05
 
 ## Live URL
 
-**Not published yet.** Ask before enabling GitHub Pages if any setting is locked.
+GitHub Pages enabled from `main` `/` (same repo).
 
-Intended public path once Pages is on (same repo):
-
-- Source dir: `/whirled2/web-mock` (or copy/build that folder to `/docs` / `gh-pages`)
-- Candidate URL: `https://whirledclassic.github.io/whirled2/whirled2/web-mock/`
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/
+- Site root: https://whirledclassic.github.io/whirled2/
 
 Shared auth/chat across browsers still needs `node server/server.mjs` (or a host). Static Pages alone = localStorage-per-browser offline mode.
 
