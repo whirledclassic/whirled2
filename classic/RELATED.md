@@ -29,9 +29,9 @@ Same *name* as this repo. Different owner, license, and architecture. We do not 
 
 ## Shadowsych — Whirled (msoy) Documentation
 
-- Archived here: [archive/shadowsych-whirled-docs.md](archive/shadowsych-whirled-docs.md)
+- Notes: [archive/README.md](archive/README.md)
 - Author: **Shadowsych** (Synced Online community docs). **Not whirledclassic. Not this maintainer.**
-- Why it is here: the copy people still pass around is a Google Drive / loose doc. Easy to lose. Shadowsych wrote that it may be given to anyone.
+- Why it is listed: the copy people still pass around is a Google Drive / loose doc. Easy to lose. Shadowsych wrote that it may be given to anyone.
 - Era: Ubuntu 14.04 dedicated box, OVH + Site5, x2go, MediaFire dependency zip. That is a *public host* recipe from years ago. Our lab is a **NAT VirtualBox guest**. Do not follow the “open port 80 on a dedicated server” parts unless you know why that is a bad default in 2026.
 
 ## FelixWolf forks
