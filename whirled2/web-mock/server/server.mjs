@@ -1,0 +1,160 @@
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, "..");
+const DATA = path.join(__dirname, "data.json");
+const PORT = Number(process.env.PORT || 8787);
+const HOST = process.env.HOST || "127.0.0.1";
+
+function emptyDb() { return { users: {}, sessions: {}, messages: [] }; }
+function load() {
+  try { return Object.assign(emptyDb(), JSON.parse(fs.readFileSync(DATA, "utf8"))); }
+  catch { return emptyDb(); }
+}
+function save(db) {
+  fs.mkdirSync(path.dirname(DATA), { recursive: true });
+  fs.writeFileSync(DATA, JSON.stringify(db, null, 2));
+}
+function hashPassword(password, salt) {
+  const useSalt = salt || crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, useSalt, 32).toString("hex");
+  return { salt: useSalt, hash };
+}
+function publicUser(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    initials: row.name.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase(),
+    bio: row.bio || "",
+    room: row.room || "Studio Loft",
+    coins: row.coins || 0
+  };
+}
+function slug(name) {
+  return String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      if (!chunks.length) return resolve({});
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf8"))); }
+      catch (err) { reject(err); }
+    });
+    req.on("error", reject);
+  });
+}
+function send(res, code, body) {
+  res.writeHead(code, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS"
+  });
+  res.end(JSON.stringify(body));
+}
+function mime(file) {
+  const ext = path.extname(file).toLowerCase();
+  return ({ ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".md": "text/plain; charset=utf-8" })[ext] || "application/octet-stream";
+}
+function authUser(db, req) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  const session = db.sessions[token];
+  if (!session) return null;
+  return db.users[session.userId] || null;
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, "http://localhost");
+  if (req.method === "OPTIONS") return send(res, 204, {});
+  const db = load();
+  try {
+    if (req.method === "POST" && url.pathname === "/api/register") {
+      const body = await readBody(req);
+      const name = String(body.name || "").trim();
+      const password = String(body.password || "");
+      if (name.length < 2) return send(res, 400, { error: "Name needs at least 2 characters." });
+      if (password.length < 4) return send(res, 400, { error: "Password needs at least 4 characters." });
+      const id = slug(name);
+      if (!id) return send(res, 400, { error: "Name is not usable." });
+      if (db.users[id]) return send(res, 409, { error: "That name is taken." });
+      const secret = hashPassword(password);
+      db.users[id] = { id, name, bio: "Home room is the profile.", room: "Studio Loft", coins: 0, ...secret };
+      const token = crypto.randomBytes(18).toString("hex");
+      db.sessions[token] = { userId: id, at: Date.now() };
+      save(db);
+      return send(res, 201, { token, user: publicUser(db.users[id]) });
+    }
+    if (req.method === "POST" && url.pathname === "/api/login") {
+      const body = await readBody(req);
+      const id = slug(body.name || "");
+      const row = db.users[id];
+      if (!row) return send(res, 401, { error: "Name or password is wrong." });
+      const check = hashPassword(String(body.password || ""), row.salt);
+      if (check.hash !== row.hash) return send(res, 401, { error: "Name or password is wrong." });
+      const token = crypto.randomBytes(18).toString("hex");
+      db.sessions[token] = { userId: id, at: Date.now() };
+      save(db);
+      return send(res, 200, { token, user: publicUser(row) });
+    }
+    if (url.pathname === "/api/me") {
+      const user = authUser(db, req);
+      if (!user) return send(res, 401, { error: "Sign in first." });
+      if (req.method === "GET") return send(res, 200, { user: publicUser(user) });
+      if (req.method === "PATCH") {
+        const body = await readBody(req);
+        if (body.name) user.name = String(body.name).trim().slice(0, 24);
+        if (body.bio != null) user.bio = String(body.bio).slice(0, 180);
+        db.users[user.id] = user;
+        save(db);
+        return send(res, 200, { user: publicUser(user) });
+      }
+    }
+    const chatMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/chat$/);
+    if (chatMatch) {
+      const room = decodeURIComponent(chatMatch[1]);
+      if (req.method === "GET") {
+        let messages = db.messages.filter((m) => m.room === room);
+        const since = url.searchParams.get("since");
+        if (since) messages = messages.filter((m) => m.at > since);
+        return send(res, 200, { messages: messages.slice(-80) });
+      }
+      if (req.method === "POST") {
+        const user = authUser(db, req);
+        if (!user) return send(res, 401, { error: "Sign in first." });
+        const body = await readBody(req);
+        const text = String(body.text || "").trim().slice(0, 240);
+        if (!text) return send(res, 400, { error: "Empty message." });
+        const message = { id: "m" + Date.now() + crypto.randomBytes(3).toString("hex"), room, who: user.name, userId: user.id, text, at: new Date().toISOString() };
+        db.messages.push(message);
+        db.messages = db.messages.slice(-500);
+        save(db);
+        return send(res, 201, { message });
+      }
+    }
+    if (url.pathname.startsWith("/api/")) return send(res, 404, { error: "Unknown endpoint." });
+  } catch (err) {
+    return send(res, 400, { error: err.message || "Bad request." });
+  }
+  let filePath = path.join(ROOT, url.pathname === "/" ? "index.html" : url.pathname);
+  if (!filePath.startsWith(ROOT)) return send(res, 403, { error: "Nope." });
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return send(res, 404, { error: "Not found." });
+  let raw = fs.readFileSync(filePath);
+  if (filePath.endsWith("index.html")) {
+    raw = Buffer.from(String(raw).replace('window.WHIRLED_API = window.WHIRLED_API || "";', 'window.WHIRLED_API = window.WHIRLED_API || location.origin;'));
+  }
+  res.writeHead(200, { "Content-Type": mime(filePath) });
+  res.end(raw);
+});
+
+server.listen(PORT, HOST, () => {
+  console.log("Whirled 2 demo server");
+  console.log("  page   http://" + HOST + ":" + PORT + "/");
+  console.log("  data   " + DATA);
+});
