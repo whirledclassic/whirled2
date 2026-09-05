@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!--
+    TITLE
+    Working name is Whirled 2. Repo says the name can change if a rights
+    holder asks. Do not put "Whirled Club" in the <title> — that is a
+    different site (the 2018 Flash-revival mirror).
+  -->
+  <title>Whirled 2 — room mock</title>
+  <link rel="stylesheet" href="css/shell.css" />
+</head>
+<body>
+
+  <!-- =====================================================================
+       TOP BAR
+       Copied from the original client's INFORMATION ARCHITECTURE, not its
+       pixels. Original tabs were: Me, Stuff, Games, Rooms, Groups, Shop.
+       Me = you. Rooms = the walkable world. Shop is disabled on purpose.
+       ===================================================================== -->
+  <header class="topbar">
+    <a class="brand" href="#rooms" title="Home is the room">
+      <strong>Whirled 2</strong>
+      <span>browser room</span>
+    </a>
+
+    <nav class="tabs" aria-label="Main">
+      <!-- data-view is read by mock-app.js to swap the workspace -->
+      <button class="tab" data-view="me" type="button">Me</button>
+      <button class="tab" data-view="stuff" type="button" title="Inventory later">Stuff</button>
+      <button class="tab" data-view="games" type="button" title="In-room toys later">Games</button>
+      <button class="tab is-on" data-view="rooms" type="button">Rooms</button>
+      <button class="tab" data-view="groups" type="button">Groups</button>
+      <!-- disabled: Josh's brief said no shop this cycle -->
+      <button class="tab" type="button" disabled title="Not this cycle">Shop</button>
+    </nav>
+
+    <div class="who">
+      <!-- Coins existed in the original economy. Here they are flavor so
+           the bar looks inhabited. Do not wire a ledger to this number. -->
+      <span class="coin" title="Not a real currency yet">coins 0</span>
+      <span>signed in as <b>Josh</b></span>
+    </div>
+  </header>
+
+  <div class="disclaimer">
+    Fan remake chrome. Not whirled.club, not Three Rings, not Grey Havens.
+    Original official world closed 8 April 2017. This page is a layout mock
+    so a developer can see where Pixi, the profile, and the feed go.
+  </div>
+
+  <!-- =====================================================================
+       WORKSPACE = occupants | Pixi canvas | profile + feed
+       This three-pane split is the product. The canvas in the middle is
+       the only node a game engine should own.
+       ===================================================================== -->
+  <main class="workspace" id="view-rooms">
+
+    <aside class="panel" aria-label="People in this room">
+      <h2>In this room</h2>
+      <div class="occupant"><span class="dot dot--you"></span> Josh <em style="color:var(--ink-soft);font-style:normal">(you)</em></div>
+      <div class="occupant"><span class="dot"></span> Brittney</div>
+      <div class="occupant"><span class="dot"></span> Agent Vortex</div>
+      <div class="occupant"><span class="dot"></span> Pletou</div>
+    </aside>
+
+    <section class="stage-wrap" aria-label="Room stage">
+      <div class="room-name">
+        <b>Studio Loft</b>
+        owner: Josh · unlocked
+      </div>
+      <p class="hint">click the floor to walk</p>
+
+      <canvas id="room-stage" width="800" height="480">
+        Your browser needs canvas for the room.
+      </canvas>
+
+      <article class="landing" id="landing">
+        <p class="kicker">A room you can walk into</p>
+        <h1>Your page is a room. Friends stand in the doorway.</h1>
+        <p>
+          Whirled was a 2008 browser world from Three Rings. Your homepage
+          was a room. Avatars walked. People made the catalog. Flash died,
+          the official world closed in 2017, and
+          <a href="https://www.whirled.club">whirled.club</a> kept a revival
+          client alive as a download.
+        </p>
+        <p>
+          This remake is a <b>new</b> public room in a normal tab:
+          TypeScript + PixiJS. Same verbs. New chrome. No Flash, no ripped
+          shop, no claim on their domain.
+        </p>
+        <div class="row">
+          <button class="coral" id="enter-room" type="button">Enter the mock room</button>
+          <a class="coral" href="https://github.com/whirledclassic/whirled2" style="background:var(--ink)">GitHub repo</a>
+          <button class="ghost" type="button" disabled title="No Discord invite in the original brief">Waitlist later</button>
+        </div>
+        <div class="facts">
+          <div>
+            <b>What you are looking at</b>
+            App shell + one click-to-walk body. Ugly on purpose. Art comes after walk.
+          </div>
+          <div>
+            <b>What a contractor should build next</b>
+            Keep this HTML chrome. Replace the capsule with a 4-dir sprite. Host on HTTPS.
+          </div>
+          <div>
+            <b>Palette</b>
+            Cream / ink / coral. High contrast. No purple-gold casino, no emoji sticker pack.
+          </div>
+          <div>
+            <b>Not this week</b>
+            Shop, bars, bling, multiplayer, Flash wrapper, whirled.club assets.
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <aside class="panel panel--rail" aria-label="Profile and feed">
+      <h2>Profile</h2>
+      <div class="profile">
+        <div class="avatar-chip" aria-hidden="true">J</div>
+        <h3>Josh</h3>
+        <p class="meta">home · Studio Loft · Providence</p>
+        <p>Building a thin browser world. Room first. Shop never-first.</p>
+      </div>
+
+      <h2>Status</h2>
+      <form class="status-form" id="status-form">
+        <label class="visually-hidden" for="status-input" style="position:absolute;left:-9999px">Post a status</label>
+        <input id="status-input" maxlength="140" placeholder="What is happening in this room?" />
+        <button type="submit">Post</button>
+      </form>
+      <div id="feed-list">
+        <div class="feed-item">
+          <b>Brittney</b> walked into Studio Loft
+          <time>2m ago · room</time>
+        </div>
+        <div class="feed-item">
+          <b>Josh</b> is wiring a Pixi floor that you can actually click
+          <time>18m ago · status</time>
+        </div>
+        <div class="feed-item">
+          <b>Agent Vortex</b> commented on the loft: “needs a plant”
+          <time>1h ago · comments</time>
+        </div>
+        <div class="feed-item">
+          <b>Pletou</b> is in Secret Glade
+          <time>3h ago · presence</time>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="placeholder" id="view-stuff">
+    <h1>Stuff</h1>
+    <p>Inventory of furniture and avatars you own. Empty until there is a room worth decorating. Do not build a warehouse UI this week.</p>
+  </section>
+  <section class="placeholder" id="view-games">
+    <h1>Games</h1>
+    <p>Original Whirled dropped Flash games on tables inside rooms. That is layer 3 in PITCH.md. Not the first ship.</p>
+  </section>
+  <section class="placeholder" id="view-groups">
+    <h1>Groups</h1>
+    <p>Shared rooms + a forum. whirled.club still has this on the old stack. We do not copy their groups database.</p>
+  </section>
+
+  <form class="bar" id="chat-form">
+    <input id="chat-input" maxlength="200" placeholder="Say something in Studio Loft…" autocomplete="off" />
+    <button class="primary" type="submit">Send</button>
+    <button type="button" title="Mute later">Vol</button>
+    <button type="button" title="Go home / recent rooms">Go</button>
+    <button type="button" title="Friends online">Friends</button>
+    <span class="spacer"></span>
+    <button type="button" id="stay-landing">Show landing</button>
+  </form>
+
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.8.1/dist/pixi.min.js"></script>
+  <script src="js/mock-app.js"></script>
+</body>
+</html>
