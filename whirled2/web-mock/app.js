@@ -1,9 +1,9 @@
-/* Whirled 2 page chrome. No Pixi. Open index.html. */
+/* Whirled 2 page chrome. Classic whirled.club layout. No Pixi. */
 (function () {
   "use strict";
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (ch) {
-      return ({ "&": "&", "<": "<", ">": ">", '"': """, "'": "&#39;" })[ch];
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
     });
   }
   var PEOPLE = [
@@ -59,18 +59,18 @@
   function rooms() {
     var me = you();
     var here = [{ name: me.name, initials: me.initials, online: true, room: ROOM, you: true }].concat(PEOPLE.filter(function (p) { return p.room === ROOM; }));
-    return '<div class="workspace"><aside class="rail"><h2>In this room</h2>' + here.map(personRow).join("") + '</aside><section class="stage-wrap"><div class="room-flag"><b>' + esc(ROOM) + "</b>owner: " + esc(me.name) + " · unlocked</div><div id="stage-slot"><div class="stage-copy"><strong>Engine mounts here</strong>Leave this rectangle empty of chrome. Click-to-walk belongs to WhirledClassicGame.<code>#stage-slot</code> · <code>window.WhirledChrome</code></div></div><div class="chat-log" id="chat-log">' + chat.map(chatRow).join("") + "</div></section><aside class="rail rail--end"><h2>Profile</h2><div class="profile-card"><div class="ava lg you">" + esc(me.initials) + "</div><h3>" + esc(me.name) + "</h3><p class="meta">home · " + esc(ROOM) + "</p><p>" + esc(me.bio || "Room first. Shop never-first.") + "</p></div><h2>Status</h2><form class="status-form" id="status-form"><input id="status-input" maxlength="140" placeholder="What is happening in this room?" /><button type="submit">Post</button></form><div id="feed-list">" + FEED.map(feedRow).join("") + "</div></aside></div>";
+    return '<div class="workspace"><aside class="rail"><h2>In this room</h2>' + here.map(personRow).join("") + '</aside><section class="stage-wrap"><div class="room-flag"><b>' + esc(ROOM) + "</b>owner: " + esc(me.name) + "</div><div id="stage-slot"><div class="stage-copy"><strong>Engine mounts here</strong>Click-to-walk belongs to the room engine.<code>#stage-slot</code></div></div><div class="chat-log" id="chat-log">' + chat.map(chatRow).join("") + "</div></section></div>";
   }
   function mePage() {
     var me = you();
-    return '<section class="page"><div class="hero"><div><div class="ava lg you">' + esc(me.initials) + "</div><h1>" + esc(me.name) + "</h1><p>Home room is the profile. Friends walk into Studio Loft.</p><form class="profile-form" id="profile-form"><label>Display name <input name="name" maxlength="24" value="" + esc(me.name) + "" /></label><label>Bio <input name="bio" maxlength="180" value="" + esc(me.bio) + "" /></label><button type="submit">Save profile</button><p class="meta" id="profile-msg"></p></form></div><div class="card"><div class="swatch"></div><div class="body"><h3>Studio Loft</h3><p class="meta">home · unlocked</p></div></div></div></section>";
+    return '<section class="page"><div class="hero"><div><div class="ava lg you">' + esc(me.initials) + "</div><h1>" + esc(me.name) + "</h1><p>Home room is the profile.</p><form class="profile-form" id="profile-form"><label>Display name <input name="name" maxlength="24" value="" + esc(me.name) + "" /></label><label>Bio <input name="bio" maxlength="180" value="" + esc(me.bio) + "" /></label><button type="submit">Save profile</button><p class="meta" id="profile-msg"></p></form></div><div class="card"><div class="swatch"></div><div class="body"><h3>Studio Loft</h3><p class="meta">home · unlocked</p></div></div></div></section>";
   }
   function gate() {
-    return '<section class="gate"><div class="gate-card"><p class="eyebrow">Whirled 2 · first live demo</p><h1>Come into the loft.</h1><p>Register or log in. Chat works now. The dashed stage is reserved for the Pixi room engine — that repo stays separate.</p><div class="gate-grid"><form id="register-form"><h2>Register</h2><input name="name" autocomplete="username" placeholder="Display name" required /><input name="password" type="password" autocomplete="new-password" placeholder="Password" required /><button type="submit">Create account</button></form><form id="login-form"><h2>Log in</h2><input name="name" autocomplete="username" placeholder="Display name" required /><input name="password" type="password" autocomplete="current-password" placeholder="Password" required /><button type="submit">Log in</button></form></div><p class="gate-err" id="gate-err"></p><p class="meta">Offline preview uses this browser only. Run server/server.mjs to share accounts and chat.</p></div></section>';
+    return '<section class="gate"><div class="gate-card"><p class="eyebrow">Whirled</p><h1>Welcome to Whirled</h1><p>Register or log in. Same tab strip as whirled.club: Me, Stuff, Games, Rooms, Groups, Shop.</p><div class="gate-grid"><form id="register-form"><h2>Register</h2><input name="name" autocomplete="username" placeholder="Display name" required /><input name="password" type="password" autocomplete="new-password" placeholder="Password" required /><button type="submit">Create account</button></form><form id="login-form"><h2>Log in</h2><input name="name" autocomplete="username" placeholder="Display name" required /><input name="password" type="password" autocomplete="current-password" placeholder="Password" required /><button type="submit">Log in</button></form></div><p class="gate-err" id="gate-err"></p><p class="meta">Offline preview stays in this browser. Run server/server.mjs to share chat.</p></div></section>';
   }
   function shell() {
     var me = you();
-    return '<header class="topbar"><a class="brand" href="#rooms"><b>Whirled 2</b><small>browser room</small></a><nav class="tabs">' + [["me","Me"],["stuff","Stuff"],["games","Games"],["rooms","Rooms"],["groups","Groups"],["shop","Shop"]].map(function (t) { return '<button class="tab' + (t[0] === "rooms" ? " is-on" : "") + '" type="button" data-tab="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</nav><div class="who"><span class="pill">coins ' + me.coins + "</span><span>signed in as <b>" + esc(me.name) + "</b></span><button type="button" id="logout-btn" class="text-btn">Log out</button></div></header><div class="note">Fan remake chrome. Not whirled.club. Engine may only draw inside #stage-slot.</div><div id="main"></div><form class="bar" id="chat-form"><input id="chat-input" maxlength="240" placeholder="Say something in Studio Loft…" /><button class="send" type="submit">Send</button><button type="button" data-tab="rooms">Go</button><button type="button" data-tab="me">Me</button><span class="grow"></span></form>';
+    return '<header class="topbar"><a class="brand" href="#rooms"><span class="swirl" aria-hidden="true"></span><span><b>Whirled</b><small>beta</small></span></a><nav class="tabs">' + [["me","Me"],["stuff","Stuff"],["games","Games"],["rooms","Rooms"],["groups","Groups"],["shop","Shop"]].map(function (t) { return '<button class="tab' + (t[0] === "rooms" ? " is-on" : "") + '" type="button" data-tab="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</nav><div class="who"><div class="row"><b>' + esc(me.name) + '</b><button type="button" id="logout-btn" class="text-btn">Logoff</button><span class="text-btn">Help</span></div><div class="row"><span class="pill">' + me.coins + ' coins</span><span>Lv 1</span></div></div></header><div id="main"></div><form class="bar" id="chat-form"><input id="chat-input" maxlength="240" placeholder="" /><button class="send" type="submit">send</button><span class="tools" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="grow"></span></form>';
   }
   function paint(tab) {
     if (!session()) { document.getElementById("app").innerHTML = gate(); bindGate(); return; }
@@ -81,9 +81,9 @@
     if (tab === "rooms") main.innerHTML = rooms();
     else if (tab === "me") main.innerHTML = mePage();
     else if (tab === "stuff") main.innerHTML = catalog("Stuff", "What you already own.", STUFF);
-    else if (tab === "shop") main.innerHTML = catalog("Shop", "Coins are labels only. Do not wire payments.", SHOP);
-    else if (tab === "games") main.innerHTML = '<section class="page"><h1>Games</h1><p class="meta">In-room toys. Not this cycle.</p></section>';
-    else main.innerHTML = '<section class="page"><h1>Groups</h1><p class="meta">Shared whirleds. We do not copy whirled.club data.</p></section>';
+    else if (tab === "shop") main.innerHTML = catalog("Shop", "Coins are labels only.", SHOP);
+    else if (tab === "games") main.innerHTML = '<section class="page"><h1>Games</h1><p class="meta">Play from a room toy. Not this cycle.</p></section>';
+    else main.innerHTML = '<section class="page"><h1>Groups</h1><p class="meta">Shared whirleds.</p></section>';
     refreshChatLog();
     exposeBridge();
   }
@@ -109,7 +109,7 @@
   }
   function exposeBridge() {
     window.WhirledChrome = {
-      version: "0.3",
+      version: "0.4",
       getStageEl: function () { return document.getElementById("stage-slot"); },
       getSession: function () { return session(); },
       getRoom: function () { return { id: "loft", name: ROOM }; },
@@ -168,7 +168,6 @@
     if (!text) return;
     if (ev.target.id === "status-form") {
       var list = document.getElementById("feed-list");
-      if (!list) { paint("rooms"); list = document.getElementById("feed-list"); }
       if (list) list.insertAdjacentHTML("afterbegin", feedRow({ who: you().name, text: text, place: "status", ago: "just now" }));
       input.value = "";
       return;
