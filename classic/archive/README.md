@@ -1,9 +1,15 @@
 # Classic archive
 
-Historical notes that belong to the **original Whirled / msoy** track, not Whirled 2.
+Historical notes for the **original Whirled / msoy** track. Not Whirled 2.
 
-The Shadowsych / Synced Online writeup used to sit at `docs/archive/shadowsych-whirled-docs.md`. That dump is gone from `docs/` so people are not staring at a random mixed folder.
+## Shadowsych’s documentation
 
-- Start here instead: [../VM-GUIDE.md](../VM-GUIDE.md), [../CLASSIC-LAB.md](../CLASSIC-LAB.md), [../SETUP.md](../SETUP.md)
-- Why the old doc exists at all: [../RELATED.md](../RELATED.md)
-- Full Shadowsych text is still in git history on `main` under the old `docs/archive/` path if you need the Ubuntu 14.04 / OVH recipe. Do not treat it as our lab guide. No MediaFire zips, no open port 80, no `www-data ALL=NOPASSWD`.
+Full file:
+
+**[shadowsych-whirled-docs.md](shadowsych-whirled-docs.md)**
+
+If that link 404s for a minute (file being restored), the same text is still in git history:
+
+https://github.com/whirledclassic/whirled2/blob/1d2613d217c8bf20ddc7ec0ef4d60951a6fe03c1/docs/archive/shadowsych-whirled-docs.md
+
+Author: **Shadowsych** (Synced Online). Not us. Ubuntu 14.04 / OVH / open-port-80 recipe. Use [../VM-GUIDE.md](../VM-GUIDE.md) and [../SETUP.md](../SETUP.md) for *this* lab.
