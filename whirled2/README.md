@@ -7,6 +7,8 @@ Issue label: `whirled2`.
 
 Same-vs-different vs original Whirled: [SAME-AND-DIFFERENT.md](SAME-AND-DIFFERENT.md).
 
+Public note — original cost, why community matters, crowdfunding rules, networking: [PUBLIC.md](PUBLIC.md).
+
 ---
 
 ## What this track is
@@ -65,6 +67,8 @@ Exact scripts will match whatever `package.json` we commit. Do not PR a framewor
 Art terms: [ARTISTS.md](ARTISTS.md). Volunteer now, credit always.
 
 Roadmap: [ROADMAP.md](ROADMAP.md).
+
+Money / community / crowdfunding: [PUBLIC.md](PUBLIC.md).
 
 ---
 
