@@ -34,6 +34,8 @@
   var WALL_KEY = "whirled2.wall.";
   var POKE_KEY = "whirled2.pokes";
   var STATUS_KEY = "whirled2.status.";
+  var notices = [];
+  var NOTE_KEY = "whirled2.notices";
   var listeners = { chat: [], occupants: [] };
   function session() { return window.WhirledApi ? window.WhirledApi.session() : null; }
   function you() {
@@ -122,6 +124,38 @@
     } catch (e) {}
     return "";
   }
+
+  function loadNotices() {
+    try { notices = JSON.parse(localStorage.getItem(NOTE_KEY) || "[]"); } catch (e) { notices = []; }
+    return notices;
+  }
+  function pushNotice(kind, text) {
+    loadNotices();
+    notices.unshift({ kind: kind || "gray", text: text, at: new Date().toISOString() });
+    notices = notices.slice(0, 30);
+    try { localStorage.setItem(NOTE_KEY, JSON.stringify(notices)); } catch (e) {}
+    renderNotices();
+  }
+  function renderNotices() {
+    loadNotices();
+    var el = document.getElementById("notice-bar");
+    if (!el) return;
+    if (!notices.length) { el.innerHTML = '<div class="notice-empty">No notifications</div>'; return; }
+    el.innerHTML = notices.slice(0, 8).map(function (n) {
+      return '<div class="notice-row kind-' + esc(n.kind) + '">' + esc(n.text) + '</div>';
+    }).join("");
+  }
+  function ensureNoticeBar() {
+    if (document.getElementById("notice-bar")) { renderNotices(); return; }
+    if (!session()) return;
+    var box = document.createElement("aside");
+    box.id = "notice-bar";
+    box.className = "notice-bar";
+    box.setAttribute("aria-label", "Notifications");
+    document.body.appendChild(box);
+    renderNotices();
+  }
+
   function meSubnav() {
     return '<div class="me-subnav"><span class="me-title">Me</span><nav class="me-links">'
       + '<button type="button" class="me-link' + (meSub === "home" ? " is-on" : "") + '" data-me="home">Me</button>'
@@ -149,17 +183,20 @@
     return '<section class="page me-page">' + meSubnav()
       + '<div class="me-grid">'
       +   '<div class="me-main">'
+      +     '<div class="panel invite-banner">Invite friends to Whirled Classic — coins stay labels only (no payments).</div>'
       +     '<div class="panel"><h2>My News</h2>'
       +       (st ? '<p class="status-line"><b>Your status:</b> ' + esc(st) + '</p>' : '')
       +       news + '</div>'
       +   '</div>'
       +   '<aside class="me-side">'
       +     '<div class="panel links-panel">'
+      +       '<div class="online-count">People in loft: <b>' + (liveOccupants.length || 1) + '</b></div>'
       +       '<button type="button" class="text-btn" data-me="profile">My Profile</button>'
       +       '<button type="button" class="text-btn" data-tab="rooms">My Rooms</button>'
-      +       '<span class="meta">People online in loft: ' + (liveOccupants.length || 1) + '</span>'
+      +       '<button type="button" class="text-btn" data-me="profile">My Passport</button>'
+      +       '<span class="meta">Passport stamps come later with the engine track.</span>'
       +     '</div>'
-      +     '<div class="panel"><h2>In Studio Loft</h2>' + friendBox + '</div>'
+      +     '<div class="panel"><h2>My Friends Online</h2>' + friendBox + '</div>'
       +   '</aside>'
       + '</div></section>';
   }
@@ -182,11 +219,17 @@
     return '<section class="page me-page">' + meSubnav()
       + '<div class="profile-card panel">'
       +   '<div class="profile-head">' + photoHtml
-      +     '<div class="profile-head-text"><h1>My Profile</h1>'
+      +     '<div class="profile-head-text">'
+      +       '<div class="profile-title-row"><h1>My Profile</h1><span class="level-badge">Level 1</span></div>'
       +       '<div class="whirled-name">' + esc(me.name) + '</div>'
       +       '<div class="status-line" id="status-display">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      +       '<div class="profile-meta meta">Permaname: ' + esc(sid) + ' · Member of Whirled Classic</div>'
       +       '<div class="profile-actions">'
-      +         '<button type="button" class="poke-btn" id="poke-self-demo" title="Others can poke you from your public profile">Poke</button>'
+      +         '<button type="button" class="action-btn" disabled title="Mail comes with shared server">Send Mail</button>'
+      +         '<button type="button" class="action-btn" data-tab="rooms">Visit Home</button>'
+      +         '<button type="button" class="action-btn" data-tab="rooms">View Rooms</button>'
+      +         '<button type="button" class="action-btn" data-tab="stuff">Browse Items</button>'
+      +         '<button type="button" class="poke-btn" id="poke-self-demo">Poke</button>'
       +         '<label class="photo-btn">Photo <input type="file" id="photo-input" accept="image/*" hidden /></label>'
       +       '</div></div></div>'
       +   '<form class="status-form" id="status-form"><input name="status" maxlength="140" placeholder="What are you up to?" value="' + esc(st) + '" /><button type="submit">Update status</button></form>'
@@ -194,11 +237,12 @@
       +     '<label>About me <input name="bio" maxlength="180" value="' + esc(me.bio) + '" /></label>'
       +     '<button type="submit">Save profile</button><p class="meta" id="profile-msg"></p></form>'
       + '</div>'
+      + '<div class="panel"><h2>Information</h2><p class="meta">' + (me.bio ? esc(me.bio) : "Add an About me blurb above.") + '</p></div>'
       + '<div class="panel"><h2>Player News / Wall</h2>'
       +   '<form class="wall-form" id="wall-form"><input name="text" maxlength="240" placeholder="Comment on this profile" required /><button type="submit">Comment</button></form>'
       +   '<div id="wall-list">' + wallHtml + '</div></div>'
       + '<div class="panel"><h2>Pokes</h2><div id="poke-list">' + pokeHtml + '</div>'
-      +   '<p class="meta">Anyone logged in can poke your profile. On this offline demo, use the Poke button to leave yourself a poke as a test.</p></div>'
+      +   '<p class="meta">Pokes notify you in the bottom-right bar (classic Whirled style).</p></div>'
       + '</section>';
   }
   function mePage() {
@@ -284,6 +328,11 @@
     else main.innerHTML = '<section class="page"><h1>Groups</h1><p class="meta">Shared whirleds.</p></section>';
     refreshChatLog();
     exposeBridge();
+    if (session()) ensureNoticeBar();
+    else {
+      var nb = document.getElementById("notice-bar");
+      if (nb) nb.remove();
+    }
   }
   function refreshChatLog() {
     var log = document.getElementById("chat-log");
@@ -429,6 +478,7 @@
     if (ev.target.id === "poke-self-demo" && session()) {
       var sid = session().user.id;
       addPoke(session().user.name, sid);
+      pushNotice("orange", session().user.name + " poked you.");
       meSub = "profile";
       paint("me");
       return;
@@ -447,13 +497,25 @@
     if (file.size > 200000) { alert("Keep photos under ~200KB for this demo."); return; }
     var reader = new FileReader();
     reader.onload = function () {
-      var data = String(reader.result || "");
-      localStorage.setItem("whirled2.photo." + session().user.id, data);
-      var s = session();
-      s.user.photo = data;
-      try { localStorage.setItem("whirled2.session", JSON.stringify(s)); } catch (e) {}
-      meSub = "profile";
-      paint("me");
+      var img = new Image();
+      img.onload = function () {
+        var canvas = document.createElement("canvas");
+        canvas.width = 80; canvas.height = 60;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#e8f4fb";
+        ctx.fillRect(0, 0, 80, 60);
+        var scale = Math.min(80 / img.width, 60 / img.height);
+        var w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (80 - w) / 2, (60 - h) / 2, w, h);
+        var data = canvas.toDataURL("image/png");
+        localStorage.setItem("whirled2.photo." + session().user.id, data);
+        var s = session();
+        s.user.photo = data;
+        try { localStorage.setItem("whirled2.session", JSON.stringify(s)); } catch (e) {}
+        meSub = "profile";
+        paint("me");
+      };
+      img.src = String(reader.result || "");
     };
     reader.readAsDataURL(file);
   });
@@ -477,6 +539,7 @@
       if (st) {
         wall.unshift({ who: you().name, text: "updated status: " + st, at: new Date().toISOString(), kind: "status" });
         saveWall(session().user.id, wall);
+        pushNotice("gray", you().name + " " + st);
       }
       meSub = "profile";
       paint("me");
@@ -489,6 +552,7 @@
       var wall2 = loadWall(session().user.id);
       wall2.unshift({ who: you().name, text: text3, at: new Date().toISOString(), kind: "comment" });
       saveWall(session().user.id, wall2);
+      pushNotice("blue", you().name + " commented on a profile.");
       meSub = "profile";
       paint("me");
       return;
