@@ -37,6 +37,7 @@
   var WALL_KEY = "whirled2.wall.";
   var POKE_KEY = "whirled2.pokes";
   var STATUS_KEY = "whirled2.status.";
+  var INFO_KEY = "whirled2.profileinfo.";
   var notices = [];
   var NOTE_KEY = "whirled2.notices";
   var listeners = { chat: [], occupants: [] };
@@ -218,6 +219,56 @@
     renderNotices();
   }
 
+
+  function loadInfo(userId) {
+    try {
+      return Object.assign({
+        activities: "", interests: "", games: "", music: "", movies: "", shows: "", books: "", about: "", homepage: ""
+      }, JSON.parse(localStorage.getItem(INFO_KEY + userId) || "{}"));
+    } catch (e) {
+      return { activities: "", interests: "", games: "", music: "", movies: "", shows: "", books: "", about: "", homepage: "" };
+    }
+  }
+  function saveInfo(userId, info) {
+    localStorage.setItem(INFO_KEY + userId, JSON.stringify(info));
+  }
+  function infoRows(info) {
+    var labels = [
+      ["activities", "Activities"], ["interests", "Interests"], ["games", "Favorite Games"],
+      ["music", "Favorite Music"], ["movies", "Favorite Movies"], ["shows", "Favorite Shows"],
+      ["books", "Favorite Books"], ["about", "About Me"]
+    ];
+    var rows = labels.map(function (pair) {
+      var val = (info[pair[0]] || "").trim();
+      if (!val) return "";
+      return '<div class="info-row"><span class="info-label">' + pair[1] + '</span><span class="info-value">' + esc(val) + '</span></div>';
+    }).filter(Boolean).join("");
+    return rows || '<p class="meta">No information filled in yet.</p>';
+  }
+  function friendsStrip() {
+    var list = loadFriends().slice(0, 24);
+    if (!list.length) return '<p class="meta">No friends listed yet.</p>';
+    return '<div class="friends-strip">' + list.map(function (f) {
+      var ph = localStorage.getItem("whirled2.photo." + f.id) || "";
+      var thumb = ph
+        ? '<img src="' + ph + '" alt="" width="48" height="48" />'
+        : '<span class="friend-fallback">' + esc(String(f.name || "?").slice(0, 1).toUpperCase()) + '</span>';
+      return '<button type="button" class="friend-thumb" data-profile="' + esc(f.id) + '" title="' + esc(f.name) + '">' + thumb + '<span>' + esc(f.name) + '</span></button>';
+    }).join("") + '</div>';
+  }
+  function profileActionRow(opts) {
+    opts = opts || {};
+    return '<div class="profile-action-row">'
+      + '<button type="button" class="profile-action" disabled title="Mail needs shared server"><span class="pa-ico">✉</span><span>Send Mail</span></button>'
+      + '<button type="button" class="profile-action" data-tab="rooms"><span class="pa-ico">⌂</span><span>Visit Home</span></button>'
+      + '<button type="button" class="profile-action" data-tab="rooms"><span class="pa-ico">▣</span><span>View Rooms</span></button>'
+      + '<button type="button" class="profile-action" data-tab="stuff"><span class="pa-ico">▤</span><span>Browse Items</span></button>'
+      + (opts.poke ? '<button type="button" class="profile-action poke" ' + opts.poke + '><span class="pa-ico">☞</span><span>Poke</span></button>' : '')
+      + (opts.friend ? '<button type="button" class="profile-action" ' + opts.friend + '><span class="pa-ico">+</span><span>Add Friend</span></button>' : '')
+      + (opts.photo ? '<label class="profile-action photo-label"><span class="pa-ico">▣</span><span>Photo</span><input type="file" id="photo-input" accept="image/*" hidden /></label>' : '')
+      + '</div>';
+  }
+
   function meSubnav() {
     return '<div class="me-subnav"><span class="me-title">Me</span><nav class="me-links">'
       + '<button type="button" class="me-link' + (meSub === "home" ? " is-on" : "") + '" data-me="home">Me</button>'
@@ -268,45 +319,68 @@
     var st = loadStatus(sid);
     var photo = photoFor(session().user);
     var wall = loadWall(sid);
+    var info = loadInfo(sid);
+    if (!info.about && me.bio) info.about = me.bio;
     var pokes = (loadPokes()[sid] || []).slice(0, 8);
     var photoHtml = photo
       ? '<img class="profile-photo" src="' + photo + '" alt="Profile photo" width="80" height="60" />'
-      : '<div class="ava lg you profile-photo-fallback">' + esc(me.initials) + '</div>';
+      : '<div class="profile-photo missing"><span>' + esc(me.initials) + '</span></div>';
     var wallHtml = wall.length ? wall.map(function (w) {
       return '<div class="wall-row"><span class="ava">' + esc((w.who || "?").slice(0, 1)) + '</span><div><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div></div>';
-    }).join("") : '<p class="meta">No comments yet. Be the first on this wall.</p>';
-    var pokeHtml = pokes.length ? pokes.map(function (p) {
-      return '<div class="meta">Poked by <b>' + esc(p.from) + '</b> · ' + esc((p.at || "").slice(0, 16).replace("T", " ")) + '</div>';
-    }).join("") : '<p class="meta">No pokes yet.</p>';
-    return '<section class="page me-page">' + meSubnav()
-      + '<div class="profile-card panel">'
-      +   '<div class="profile-head">' + photoHtml
-      +     '<div class="profile-head-text">'
-      +       '<div class="profile-title-row"><h1>My Profile</h1><span class="level-badge">Level 1</span></div>'
-      +       '<div class="whirled-name">' + esc(me.name) + '</div>'
-      +       '<div class="status-line" id="status-display">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
-      +       '<div class="profile-meta meta">Permaname: ' + esc(sid) + ' · Member of Whirled Classic</div>'
-      +       '<div class="profile-actions">'
-      +         '<button type="button" class="action-btn" disabled title="Mail comes with shared server">Send Mail</button>'
-      +         '<button type="button" class="action-btn" data-tab="rooms">Visit Home</button>'
-      +         '<button type="button" class="action-btn" data-tab="rooms">View Rooms</button>'
-      +         '<button type="button" class="action-btn" data-tab="stuff">Browse Items</button>'
-      +         '<button type="button" class="poke-btn" id="poke-self-demo">Poke</button>'
-      +         '<label class="photo-btn">Photo <input type="file" id="photo-input" accept="image/*" hidden /></label>'
-      +       '</div></div></div>'
-      +   '<form class="status-form" id="status-form"><input name="status" maxlength="140" placeholder="What are you up to?" value="' + esc(st) + '" /><button type="submit">Update status</button></form>'
-      +   '<form class="profile-form" id="profile-form"><label>Display name <input name="name" maxlength="24" value="' + esc(me.name) + '" /></label>'
-      +     '<label>About me <input name="bio" maxlength="180" value="' + esc(me.bio) + '" /></label>'
-      +     '<button type="submit">Save profile</button><p class="meta" id="profile-msg"></p></form>'
-      + '</div>'
-      + '<div class="panel"><h2>Information</h2><p class="meta">' + (me.bio ? esc(me.bio) : "Add an About me blurb above.") + '</p></div>'
-      + '<div class="panel"><h2>Player News / Wall</h2>'
-      +   '<form class="wall-form" id="wall-form"><input name="text" maxlength="240" placeholder="Comment on this profile" required /><button type="submit">Comment</button></form>'
-      +   '<div id="wall-list">' + wallHtml + '</div></div>'
-      + '<div class="panel"><h2>Pokes</h2><div id="poke-list">' + pokeHtml + '</div>'
-      +   '<p class="meta">Pokes notify you in the bottom-right bar (classic Whirled style).</p></div>'
-      + '</section>';
+    }).join("") : '<p class="meta">No comments yet.</p>';
+    var newsHtml = wall.filter(function (w) { return w.kind === "status" || w.kind === "comment"; }).slice(0, 8).map(function (w) {
+      return '<div class="news-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+    }).join("") || '<p class="meta">No player news yet.</p>';
+    var member = "";
+    try { member = (session().user.since || localStorage.getItem("whirled2.since." + sid) || ""); } catch (e) {}
+    if (!member) {
+      member = new Date().toISOString().slice(0, 10);
+      try { localStorage.setItem("whirled2.since." + sid, member); } catch (e) {}
+    }
+    return '<section class="page me-page profile-page">' + meSubnav()
+      + '<div class="classic-profile">'
+      +   '<div class="cp-header">'
+      +     '<div class="cp-photo">' + photoHtml + '</div>'
+      +     '<div class="cp-main">'
+      +       '<div class="cp-name-row"><span class="cp-name">' + esc(me.name) + '</span><span class="level-badge">Level 1</span></div>'
+      +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      +       profileActionRow({ photo: true, poke: 'id="poke-self-demo"' })
+      +     '</div>'
+      +     '<aside class="cp-meta-box">'
+      +       '<div><span class="k">Permaname</span><span class="v">' + esc(sid) + '</span></div>'
+      +       '<div><span class="k">Member since</span><span class="v">' + esc(member) + '</span></div>'
+      +       '<div><span class="k">Last online</span><span class="v">now</span></div>'
+      +       '<div><span class="k">Home Page</span><span class="v">' + (info.homepage ? '<a href="' + esc(info.homepage) + '" target="_blank" rel="noopener">' + esc(info.homepage) + '</a>' : '—') + '</span></div>'
+      +     '</aside>'
+      +   '</div>'
+      +   '<form class="status-form cp-status-form" id="status-form"><input name="status" maxlength="140" placeholder="Update your status…" value="' + esc(st) + '" /><button type="submit">Set status</button></form>'
+      +   '<div class="cp-section"><h2>Information</h2>'
+      +     '<form class="info-form" id="info-form">'
+      +       '<label>Activities <input name="activities" value="' + esc(info.activities) + '" /></label>'
+      +       '<label>Interests <input name="interests" value="' + esc(info.interests) + '" /></label>'
+      +       '<label>Favorite Games <input name="games" value="' + esc(info.games) + '" /></label>'
+      +       '<label>Favorite Music <input name="music" value="' + esc(info.music) + '" /></label>'
+      +       '<label>Favorite Movies <input name="movies" value="' + esc(info.movies) + '" /></label>'
+      +       '<label>Favorite Shows <input name="shows" value="' + esc(info.shows) + '" /></label>'
+      +       '<label>Favorite Books <input name="books" value="' + esc(info.books) + '" /></label>'
+      +       '<label>About Me <input name="about" value="' + esc(info.about || me.bio) + '" /></label>'
+      +       '<label>Home Page URL <input name="homepage" value="' + esc(info.homepage) + '" /></label>'
+      +       '<label>Display name <input name="name" maxlength="24" value="' + esc(me.name) + '" /></label>'
+      +       '<button type="submit">Save information</button><p class="meta" id="profile-msg"></p>'
+      +     '</form>'
+      +     '<div class="info-preview">' + infoRows(Object.assign({}, info, { about: info.about || me.bio })) + '</div>'
+      +   '</div>'
+      +   '<div class="cp-section"><h2>Player News</h2>' + newsHtml + '</div>'
+      +   '<div class="cp-section"><h2>Friends</h2>' + friendsStrip() + '</div>'
+      +   '<div class="cp-section"><h2>Comments</h2>'
+      +     '<form class="wall-form" id="wall-form"><input name="text" maxlength="240" placeholder="Leave a comment" required /><button type="submit">Post</button></form>'
+      +     '<div id="wall-list">' + wallHtml + '</div></div>'
+      +   '<div class="cp-section"><h2>Pokes</h2>' + (pokes.length ? pokes.map(function (p) {
+            return '<div class="meta">Poked by <b>' + esc(p.from) + '</b> · ' + esc((p.at || "").slice(0, 16).replace("T", " ")) + '</div>';
+          }).join("") : '<p class="meta">No pokes yet.</p>') + '</div>'
+      + '</div></section>';
   }
+
   function meFriends() {
     var list = loadFriends();
     var rows = list.length ? list.map(function (f) {
@@ -322,7 +396,6 @@
       + rows + '</div></section>';
   }
   function otherProfile(id) {
-    var me = you();
     var occ = liveOccupants.filter(function (p) { return p.id === id; })[0];
     var friend = loadFriends().filter(function (f) { return f.id === id; })[0];
     var name = (occ && occ.name) || (friend && friend.name) || id;
@@ -330,28 +403,42 @@
     var st = loadStatus(id);
     var photo = localStorage.getItem("whirled2.photo." + id) || "";
     var wall = loadWall(id);
+    var info = loadInfo(id);
     var photoHtml = photo
       ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
-      : '<div class="ava lg profile-photo-fallback">' + esc(initials) + '</div>';
+      : '<div class="profile-photo missing"><span>' + esc(initials) + '</span></div>';
     var wallHtml = wall.length ? wall.map(function (w) {
       return '<div class="wall-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
     }).join("") : '<p class="meta">No comments yet.</p>';
     var isSelf = session() && session().user.id === id;
-    return '<section class="page me-page">' + meSubnav()
-      + '<div class="profile-card panel"><div class="profile-head">' + photoHtml
-      + '<div class="profile-head-text">'
-      + '<div class="profile-title-row"><h1>' + (isSelf ? "My Profile" : "Profile") + '</h1><span class="level-badge">Level 1</span></div>'
-      + '<div class="whirled-name">' + esc(name) + '</div>'
-      + '<div class="status-line">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
-      + '<div class="profile-actions">'
-      +   (isSelf ? '' : '<button type="button" class="poke-btn" data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '">Poke</button>')
-      +   (isSelf ? '' : '<button type="button" class="action-btn" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Add Friend</button>')
-      +   '<button type="button" class="action-btn" data-tab="rooms">Visit Home</button>'
-      + '</div></div></div></div>'
-      + '<div class="panel"><h2>Wall</h2>'
-      + '<form class="wall-form" id="wall-form" data-wall-user="' + esc(id) + '"><input name="text" maxlength="240" placeholder="Comment on this profile" required /><button type="submit">Comment</button></form>'
-      + '<div id="wall-list">' + wallHtml + '</div></div></section>';
+    var member = "";
+    try { member = localStorage.getItem("whirled2.since." + id) || ""; } catch (e) {}
+    return '<section class="page me-page profile-page">' + meSubnav()
+      + '<div class="classic-profile">'
+      +   '<div class="cp-header">'
+      +     '<div class="cp-photo">' + photoHtml + '</div>'
+      +     '<div class="cp-main">'
+      +       '<div class="cp-name-row"><span class="cp-name">' + esc(name) + '</span><span class="level-badge">Level 1</span></div>'
+      +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      +       profileActionRow({
+            poke: isSelf ? '' : ('data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '"'),
+            friend: isSelf ? '' : ('data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '"')
+          })
+      +     '</div>'
+      +     '<aside class="cp-meta-box">'
+      +       '<div><span class="k">Permaname</span><span class="v">' + esc(id) + '</span></div>'
+      +       '<div><span class="k">Member since</span><span class="v">' + esc(member || "—") + '</span></div>'
+      +       '<div><span class="k">Last online</span><span class="v">' + (occ ? "now" : "unknown") + '</span></div>'
+      +       '<div><span class="k">Home Page</span><span class="v">' + (info.homepage ? esc(info.homepage) : "—") + '</span></div>'
+      +     '</aside>'
+      +   '</div>'
+      +   '<div class="cp-section"><h2>Information</h2>' + infoRows(info) + '</div>'
+      +   '<div class="cp-section"><h2>Comments</h2>'
+      +     '<form class="wall-form" id="wall-form" data-wall-user="' + esc(id) + '"><input name="text" maxlength="240" placeholder="Leave a comment" required /><button type="submit">Post</button></form>'
+      +     '<div id="wall-list">' + wallHtml + '</div></div>'
+      + '</div></section>';
   }
+
   function mePage() {
     if (viewingId && session() && viewingId !== session().user.id) return otherProfile(viewingId);
     if (viewingId && session() && viewingId === session().user.id) { meSub = "profile"; viewingId = null; }
@@ -680,12 +767,26 @@
   });
   app.addEventListener("submit", function (ev) {
     ev.preventDefault();
-    if (ev.target.id === "profile-form") {
+    if (ev.target.id === "profile-form" || ev.target.id === "info-form") {
       var data = new FormData(ev.target);
       var msg = document.getElementById("profile-msg");
-      window.WhirledApi.saveProfile({ name: data.get("name"), bio: data.get("bio") }).then(function () {
+      var sid = session().user.id;
+      var info = {
+        activities: String(data.get("activities") || ""),
+        interests: String(data.get("interests") || ""),
+        games: String(data.get("games") || ""),
+        music: String(data.get("music") || ""),
+        movies: String(data.get("movies") || ""),
+        shows: String(data.get("shows") || ""),
+        books: String(data.get("books") || ""),
+        about: String(data.get("about") || ""),
+        homepage: String(data.get("homepage") || "")
+      };
+      saveInfo(sid, info);
+      window.WhirledApi.saveProfile({ name: data.get("name") || you().name, bio: info.about }).then(function () {
         if (msg) msg.textContent = "Saved.";
         meSub = "profile";
+        viewingId = null;
         paint("me");
       }).catch(function (e) { if (msg) msg.textContent = e.message; });
       return;
