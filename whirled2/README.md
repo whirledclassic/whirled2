@@ -62,9 +62,9 @@ Exact scripts will match whatever `package.json` we commit. Do not PR a framewor
 3. [#3](https://github.com/whirledclassic/whirled2/issues/3) — floor, walls, a few props
 4. [#4](https://github.com/whirledclassic/whirled2/issues/4) — VPS + HTTPS notes
 
-Art terms: [../docs/ARTISTS.md](../docs/ARTISTS.md). Volunteer now, credit always.
+Art terms: [ARTISTS.md](ARTISTS.md). Volunteer now, credit always.
 
-Roadmap: [../docs/ROADMAP.md](../docs/ROADMAP.md).
+Roadmap: [ROADMAP.md](ROADMAP.md).
 
 ---
 
