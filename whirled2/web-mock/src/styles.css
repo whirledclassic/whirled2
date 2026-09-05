@@ -325,3 +325,77 @@ body { font-family: var(--ui); color: var(--ink); background: #d7eaf6; }
     max-height: 52px;
   }
 }
+
+
+/* —— Classic status + toolbar (wiki-inspired, pale blue skin) —— */
+.who-links .mail { color: #1e6fa8; font-weight: 700; }
+.who-links .sep { color: #9bb8cc; margin: 0 2px; }
+.who-stats .stat {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fff; border: 1px solid #c5deee; border-radius: 999px;
+  padding: 1px 8px; font-weight: 700; color: #1e6fa8;
+}
+.tab {
+  min-width: 76px;
+  min-height: 32px;
+  text-align: center;
+}
+.room-strip {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 10px; background: linear-gradient(#eef6fc, #d7ebf6);
+  border-bottom: 1px solid #b7d3e8; color: #0b3a5a; font-size: 12px; font-weight: 700;
+}
+.room-owner { font-weight: 500; color: #4a6a80; }
+.subtabs {
+  display: flex; gap: 2px; padding: 4px 8px 0; background: #cfe4f2;
+  border-bottom: 1px solid #a9c7dc;
+}
+.subtab {
+  border: 0; background: transparent; color: #5a7e96; font: 700 11px/1 var(--ui);
+  padding: 6px 10px 7px; border-radius: 6px 6px 0 0; cursor: default;
+}
+.subtab.is-on { background: #f4f9fc; color: #0b3a5a; }
+.subtab:disabled { opacity: 0.55; }
+.room-flag { display: none; } /* replaced by room-strip */
+
+.bar {
+  background: #f3f7fa;
+  color: #16324a;
+  border-top: 1px solid #b7d3e8;
+  gap: 8px;
+}
+.bar input {
+  border: 1px solid #9bb8cc; background: #fff; color: #111;
+  max-width: 360px;
+}
+.bar button.send {
+  background: linear-gradient(#6eb8e8, #3aa3e0);
+  border: 1px solid #2b87c0;
+  border-radius: 12px;
+  padding: 6px 14px;
+}
+.chat-opts {
+  border: 0; width: 28px; height: 28px; border-radius: 50%;
+  background: #3aa3e0; color: #fff; font-size: 10px; cursor: default;
+}
+.toolbar { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
+.tb {
+  width: 26px; height: 26px; display: inline-block; border-radius: 4px;
+  border: 1px solid #b7d3e8; background: #fff center/16px 16px no-repeat;
+  box-shadow: inset 0 1px 0 #fff;
+}
+.tb-vol { background-image: linear-gradient(#7ec8f0, #3aa3e0); }
+.tb-go { background: #fff; position: relative; }
+.tb-go::after { content: "Go"; display: grid; place-items: center; height: 100%; font: 700 9px var(--ui); color: #1e6fa8; }
+.tb-friends { background-image: radial-gradient(circle at 50% 40%, #7ec8f0 0 40%, transparent 41%), linear-gradient(#e8f4fb, #cfe4f2); }
+.tb-party { background: repeating-linear-gradient(45deg, #7ec8f0, #7ec8f0 3px, #e8f4fb 3px, #e8f4fb 6px); }
+.tb-room { background: linear-gradient(#9fd3f0 0 55%, #6b8f4a 55%); }
+
+@media (max-width: 900px) {
+  .bar { background: #0e141a; color: #dce8f0; border-top: 0; }
+  .bar input { border-color: #2a3d4c; }
+  .toolbar { display: none; }
+  .chat-opts { display: none; }
+  .subtabs { overflow-x: auto; }
+  .room-strip { font-size: 11px; }
+}

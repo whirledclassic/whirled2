@@ -65,7 +65,20 @@
   function rooms() {
     var me = you();
     var here = [{ name: me.name, initials: me.initials, online: true, room: ROOM, you: true }].concat(PEOPLE.filter(function (p) { return p.room === ROOM; }));
-    return '<div class="workspace"><aside class="rail"><h2>In this room</h2>' + here.map(personRow).join('') + '</aside><section class="stage-wrap"><div class="room-flag"><b>' + esc(ROOM) + '</b>owner: ' + esc(me.name) + '</div><div id="stage-slot"><div class="stage-copy"><strong>Engine mounts here</strong>Click-to-walk belongs to the room engine.<code>#stage-slot</code></div></div><div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div></section></div>';
+    return ''
+      + '<div class="workspace">'
+      +   '<aside class="rail"><h2>In this room</h2>' + here.map(personRow).join('') + '</aside>'
+      +   '<section class="stage-wrap">'
+      +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span><span class="room-owner">owner: ' + esc(me.name) + '</span></div>'
+      +     '<div class="subtabs" aria-label="Chat channels">'
+      +       '<button type="button" class="subtab is-on">Room</button>'
+      +       '<button type="button" class="subtab" disabled>Groups</button>'
+      +       '<button type="button" class="subtab" disabled>People</button>'
+      +     '</div>'
+      +     '<div id="stage-slot"><div class="stage-copy"><strong>Engine mounts here</strong>Click-to-walk belongs to the room engine.<code>#stage-slot</code></div></div>'
+      +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
+      +   '</section>'
+      + '</div>';
   }
   function mePage() {
     var me = you();
@@ -76,7 +89,40 @@
   }
   function shell() {
     var me = you();
-    return '<header class="topbar"><a class="brand" href="#rooms">' + logoImg("logo") + '<span class="sr-only">Whirled Classic</span></a><nav class="tabs">' + [["me","Me"],["stuff","Stuff"],["games","Games"],["rooms","Rooms"],["groups","Groups"],["shop","Shop"]].map(function (t) { return '<button class="tab' + (t[0] === "rooms" ? " is-on" : "") + '" type="button" data-tab="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</nav><div class="who"><div class="row"><b>' + esc(me.name) + '</b><button type="button" id="logout-btn" class="text-btn">Logoff</button><span class="text-btn">Help</span></div><div class="row"><span class="pill">' + me.coins + ' coins</span><span>Lv 1</span></div></div></header><div id="main"></div><form class="bar" id="chat-form"><input id="chat-input" maxlength="240" placeholder="" /><button class="send" type="submit">send</button><span class="tools" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="grow"></span></form>';
+    return ''
+      + '<header class="topbar">'
+      +   '<a class="brand" href="#rooms">' + logoImg("logo") + '<span class="sr-only">Whirled Classic</span></a>'
+      +   '<nav class="tabs">' + [["me","Me"],["stuff","Stuff"],["games","Games"],["rooms","Rooms"],["groups","Groups"],["shop","Shop"]].map(function (t) {
+            return '<button class="tab' + (t[0] === "rooms" ? " is-on" : "") + '" type="button" data-tab="' + t[0] + '">' + t[1] + '</button>';
+          }).join("") + '</nav>'
+      +   '<div class="who">'
+      +     '<div class="row who-links">'
+      +       '<span class="mail" title="Mail">&#9993; <u>(0)</u></span>'
+      +       '<b>' + esc(me.name) + '</b>'
+      +       '<span class="sep">|</span>'
+      +       '<span class="text-btn">Help</span>'
+      +       '<span class="sep">|</span>'
+      +       '<button type="button" id="logout-btn" class="text-btn">Logoff</button>'
+      +     '</div>'
+      +     '<div class="row who-stats">'
+      +       '<span class="stat coins" title="Coins">' + me.coins + ' coins</span>'
+      +       '<span class="stat level" title="Level">Lv 1</span>'
+      +     '</div>'
+      +   '</div>'
+      + '</header>'
+      + '<div id="main"></div>'
+      + '<form class="bar" id="chat-form">'
+      +   '<button type="button" class="chat-opts" title="Chat options" aria-label="Chat options">&#9679;</button>'
+      +   '<input id="chat-input" maxlength="240" placeholder="Type here to chat!" autocomplete="off" />'
+      +   '<button class="send" type="submit">send</button>'
+      +   '<span class="toolbar" aria-hidden="true">'
+      +     '<i class="tb tb-vol" title="Volume"></i>'
+      +     '<i class="tb tb-go" title="Go"></i>'
+      +     '<i class="tb tb-friends" title="Friends"></i>'
+      +     '<i class="tb tb-party" title="Parties"></i>'
+      +     '<i class="tb tb-room" title="Room"></i>'
+      +   '</span>'
+      + '</form>';
   }
   function paint(tab) {
     if (!session()) {
