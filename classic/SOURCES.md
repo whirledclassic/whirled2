@@ -1,8 +1,8 @@
 # Sources (public only)
 
-This page lists **public** documents and projects. Private mail stays private. We do not quote, paraphrase, or publish private emails here unless the sender said we could.
+This page lists **public** documents and projects.
 
-If a name or note was here before and came from a private thread, it was pulled on 2026-09-05. That was a mistake.
+Rule for this repo: do not quote, paraphrase, or publish private emails, DMs, or off-the-record notes unless the sender gave clear written permission to post them. If something landed here from a private thread, it does not belong in the public tree.
 
 ---
 
@@ -23,20 +23,21 @@ If a name or note was here before and came from a private thread, it was pulled 
 - NeoHabitat (public Habitat revival): https://neohabitat.org
 - MADE: https://www.themade.org
 - Virtual Worlds Museum, Whirled exhibit: https://virtualworlds.museum/exhibits/whirled
+- Chip Morningstar, *Habitat: Lessons from an Early Online Community* and related public essays (public writing only)
 - Related remakes: [RELATED.md](RELATED.md)
 - Link index: [LINKS.md](LINKS.md)
 
-Chip Morningstar’s published essay *Lessons of Habitat* is public writing. NeoHabitat is a public project. Neither is a license to post his private email.
+Public essays and public project sites are not permission to post anyone's private email.
 
 ---
 
 ## Lab notes that are ours
 
-Build facts we hit in the VM (not from other people’s inboxes):
+Build facts we hit in the VM (not from other people's inboxes):
 
 - msoy wants **Java 8**, not 21.
 - Linux + Ant + Postgres is the path that booted.
 - NAT is safer than Bridged on the Windows host we used.
-- Do not publish VM hostnames, player dumps, home-router ports, or private emails on GitHub.
+- Do not publish VM hostnames, player dumps, home-router ports, or private correspondence on GitHub.
 
 See [CLASSIC-LAB.md](CLASSIC-LAB.md) and [SETUP.md](SETUP.md).

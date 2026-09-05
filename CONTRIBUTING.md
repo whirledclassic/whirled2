@@ -14,6 +14,7 @@ Same/different vs the 2007 client: [`whirled2/SAME-AND-DIFFERENT.md`](whirled2/S
 - One job per PR. A walk-cycle is a PR. A new renderer is not a first PR.
 - Talk in an issue before a large change.
 - No secrets, no `.env`, no lab VM hostnames, no player dumps.
+- **No private emails.** Do not paste, quote, or summarize private mail, DMs, or off-the-record notes in this public repo unless the sender gave clear written permission to publish.
 - No original Whirled / msoy binaries or ripped shop assets.
 - Do not vendor `greyhavens/msoy` into this tree.
 - Be an adult. Harassment or "gotcha" crash content gets you removed.
