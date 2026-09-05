@@ -28,8 +28,12 @@
   var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
+  var meSub = "home"; // home | profile
   var pollTimer = null;
   var occTimer = null;
+  var WALL_KEY = "whirled2.wall.";
+  var POKE_KEY = "whirled2.pokes";
+  var STATUS_KEY = "whirled2.status.";
   var listeners = { chat: [], occupants: [] };
   function session() { return window.WhirledApi ? window.WhirledApi.session() : null; }
   function you() {
@@ -76,20 +80,131 @@
       +   '</aside>'
       +   '<section class="stage-wrap">'
       +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span><span class="room-owner">owner: ' + esc(me.name) + '</span></div>'
-      +     '<div class="subtabs" aria-label="Chat channels">'
-      +       '<button type="button" class="subtab is-on">Room</button>'
-      +       '<button type="button" class="subtab" disabled>Groups</button>'
-      +       '<button type="button" class="subtab" disabled>People</button>'
-      +     '</div>'
       +     '<div id="stage-slot"><div class="stage-copy"><strong>Engine mounts here</strong>Click-to-walk belongs to the room engine.<code>#stage-slot</code></div></div>'
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
       +   '</section>'
       + '</div>';
   }
-  function mePage() {
-    var me = you();
-    return '<section class="page"><div class="hero"><div><div class="ava lg you">' + esc(me.initials) + '</div><h1>' + esc(me.name) + '</h1><p>Home room is the profile.</p><form class="profile-form" id="profile-form"><label>Display name <input name="name" maxlength="24" value="' + esc(me.name) + '" /></label><label>Bio <input name="bio" maxlength="180" value="' + esc(me.bio) + '" /></label><button type="submit">Save profile</button><p class="meta" id="profile-msg"></p></form></div><div class="card"><div class="swatch"></div><div class="body"><h3>Studio Loft</h3><p class="meta">home · unlocked</p></div></div></div></section>';
+
+  function wallKey(userId) { return WALL_KEY + (userId || "guest"); }
+  function loadWall(userId) {
+    try { return JSON.parse(localStorage.getItem(wallKey(userId)) || "[]"); } catch (e) { return []; }
   }
+  function saveWall(userId, rows) {
+    localStorage.setItem(wallKey(userId), JSON.stringify(rows.slice(-80)));
+  }
+  function loadStatus(userId) {
+    try { return localStorage.getItem(STATUS_KEY + userId) || ""; } catch (e) { return ""; }
+  }
+  function saveStatus(userId, text) {
+    localStorage.setItem(STATUS_KEY + userId, String(text || "").slice(0, 140));
+  }
+  function loadPokes() {
+    try { return JSON.parse(localStorage.getItem(POKE_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function addPoke(fromId, toId) {
+    var map = loadPokes();
+    var key = toId;
+    if (!map[key]) map[key] = [];
+    map[key].unshift({ from: fromId, at: new Date().toISOString() });
+    map[key] = map[key].slice(0, 40);
+    localStorage.setItem(POKE_KEY, JSON.stringify(map));
+    return map[key];
+  }
+  function photoFor(user) {
+    if (user && user.photo) return user.photo;
+    try {
+      var s = session();
+      if (s && s.user && s.user.id === (user && user.id)) {
+        return localStorage.getItem("whirled2.photo." + s.user.id) || "";
+      }
+      if (user && user.id) return localStorage.getItem("whirled2.photo." + user.id) || "";
+    } catch (e) {}
+    return "";
+  }
+  function meSubnav() {
+    return '<div class="me-subnav"><span class="me-title">Me</span><nav class="me-links">'
+      + '<button type="button" class="me-link' + (meSub === "home" ? " is-on" : "") + '" data-me="home">Me</button>'
+      + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link' + (meSub === "profile" ? " is-on" : "") + '" data-me="profile">My Profile</button>'
+      + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link" data-tab="rooms">My Rooms</button>'
+      + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link" disabled title="Coming soon">Friends</button>'
+      + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link" disabled title="Coming soon">Account</button>'
+      + '</nav></div>';
+  }
+  function meHome() {
+    var me = you();
+    var st = loadStatus(session().user.id);
+    var wall = loadWall(session().user.id).slice(0, 12);
+    var news = wall.map(function (w) {
+      return '<div class="news-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+    }).join("") || '<p class="meta">No news yet. Post a status on My Profile.</p>';
+    var friendsOnline = liveOccupants.filter(function (p) { return !p.you; });
+    var friendBox = friendsOnline.length
+      ? friendsOnline.map(function (p) { return '<div class="friend-row"><span class="ava">' + esc(p.initials) + '</span><div><b>' + esc(p.name) + '</b><div class="sub">In ' + esc(p.room || ROOM) + '</div></div></div>'; }).join("")
+      : '<p class="meta">No other players online in this room right now.</p>';
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="me-grid">'
+      +   '<div class="me-main">'
+      +     '<div class="panel"><h2>My News</h2>'
+      +       (st ? '<p class="status-line"><b>Your status:</b> ' + esc(st) + '</p>' : '')
+      +       news + '</div>'
+      +   '</div>'
+      +   '<aside class="me-side">'
+      +     '<div class="panel links-panel">'
+      +       '<button type="button" class="text-btn" data-me="profile">My Profile</button>'
+      +       '<button type="button" class="text-btn" data-tab="rooms">My Rooms</button>'
+      +       '<span class="meta">People online in loft: ' + (liveOccupants.length || 1) + '</span>'
+      +     '</div>'
+      +     '<div class="panel"><h2>In Studio Loft</h2>' + friendBox + '</div>'
+      +   '</aside>'
+      + '</div></section>';
+  }
+  function meProfile() {
+    var me = you();
+    var sid = session().user.id;
+    var st = loadStatus(sid);
+    var photo = photoFor(session().user);
+    var wall = loadWall(sid);
+    var pokes = (loadPokes()[sid] || []).slice(0, 8);
+    var photoHtml = photo
+      ? '<img class="profile-photo" src="' + photo + '" alt="Profile photo" width="80" height="60" />'
+      : '<div class="ava lg you profile-photo-fallback">' + esc(me.initials) + '</div>';
+    var wallHtml = wall.length ? wall.map(function (w) {
+      return '<div class="wall-row"><span class="ava">' + esc((w.who || "?").slice(0, 1)) + '</span><div><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div></div>';
+    }).join("") : '<p class="meta">No comments yet. Be the first on this wall.</p>';
+    var pokeHtml = pokes.length ? pokes.map(function (p) {
+      return '<div class="meta">Poked by <b>' + esc(p.from) + '</b> · ' + esc((p.at || "").slice(0, 16).replace("T", " ")) + '</div>';
+    }).join("") : '<p class="meta">No pokes yet.</p>';
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="profile-card panel">'
+      +   '<div class="profile-head">' + photoHtml
+      +     '<div class="profile-head-text"><h1>My Profile</h1>'
+      +       '<div class="whirled-name">' + esc(me.name) + '</div>'
+      +       '<div class="status-line" id="status-display">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      +       '<div class="profile-actions">'
+      +         '<button type="button" class="poke-btn" id="poke-self-demo" title="Others can poke you from your public profile">Poke</button>'
+      +         '<label class="photo-btn">Photo <input type="file" id="photo-input" accept="image/*" hidden /></label>'
+      +       '</div></div></div>'
+      +   '<form class="status-form" id="status-form"><input name="status" maxlength="140" placeholder="What are you up to?" value="' + esc(st) + '" /><button type="submit">Update status</button></form>'
+      +   '<form class="profile-form" id="profile-form"><label>Display name <input name="name" maxlength="24" value="' + esc(me.name) + '" /></label>'
+      +     '<label>About me <input name="bio" maxlength="180" value="' + esc(me.bio) + '" /></label>'
+      +     '<button type="submit">Save profile</button><p class="meta" id="profile-msg"></p></form>'
+      + '</div>'
+      + '<div class="panel"><h2>Player News / Wall</h2>'
+      +   '<form class="wall-form" id="wall-form"><input name="text" maxlength="240" placeholder="Comment on this profile" required /><button type="submit">Comment</button></form>'
+      +   '<div id="wall-list">' + wallHtml + '</div></div>'
+      + '<div class="panel"><h2>Pokes</h2><div id="poke-list">' + pokeHtml + '</div>'
+      +   '<p class="meta">Anyone logged in can poke your profile. On this offline demo, use the Poke button to leave yourself a poke as a test.</p></div>'
+      + '</section>';
+  }
+  function mePage() {
+    return meSub === "profile" ? meProfile() : meHome();
+  }
+
   function gate() {
     return ''
       + '<section class="gate"><div class="gate-card">'
@@ -304,27 +419,83 @@
   var app = document.getElementById("app");
   boot();
   app.addEventListener("click", function (ev) {
-    if (ev.target.id === "logout-btn") { window.WhirledApi.logout(); chat = []; paint(""); return; }
+    if (ev.target.id === "logout-btn") { window.WhirledApi.logout(); chat = []; liveOccupants = []; paint(""); return; }
+    var meBtn = ev.target.closest("[data-me]");
+    if (meBtn && session()) {
+      meSub = meBtn.getAttribute("data-me") || "home";
+      paint("me");
+      return;
+    }
+    if (ev.target.id === "poke-self-demo" && session()) {
+      var sid = session().user.id;
+      addPoke(session().user.name, sid);
+      meSub = "profile";
+      paint("me");
+      return;
+    }
     var tab = ev.target.closest("[data-tab]");
-    if (tab && tab.getAttribute("data-tab") && session()) paint(tab.getAttribute("data-tab"));
+    if (tab && tab.getAttribute("data-tab") && session()) {
+      var t = tab.getAttribute("data-tab");
+      if (t === "me") meSub = "home";
+      paint(t);
+    }
+  });
+  app.addEventListener("change", function (ev) {
+    if (ev.target.id !== "photo-input" || !session()) return;
+    var file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (file.size > 200000) { alert("Keep photos under ~200KB for this demo."); return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data = String(reader.result || "");
+      localStorage.setItem("whirled2.photo." + session().user.id, data);
+      var s = session();
+      s.user.photo = data;
+      try { localStorage.setItem("whirled2.session", JSON.stringify(s)); } catch (e) {}
+      meSub = "profile";
+      paint("me");
+    };
+    reader.readAsDataURL(file);
   });
   app.addEventListener("submit", function (ev) {
     ev.preventDefault();
     if (ev.target.id === "profile-form") {
       var data = new FormData(ev.target);
       var msg = document.getElementById("profile-msg");
-      window.WhirledApi.saveProfile({ name: data.get("name"), bio: data.get("bio") }).then(function () { if (msg) msg.textContent = "Saved."; paint("me"); }).catch(function (e) { if (msg) msg.textContent = e.message; });
+      window.WhirledApi.saveProfile({ name: data.get("name"), bio: data.get("bio") }).then(function () {
+        if (msg) msg.textContent = "Saved.";
+        meSub = "profile";
+        paint("me");
+      }).catch(function (e) { if (msg) msg.textContent = e.message; });
+      return;
+    }
+    if (ev.target.id === "status-form" && session()) {
+      var data2 = new FormData(ev.target);
+      var st = String(data2.get("status") || "").trim().slice(0, 140);
+      saveStatus(session().user.id, st);
+      var wall = loadWall(session().user.id);
+      if (st) {
+        wall.unshift({ who: you().name, text: "updated status: " + st, at: new Date().toISOString(), kind: "status" });
+        saveWall(session().user.id, wall);
+      }
+      meSub = "profile";
+      paint("me");
+      return;
+    }
+    if (ev.target.id === "wall-form" && session()) {
+      var data3 = new FormData(ev.target);
+      var text3 = String(data3.get("text") || "").trim().slice(0, 240);
+      if (!text3) return;
+      var wall2 = loadWall(session().user.id);
+      wall2.unshift({ who: you().name, text: text3, at: new Date().toISOString(), kind: "comment" });
+      saveWall(session().user.id, wall2);
+      meSub = "profile";
+      paint("me");
       return;
     }
     var input = ev.target.querySelector("input");
     var text = input && input.value.trim();
     if (!text) return;
-    if (ev.target.id === "status-form") {
-      var list = document.getElementById("feed-list");
-      if (list) list.insertAdjacentHTML("afterbegin", feedRow({ who: you().name, text: text, place: "status", ago: "just now" }));
-      input.value = "";
-      return;
-    }
     if (ev.target.id === "chat-form") { pushChat(text); input.value = ""; }
   });
 })();

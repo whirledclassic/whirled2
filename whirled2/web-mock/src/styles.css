@@ -58,7 +58,6 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   padding: 8px 14px 9px;
   border-radius: 8px 8px 0 0;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 0 #1a4a68;
-  text-transform: lowercase;
 }
 .tab:hover { filter: brightness(1.08); }
 .tab.is-on {
@@ -457,4 +456,64 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   .chat-opts { display: none; }
   .subtabs { overflow-x: auto; }
   .room-strip { font-size: 11px; }
+}
+
+
+/* Me dashboard (classic Me tab inspiration) */
+.me-subnav {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: linear-gradient(#4a90b8, #2f6f96);
+  color: #fff; padding: 8px 12px; border-radius: 6px; margin: -6px 0 14px;
+}
+.me-title { font-weight: 700; font-size: 15px; }
+.me-links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.me-link {
+  border: 0; background: transparent; color: #e8f4fb; font: 700 12px var(--ui);
+  cursor: pointer; padding: 4px 2px; text-decoration: none;
+}
+.me-link.is-on, .me-link:hover { color: #fff; text-decoration: underline; }
+.me-link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
+.me-subnav .sep { color: rgba(255,255,255,0.45); }
+.me-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 14px; }
+.panel {
+  background: #fff; border: 1px solid #c5deee; border-radius: 8px;
+  padding: 12px 14px; margin-bottom: 12px;
+}
+.panel h2 { margin: 0 0 10px; color: #1e6fa8; font-size: 16px; }
+.news-row, .wall-row, .friend-row {
+  display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px dotted #c5deee;
+  font-size: 13px;
+}
+.news-row time, .wall-row time { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.links-panel { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.status-line { margin: 6px 0 10px; }
+.profile-card .profile-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
+.profile-photo {
+  width: 80px; height: 60px; object-fit: cover; border-radius: 4px;
+  border: 1px solid #b7d3e8; background: #e8f4fb;
+}
+.profile-photo-fallback { flex-shrink: 0; }
+.whirled-name { font-size: 20px; font-weight: 700; color: #1e6fa8; }
+.profile-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.poke-btn, .photo-btn {
+  border: 0; background: linear-gradient(#6eb8e8, #3aa3e0); color: #fff;
+  font: 700 12px var(--ui); padding: 7px 12px; border-radius: 6px; cursor: pointer;
+}
+.photo-btn { display: inline-block; }
+.wall-form, .status-form {
+  display: flex; gap: 8px; margin: 0 0 12px; flex-wrap: wrap;
+}
+.wall-form input, .status-form input {
+  flex: 1; min-width: 160px; border: 1px solid #b7d3e8; border-radius: 4px;
+  padding: 8px 10px; font: 13px var(--ui);
+}
+.wall-form button, .status-form button {
+  border: 0; background: var(--tab-on); color: #fff; border-radius: 4px;
+  padding: 8px 12px; font: 700 12px var(--ui); cursor: pointer;
+}
+.subtabs, .subtab { display: none !important; } /* removed duplicate under-tabs */
+
+@media (max-width: 900px) {
+  .me-grid { grid-template-columns: 1fr; }
+  .me-subnav { flex-direction: column; align-items: flex-start; }
 }
