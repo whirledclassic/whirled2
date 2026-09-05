@@ -15,20 +15,23 @@
   var PEOPLE = []; // real occupants only — filled from presence API / session
   var STUFF = [
     { kind: "avatar", name: "Inkcoat default", creator: "you", owned: true, coins: 0 },
-    { kind: "furniture", name: "Oak table", creator: "Brittney", owned: true, coins: 40 },
+    { kind: "furniture", name: "Oak table", creator: "studio", owned: true, coins: 40 },
     { kind: "backdrop", name: "Loft wall", creator: "you", owned: true, coins: 0 }
   ];
   var SHOP = [
-    { kind: "avatar", name: "Paper fox", creator: "Pletou", owned: false, coins: 80 },
-    { kind: "furniture", name: "Window seat", creator: "Brittney", owned: false, coins: 60 },
-    { kind: "backdrop", name: "Two-moon night", creator: "Vortex", owned: false, coins: 120 },
-    { kind: "toy", name: "Click-plant", creator: "Cleaver", owned: false, coins: 20 }
+    { kind: "avatar", name: "Paper fox", creator: "shop", owned: false, coins: 80 },
+    { kind: "furniture", name: "Window seat", creator: "studio", owned: false, coins: 60 },
+    { kind: "backdrop", name: "Two-moon night", creator: "shop", owned: false, coins: 120 },
+    { kind: "toy", name: "Click-plant", creator: "shop", owned: false, coins: 20 }
   ];
   var FEED = [];
   var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
-  var meSub = "home"; // home | profile
+  var meSub = "home"; // home | profile | friends
+  var inRoom = false;
+  var viewingId = null; // profile being viewed
+  var FRIENDS_KEY = "whirled2.friends";
   var pollTimer = null;
   var occTimer = null;
   var WALL_KEY = "whirled2.wall.";
@@ -37,6 +40,20 @@
   var notices = [];
   var NOTE_KEY = "whirled2.notices";
   var listeners = { chat: [], occupants: [] };
+  function loadFriends() {
+    try { return JSON.parse(localStorage.getItem(FRIENDS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveFriends(list) {
+    localStorage.setItem(FRIENDS_KEY, JSON.stringify(list.slice(0, 100)));
+  }
+  function addFriend(entry) {
+    var list = loadFriends();
+    if (!entry || !entry.id) return list;
+    if (list.some(function (f) { return f.id === entry.id; })) return list;
+    list.unshift({ id: entry.id, name: entry.name, at: new Date().toISOString() });
+    saveFriends(list);
+    return list;
+  }
   function session() { return window.WhirledApi ? window.WhirledApi.session() : null; }
   function you() {
     var s = session();
@@ -46,7 +63,12 @@
     return { name: "Guest", initials: "?", bio: "", coins: 0, room: ROOM };
   }
   function personRow(p) {
-    return '<div class="person"><span class="ava' + (p.you ? " you" : "") + '">' + esc(p.initials) + '</span><span>' + esc(p.name) + (p.you ? " <span class='sub'>(you)</span>" : "") + '</span><span class="dot' + (p.online ? " on" : "") + '"></span><span class="sub">' + esc(p.you ? "you" : p.room) + "</span></div>";
+    var id = p.id || "";
+    return '<button type="button" class="person" data-profile="' + esc(id) + '">'
+      + '<span class="ava' + (p.you ? " you" : "") + '">' + esc(p.initials || "?") + '</span>'
+      + '<span class="person-name">' + esc(p.name) + (p.you ? " <span class=\"sub\">(you)</span>" : "") + '</span>'
+      + '<span class="dot' + (p.online ? " on" : "") + '"></span>'
+      + '<span class="sub">' + esc(p.you ? "you" : (p.room || "")) + '</span></button>';
   }
   function feedRow(ev) {
     return '<div class="feed-row"><span class="ava">' + esc(ev.who.slice(0, 1)) + "</span><div><b>" + esc(ev.who) + "</b> " + esc(ev.text) + "<time>" + esc(ev.ago || "just now") + " · " + esc(ev.place || "status") + "</time></div></div>";
@@ -63,7 +85,26 @@
   function catalog(title, blurb, items) {
     return '<section class="page"><div class="page-head"><div><h1>' + esc(title) + '</h1><p>' + esc(blurb) + '</p></div></div><div class="grid">' + items.map(card).join('') + '</div></section>';
   }
-  function rooms() {
+  function roomsLobby() {
+    var me = you();
+    var online = liveOccupants.length || (session() ? 1 : 0);
+    return '<section class="page rooms-lobby">'
+      + '<div class="featured">Featured Rooms</div>'
+      + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Decorate, chat and play — engine mounts inside the loft.</p>'
+      + '<div class="section-label">Active rooms</div>'
+      + '<div class="room-tiles">'
+      +   '<button type="button" class="room-tile" data-enter-room="loft">'
+      +     '<div class="thumb"></div>'
+      +     '<div class="body"><h3>Studio Loft</h3>'
+      +       '<p class="meta">owner: ' + esc(me.name) + ' · home</p>'
+      +       '<div class="online">' + online + ' online now!</div>'
+      +       '<span class="enter-label">Enter</span></div>'
+      +   '</button>'
+      + '</div>'
+      + '<p class="meta">More public rooms arrive when the shared server lists them.</p>'
+      + '</section>';
+  }
+  function roomView() {
     var me = you();
     var here = liveOccupants.slice();
     if (!here.some(function (p) { return p.you || (session() && p.id === session().user.id); })) {
@@ -79,6 +120,7 @@
       + '<div class="workspace">'
       +   '<aside class="rail"><h2>In this room</h2>'
       +     (empty ? '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>' : here.map(personRow).join(''))
+      +     '<button type="button" class="text-btn leave-room" data-leave-room="1">Back to Rooms</button>'
       +   '</aside>'
       +   '<section class="stage-wrap">'
       +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span><span class="room-owner">owner: ' + esc(me.name) + '</span></div>'
@@ -87,6 +129,10 @@
       +   '</section>'
       + '</div>';
   }
+  function rooms() {
+    return inRoom ? roomView() : roomsLobby();
+  }
+
 
   function wallKey(userId) { return WALL_KEY + (userId || "guest"); }
   function loadWall(userId) {
@@ -164,7 +210,7 @@
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link" data-tab="rooms">My Rooms</button>'
       + '<span class="sep">|</span>'
-      + '<button type="button" class="me-link" disabled title="Coming soon">Friends</button>'
+      + '<button type="button" class="me-link' + (meSub === "friends" ? " is-on" : "") + '" data-me="friends">Friends</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link" disabled title="Coming soon">Account</button>'
       + '</nav></div>';
@@ -245,9 +291,59 @@
       +   '<p class="meta">Pokes notify you in the bottom-right bar (classic Whirled style).</p></div>'
       + '</section>';
   }
-  function mePage() {
-    return meSub === "profile" ? meProfile() : meHome();
+  function meFriends() {
+    var list = loadFriends();
+    var rows = list.length ? list.map(function (f) {
+      return '<div class="friend-row">'
+        + '<button type="button" class="text-btn" data-profile="' + esc(f.id) + '"><b>' + esc(f.name) + '</b></button>'
+        + '<span class="meta">friended ' + esc((f.at || "").slice(0, 10)) + '</span>'
+        + '<button type="button" class="action-btn" data-profile="' + esc(f.id) + '">Visit</button>'
+        + '</div>';
+    }).join("") : '<p class="meta">No friends yet. Open someone\'s profile and hit Add Friend.</p>';
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="panel"><h2>Friends</h2>'
+      + '<p class="meta">Invite Them! Search comes with the shared server. For now, add people you meet in the loft.</p>'
+      + rows + '</div></section>';
   }
+  function otherProfile(id) {
+    var me = you();
+    var occ = liveOccupants.filter(function (p) { return p.id === id; })[0];
+    var friend = loadFriends().filter(function (f) { return f.id === id; })[0];
+    var name = (occ && occ.name) || (friend && friend.name) || id;
+    var initials = (occ && occ.initials) || String(name).slice(0, 1).toUpperCase();
+    var st = loadStatus(id);
+    var photo = localStorage.getItem("whirled2.photo." + id) || "";
+    var wall = loadWall(id);
+    var photoHtml = photo
+      ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
+      : '<div class="ava lg profile-photo-fallback">' + esc(initials) + '</div>';
+    var wallHtml = wall.length ? wall.map(function (w) {
+      return '<div class="wall-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+    }).join("") : '<p class="meta">No comments yet.</p>';
+    var isSelf = session() && session().user.id === id;
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="profile-card panel"><div class="profile-head">' + photoHtml
+      + '<div class="profile-head-text">'
+      + '<div class="profile-title-row"><h1>' + (isSelf ? "My Profile" : "Profile") + '</h1><span class="level-badge">Level 1</span></div>'
+      + '<div class="whirled-name">' + esc(name) + '</div>'
+      + '<div class="status-line">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      + '<div class="profile-actions">'
+      +   (isSelf ? '' : '<button type="button" class="poke-btn" data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '">Poke</button>')
+      +   (isSelf ? '' : '<button type="button" class="action-btn" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Add Friend</button>')
+      +   '<button type="button" class="action-btn" data-tab="rooms">Visit Home</button>'
+      + '</div></div></div></div>'
+      + '<div class="panel"><h2>Wall</h2>'
+      + '<form class="wall-form" id="wall-form" data-wall-user="' + esc(id) + '"><input name="text" maxlength="240" placeholder="Comment on this profile" required /><button type="submit">Comment</button></form>'
+      + '<div id="wall-list">' + wallHtml + '</div></div></section>';
+  }
+  function mePage() {
+    if (viewingId && session() && viewingId !== session().user.id) return otherProfile(viewingId);
+    if (viewingId && session() && viewingId === session().user.id) { meSub = "profile"; viewingId = null; }
+    if (meSub === "friends") return meFriends();
+    if (meSub === "profile") return meProfile();
+    return meHome();
+  }
+
 
   function gate() {
     return ''
@@ -316,7 +412,10 @@
       return;
     }
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
-    document.getElementById("app").setAttribute("data-tab", tab || "rooms");
+    var tabAttr = tab || "rooms";
+    if (tabAttr === "rooms" && !inRoom) tabAttr = "rooms-lobby";
+    if (tabAttr === "rooms" && inRoom) tabAttr = "rooms";
+    document.getElementById("app").setAttribute("data-tab", tabAttr);
     document.querySelectorAll(".tab").forEach(function (btn) { btn.classList.toggle("is-on", btn.getAttribute("data-tab") === tab); });
     var main = document.getElementById("main");
     if (!main) return;
@@ -468,10 +567,52 @@
   var app = document.getElementById("app");
   boot();
   app.addEventListener("click", function (ev) {
-    if (ev.target.id === "logout-btn") { window.WhirledApi.logout(); chat = []; liveOccupants = []; paint(""); return; }
+    if (ev.target.id === "logout-btn") {
+      window.WhirledApi.logout();
+      chat = []; liveOccupants = []; inRoom = false; viewingId = null;
+      paint("");
+      return;
+    }
+    var enter = ev.target.closest("[data-enter-room]");
+    if (enter && session()) {
+      inRoom = true;
+      paint("rooms");
+      loadOccupants();
+      return;
+    }
+    if (ev.target.closest("[data-leave-room]")) {
+      inRoom = false;
+      paint("rooms");
+      return;
+    }
+    var prof = ev.target.closest("[data-profile]");
+    if (prof && session()) {
+      viewingId = prof.getAttribute("data-profile") || null;
+      meSub = "profile";
+      paint("me");
+      return;
+    }
+    var addF = ev.target.closest("[data-add-friend]");
+    if (addF && session()) {
+      addFriend({ id: addF.getAttribute("data-add-friend"), name: addF.getAttribute("data-friend-name") });
+      pushNotice("gray", "You friended " + (addF.getAttribute("data-friend-name") || "someone") + ".");
+      meSub = "friends";
+      viewingId = null;
+      paint("me");
+      return;
+    }
+    var pokeOther = ev.target.closest("[data-poke]");
+    if (pokeOther && session()) {
+      var pid = pokeOther.getAttribute("data-poke");
+      var pname = pokeOther.getAttribute("data-poke-name") || pid;
+      addPoke(session().user.name, pid);
+      pushNotice("orange", "You poked " + pname + ".");
+      return;
+    }
     var meBtn = ev.target.closest("[data-me]");
     if (meBtn && session()) {
       meSub = meBtn.getAttribute("data-me") || "home";
+      viewingId = null;
       paint("me");
       return;
     }
@@ -480,13 +621,15 @@
       addPoke(session().user.name, sid);
       pushNotice("orange", session().user.name + " poked you.");
       meSub = "profile";
+      viewingId = null;
       paint("me");
       return;
     }
     var tab = ev.target.closest("[data-tab]");
     if (tab && tab.getAttribute("data-tab") && session()) {
       var t = tab.getAttribute("data-tab");
-      if (t === "me") meSub = "home";
+      if (t === "me") { meSub = "home"; viewingId = null; }
+      if (t === "rooms") { /* keep inRoom */ }
       paint(t);
     }
   });
@@ -549,11 +692,13 @@
       var data3 = new FormData(ev.target);
       var text3 = String(data3.get("text") || "").trim().slice(0, 240);
       if (!text3) return;
-      var wall2 = loadWall(session().user.id);
+      var targetWall = ev.target.getAttribute("data-wall-user") || session().user.id;
+      var wall2 = loadWall(targetWall);
       wall2.unshift({ who: you().name, text: text3, at: new Date().toISOString(), kind: "comment" });
-      saveWall(session().user.id, wall2);
+      saveWall(targetWall, wall2);
       pushNotice("blue", you().name + " commented on a profile.");
-      meSub = "profile";
+      if (targetWall === session().user.id) { viewingId = null; meSub = "profile"; }
+      else viewingId = targetWall;
       paint("me");
       return;
     }

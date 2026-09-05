@@ -553,3 +553,22 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   #app[data-tab]:not([data-tab="rooms"]) ~ .notice-bar,
   body:has(#app[data-tab="gate"]) .notice-bar { bottom: 12px; }
 }
+
+
+.rooms-lobby .lobby-blurb { color: #1e6fa8; margin: 0 0 14px; }
+.section-label {
+  display: inline-block; background: #3aa3e0; color: #fff;
+  font: 700 11px var(--ui); padding: 4px 8px; border-radius: 3px; margin-bottom: 10px;
+}
+.room-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.room-tile .enter-label {
+  display: inline-block; margin-top: 8px; background: linear-gradient(#6eb8e8, #3aa3e0);
+  color: #fff; font: 700 12px var(--ui); padding: 6px 12px; border-radius: 6px;
+}
+.person {
+  width: 100%; border: 0; background: transparent; color: inherit;
+  cursor: pointer; text-align: left;
+}
+.person:hover { background: rgba(255,255,255,0.06); }
+.leave-room { display: block; margin: 10px; color: #7ec8f0 !important; }
+.rooms-lobby .featured { margin: -18px -22px 14px; }
