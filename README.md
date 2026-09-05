@@ -47,6 +47,9 @@ No. Same *product idea* — your room, walk-around avatars, user-made stuff — 
 **Why two tracks?**  
 Classic = the artifact, privately hosted. Whirled 2 = a 2026 browser room that does not need Flash. Different compilers, different risk, same maintainer.
 
+**What did the original cost, and how would this even get funded?**  
+[whirled2/PUBLIC.md](whirled2/PUBLIC.md) — published 2010 numbers (~$5M in / ~$300K out), why the community is the actual asset, crowdfunding rules, networking notes.
+
 **Name collision:** [lulzsun/whirled2](https://github.com/lulzsun/whirled2) is someone else’s remake. Not this tree.
 
 ---
@@ -55,7 +58,7 @@ Classic = the artifact, privately hosted. Whirled 2 = a 2026 browser room that d
 
 - **Classic:** stack is booting on a Debian 13 XFCE VM (VirtualBox, NAT, Java 8). Next step on this track is treating that box as a **private server**, not a screenshot museum. Guide for repeating the build: [classic/SETUP.md](classic/SETUP.md).
 - **Whirled 2:** public repo is open. First ship is one click-to-walk room. That is [issue #1](https://github.com/whirledclassic/whirled2/issues/1).
-- Money: volunteer now. Credit always. Pay only if a world actually makes money and the maintainer can pay from that. [whirled2/ARTISTS.md](whirled2/ARTISTS.md).
+- Money: volunteer now. Credit always. Pay only if a world actually makes money and the maintainer can pay from that. [whirled2/ARTISTS.md](whirled2/ARTISTS.md). Longer public note: [whirled2/PUBLIC.md](whirled2/PUBLIC.md).
 
 ---
 
@@ -79,7 +82,8 @@ Classic = the artifact, privately hosted. Whirled 2 = a 2026 browser room that d
     ├─ README.md
     ├─ SAME-AND-DIFFERENT.md
     ├─ ROADMAP.md
-    └─ ARTISTS.md
+    ├─ ARTISTS.md
+    └─ PUBLIC.md               ← money, community, crowdfunding, networking
 ```
 
 There is no leftover `docs/` dump. Classic notes live under [`classic/`](classic/). Whirled 2 notes live under [`whirled2/`](whirled2/).
@@ -101,6 +105,7 @@ Classic:
 
 Whirled 2:
 
+- [whirled2/PUBLIC.md](whirled2/PUBLIC.md) — public: original cost, community, funding rules
 - [whirled2/ROADMAP.md](whirled2/ROADMAP.md)
 - [whirled2/ARTISTS.md](whirled2/ARTISTS.md)
 - [whirled2/SAME-AND-DIFFERENT.md](whirled2/SAME-AND-DIFFERENT.md)
