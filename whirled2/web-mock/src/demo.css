@@ -1,0 +1,22 @@
+.text-btn { border: 0; background: transparent; color: var(--coral-deep); font: 650 12px var(--ui); cursor: pointer; }
+.stage-wrap { display: flex; flex-direction: column; }
+#stage-slot { flex: 1; min-height: 280px; }
+.chat-log { max-height: 160px; overflow: auto; background: #1c1814; color: #f3eee4; padding: 8px 12px; font-size: 13px; border-top: 1px solid #2a241e; }
+.chat-row { padding: 4px 0; border-bottom: 1px solid #2a241e; }
+.chat-row b { color: #fff; margin-right: 6px; }
+.chat-row time { color: #8b8376; font-size: 11px; }
+.profile-form { display: flex; flex-direction: column; gap: 8px; padding: 16px 0 0; max-width: 360px; }
+.profile-form input { border: 1px solid var(--line); background: var(--cream); padding: 8px 10px; font: 13px var(--ui); border-radius: 8px; }
+.profile-form button { border: 0; background: var(--ink); color: var(--paper); padding: 8px 12px; border-radius: 8px; font: 650 12px var(--ui); cursor: pointer; width: max-content; }
+.profile-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.gate { min-height: 100vh; display: grid; place-items: center; padding: 32px 16px; background: radial-gradient(circle at 20% 10%, rgba(210,76,56,0.14), transparent 40%), var(--cream); }
+.gate-card { width: min(720px, 100%); background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 32px; box-shadow: var(--shadow); }
+.gate-card h1 { font-family: var(--display); font-weight: 500; font-size: clamp(32px, 5vw, 46px); margin: 0 0 8px; letter-spacing: -0.03em; }
+.eyebrow { letter-spacing: 0.16em; text-transform: uppercase; font-size: 11px; color: var(--coral-deep); margin: 0 0 8px; }
+.gate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+.gate-grid form { display: flex; flex-direction: column; gap: 8px; background: var(--cream); padding: 16px; border-radius: 12px; border: 1px solid var(--line); }
+.gate-grid h2 { margin: 0 0 4px; font-size: 14px; }
+.gate-grid input { border: 1px solid var(--line); background: var(--paper); padding: 9px 10px; border-radius: 8px; font: 14px var(--ui); }
+.gate-grid button { border: 0; background: var(--ink); color: #fff; padding: 10px; border-radius: 8px; font: 650 13px var(--ui); cursor: pointer; }
+.gate-err { color: var(--coral-deep); min-height: 1.2em; }
+@media (max-width: 900px) { .gate-grid { grid-template-columns: 1fr; } }
