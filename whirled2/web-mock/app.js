@@ -4,7 +4,8 @@
   var LOGO = "./assets/whirled-classic-logo.png";
   var LOGO_FALLBACK = "./assets/logo.svg";
   function logoImg(cls) {
-    return '<img class="' + cls + '" alt="Whirled Classic" src="' + LOGO + '" onerror="this.onerror=null;this.src=\'' + LOGO_FALLBACK + '\'" />';
+    var wh = cls.indexOf("gate") >= 0 ? ' width="180" height="120"' : ' width="120" height="48"';
+    return '<img class="' + cls + '" alt="Whirled Classic" src="' + LOGO + '"' + wh + ' decoding="async" onerror="this.onerror=null;this.src=\'' + LOGO_FALLBACK + '\'" />';
   }
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (ch) {
@@ -78,8 +79,15 @@
     return '<header class="topbar"><a class="brand" href="#rooms">' + logoImg("logo") + '<span class="sr-only">Whirled Classic</span></a><nav class="tabs">' + [["me","Me"],["stuff","Stuff"],["games","Games"],["rooms","Rooms"],["groups","Groups"],["shop","Shop"]].map(function (t) { return '<button class="tab' + (t[0] === "rooms" ? " is-on" : "") + '" type="button" data-tab="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</nav><div class="who"><div class="row"><b>' + esc(me.name) + '</b><button type="button" id="logout-btn" class="text-btn">Logoff</button><span class="text-btn">Help</span></div><div class="row"><span class="pill">' + me.coins + ' coins</span><span>Lv 1</span></div></div></header><div id="main"></div><form class="bar" id="chat-form"><input id="chat-input" maxlength="240" placeholder="" /><button class="send" type="submit">send</button><span class="tools" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="grow"></span></form>';
   }
   function paint(tab) {
-    if (!session()) { document.getElementById("app").innerHTML = gate(); bindGate(); return; }
+    if (!session()) {
+      document.getElementById("app").innerHTML = gate();
+      document.getElementById("app").setAttribute("data-tab", "gate");
+      bindGate();
+      try { window.__whirledBoot = true; } catch (e) {}
+      return;
+    }
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
+    document.getElementById("app").setAttribute("data-tab", tab || "rooms");
     document.querySelectorAll(".tab").forEach(function (btn) { btn.classList.toggle("is-on", btn.getAttribute("data-tab") === tab); });
     var main = document.getElementById("main");
     if (!main) return;

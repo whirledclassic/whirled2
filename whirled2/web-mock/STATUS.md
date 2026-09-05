@@ -4,6 +4,8 @@ Date: 2026-09-05
 
 ## What shipped (this pass)
 
+- Mobile chrome: stacked header, horizontal scroll tabs, capped logo (fixes iPhone full-bleed logo), room-first layout, chat bar only on Rooms, touch-sized controls.
+
 - Header + login gate use `assets/whirled-classic-logo.png` (user mark). `assets/logo.svg` remains onerror fallback only.
 - Classic pale-blue chrome kept/confirmed: pale header, tabs Me / Stuff / Games / Rooms / Groups / Shop, dark occupant rail, full-bleed `#stage-slot`, black bottom send bar. Gold coin-pill tint removed (coins stay labels, blue text).
 - Login + loft chat survive browser tab switches via `visibilitychange` / `pageshow` (bfcache) restore and `storage` cross-tab sync. Session and offline chat remain in `localStorage` (`whirled2.session`, `whirled2.chat.loft`).

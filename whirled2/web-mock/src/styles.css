@@ -167,23 +167,161 @@ body { font-family: var(--ui); color: var(--ink); background: #d7eaf6; }
 .gate-grid form { display: flex; flex-direction: column; gap: 8px; background: #e8f4fb; padding: 14px; border: 1px solid #b7d3e8; border-radius: 6px; }
 .gate-grid h2 { margin: 0; font-size: 14px; color: #1e6fa8; }
 .gate-err { color: #b33b2a; min-height: 1.2em; }
-@media (max-width: 900px) {
-  .workspace { grid-template-columns: 1fr; }
-  .rail { max-height: 140px; }
-  .gate-grid, .hero { grid-template-columns: 1fr; }
-  .tabs { flex-wrap: wrap; }
-  .brand .logo { height: 40px; max-width: 120px; }
+
+
+/* —— Desktop polish —— */
+.topbar { flex-wrap: nowrap; }
+.tabs { flex-wrap: nowrap; overflow-x: auto; min-width: 0; }
+.tab { white-space: nowrap; flex-shrink: 0; }
+.brand .logo {
+  width: 120px;
+  height: 48px;
+  max-width: 120px;
+  max-height: 48px;
+}
+.gate-logo {
+  width: 180px;
+  height: auto;
+  max-width: min(180px, 70vw);
+  max-height: 110px;
 }
 
-
-/* mobile touch */
+/* —— Phone / narrow: stacked Whirled chrome —— */
 @media (max-width: 900px) {
-  .tab { padding: 10px 12px; font-size: 12px; min-height: 40px; }
-  .bar { height: auto; min-height: 52px; padding: 6px 8px; flex-wrap: wrap; }
-  .bar input { max-width: none; width: 100%; min-height: 40px; font-size: 16px; }
+  html, body { height: 100%; overflow: hidden; }
+  #app {
+    height: 100%;
+    max-height: 100dvh;
+    min-height: 100dvh;
+  }
+  #main {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .topbar {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "brand who"
+      "tabs tabs";
+    gap: 4px 8px;
+    align-items: center;
+    min-height: 0;
+    padding: 6px 8px 0;
+    padding-top: max(6px, env(safe-area-inset-top));
+  }
+  .brand { grid-area: brand; padding: 0; }
+  .brand .logo {
+    width: 96px !important;
+    height: 36px !important;
+    max-width: 96px !important;
+    max-height: 36px !important;
+    object-fit: contain;
+  }
+  .who {
+    grid-area: who;
+    padding: 0;
+    font-size: 11px;
+    align-items: flex-end;
+  }
+  .who .row { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .tabs {
+    grid-area: tabs;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+    padding: 0 0 6px;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 10px 14px;
+    font-size: 13px;
+    min-height: 40px;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    background: #000;
+  }
+  .rail {
+    order: 2;
+    max-height: 28vh;
+    border-right: 0;
+    border-top: 1px solid #000;
+  }
+  .stage-wrap {
+    order: 1;
+    flex: 1;
+    min-height: 42vh;
+  }
+  #stage-slot { min-height: 36vh; }
+
+  .page {
+    padding: 14px 12px 88px;
+    width: 100%;
+  }
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .hero { grid-template-columns: 1fr; }
+
+  .gate {
+    min-height: 100dvh;
+    align-items: start;
+    padding: 16px 12px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    overflow: auto;
+  }
+  .gate-card { width: 100%; padding: 16px 14px; border-radius: 10px; }
+  .gate-card h1 { font-size: 22px; }
+  .gate-logo {
+    width: 140px !important;
+    max-width: 140px !important;
+    max-height: 88px !important;
+    height: auto !important;
+  }
+  .gate-grid { grid-template-columns: 1fr; gap: 10px; }
+  .gate-grid input, .gate-grid button {
+    min-height: 44px;
+    font-size: 16px; /* iOS no-zoom */
+  }
+
+  .bar {
+    position: sticky;
+    bottom: 0;
+    height: auto;
+    min-height: 52px;
+    padding: 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    flex-wrap: nowrap;
+    z-index: 5;
+  }
+  .bar input {
+    max-width: none;
+    flex: 1;
+    min-height: 40px;
+    font-size: 16px;
+  }
   .bar button.send { min-height: 40px; min-width: 64px; }
-  .gate-card { padding: 18px 14px; }
-  .gate-grid input, .gate-grid button { min-height: 44px; font-size: 16px; }
-  .brand .logo, .gate-logo { max-width: 100%; height: auto; }
-  .gate-logo { max-height: 96px; }
+  .tools { display: none; }
+  .grow { display: none; }
+}
+
+@media (min-width: 901px) {
+  .brand .logo {
+    width: 140px;
+    height: 52px;
+    max-width: 140px;
+    max-height: 52px;
+  }
 }

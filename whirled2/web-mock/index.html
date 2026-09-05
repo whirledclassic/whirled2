@@ -6,8 +6,18 @@
   <meta name="theme-color" content="#e8f4fb" />
   <meta http-equiv="Cache-Control" content="no-cache" />
   <title>Whirled Classic</title>
-  <link rel="stylesheet" href="./src/styles.css?v=20260905c" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260905c" />
+  <style>
+    /* Critical: never let the logo blow up before CSS loads (iPhone Safari). */
+    .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
+    .gate-logo, img.gate-logo { width: 160px !important; height: auto !important; max-width: 70vw !important; max-height: 100px !important; object-fit: contain; display: block; margin: 0 auto 10px; }
+    body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", sans-serif; background: #d7eaf6; color: #16324a; }
+    #app[data-tab]:not([data-tab="rooms"]) .bar { display: none; }
+    @media (max-width: 900px) {
+      .brand .logo, img.logo { width: 96px !important; height: 36px !important; max-width: 96px !important; max-height: 36px !important; }
+    }
+  </style>
+  <link rel="stylesheet" href="./src/styles.css?v=20260905e" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260905e" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
@@ -18,31 +28,16 @@
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       var msg = (ev && ev.message) ? ev.message : "Script error";
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260905c">Tap to reload fresh</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260905e">Tap to reload fresh</a></p></div></section>';
     });
     setTimeout(function () {
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       if (el.textContent.indexOf("Loading chrome") === -1) return;
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Phone/desktop cache may be holding an old script. Use the link below.</p><p><a href="./?v=20260905c">Reload fresh build</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Old phone cache. Open a fresh link.</p><p><a href="./?v=20260905e">Reload fresh build</a></p></div></section>';
     }, 2500);
   </script>
-  <script src="./src/api.js?v=20260905c"></script>
-  <script src="./app.js?v=20260905c"></script>
-  <script>
-    // app.js paints #app on success; mark boot if gate/shell appeared
-    (function mark() {
-      var el = document.getElementById("app");
-      if (el && el.querySelector && (el.querySelector(".gate") || el.querySelector(".topbar"))) {
-        window.__whirledBoot = true;
-      }
-    })();
-    setTimeout(function () {
-      var el = document.getElementById("app");
-      if (el && el.querySelector && (el.querySelector(".gate") || el.querySelector(".topbar"))) {
-        window.__whirledBoot = true;
-      }
-    }, 0);
-  </script>
+  <script src="./src/api.js?v=20260905e"></script>
+  <script src="./app.js?v=20260905e"></script>
 </body>
 </html>
