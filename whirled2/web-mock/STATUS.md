@@ -8,6 +8,8 @@ Date: 2026-09-05
 - Classic pale-blue chrome kept/confirmed: pale header, tabs Me / Stuff / Games / Rooms / Groups / Shop, dark occupant rail, full-bleed `#stage-slot`, black bottom send bar. Gold coin-pill tint removed (coins stay labels, blue text).
 - Login + loft chat survive browser tab switches via `visibilitychange` / `pageshow` (bfcache) restore and `storage` cross-tab sync. Session and offline chat remain in `localStorage` (`whirled2.session`, `whirled2.chat.loft`).
 - Broken `esc()` HTML entity map repaired.
+- Fixed `app.js` template string quoting (`id="stage-slot"` / `class="grid"` inside double-quoted JS) that left the live page stuck on “Loading chrome…”.
+- Logo compressed (~166KB). Pages root `index.html` redirects to web-mock.
 - `window.WhirledChrome` unchanged in role (`getStageEl`, `getSession`, `getRoom`, chat hooks). Engine still draws only in `#stage-slot`.
 
 ## Live URL
