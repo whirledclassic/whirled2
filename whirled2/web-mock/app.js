@@ -1,13 +1,14 @@
 /* Whirled 2 page chrome. Classic whirled.club layout. No Pixi. */
 (function () {
   "use strict";
-  var LOGO = "./assets/logo.svg";
+  var LOGO = "./assets/whirled-classic-logo.png";
+  var LOGO_FALLBACK = "./assets/logo.svg";
   function logoImg(cls) {
-    return '<img class="' + cls + '" alt="Whirled Classic" src="' + LOGO + '" />';
+    return '<img class="' + cls + '" alt="Whirled Classic" src="' + LOGO + '" onerror="this.onerror=null;this.src=\'' + LOGO_FALLBACK + '\'" />';
   }
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (ch) {
-      return ({ "&": "&", "<": "<", ">": ">", '"': """, "'": "&#39;" })[ch];
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
     });
   }
   var PEOPLE = [
@@ -18,7 +19,7 @@
   var STUFF = [
     { kind: "avatar", name: "Inkcoat default", creator: "you", owned: true, coins: 0 },
     { kind: "furniture", name: "Oak table", creator: "Brittney", owned: true, coins: 40 },
-    { kind: "backdrop", name: "Cream loft wall", creator: "you", owned: true, coins: 0 }
+    { kind: "backdrop", name: "Loft wall", creator: "you", owned: true, coins: 0 }
   ];
   var SHOP = [
     { kind: "avatar", name: "Paper fox", creator: "Pletou", owned: false, coins: 80 },
@@ -152,6 +153,37 @@
     paint(session() ? "rooms" : "");
     if (session()) { loadHistory(); startPoll(); }
   }
+
+  function onVisible() {
+    if (!session()) {
+      if (document.getElementById("gate-err") || document.querySelector(".gate")) return;
+      paint("");
+      return;
+    }
+    if (!document.getElementById("main")) {
+      boot();
+      return;
+    }
+    loadHistory();
+    startPoll();
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") onVisible();
+  });
+  window.addEventListener("pageshow", function (ev) {
+    if (ev.persisted) onVisible();
+  });
+  window.addEventListener("storage", function (ev) {
+    if (!ev.key) return;
+    if (ev.key === "whirled2.session") {
+      boot();
+      return;
+    }
+    if (ev.key.indexOf("whirled2.chat.") === 0 && session()) {
+      loadHistory();
+    }
+  });
+
   var app = document.getElementById("app");
   boot();
   app.addEventListener("click", function (ev) {

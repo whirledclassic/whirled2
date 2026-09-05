@@ -50,7 +50,7 @@ Needs Node 18+. No `npm install`.
 | `index.html` | Shell |
 | `app.js` | Tabs, gate, chat, profile |
 | `src/api.js` | Client: live server or localStorage fallback |
-| `src/styles.css` | Cream / ink / coral |
+| `src/styles.css` | Pale blue classic Whirled chrome |
 | `server/server.mjs` | Tiny Node demo API |
 | `ENGINE-BRIDGE.md` | How the Pixi repo mounts later |
 | `NETWORKING.md` | Auth, database, host plan for both of you |

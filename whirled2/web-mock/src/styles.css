@@ -12,7 +12,6 @@
   --stage: #1a2834;
   --chat: #0e141a;
   --send: #3aa3e0;
-  --gold: #f0b429;
   --ui: "Trebuchet MS", "Segoe UI", sans-serif;
 }
 * { box-sizing: border-box; }
@@ -70,7 +69,7 @@ body { font-family: var(--ui); color: var(--ink); background: #d7eaf6; }
 .who b { color: #1e6fa8; }
 .pill {
   background: #fff; border: 1px solid #c5deee; border-radius: 999px;
-  padding: 1px 8px; color: #c47a12; font-weight: 700;
+  padding: 1px 8px; color: #1e6fa8; font-weight: 700;
 }
 .text-btn { border: 0; background: transparent; color: #1e6fa8; font: 700 11px var(--ui); cursor: pointer; text-decoration: underline; }
 .note { display: none; }
@@ -128,7 +127,7 @@ body { font-family: var(--ui); color: var(--ink); background: #d7eaf6; }
 .card .swatch.fox { background: linear-gradient(#e07a28, #f4e6d4); }
 .card .body { padding: 8px 10px 10px; }
 .card h3 { margin: 0 0 3px; font-size: 14px; }
-.price { margin-top: 6px; font-size: 12px; font-weight: 700; color: #c47a12; }
+.price { margin-top: 6px; font-size: 12px; font-weight: 700; color: #1e6fa8; }
 .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; align-items: center; margin-bottom: 20px; }
 .profile-form, .status-form { display: flex; flex-direction: column; gap: 8px; padding: 12px 0 0; max-width: 360px; }
 .status-form { flex-direction: row; padding: 8px 10px; }
