@@ -1,7 +1,7 @@
 # Classic Whirled / msoy lab
 
-**This is not Whirled 2.**  
-Label: `whirled` / `classic-lab`.  
+**Track landing page:** [`../classic/README.md`](../classic/README.md)  
+**This is not Whirled 2.** Label: `whirled` / `classic-lab`.  
 Source of truth for code: [greyhavens/msoy](https://github.com/greyhavens/msoy) (“What in the Whirled is this?”). Related trees: [whirled-sdk](https://github.com/greyhavens/whirled-sdk), [whirled-api](https://github.com/greyhavens/whirled-api), [whirled-projects](https://github.com/greyhavens/whirled-projects), [thane](https://github.com/greyhavens/thane).
 
 Grey Havens’ own README says the tree was yanked from a crufty home and is a stadium-sized Rube Goldberg machine. They are not wrong. Budget your ego accordingly.
@@ -12,7 +12,7 @@ Grey Havens’ own README says the tree was yanked from a crufty home and is a s
 
 Boot the original Flash + Java stack on a **local Linux lab** so the 2007–2017 client is not only a screenshot. No home ports. No public hostname.
 
-If you want a room people can join in a normal browser, that is [Whirled 2](../README.md) in this repo — TypeScript + Pixi — not a patch on msoy.
+If you want a room people can join in a normal browser, that is [Whirled 2](../whirled2/README.md) — TypeScript + Pixi — not a patch on msoy.
 
 ---
 
