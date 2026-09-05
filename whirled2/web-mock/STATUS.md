@@ -15,7 +15,8 @@ Date: 2026-09-05
 GitHub Pages enabled from `main` `/` (same repo).
 
 - Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/
-- Site root: https://whirledclassic.github.io/whirled2/
+- Site root (redirects to mock): https://whirledclassic.github.io/whirled2/
+- Logo asset compressed (~166KB PNG, transparent black keyed)
 
 Shared auth/chat across browsers still needs `node server/server.mjs` (or a host). Static Pages alone = localStorage-per-browser offline mode.
 
