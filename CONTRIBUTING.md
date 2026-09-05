@@ -33,7 +33,7 @@ Classic priority: keep lab notes accurate. Do not publish the VM.
 
 ## Artist work
 
-See [docs/ARTISTS.md](docs/ARTISTS.md). Same money line as code: volunteer now, credit always, pay only from real revenue later.
+See [whirled2/ARTISTS.md](whirled2/ARTISTS.md). Same money line as code: volunteer now, credit always, pay only from real revenue later.
 
 ## Code style (Whirled 2)
 
