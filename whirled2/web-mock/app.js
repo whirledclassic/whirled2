@@ -91,7 +91,25 @@
     return '<section class="page"><div class="hero"><div><div class="ava lg you">' + esc(me.initials) + '</div><h1>' + esc(me.name) + '</h1><p>Home room is the profile.</p><form class="profile-form" id="profile-form"><label>Display name <input name="name" maxlength="24" value="' + esc(me.name) + '" /></label><label>Bio <input name="bio" maxlength="180" value="' + esc(me.bio) + '" /></label><button type="submit">Save profile</button><p class="meta" id="profile-msg"></p></form></div><div class="card"><div class="swatch"></div><div class="body"><h3>Studio Loft</h3><p class="meta">home · unlocked</p></div></div></div></section>';
   }
   function gate() {
-    return '<section class="gate"><div class="gate-card">' + logoImg("gate-logo") + '<p class="eyebrow">Whirled Classic</p><h1>Welcome to Whirled</h1><p>Register or log in. Same tab strip as whirled.club: Me, Stuff, Games, Rooms, Groups, Shop.</p><div class="gate-grid"><form id="register-form"><h2>Register</h2><input name="name" autocomplete="username" placeholder="Display name" required /><input name="password" type="password" autocomplete="new-password" placeholder="Password" required /><button type="submit">Create account</button></form><form id="login-form"><h2>Log in</h2><input name="name" autocomplete="username" placeholder="Display name" required /><input name="password" type="password" autocomplete="current-password" placeholder="Password" required /><button type="submit">Log in</button></form></div><p class="gate-err" id="gate-err"></p><p class="meta">Offline preview stays in this browser. Run server/server.mjs to share chat.</p></div></section>';
+    return ''
+      + '<section class="gate"><div class="gate-card">'
+      +   logoImg("gate-logo")
+      +   '<p class="eyebrow">Whirled Classic</p>'
+      +   '<h1>Welcome to Whirled</h1>'
+      +   '<p>Play games, make friends, make stuff — classic whirled chrome, new engine.</p>'
+      +   '<div class="gate-grid">'
+      +     '<form id="register-form"><h2>It\'s free — create an account</h2>'
+      +       '<input name="name" autocomplete="username" placeholder="Display name" required />'
+      +       '<input name="password" type="password" autocomplete="new-password" placeholder="New password" required />'
+      +       '<button type="submit">Sign Up</button></form>'
+      +     '<form id="login-form"><h2>Already have an account?</h2>'
+      +       '<input name="name" autocomplete="username" placeholder="Display name" required />'
+      +       '<input name="password" type="password" autocomplete="current-password" placeholder="Password" required />'
+      +       '<button type="submit">Logon</button></form>'
+      +   '</div>'
+      +   '<p class="gate-err" id="gate-err"></p>'
+      +   '<p class="meta">Offline preview stays in this browser. Shared chat needs server/server.mjs.</p>'
+      + '</div></section>';
   }
   function shell() {
     var me = you();
