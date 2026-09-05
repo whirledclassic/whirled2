@@ -21,7 +21,7 @@ Also in this folder:
 - [FLASH-AND-RUFFLE.md](FLASH-AND-RUFFLE.md)
 - [LINKS.md](LINKS.md)
 - [RELATED.md](RELATED.md)
-- [archive/shadowsych-whirled-docs.md](archive/shadowsych-whirled-docs.md)
+- [archive/README.md](archive/README.md)
 
 ---
 
