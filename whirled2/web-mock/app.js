@@ -86,7 +86,7 @@
     var items = loadStuff();
     if (!items.length) {
       return '<section class="page"><div class="page-head"><div><h1>Stuff</h1><p>What you already own.</p></div></div>'
-        + '<div class="panel"><p class="meta">Your inventory is empty. Nothing fake here — items you create or earn will show up in this list.</p></div></section>';
+        + '<div class="panel"><p class="meta">Your inventory is empty. Items you create or earn will show up here.</p></div></section>';
     }
     return catalog("Stuff", "What you already own.", items);
   }
@@ -94,7 +94,7 @@
     var items = loadShop();
     if (!items.length) {
       return '<section class="page"><div class="page-head"><div><h1>Shop</h1><p>Coins are labels only. No payments.</p></div></div>'
-        + '<div class="panel"><p class="meta">No listings yet. The shop stays empty until real catalog packs are published — we will not invent fake items.</p></div></section>';
+        + '<div class="panel"><p class="meta">No listings yet. Catalog packs will show up here when they are published. Coins stay labels only.</p></div></section>';
     }
     return catalog("Shop", "Coins are labels only. No payments.", items);
   }
