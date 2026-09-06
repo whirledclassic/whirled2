@@ -1,5 +1,7 @@
 /* whirled2/web-mock/src/fallback-engine.js
- * ?v=20260906cv
+ * ?v=20260906cw
+ * Chrome-only. Instant #stage-slot canvas, then public Pixi if it loads.
+ * Does not touch WhirledClassicGame.
  */
 (function (root) {
   "use strict";
@@ -30,22 +32,55 @@
     return "";
   }
 
-  function tryRemote(host) {
-    var src = remoteSrc();
-    if (!src) return;
-    import(src).then(function (mod) {
-      var mount = (mod && (mod.mountWhirledEngine || mod.default)) || null;
-      if (typeof mount !== "function") return;
-      host.setAttribute("data-remote-engine", "1");
-      return mount(host);
-    }).catch(function () {});
+  function instantStage(host) {
+    if (!host) return null;
+    if (host.getAttribute("data-remote-engine") === "1" && host.querySelector("canvas")) {
+      return host.querySelector("canvas");
+    }
+    var cv = host.querySelector("canvas.whirled-instant-stage");
+    if (!cv) {
+      cv = document.createElement("canvas");
+      cv.className = "whirled-instant-stage";
+      cv.style.cssText = "display:block;width:100%;height:100%;background:#6eb7d8;";
+      host.innerHTML = "";
+      host.appendChild(cv);
+    }
+    host.setAttribute("data-whirled-engine", "1");
+    host.setAttribute("data-engine-owns-avatar-walk", "1");
+    var r = host.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.max(2, Math.floor((r.width || 320) * dpr));
+    cv.height = Math.max(2, Math.floor((r.height || 200) * dpr));
+    var ctx = cv.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#6eb7d8";
+      ctx.fillRect(0, 0, cv.width, cv.height * 0.58);
+      ctx.fillStyle = "#c9a36a";
+      ctx.fillRect(0, cv.height * 0.58, cv.width, cv.height * 0.42);
+    }
+    return cv;
   }
 
-  var prev = root.mountWhirledEngine;
-  root.mountWhirledEngine = function (host) {
-    tryRemote(host);
-    if (typeof prev === "function" && prev !== root.mountWhirledEngine) {
-      try { return prev(host); } catch (e) {}
+  function loadPixi(host) {
+    var src = remoteSrc();
+    if (!src) return Promise.resolve(false);
+    var pending = root.__whirledPixiReady;
+    if (!pending) {
+      try { pending = import(src); root.__whirledPixiReady = pending; }
+      catch (e) { return Promise.resolve(false); }
     }
+    return pending.then(function (mod) {
+      var mount = (mod && (mod.mountWhirledEngine || mod.default)) || null;
+      if (typeof mount !== "function") return false;
+      return Promise.resolve(mount(host)).then(function () {
+        host.setAttribute("data-remote-engine", "1");
+        return true;
+      });
+    }).catch(function () { return false; });
+  }
+
+  root.mountWhirledEngine = function (host) {
+    instantStage(host);
+    return loadPixi(host);
   };
 })(window);
