@@ -2599,12 +2599,15 @@ body > .party-panel {
 }
 
 /* Expanded / bottom-sheet player — big tap target when iframe chrome is too small */
+/* How this works: fixed sheet above chat bar (~z 15). JS may parent dock on body so #main stacking cannot bury it.
+   Beginner: Open player stays on top; Close player / leave collapses. Do not collapse on taps inside the dock/iframe.
+   ENGINE DEV: z-index ~100; optional dimmer must use data-embed-collapse — never treat iframe taps as dismiss. */
 .room-embed-dock.is-expanded {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 90;
+  z-index: 100;
   margin: 0;
   padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
   border-radius: 14px 14px 0 0;
@@ -2986,7 +2989,7 @@ body > .party-panel {
     z-index: 4 !important;
   }
   .room-embed-dock.is-expanded {
-    z-index: 95 !important;
+    z-index: 100 !important;
   }
 
   /* 8) Header wallet / links — less cramped */

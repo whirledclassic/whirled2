@@ -166,7 +166,13 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## Room music embeds + Profile BG (20260906t)
 
-- **Mobile touch**: `#room-embed-dock` z-index 12, `pointer-events:auto`, iframe ≥200px (YT). Expanded sheet (`is-expanded`, z-index 90+) for finger-sized player. External buttons do not rely on iframe chrome alone.
+- **Mobile touch**: `#room-embed-dock` z-index 12, `pointer-events:auto`, iframe ≥200px (YT). Expanded sheet (`is-expanded`) for finger-sized player. External buttons do not rely on iframe chrome alone.
 - **Parse**: music.youtube.com, Shorts/Live/embed/youtu.be/watch+list; Spotify intl- + parseable spotify.link only.
 - **Profile BG**: Upload custom background card; `applyProfileSkinDom` full-bleed on `.page.profile-page`; never call it MySpace — Profile look / Customize look only.
-- **Cache**: `LOGO_V` / `?v=20260906t`. Do not push mid-parallel FB edit unless instructed.
+
+## Room embed dock survives paint (20260906u)
+
+- **Bug**: every `paint("rooms")` replaced `main.innerHTML`, wiping `#room-embed-dock` + remounting the iframe — Open player looked like it "closed" on mute / source tabs / panel taps.
+- **Fix**: `roomEmbedExpanded` flag; `parkRoomEmbedDock()` before `main.innerHTML`; `ensureRoomEmbedDock` adopts parked node and re-applies `is-expanded` + Close player. Expanded dock parents on `document.body` (z-index 100) above chat bar.
+- **Panel**: `#room-playlist-panel` closes only via Close / leave room / `clearStrayUI` — keep open across source tabs.
+- **Cache**: `LOGO_V` / `?v=20260906u`. Do not push unless instructed.

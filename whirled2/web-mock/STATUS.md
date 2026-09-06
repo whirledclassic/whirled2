@@ -2,18 +2,17 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906t)
+## What shipped (?v=20260906u)
 
-- **Room music embeds (mobile)**: hardened YouTube/Spotify URL parse; dock under stage with **Open player** bottom-sheet, **Tap play in embed**, and **Open on YouTube/Spotify** (native tab). Mobile iframe height ~200px (YT) / ~152px (Spotify) — no more 96px squash. `pointer-events` / z-index so chat chrome does not steal taps.
-- **Profile look — custom background**: prominent **Upload custom background** (image behind everything); auto Image/cover/scroll; thumbnail + Clear image; translucent modules.
-- **Facebook Connect**: gate **Continue with Facebook** + Me → Account link/unlink + Facebook App ID (`whirled2.facebookAppId` / `WHIRLED2_FB_APP_ID`). SDK `v21.0`; users `fb_` + id. Discord / Google Coming Soon only.
+- **Room music player stickiness**: `paint("rooms")` no longer destroys the expanded Open player sheet. Live `#room-embed-dock` is parked/reattached (iframe preserved); `roomEmbedExpanded` re-applies `is-expanded` + Close player after every paint/sync. Expanded sheet z-index 100 (above chat bar). Room music side panel stays open except Close / leave / clearStrayUI.
+- Prior **?v=20260906t**: room music embeds (mobile) + Profile look custom BG + Facebook Connect.
 - Prior **?v=20260906s**: Facebook Connect first land.
 - Prior **?v=20260906r**: mobile Room **♪ Music** + Room menu again.
 - Prior **?v=20260906q**: mobile visual overhaul.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906t
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906u
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
