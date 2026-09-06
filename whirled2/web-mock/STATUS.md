@@ -1,8 +1,11 @@
-## What shipped (?v=20260906ca)
+## What shipped (?v=20260906cb)
 
-- **Flash blank loft CRITICAL:** companion-first left transparent empty `host.swf` + faded stand → nothing visible (worse than tofu). **DIRECT-first** outer Ruffle avatar always paints; optional companion upgrade after; stand thumb stays opaque until `connected`.
+- **Flash blank loft CRITICAL:** companion-first left transparent empty `host.swf` + faded stand → nothing visible (worse than tofu).
+- **DIRECT-stable:** loft Wear mounts avatar SWF via outer Ruffle first and **keeps it** (no auto companion remount that wipes a working paint). Stand thumb/glyph always present; behind player once `data-mount-mode=direct` + `is-playing`.
+- CSS: never hide stand during mount/companion-pending; never `classic-png-under-swf` (opacity 0) without connected paint.
+- Companion nest + watchdog DIRECT remount remain coded for walk-scene opt-in later; Wear path skips auto-upgrade.
 - Preserve: bz flashQa, by self-host Ruffle, hostLoadBytes, walk-lerp/spoke/sleep
-- Cache: **`?v=20260906ca`**. Push: `/tmp/push-ca.js`.
+- Cache: **`?v=20260906cb`**. Push: `/tmp/push-ca.js` (dry-run default). **Do not push from executor.**
 
 ## What shipped (?v=20260906bz)
 

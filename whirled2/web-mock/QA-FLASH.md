@@ -1,22 +1,22 @@
-# QA-FLASH — Flash / loft interact checklist (?v=20260906by)
+# QA-FLASH — Flash / loft interact checklist (?v=20260906cb)
 
-Dual modes: `playbackMode` png-hybrid|ruffle. **bx** = companion `hostLoadBytes`→`loadBytes` walk sync; **bu** nest; **bt** never-tofu; **bs** Hybrid gate.
+Dual modes: `playbackMode` png-hybrid|ruffle. **ca** = DIRECT-stable blank-loft fix; **by** hostLoadBytes; **bu** nest; **bt** never-tofu; **bs** Hybrid gate.
 
-## Success criteria (?v=20260906by)
+## Success criteria (?v=20260906cb)
 
-0. Worn Classic Flash SWF never shows tofu bean **or blank loft** — companion (or DIRECT fallback) + stand thumb / glyph.
-1. Wear **Classic Flash (Ruffle)** → loft → **floor click** moves billboard (chrome bob) **and** plays **in-SWF walk** via `hostWalk` → `appearanceChanged_v2` when companion connected.
-2. **blob/IDB Wear** uses `hostLoadBytes(base64)` (NOT nested blob:/data: into Loader).
-3. Watchdog ~2s / bridge error → remount **DIRECT** outer Ruffle (blob OK).
-4. Wear **Whirled2 Smooth** → PNG walk; Ruffle **not** mounted.
-5. Dual Wear radio cards still present.
-6. Debug: `?avatarDebug=1` → `WhirledClassicAvatar.getLoftHostDebug()` shows `companionHost: true` + bridge `connected` + `hostLoadBytesLen`.
+0. Worn Classic Flash SWF never shows tofu bean **or blank loft** — DIRECT outer Ruffle + stand thumb / glyph immediately.
+1. Wear **Classic Flash (Ruffle)** → loft → **floor click** moves billboard (chrome bob); avatar click → emotes. Companion auto-upgrade **skipped** so loft never remounts empty `host.swf`.
+2. If companion path used later: `hostLoadBytes(base64)` for blob/IDB; watchdog ~2s → remount **DIRECT**.
+3. Wear **Whirled2 Smooth** → PNG walk; Ruffle **not** mounted.
+4. Dual Wear radio cards still present.
+5. Debug: `?avatarDebug=1` → host shows `data-mount-mode="direct"` + stand/SWF visible.
 
 ## Architecture
 
-- Outer Ruffle: `./assets/avatar-host/avatar-host.swf?v=20260906by`
-- EI: `hostLoadBytes` / `hostLoadBytesBegin|Chunk|Commit` / `hostLoadUrl` (http only) / `hostWalk` / `hostEmote`
-- Bridge: `window.WhirledAvatarHostBridge(kind, payload)`
+- Loft Wear default: outer Ruffle loads **avatar SWF DIRECT** (blob OK)
+- Stand thumb / glyph always in `#avatar-ruffle-host` (CSS: on top while mounting; behind once DIRECT playing)
+- Companion nest coded but not auto-upgraded after DIRECT (blank-loft risk)
+- Bridge (when used): `window.WhirledAvatarHostBridge(kind, payload)`
 - Source: `tools/avatar-host/AvatarHost.hx` (ORIGINAL MIT; study protocol only — no AGPL copy)
 
 ## Commands
@@ -24,5 +24,5 @@ Dual modes: `playbackMode` png-hybrid|ruffle. **bx** = companion `hostLoadBytes`
 ```bash
 node --check src/classic-avatar.js && node --check app.js
 node scripts/qa-flash-check.cjs
-node /tmp/push-bx.js   # dry-run (executor does NOT push)
+node /tmp/push-ca.js   # dry-run (executor does NOT push)
 ```

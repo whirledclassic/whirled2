@@ -7240,17 +7240,32 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 }
 
 
-/* (?v=20260906ca) CRITICAL: empty companion host looked like "no avatar".
-   Keep stand thumb/glyph fully visible until companion handshake connects. */
-.avatar-ruffle-host.is-playing:not(.is-companion-connected) .classic-swf-stand-thumb,
-.avatar-ruffle-host[data-mount-mode="companion-pending"] .classic-swf-stand-thumb,
+/* (?v=20260906cb) CRITICAL: empty companion host looked like "no avatar".
+   Beginner: always show stand/glyph while mounting or companion-pending (on TOP).
+   Once DIRECT avatar SWF is playing, put stand BEHIND so the real SWF paints (never cover it).
+   Never classic-png-under-swf hide without a visible SWF — see afterMountUi in classic-avatar.js. */
 .avatar-ruffle-host.is-mounting .classic-swf-stand-thumb,
-.avatar-ruffle-host.is-playing:not(.is-companion-connected) .classic-swf-placeholder,
+.avatar-ruffle-host.is-failed .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-pending"] .classic-swf-stand-thumb,
+.avatar-ruffle-host.is-mounting .classic-swf-placeholder,
+.avatar-ruffle-host.is-failed .classic-swf-placeholder,
 .avatar-ruffle-host[data-mount-mode="companion-pending"] .classic-swf-placeholder {
   opacity: 1 !important;
   z-index: 3 !important;
 }
+/* DIRECT playing: SWF is the paint — stand is backup under the player, not a cover sheet. */
+.avatar-ruffle-host[data-mount-mode="direct"].is-playing .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="direct"].is-playing .classic-swf-placeholder {
+  opacity: 0.35;
+  z-index: 0 !important;
+}
 .avatar-ruffle-host.is-companion-connected.is-playing .classic-swf-stand-thumb {
   opacity: 0.45;
   z-index: 0;
+}
+/* Safety: if is-playing but no mount-mode yet (race), keep stand readable — never opacity 0. */
+.avatar-ruffle-host.is-playing:not([data-mount-mode]):not(.is-companion-connected) .classic-swf-stand-thumb,
+.avatar-ruffle-host.is-playing:not([data-mount-mode]):not(.is-companion-connected) .classic-swf-placeholder {
+  opacity: 1 !important;
+  z-index: 2 !important;
 }
