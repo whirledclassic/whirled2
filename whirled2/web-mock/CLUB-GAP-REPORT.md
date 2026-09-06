@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bp` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bq` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,22 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bp`)
+## Closed this pass (`?v=20260906bq`)
+
+| Item | Notes |
+|------|--------|
+| /go | Opens Go… toolbar menu in loft |
+| /party /parties | Opens Parties! board |
+| /rooms | Back to Rooms lobby (leave loft) |
+| /join [name] | Join them in Studio Loft (friend/occupant resolve) |
+| Occupant dbl-click | → Whisper (parity with chat name; respects blocklist) |
+| /help topics | go / party|parties / rooms / join |
+| Preserve | bl/bm Flash loft interact (`classic-avatar.js` untouched); bp friends/who/home/Complain; bo Block; bn action/whisper; bg dual Wear; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bp`)
+
 
 | Item | Notes |
 |------|--------|

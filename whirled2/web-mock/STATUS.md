@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bq)
+
+- **Club gaps + polish (after bp):** wiki **/go** opens Go… toolbar; **/party|/parties** opens Parties! board; **/rooms** Back to Rooms lobby; **/join [name]** Join them in Studio Loft; **occupant double-click** → Whisper (parity with chat name; respects blocklist); `/help go|party|rooms|join`
+- **Preserve:** bl/bm Flash loft interact (`classic-avatar.js` UNTOUCHED), bp /friends /who /home + Complain modal, bo Block/Unblock, bn /action whisper Club★, bg dual Wear, bk–bj club, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bq`**. Push: `/tmp/push-bq.js` (dry-run default).
+
 ## What shipped (?v=20260906bp)
 
 - **Club gaps + polish (after bo):** wiki **/friends** opens Friends Online toolbar (or Me→Friends); **/who** lists In this room occupants (away/zzz); **/home** Go home; **Complain…** Coming Soon modal (Report reason stubs + Block instead); **double-click** chat name → Whisper (respects blocklist); `/help friends|who|home|complain`

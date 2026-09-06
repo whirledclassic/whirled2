@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bp";
+  var LOGO_V = "20260906bq";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1518,7 +1518,7 @@
   }
 
   function complainModalHtml(id, name) {
-    // How this works (?v=20260906bp): wiki Report/Complain — Coming Soon categories (no fake mod queue).
+    // How this works (?v=20260906bq): wiki Report/Complain — Coming Soon categories (no fake mod queue).
     // Beginner: reason buttons are disabled stubs; Block still works from the name menu.
     name = name || "Player";
     id = id || "";
@@ -1554,7 +1554,7 @@
     if (tmp.firstChild) document.body.appendChild(tmp.firstChild);
   }
   function openFriendsToolbarFromChat() {
-    // How this works (?v=20260906bp): /friends opens wiki Friends Online toolbar popup when in loft.
+    // How this works (?v=20260906bq): /friends opens wiki Friends Online toolbar popup when in loft.
     friendsPopupOpen = true;
     var pop = document.getElementById("friends-toolbar-pop");
     if (pop) return true;
@@ -1566,7 +1566,7 @@
     return !!document.getElementById("friends-toolbar-pop");
   }
   function goHomeFromChat() {
-    // How this works (?v=20260906bp): /home — same as Go… → Go home (respects room lock).
+    // How this works (?v=20260906bq): /home — same as Go… → Go home (respects room lock).
     goMenuOpen = false;
     var gm = document.getElementById("go-menu");
     if (gm) gm.hidden = true;
@@ -1581,7 +1581,7 @@
     return true;
   }
   function whoInRoomLines() {
-    // How this works (?v=20260906bp): /who — list In this room (local occupants).
+    // How this works (?v=20260906bq): /who — list In this room (local occupants).
     var here = [];
     try {
       here = (liveOccupants || []).slice();
@@ -1602,6 +1602,96 @@
       lines.push("· " + nm + (tags.length ? " (" + tags.join(", ") + ")" : ""));
     });
     return lines;
+  }
+  function openGoMenuFromChat() {
+    // How this works (?v=20260906bq): /go opens wiki Go… toolbar menu when in loft.
+    if (!inRoom) return false;
+    friendsPopupOpen = false;
+    var fpop = document.getElementById("friends-toolbar-pop");
+    if (fpop) fpop.remove();
+    var rmenu = document.getElementById("room-menu");
+    if (rmenu) { rmenu.hidden = true; roomMenuOpen = false; }
+    partyPanelOpen = false;
+    var wrapGo = document.querySelector(".tb-go-wrap");
+    if (!wrapGo) return false;
+    var menu = document.getElementById("go-menu");
+    if (menu) menu.remove();
+    var tmpG = document.createElement("div");
+    tmpG.innerHTML = goMenuHtml();
+    var goNode = tmpG.firstChild;
+    if (!goNode) return false;
+    wrapGo.appendChild(goNode);
+    goNode.hidden = false;
+    goMenuOpen = true;
+    return true;
+  }
+  function openPartiesFromChat() {
+    // How this works (?v=20260906bq): /party|/parties opens Parties! board (wiki Room).
+    if (!inRoom) return false;
+    goMenuOpen = false;
+    var gm = document.getElementById("go-menu");
+    if (gm) gm.hidden = true;
+    var rmenu = document.getElementById("room-menu");
+    if (rmenu) { rmenu.hidden = true; roomMenuOpen = false; }
+    friendsPopupOpen = false;
+    var fpop = document.getElementById("friends-toolbar-pop");
+    if (fpop) fpop.remove();
+    partyPanelOpen = true;
+    paint("rooms");
+    return true;
+  }
+  function leaveToRoomsLobbyFromChat() {
+    // How this works (?v=20260906bq): /rooms — Back to Rooms lobby (same as leave-room chrome).
+    if (!inRoom) {
+      paint("rooms");
+      return true;
+    }
+    inRoom = false;
+    roomImmersiveForcedOff = false;
+    try { updateLandscapeImmersion(); } catch (eLb) {}
+    decorateMode = false;
+    roomPanelOpen = false;
+    playlistPanelOpen = false;
+    roomItemsPanelOpen = false;
+    partyPanelOpen = false;
+    goMenuOpen = false;
+    roomMenuOpen = false;
+    leaveRoomResetChat();
+    loftVisitOccupants = [];
+    paint("rooms");
+    return true;
+  }
+  function joinThemFromChat(nameQ) {
+    // How this works (?v=20260906bq): /join [name] — Join them in Studio Loft (wiki Friend).
+    nameQ = String(nameQ || "").trim();
+    var target = null;
+    if (nameQ) {
+      var q = nameQ.toLowerCase();
+      var pool = [];
+      try { (loadFriends() || []).forEach(function (f) { if (f && f.id) pool.push(f); }); } catch (eF) {}
+      try { (liveOccupants || []).forEach(function (p) {
+        if (!p || !p.id) return;
+        if (!pool.some(function (x) { return String(x.id) === String(p.id); })) pool.push(p);
+      }); } catch (eO) {}
+      var exact = null, prefix = [];
+      pool.forEach(function (p) {
+        var nm = String(p.name || "").toLowerCase();
+        var id = String(p.id || "").toLowerCase();
+        if (id === q || nm === q) exact = p;
+        else if (nm.indexOf(q) === 0 || id.indexOf(q) === 0) prefix.push(p);
+      });
+      if (exact) target = exact;
+      else if (prefix.length === 1) target = prefix[0];
+      else if (prefix.length > 1) return { ok: false, error: "Ambiguous name — try a fuller /join name." };
+      else return { ok: false, error: "No friend/occupant matching \"" + nameQ.slice(0, 40) + "\"." };
+    }
+    if (!tryEnterLoft()) return { ok: false, error: "Could not enter loft (lock or gate)." };
+    clearRoomChatDisplay(true);
+    paint("rooms");
+    loadOccupants();
+    try { awardAction("enterRoom"); } catch (eA) {}
+    var nm = target ? sanitizeDisplayName(target.name || target.id, target.id || "friend") : "friends";
+    return { ok: true, name: nm };
   }
 
   var loftVisitOccupants = []; // session occupants seen this loft visit
@@ -5006,7 +5096,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm/bn/bo + bp) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm/bn/bo/bp + bq) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -5052,6 +5142,9 @@
       "• bp: club gaps after bo — /friends opens Friends Online toolbar; /who lists occupants; /home Go home;",
       "  Complain Coming Soon modal (wiki Report reasons stub + Block instead); double-click chat name → Whisper;",
       "  /help friends|who|home|complain — classic-avatar.js Flash loft interact UNTOUCHED",
+      "• bq: club gaps after bp — /go Go… menu; /party|/parties Parties! board; /rooms Back to Rooms lobby;",
+      "  /join [name] Join them in loft; occupant double-click → Whisper (parity with chat name);",
+      "  /help go|party|rooms|join — classic-avatar.js Flash loft interact UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -5184,10 +5277,10 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Club polish after bo: /friends Friends Online toolbar; /who occupants; /home Go home\n"
-        + "• Complain Coming Soon modal (wiki Report reason stubs + Block instead)\n"
-        + "• Double-click chat name → Whisper (respects blocklist); /help friends|who|home|complain\n"
-        + "Preserve: bl/bm Flash loft interact (classic-avatar.js untouched), bo Block, bn action/whisper, bg dual Wear, Whirl, visit-since.",
+        + "• Club polish after bp: /go Go… menu; /party|/parties Parties! board; /rooms lobby\n"
+        + "• /join [name] Join them in loft; occupant double-click → Whisper (parity with chat name)\n"
+        + "• /help go|party|rooms|join — classic-avatar.js Flash loft interact UNTOUCHED\n"
+        + "Preserve: bl/bm Flash loft interact, bp /friends /who /home + Complain, bo Block, bn action/whisper, bg dual Wear, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -6391,8 +6484,9 @@
       +     '<li><b>/bleepall</b> — hide/unhide all room items for you (session)</li>'
       +     '<li><b>/action</b> <i>name</i> (/ac) — play emote (bare opens menu) · <b>/state</b>|/st Coming Soon</li>'
       +     '<li><b>/msg</b>|/tell|/w <i>name</i> [text] — open whisper / send PM</li>'
-      +     '<li><b>/friends</b> — Friends Online toolbar · <b>/who</b> — occupants · <b>/home</b> — Go home</li>'
-      +     '<li><b>Double-click</b> chat name — Whisper · <b>Complain…</b> Coming Soon modal</li>'
+      +     '<li><b>/friends</b> — Friends Online · <b>/who</b> — occupants · <b>/home</b> — Go home</li>'
+      +     '<li><b>/go</b> — Go… menu · <b>/party</b> — Parties! · <b>/rooms</b> — lobby · <b>/join</b> [name]</li>'
+      +     '<li><b>Double-click</b> chat name or occupant — Whisper · <b>Complain…</b> Coming Soon modal</li>'
       +     '<li><b>Block</b> — name or occupant menu; hides their chat for you · Unblock restores</li>'
       +   '</ul></div></div>';
   }
@@ -8977,7 +9071,7 @@
           "dev-cache",
           "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
           "STATUS.md",
-          "Current build: ?v=20260906bp (club /friends /who /home + Complain modal after bo). Hard-refresh after pulls."
+          "Current build: ?v=20260906bq (club /go /party /rooms /join + occ dbl-Whisper after bp). Hard-refresh after pulls."
         )
       + devHubCard(
           "FLA / SWF lab notes",
@@ -12109,6 +12203,7 @@
         "/action|/ac [name] — emote (bare = menu) · /state|/st Coming Soon",
         "/msg|/tell|/w <name> [text] — whisper (not if blocked)",
         "/friends · /who · /home — Friends Online / occupants / Go home",
+        "/go · /party|/parties · /rooms · /join [name] — Go menu / Parties / lobby / Join them",
         "/clear — clear active chat tab",
         "Block — name menu (hides their chat for you) · Complain Coming Soon"
       ];
@@ -12142,6 +12237,14 @@
         helpLines = ["/who — list players In this room (local occupants; away/zzz tags)."];
       } else if (helpTopic === "home") {
         helpLines = ["/home — Go home to your loft (same as Go… → Go home; respects room lock)."];
+      } else if (helpTopic === "go") {
+        helpLines = ["/go — open Go… toolbar (home / recents / friends / halls / games). Enter loft first."];
+      } else if (helpTopic === "party" || helpTopic === "parties") {
+        helpLines = ["/party|/parties — open Parties! board (create/join local parties). Enter loft first."];
+      } else if (helpTopic === "rooms") {
+        helpLines = ["/rooms — leave loft to Rooms lobby (same as Back to Rooms)."];
+      } else if (helpTopic === "join") {
+        helpLines = ["/join [name] — Join them in Studio Loft (friend/occupant name). Bare /join enters loft."];
       } else if (helpTopic === "complain" || helpTopic === "report") {
         helpLines = ["Complain… — name menu opens Coming Soon report modal (no fake mod queue). Block hides chat now."];
       }
@@ -12149,7 +12252,7 @@
       return;
     }
     if (/^\/friends$/i.test(text)) {
-      // How this works (?v=20260906bp): wiki Friends Online — open toolbar popup from chat.
+      // How this works (?v=20260906bq): wiki Friends Online — open toolbar popup from chat.
       if (!inRoom) {
         meSub = "friends"; viewingId = null; paint("me");
         pushSystemChat("Friends — opened Me → Friends (enter loft for Friends Online toolbar).", { ephemeral: true });
@@ -12169,6 +12272,44 @@
     if (/^\/home$/i.test(text)) {
       if (goHomeFromChat()) pushNotice("blue", "Home loft.", { transient: true });
       else pushSystemChat("Could not enter home loft (lock or gate).", { ephemeral: true });
+      return;
+    }
+    if (/^\/go$/i.test(text)) {
+      // How this works (?v=20260906bq): wiki Go… — open toolbar from chat.
+      if (!inRoom) {
+        pushSystemChat("Enter a loft first, then /go opens the Go… menu.", { ephemeral: true });
+        return;
+      }
+      if (openGoMenuFromChat()) pushNotice("blue", "Go…", { transient: true });
+      else pushSystemChat("Go menu not ready — try the Go button on the room bar.", { ephemeral: true });
+      return;
+    }
+    if (/^\/part(?:y|ies)$/i.test(text)) {
+      // How this works (?v=20260906bq): wiki Parties! board from chat.
+      if (!inRoom) {
+        pushSystemChat("Enter a loft first, then /party opens Parties!.", { ephemeral: true });
+        return;
+      }
+      if (openPartiesFromChat()) pushNotice("blue", "Parties!", { transient: true });
+      else pushSystemChat("Parties board not ready.", { ephemeral: true });
+      return;
+    }
+    if (/^\/rooms$/i.test(text)) {
+      // How this works (?v=20260906bq): /rooms — Back to Rooms lobby.
+      leaveToRoomsLobbyFromChat();
+      pushNotice("blue", "Rooms lobby.", { transient: true });
+      return;
+    }
+    if (/^\/join(?:\s|$)/i.test(text)) {
+      // How this works (?v=20260906bq): /join [name] — Join them in loft (wiki Friend).
+      var joinQ = text.replace(/^\/join\s*/i, "").trim();
+      var jres = joinThemFromChat(joinQ);
+      if (!jres.ok) {
+        pushSystemChat(jres.error || "Join failed.", { ephemeral: true });
+        pushNotice("orange", jres.error || "Join failed.", { transient: true });
+      } else {
+        pushNotice("blue", "Joined " + (jres.name || "friends") + " in Studio Loft.", { transient: true });
+      }
       return;
     }
     if (/^\/(away|afk)(?:\s|$)/i.test(text)) {
@@ -13248,7 +13389,7 @@
       ev.preventDefault();
       var whoId = chatWho.getAttribute("data-chat-who") || "";
       var whoName = chatWho.getAttribute("data-chat-who-name") || "";
-      // How this works (?v=20260906bp): double-click chat name → Whisper (wiki-adjacent; respects Block).
+      // How this works (?v=20260906bq): double-click chat name → Whisper (wiki-adjacent; respects Block).
       var nowClk = Date.now();
       var last = window.__whirledChatNameClick || { id: "", t: 0 };
       window.__whirledChatNameClick = { id: whoId, t: nowClk };
@@ -13545,7 +13686,7 @@
     }
     if (ev.target.closest("[data-block-chat]")) {
       // How this works (?v=20260906bo): wiki Block — hide their chat locally; Unblock restores.
-      // How this works (?v=20260906bp): also closes Complain modal when using Block instead.
+      // How this works (?v=20260906bq): also closes Complain modal when using Block instead.
       var blk = ev.target.closest("[data-block-chat]");
       addBlocked({ id: blk.getAttribute("data-block-chat"), name: blk.getAttribute("data-block-name") });
       var cnm0 = document.getElementById("chat-name-menu");
@@ -13871,6 +14012,35 @@
     var occBtn = ev.target.closest("[data-occ-menu]");
     if (occBtn && session() && !ev.target.closest(".occ-menu")) {
       var oid = occBtn.getAttribute("data-occ-menu") || "";
+      // How this works (?v=20260906bq): double-click occupant → Whisper (parity with chat name; respects Block).
+      var nowOcc = Date.now();
+      var lastOcc = window.__whirledOccClick || { id: "", t: 0 };
+      window.__whirledOccClick = { id: oid, t: nowOcc };
+      var sidOcc = session().user ? session().user.id : "";
+      var occName = "";
+      try {
+        var hitOcc = (liveOccupants || []).filter(function (p) { return p && String(p.id) === String(oid); })[0];
+        if (hitOcc) occName = sanitizeDisplayName(hitOcc.name || oid, oid);
+      } catch (eOccN) {}
+      if (oid && lastOcc.id === oid && (nowOcc - lastOcc.t) < 450 && sidOcc !== oid) {
+        occMenuId = null;
+        if (isBlocked(oid)) {
+          pushNotice("orange", "Unblock " + (occName || "player") + " before whispering.", { transient: true });
+          if (document.querySelector(".workspace")) refreshOccupantRail();
+          return;
+        }
+        openPmTab(oid, occName || oid);
+        friendsPopupOpen = false;
+        var fpopOcc = document.getElementById("friends-toolbar-pop");
+        if (fpopOcc) fpopOcc.remove();
+        refreshChatLog();
+        applyChatInputTint();
+        var cinOcc = document.getElementById("chat-input");
+        if (cinOcc) cinOcc.focus();
+        pushNotice("blue", "Whisper " + (occName || "player"), { transient: true });
+        if (document.querySelector(".workspace")) refreshOccupantRail();
+        return;
+      }
       occMenuId = (occMenuId === oid) ? null : oid;
       if (document.querySelector(".workspace")) refreshOccupantRail();
       else paint(document.querySelector(".tab.is-on") ? document.querySelector(".tab.is-on").getAttribute("data-tab") : "rooms");
@@ -14382,7 +14552,7 @@
       return;
     }
     if (ev.target.closest("[data-complain-stub]") && session()) {
-      // How this works (?v=20260906bp): wiki Report — open Coming Soon complain modal (no fake mod queue).
+      // How this works (?v=20260906bq): wiki Report — open Coming Soon complain modal (no fake mod queue).
       var stubC = ev.target.closest("[data-complain-stub]");
       var cidC = stubC.getAttribute("data-complain-stub") || "";
       var cnmC = document.getElementById("chat-name-menu");
@@ -15342,7 +15512,7 @@
     }
     var plRep = ev.target.closest("[data-playlist-report]");
     if (plRep && session()) {
-      // How this works (?v=20260906bp): Music Report stub stays honest Coming Soon (same as Complain).
+      // How this works (?v=20260906bq): Music Report stub stays honest Coming Soon (same as Complain).
       pushNotice("orange", "Report music — Coming Soon (no fake mod queue). Use Block on chat names for players.", { transient: true });
       return;
     }
