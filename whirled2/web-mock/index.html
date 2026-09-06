@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Whirled2 dk</title>
+  <title>Whirled2 dl</title>
   <style>
     .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
     body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; background: #89C6E3; color: #16324a; }
@@ -18,7 +18,6 @@
       position: relative !important;
     }
     #stage-slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
-    /* dk: Chat options + Room must never render as black squares, even if styles.css is cached. */
     #chat-form button.chat-opts,
     #chat-opts-btn,
     #chat-form button.tb,
@@ -32,15 +31,6 @@
       color: #1e6fa8 !important;
       box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(22,50,74,.14) !important;
     }
-    #chat-form button.chat-opts:hover,
-    #chat-form button.chat-opts:active,
-    #chat-opts-btn:active,
-    #chat-form button.tb:hover,
-    #chat-form button.tb:active {
-      background: linear-gradient(180deg, #fff, #c9e4f6) !important;
-      border-color: #3aa3e0 !important;
-      color: #155a8a !important;
-    }
     #chat-form button.tb.tb-music {
       border-radius: 50% !important;
       background: linear-gradient(180deg, #7ec8f0, #3aa3e0) !important;
@@ -48,9 +38,28 @@
       color: #fff !important;
     }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906dk" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906dk" />
-  <link rel="stylesheet" href="./src/bar-fix.css?v=20260906dk" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906dl" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906dl" />
+  <link rel="stylesheet" href="./src/bar-fix.css?v=20260906dl" />
+  <link rel="stylesheet" href="./src/mobile-polish.css?v=20260906dl" />
+  <script>
+    (function () {
+      function syncDevice() {
+        var coarse = false;
+        try { coarse = window.matchMedia("(pointer: coarse)").matches; } catch (e) {}
+        var narrow = window.innerWidth <= 700;
+        var midTouch = coarse && window.innerWidth <= 900;
+        var phone = narrow || midTouch;
+        var root = document.documentElement;
+        root.classList.toggle("w2-phone", phone);
+        root.classList.toggle("w2-desktop", !phone);
+        root.setAttribute("data-device", phone ? "phone" : "desktop");
+      }
+      syncDevice();
+      window.addEventListener("resize", syncDevice, { passive: true });
+      window.addEventListener("orientationchange", syncDevice, { passive: true });
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
 </head>
 <body>
@@ -64,7 +73,7 @@
       if (/127\.0\.0\.1|localhost/.test(ls)) localStorage.removeItem("whirled2.engineSrc");
     } catch (e) {}
   </script>
-  <script src="./src/api.js?v=20260906dk"></script>
+  <script src="./src/api.js?v=20260906dl"></script>
   <script>
     (function () {
       if (!window.WhirledApi || !window.WhirledApi.login) return;
@@ -84,9 +93,9 @@
       };
     })();
   </script>
-  <script src="./src/classic-avatar.js?v=20260906dk"></script>
-  <script src="./src/pixi-bridge.js?v=20260906dk"></script>
-  <script src="./app.js?v=20260906dk"></script>
+  <script src="./src/classic-avatar.js?v=20260906dl"></script>
+  <script src="./src/pixi-bridge.js?v=20260906dl"></script>
+  <script src="./app.js?v=20260906dl"></script>
   <script>
     (function () {
       function drawLoft(host) {
