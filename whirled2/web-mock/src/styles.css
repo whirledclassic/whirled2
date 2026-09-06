@@ -1,3 +1,13 @@
+/* Beginner map (?v=20260906au):
+ * - :root CSS variables — pale-blue classic ink/paper/sky
+ * - .topbar / .tabs / .bar — shell chrome
+ * - .stage-host / #stage-slot — loft mount (engine canvas goes here)
+ * - #avatar-wear-layer — Wear billboard sibling (not inside stage-slot)
+ * - .gate / .help-page / .dev-hub-page — overlays
+ * - [data-theme] — Classic / Night / Soft browser themes
+ * ENGINE DEV: never restyle #stage-slot into a fake Pixi host.
+ */
+
 /* Whirled2 chrome styles
  * How this works: pale blue classic chrome (no gold/purple). Layout: #app column →
  * topbar + #main + #room-embed-dock + .bar chat. Room stage uses .stage-host / #stage-slot / #decorate-layer.
@@ -5420,3 +5430,365 @@ button.tb.tb-music,
   max-height: 120px; width: auto; image-rendering: pixelated; margin: 6px auto; display: block;
 }
 .avatar-guide-page .help-tips { line-height: 1.45; }
+
+
+/* ---- 20260906at: Make Door + chat fidelity + passport seals ----
+ * Beginner: green door chips travel between rooms; Room vs Private tabs clearer.
+ * ENGINE DEV: decorate-layer doors are chrome only — never remount #stage-slot.
+ */
+.decorate-layer {
+  pointer-events: none;
+}
+.decorate-layer.is-active {
+  pointer-events: auto;
+}
+.decorate-layer.has-doors .decorate-chip.is-door {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.decorate-chip.is-door {
+  border-color: #2ecc71;
+  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.35), 0 2px 6px rgba(22, 50, 74, 0.25);
+}
+.decorate-layer.show-door-glow .decorate-chip.is-door,
+.decorate-chip.is-door.is-glowing {
+  box-shadow: 0 0 12px 4px rgba(46, 204, 113, 0.75), 0 2px 6px rgba(22, 50, 74, 0.25);
+  outline: 2px solid #2ecc71;
+}
+.decorate-chip.is-selected {
+  border-color: #1e6fa8;
+  box-shadow: 0 0 0 3px rgba(30, 111, 168, 0.45);
+  z-index: 3;
+}
+.dec-door-badge {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  font-size: 12px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.35));
+  pointer-events: none;
+}
+.door-tag {
+  color: #1a7a45;
+  font-weight: 700;
+  font-size: 11px;
+}
+.dec-placed-row.is-selected {
+  background: #e8f4fb;
+  border-radius: 6px;
+  outline: 1px solid #7eb6d8;
+}
+.make-door-panel .create-room-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.make-door-panel .door-current { margin: 6px 0; }
+
+/* Chat tabs: Room (blue) vs Private (orange) clearer on mobile + desktop */
+.chat-tabs-fidelity {
+  align-items: stretch;
+}
+.chat-tab-pm {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 1.15;
+  min-height: 36px;
+}
+.chat-tab-kind {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.9;
+}
+.chat-tab-pm .chat-tab-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+.chat-tab-room {
+  font-weight: 800;
+}
+@media (max-width: 700px) {
+  .chat-tab-pm {
+    min-height: 44px;
+    padding: 6px 10px !important;
+  }
+  .chat-tab-kind { font-size: 10px; }
+  .chat-name-menu {
+    min-width: 180px;
+    max-width: min(92vw, 240px);
+  }
+}
+
+/* Chat name-click menu */
+.chat-name-menu-head {
+  padding: 8px 12px 4px;
+  font: 700 12px var(--ui);
+  color: #1e6fa8;
+  border-bottom: 1px solid #c5deee;
+  margin-bottom: 4px;
+}
+.chat-who {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  color: #1e6fa8;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.chat-who:hover { color: #0d4f7a; }
+
+/* Passport seals */
+.stamp-seal {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  border: 2px solid #7eb6d8;
+  background: radial-gradient(circle at 35% 30%, #fff, #d6eef9 70%);
+  color: #1e6fa8;
+  font-size: 16px;
+  font-weight: 800;
+}
+.stamp-cell.is-earned .stamp-seal {
+  border-color: #2f8fd0;
+  background: radial-gradient(circle at 35% 30%, #fff, #b8dff3 65%, #7eb6d8);
+  box-shadow: 0 1px 4px rgba(30, 111, 168, 0.25);
+  color: #0d5a8c;
+}
+.stamp-cell.is-locked .stamp-seal {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+.occ-menu-sep {
+  height: 1px;
+  background: #c5deee;
+  margin: 4px 8px;
+}
+
+/* at fidelity: ensure door travel clicks win over earlier pointer-events rules */
+.decorate-layer:not(.is-active) { pointer-events: none !important; }
+.decorate-layer.is-active { pointer-events: auto !important; }
+.decorate-layer.has-doors:not(.is-active) .decorate-chip.is-door {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+
+/* ---- 20260906au: Developer Information Hub ----
+ * Beginner: pale-blue index cards for chrome/engine docs.
+ * ENGINE DEV: chrome-only page — never styles #stage-slot mount.
+ */
+.dev-hub-page .dev-hub-intro { margin-bottom: 12px; }
+.dev-hub-toc {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px;
+}
+.dev-hub-toc a {
+  display: inline-block; padding: 6px 10px; border-radius: 999px;
+  background: #e8f4fb; border: 1px solid #9ec4de; color: #16324a;
+  font: 600 12px var(--ui); text-decoration: none;
+}
+.dev-hub-toc a:hover { background: #d7ebf8; border-color: #1e6fa8; }
+.dev-hub-card {
+  margin-bottom: 12px;
+}
+.dev-hub-card h2 {
+  margin: 0 0 8px; color: #1e6fa8; font: 700 16px var(--ui);
+}
+.dev-hub-card .engine-note {
+  background: #eef7fc; border-left: 3px solid #3aa3e0;
+  padding: 6px 10px; border-radius: 0 8px 8px 0;
+}
+
+.dev-hub-card-flash {
+  border: 2px solid #3aa3e0;
+  background: linear-gradient(#f8fcff, #e8f4fb);
+  box-shadow: 0 2px 0 rgba(30,111,168,0.12);
+}
+.dev-hub-card-flash h2 { color: #0d5a8c; }
+
+
+/* ---- 20260906av: visit-scoped chat + clear + visual polish ----
+ * Beginner: Enter room = clean chat. Clear chat bumps visit since so poll cannot refill cemetery.
+ * ENGINE DEV: display-only; music composer untouched.
+ */
+.chat-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 8px 0;
+}
+.chat-toolbar-row .chat-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+.chat-clear-view-btn {
+  flex: 0 0 auto;
+  font-size: 11px !important;
+  font-weight: 700;
+  color: #1e6fa8 !important;
+  background: #e8f4fb !important;
+  border: 1px solid #7eb6d8 !important;
+  border-radius: 999px;
+  padding: 4px 10px !important;
+  min-height: 32px;
+}
+.chat-clear-view-btn:hover { background: #d6eef9 !important; }
+
+/* Readable bubbles — pale-blue classic; reduce mid-stage reaction clutter on overlay */
+.chat-log .chat-bubble:not(.emote):not(.system),
+.chat-overlay .chat-bubble:not(.emote):not(.system) {
+  background: #e8f4fb;
+  color: #16324a;
+  border: 1px solid #b7d3e8;
+  border-radius: 10px;
+  padding: 6px 10px;
+  line-height: 1.35;
+}
+.chat-log .chat-bubble.system,
+.chat-overlay .chat-bubble.system {
+  background: transparent;
+  border: 0;
+  color: #5a7a90;
+  font-size: 12px;
+  font-style: italic;
+}
+.chat-overlay .react-bar,
+.chat-log .react-bar {
+  opacity: 0.35;
+}
+.chat-overlay .chat-row:hover .react-bar,
+.chat-log .chat-row:hover .react-bar {
+  opacity: 1;
+}
+@media (hover: none), (pointer: coarse) {
+  /* Mobile: hide always-on reaction bar; long-press path from ar remains */
+  .chat-overlay .react-bar,
+  .chat-log .react-bar {
+    display: none !important;
+  }
+  .chat-clear-view-btn {
+    min-height: 40px;
+    padding: 8px 12px !important;
+  }
+  .room-invite-desktop { display: none !important; }
+}
+.chat-tabs-fidelity .chat-tab-room.is-on {
+  box-shadow: inset 0 -2px 0 #fff;
+}
+.chat-input.is-pm,
+#chat-input.is-pm {
+  background: #fff3e8 !important;
+  border-color: #e0a878 !important;
+}
+
+/* ---- 20260906aw: Classic Flash / Whirled avatar upload + Ruffle overlay ----
+ * Beginner: Stuff → Avatars shows Classic Flash panel. Experimental badge = Ruffle path.
+ * ENGINE DEV: Ruffle mounts in chrome slots only — never inside #stage-slot.
+ */
+.classic-exp-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  font: 700 10px/1.4 "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1e6fa8;
+  background: linear-gradient(#f0f8ff, #cfe8f8);
+  border: 1px solid #7eb6d4;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.classic-exp-badge-overlay {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  margin: 0;
+  font-size: 9px;
+  pointer-events: none;
+}
+.classic-avatar-panel {
+  border: 1px solid #7eb6d4;
+  background: linear-gradient(#f7fbfe, #e8f4fb);
+}
+.classic-avatar-form label { display: block; margin: 8px 0; }
+.classic-analyze-report {
+  margin-top: 10px;
+  background: #f4faff;
+  border: 1px dashed #7eb6d4;
+}
+.classic-ruffle-preview,
+.classic-ruffle-host-detail {
+  margin-top: 10px;
+}
+.classic-ruffle-host,
+.classic-ruffle-host-detail,
+.classic-viewer-swf-slot,
+.classic-wear-swf-slot {
+  position: relative;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(22, 50, 74, 0.06);
+  border: 1px solid #b7d4e8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.classic-viewer-swf-slot {
+  position: absolute;
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
+  width: min(160px, 40%);
+  height: min(200px, 50%);
+  z-index: 3;
+  background: transparent;
+  border: none;
+  pointer-events: none;
+}
+.classic-viewer-swf-slot.is-on { pointer-events: auto; }
+.classic-wear-swf-slot {
+  width: min(140px, 100%);
+  height: min(160px, 40vh);
+  margin-bottom: 2px;
+  background: transparent;
+  border: none;
+  pointer-events: none;
+}
+.classic-wear-swf-slot.is-on { pointer-events: none; }
+.classic-wear-swf-slot.is-failed,
+.classic-viewer-swf-slot.is-failed {
+  display: none;
+}
+.avatar-wear-sprite.classic-png-under-swf {
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.classic-detail-extras {
+  margin-top: 12px;
+  border-left: 3px solid #3aa3e0;
+}
+.avatar-lab-hold-panel .classic-hold-bridge {
+  margin-top: 8px;
+  padding: 8px;
+  background: #eef7fc;
+  border-radius: 8px;
+}

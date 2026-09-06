@@ -19,6 +19,16 @@
  * - Avatar lab (experimental, gated in app.js): optional POST /api/media, GET /api/media/:sha1,
  *   GET/PUT /api/wardrobe/:memberId — Pages works without these (local IndexedDB only).
  */
+/**
+ * Beginner map (?v=20260906au):
+ * - apiBase() / WHIRLED_API → optional demo server
+ * - register/login → hybrid (API then offline localStorage)
+ * - postChat / getChat → loft chat
+ * - getRoomMusic / setRoomMusic → shared soundtrack
+ * - discordAuth* → OAuth helpers (secrets stay on server)
+ * ENGINE DEV: HTTP/localStorage only — never mounts #stage-slot.
+ */
+
 (function (root) {
   "use strict";
 
@@ -216,12 +226,21 @@
       }
     },
 
-    async history(room) {
+    async history(room, since) {
+      // How this works (?v=20260906av): optional since= ISO filters server + offline local log.
+      // Beginner: chrome passes visit start so ancient demo chat is not rehydrated.
+      room = room || "loft";
       try {
-        return await request("/api/rooms/" + encodeURIComponent(room) + "/chat");
+        var q = since ? ("?since=" + encodeURIComponent(since)) : "";
+        return await request("/api/rooms/" + encodeURIComponent(room) + "/chat" + q);
       } catch (err) {
         var raw = [];
-        try { raw = JSON.parse(localStorage.getItem(CHAT_KEY) || "[]"); } catch (e) {}
+        var key = "whirled2.chat." + room;
+        try { raw = JSON.parse(localStorage.getItem(key) || localStorage.getItem(CHAT_KEY) || "[]"); } catch (e) {}
+        if (!Array.isArray(raw)) raw = [];
+        if (since) {
+          raw = raw.filter(function (m) { return m && String(m.at || "") >= String(since); });
+        }
         return { messages: raw };
       }
     },
@@ -243,10 +262,16 @@
           body: JSON.stringify({ text: msg.text })
         });
       } catch (err) {
+        // How this works (?v=20260906av): offline append to per-room key (and legacy loft key).
         var raw = [];
-        try { raw = JSON.parse(localStorage.getItem(CHAT_KEY) || "[]"); } catch (e) {}
+        var key = "whirled2.chat." + (room || "loft");
+        try { raw = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) {}
+        if (!Array.isArray(raw)) raw = [];
         raw.push(msg);
-        localStorage.setItem(CHAT_KEY, JSON.stringify(raw.slice(-80)));
+        try { localStorage.setItem(key, JSON.stringify(raw.slice(-80))); } catch (e2) {}
+        if (key !== CHAT_KEY) {
+          try { localStorage.setItem(CHAT_KEY, JSON.stringify(raw.slice(-80))); } catch (e3) {}
+        }
         return { message: msg };
       }
     },

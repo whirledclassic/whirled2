@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ar";
+  var LOGO_V = "20260906av";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -47,7 +47,10 @@
   var SHOP_KEY = "whirled2.shop";
   var MAIL_KEY = "whirled2.mail";
   var PARTIES_KEY = "whirled2.parties";
-  var ROOM_LAYOUT_KEY = "whirled2.roomLayout.loft";
+  var ROOM_LAYOUT_KEY = "whirled2.roomLayout.loft"; // legacy loft key; prefer roomLayoutStorageKey()
+  // How this works (?v=20260906at): layouts are per-room: whirled2.roomLayout.{roomId}.
+  // Beginner: doors live on decorate chips (doorTo). Travel uses tryEnterRoom — chrome only.
+  // ENGINE DEV: door travel never remounts #stage-slot specially; same roomView paint.
   // How this works (20260906af): multi-room catalog in whirled2.rooms (object map by id).
   // Beginner: Studio Loft stays the default seed; Create Room adds more you own.
   // ENGINE DEV: catalog is chrome/localStorage only — does not remount #stage-slot.
@@ -1321,11 +1324,17 @@
   var occFilterQ = ""; // optional occupant rail filter when >5 people
   var roomItemsPanelOpen = false; // Room menu → View items
   var decorateMode = false;
+  // How this works (?v=20260906at): selected decorate chip for Make Door / Drop Door.
+  // Beginner: tap a chip while decorating → Make Door panel; outside decorate, doors travel.
+  var selectedDecId = null;
+  var doorGlowPreview = false; // Room menu → View clickable furniture (green door glow)
+  var makeDoorPanelOpen = false; // side panel when linking/creating via a door chip
   var partyPanelOpen = false;
   var hangoutInvitePending = null; // [{id,name},…] after leave loft (real occupants only)
   var loftVisitOccupants = []; // session occupants seen this loft visit
   var helpOpen = false;
   var legalOpen = false; // Help → Legal / Disclaimer
+  var devHubOpen = false; // Developer Information Hub (?v=20260906au) — #dev / #docs / ?page=dev
   var musicGestureNeeded = false; // browser blocked autoplay — show Click to play
   // How this works (20260906af): mute + volume prefs persist in localStorage.
   // Beginner: Mute remembers across reloads; volume slider is 0–100%.
@@ -1461,9 +1470,12 @@
   }
   function normalizeWornAvatar(raw) {
     // Repair older Wear rows that stored relative frame paths (invisible in loft).
+    // How this works (?v=20260906at+au): keep swfUrl / mediaKind hooks for parallel Ruffle lab — do not strip.
     if (!raw || typeof raw !== "object") return raw;
     var path = raw.packPath || "";
     if (raw.slug && !path) path = "assets/avatars/user-pack/" + raw.slug + "/";
+    // ENGINE DEV (au): classic SWF wear may set swfUrl + mediaKind:"swf". Absolutize without mounting Ruffle here.
+    if (raw.swfUrl) raw.swfUrl = absolutizeMediaUrl(raw.swfUrl, path) || raw.swfUrl;
     if (raw.preview) raw.preview = absolutizeMediaUrl(raw.preview, path);
     if (raw.thumb) raw.thumb = absolutizeMediaUrl(raw.thumb, path);
     if (raw.frames && raw.frames.length) {
@@ -1599,6 +1611,8 @@
     // ENGINE DEV: layer stays pointer-events none; billboard is clickable for emotes (?v=20260906aq).
     // Click-to-walk still binds on .stage-host (floor). Avatar click stopPropagation.
     // When Pixi mountWhirledEngine owns #stage-slot, chrome walk disables (see bindChromeClickToWalk).
+    // How this works (?v=20260906at+au): if worn.swfUrl / mediaKind==="swf", leave a Ruffle mount hook
+    // (#avatar-ruffle-host) for the parallel Flash lab — PNG path unchanged when frames exist.
     var worn = loadWornAvatar();
     if (!worn) worn = makeTofuWornRow();
     var scale = loadAvatarScale(worn.stuffId || TOFU_AVATAR_ID);
@@ -1606,6 +1620,16 @@
     var x = (typeof worn.xPct === "number" && isFinite(worn.xPct)) ? worn.xPct : 50;
     var face = worn.face === -1 ? -1 : 1;
     var posStyle = "--wear-scale:" + scale + ";--wear-x:" + x + "%;--wear-face:" + face + ";";
+    var isSwf = !!(worn.swfUrl || worn.mediaKind === "swf" || worn.kind === "swf");
+    if (isSwf && worn.swfUrl && !(worn.frames && worn.frames.length) && !worn.preview) {
+      // Parallel au path: host div only — Ruffle mounts later when lab unlocks (never #stage-slot).
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Flash avatar (Ruffle hook)" data-swf-url="' + esc(worn.swfUrl) + '">'
+        + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
+        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host" data-swf-url="' + esc(worn.swfUrl) + '" title="Ruffle mount point — lab in progress"></div>'
+        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar") + '</div>'
+        +   '<p class="meta avatar-swf-pending">Flash avatar — Ruffle lab Coming Soon (<code>?avatarLab=1</code>)</p>'
+        + '</div></div>';
+    }
     if (isTofu) {
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Default tofu avatar">'
         + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
@@ -3009,6 +3033,8 @@
     roomSharePanelOpen = false;
     helpOpen = false;
     legalOpen = false;
+    devHubOpen = false;
+    avatarGuideOpen = false;
     invitePanelOpen = false;
     occMenuId = null;
     friendInvitePending = null;
@@ -3045,20 +3071,40 @@
     if (com) com.hidden = true;
     var cnm = document.getElementById("chat-name-menu");
     if (cnm) cnm.remove();
+    var mdp = document.getElementById("make-door-panel");
+    if (mdp) mdp.remove();
     clearTransientNotices();
   }
 
-  function loadRoomLayout() {
+  function roomLayoutStorageKey(roomId) {
+    // How this works (?v=20260906at): one layout blob per room id (loft + created rooms).
+    roomId = String(roomId || (typeof currentRoomId !== "undefined" ? currentRoomId : "") || "loft");
+    return "whirled2.roomLayout." + roomId;
+  }
+  function loadRoomLayout(roomId) {
+    // How this works: load decorate chips (+ optional doorTo) for the active or given room.
+    // Beginner: loft still reads the classic whirled2.roomLayout.loft key.
+    roomId = String(roomId || (typeof currentRoomId !== "undefined" ? currentRoomId : "") || "loft");
+    var key = roomLayoutStorageKey(roomId);
     try {
-      var raw = JSON.parse(localStorage.getItem(ROOM_LAYOUT_KEY) || '{"items":[]}');
+      var rawStr = localStorage.getItem(key);
+      // Migrate: if loft key empty but legacy constant had data, keep using ROOM_LAYOUT_KEY.
+      if (!rawStr && roomId === "loft") rawStr = localStorage.getItem(ROOM_LAYOUT_KEY);
+      var raw = JSON.parse(rawStr || '{"items":[]}');
       if (!raw || !Array.isArray(raw.items)) return { items: [] };
       return raw;
     } catch (e) { return { items: [] }; }
   }
-  function saveRoomLayout(layout) {
+  function saveRoomLayout(layout, roomId) {
+    // How this works: persist chips for this room (cap 80). Doors keep doorTo/doorLabel.
+    roomId = String(roomId || (typeof currentRoomId !== "undefined" ? currentRoomId : "") || "loft");
     try {
       var items = (layout && layout.items) ? layout.items.slice(0, 80) : [];
-      localStorage.setItem(ROOM_LAYOUT_KEY, JSON.stringify({ items: items }));
+      var payload = JSON.stringify({ items: items });
+      localStorage.setItem(roomLayoutStorageKey(roomId), payload);
+      if (roomId === "loft") {
+        try { localStorage.setItem(ROOM_LAYOUT_KEY, payload); } catch (e0) {}
+      }
     } catch (e) {}
   }
   function loadFavorites() {
@@ -3285,6 +3331,179 @@
     saveRoomsCatalog(map);
     return { ok: true, room: room, free: isFree, payWith: isFree ? "free" : payWith };
   }
+
+  // ---------------------------------------------------------------------------
+  // Make Door / room graph (?v=20260906at) — wiki Door chrome
+  // How this works: any decorate chip can become a door (doorTo + doorLabel).
+  //   Decorate → select chip → Make Door → create new room OR link existing →
+  //   leave decorate → click green door → tryEnterRoom(doorTo).
+  // Beginner: Drop Door removes the link but keeps the furniture + the room.
+  // ENGINE DEV: travel only flips currentRoomId + paint; #stage-slot contract unchanged.
+  // ---------------------------------------------------------------------------
+  function ensureDoorStubFurniture() {
+    // How this works: if Stuff has no furniture, seed one pale-blue "Doorframe stub"
+    // so Make Door is usable without inventing a shop catalog.
+    var items = loadStuff();
+    var hasFurn = items.some(function (it) { return itemCat(it) === "furniture"; });
+    if (hasFurn) return null;
+    var stub = {
+      id: "furn-door-stub",
+      name: "Doorframe stub",
+      kind: "furniture",
+      cat: "furniture",
+      thumb: "",
+      creator: "Whirled2",
+      blurb: "Starter doorway furniture for Make Door (not a shop SKU).",
+      at: new Date().toISOString(),
+      stubDoor: true
+    };
+    items.unshift(stub);
+    try { saveStuff(items); } catch (e) {}
+    return stub;
+  }
+  function findLayoutItem(decId, roomId) {
+    var layout = loadRoomLayout(roomId);
+    for (var i = 0; i < layout.items.length; i++) {
+      if (layout.items[i] && layout.items[i].id === decId) return layout.items[i];
+    }
+    return null;
+  }
+  function updateLayoutItem(decId, patch, roomId) {
+    roomId = roomId || currentRoomId || "loft";
+    var layout = loadRoomLayout(roomId);
+    var found = false;
+    layout.items = (layout.items || []).map(function (it) {
+      if (!it || it.id !== decId) return it;
+      found = true;
+      var next = Object.assign({}, it, patch || {});
+      return next;
+    });
+    if (!found) return false;
+    saveRoomLayout(layout, roomId);
+    return true;
+  }
+  function makeDoorLink(decId, targetRoomId, label) {
+    // How this works: mark chip as door → targetRoomId. Classic green glow when clickable.
+    if (!decId || !targetRoomId) return { ok: false, error: "Pick furniture and a destination room." };
+    if (!getRoom(targetRoomId)) return { ok: false, error: "That room is not on this browser." };
+    var r = getRoom(targetRoomId);
+    var doorLabel = String(label || (r && r.name) || targetRoomId).slice(0, 48);
+    if (!updateLayoutItem(decId, { doorTo: targetRoomId, doorLabel: doorLabel })) {
+      return { ok: false, error: "Furniture chip not found in this room." };
+    }
+    try { awardAction("makeDoor"); } catch (eA) {}
+    return { ok: true, doorTo: targetRoomId, doorLabel: doorLabel };
+  }
+  function makeDoorCreateRoom(decId, opts) {
+    // How this works: wiki — Make Door can create a new room, then link this chip to it.
+    // Beginner: same earn-only createOwnedRoom costs (first free / 10k coins / 1 bar).
+    opts = opts || {};
+    var created = createOwnedRoom({
+      name: opts.name || "Home",
+      blurb: opts.blurb || "via Make Door",
+      lockMode: opts.lockMode || "unlocked",
+      payWith: opts.payWith || "coins"
+    });
+    if (!created.ok) return created;
+    var linked = makeDoorLink(decId, created.room.id, created.room.name);
+    if (!linked.ok) return linked;
+    return { ok: true, room: created.room, free: created.free, doorTo: created.room.id };
+  }
+  function dropDoor(decId, roomId) {
+    // How this works: wiki Drop Door — furniture stays; room still exists; only door link clears.
+    roomId = roomId || currentRoomId || "loft";
+    var layout = loadRoomLayout(roomId);
+    var ok = false;
+    layout.items = (layout.items || []).map(function (it) {
+      if (!it || it.id !== decId) return it;
+      ok = true;
+      var next = Object.assign({}, it);
+      delete next.doorTo;
+      delete next.doorLabel;
+      return next;
+    });
+    if (!ok) return false;
+    saveRoomLayout(layout, roomId);
+    return true;
+  }
+  function travelThroughDoor(decId) {
+    // How this works: click a door chip outside decorate mode → enter linked room.
+    var it = findLayoutItem(decId, currentRoomId || "loft");
+    if (!it || !it.doorTo) {
+      pushNotice("orange", "That furniture is not a door yet. Decorate → Make Door.", { transient: true });
+      return false;
+    }
+    var dest = it.doorTo;
+    var label = it.doorLabel || (getRoom(dest) && getRoom(dest).name) || dest;
+    if (!tryEnterRoom(dest)) return false;
+    beginRoomChatVisit(dest);
+    try { awardAction("doorTravel"); } catch (eT) {}
+    // system line added after begin (begin already pushed a fresh-visit note)
+    try {
+      pushSystemChat("You go through the door to “" + label + "”.");
+    } catch (eS) {}
+    pushNotice("green", "Entered “" + label + "”.", { transient: true });
+    paint("rooms");
+    try { loadOccupants(); } catch (eO) {}
+    try { bindDoorLayerClicks(); } catch (eB) {}
+    return true;
+  }
+  function doorDestOptionsHtml(excludeId) {
+    // How this works: <select> of rooms you can link to (owned + loft).
+    var s = session();
+    var uid = s && s.user ? String(s.user.id) : "";
+    var rooms = listRoomsArray().filter(function (r) {
+      if (!r || !r.id) return false;
+      if (excludeId && r.id === excludeId) return false;
+      // Allow loft + rooms you own (classic: link to your graph).
+      if (r.id === "loft") return true;
+      if (uid && String(r.ownerId || "") === uid) return true;
+      return false;
+    });
+    if (!rooms.length) return '<option value="">No rooms yet</option>';
+    return rooms.map(function (r) {
+      return '<option value="' + esc(r.id) + '">' + esc(r.name || r.id) + (r.id === "loft" ? " (home)" : "") + '</option>';
+    }).join("");
+  }
+  function makeDoorPanelHtml() {
+    // How this works: pale-blue Make Door panel — create new OR link existing (wiki Door).
+    if (!makeDoorPanelOpen || !selectedDecId) return "";
+    var it = findLayoutItem(selectedDecId);
+    if (!it) return "";
+    var s = session();
+    var uid = s && s.user ? String(s.user.id) : "";
+    var ownedN = ownedRoomsFor(uid).filter(function (r) { return r && !r.seed; }).length;
+    var isFree = ownedN === 0;
+    var snap = uid ? getWalletSnapshot(uid) : { coins: 0, bars: 0 };
+    var curDoor = it.doorTo
+      ? ('<p class="meta door-current">Door → <b>' + esc(it.doorLabel || it.doorTo) + '</b> (<code>' + esc(it.doorTo) + '</code>)</p>'
+        + '<button type="button" class="action-btn" data-drop-door="' + esc(it.id) + '">Drop Door</button>')
+      : '<p class="meta">Not a door yet — create a room or link an existing one.</p>';
+    var payBtns = isFree
+      ? '<button type="button" class="action-btn" data-make-door-create="free">Create free room + door</button>'
+      : ('<button type="button" class="action-btn" data-make-door-create="coins"'
+        + ((snap.coins >= ROOM_CREATE_COINS) ? "" : " disabled") + '>Pay 10,000 Coins + door</button>'
+        + '<button type="button" class="action-btn" data-make-door-create="bars"'
+        + ((snap.bars >= ROOM_CREATE_BARS) ? "" : " disabled") + '>Pay 1 Bar + door</button>');
+    return '<div class="room-side-panel make-door-panel" id="make-door-panel">'
+      + '<div class="panel">'
+      +   '<div class="room-side-head"><h2>Make Door</h2>'
+      +     '<button type="button" class="text-btn" data-make-door-close="1">Close</button></div>'
+      +   '<p class="meta">Wiki Door: turn furniture into a doorway. Green glow = travel. Drop Door keeps the room.</p>'
+      +   '<p class="meta">Selected: <b>' + esc(it.name || "Furniture") + '</b></p>'
+      +   curDoor
+      +   '<div class="section-label">Create a new room (classic cost)</div>'
+      +   '<label class="create-room-label">New room name'
+      +     '<input type="text" id="make-door-name" maxlength="48" value="Home" /></label>'
+      +   '<div class="create-room-actions">' + payBtns + '</div>'
+      +   '<div class="section-label">Or link an existing room</div>'
+      +   '<label class="create-room-label">Destination'
+      +     '<select id="make-door-target">' + doorDestOptionsHtml(currentRoomId || "loft") + '</select></label>'
+      +   '<button type="button" class="action-btn" data-make-door-link="1">Link door</button>'
+      +   '<p class="meta">Earn-only coins/bars — no Buy Bars. ENGINE DEV: doorTo on layout chip only.</p>'
+      + '</div></div>';
+  }
+
   function loadRoomLock(roomId) {
     // How this works: prefer lock on whirled2.rooms[roomId]; loft also mirrors legacy key.
     roomId = roomId || currentRoomId || "loft";
@@ -3425,7 +3644,7 @@
       +     '<label class="create-lock-opt"><input type="radio" name="create-room-lock" value="friends" /> 👥 Friends</label>'
       +     '<label class="create-lock-opt"><input type="radio" name="create-room-lock" value="locked" /> 🔒 Locked</label>'
       +   '</div>'
-      +   '<p class="meta">Doors / Make Door / snapshot thumbs — Coming Soon. Glows hold — Coming Soon.</p>'
+      +   '<p class="meta">Doors: Decorate Room → select furniture → <b>Make Door</b> (create or link). Snapshot thumbs — Coming Soon.</p>'
       +   '<div class="create-room-actions">' + payBtns + '</div>'
       + '</div>';
   }
@@ -4103,6 +4322,8 @@
     { id: "party_starter", cat: "play", name: "Party Starter", tip: "Create a party from the toolbar.", action: "party", need: 1, goTab: "rooms", goEnter: true, goParty: true },
     { id: "creator", cat: "create", name: "Creator", tip: "Upload something to Stuff.", action: "upload", need: 1, goTab: "stuff" },
     { id: "decorator", cat: "create", name: "Decorator", tip: "Place a decorate chip in your loft.", action: "decorate", need: 1, goTab: "rooms", goEnter: true, goDecorate: true },
+    { id: "door_builder", cat: "create", name: "Door Builder", tip: "Make a door linking two rooms.", action: "makeDoor", need: 1, goTab: "rooms", goEnter: true, goDecorate: true },
+    { id: "room_hopper", cat: "play", name: "Room Hopper", tip: "Travel through a door to another room.", action: "doorTravel", need: 1, goTab: "rooms", goEnter: true },
     { id: "shop_lister", cat: "shop", name: "Shop Lister", tip: "List an item in the Shop.", action: "shopList", need: 1, goTab: "stuff" },
     { id: "window_shopper", cat: "shop", name: "Window Shopper", tip: "Open a shop item detail.", action: "shopView", need: 1, goTab: "shop" }
   ];
@@ -4184,7 +4405,7 @@
     clearStrayUI();
     if (stamp.goEnter) {
       inRoom = true;
-      clearRoomChatDisplay(true);
+      try { beginRoomChatVisit(currentRoomId || "loft"); } catch (eV) { clearRoomChatDisplay(true); }
     }
     if (stamp.goDecorate) decorateMode = true;
     if (stamp.goParty) partyPanelOpen = true;
@@ -4199,6 +4420,12 @@
   }
     var ROOM = "Studio Loft";
   var chat = [];
+  // How this works (?v=20260906av): room chat is VISIT-scoped. Entering a room starts a clean slate.
+  // Beginner: demo API used to dump ancient loft messages (other players) every poll — that felt broken.
+  // roomChatVisitSince = ISO time of this Enter/Clear; poll only merges messages newer than this.
+  // ENGINE DEV: chrome display only — never invents catalog; music poll stays separate in startPoll.
+  var roomChatVisitSince = ""; // ISO string; empty = not in a room visit
+  var roomChatRoomId = ""; // which room this visit chat belongs to
   var liveOccupants = [];
   var meSub = "home"; // home | profile | rooms | friends | mail | passport | account | themes | club | blocklist | galleries | transactions | contests | share
   var newsFilter = "all"; // all | comments | friendings | status | stamps | rooms
@@ -4685,13 +4912,15 @@
     // Why: classic wiki tabs; mobile CSS raises touch height. ENGINE DEV: chrome only.
     var t = loadChatTabs();
     var roomUnread = !!(t.unread && t.unread.room);
-    var html = '<div class="chat-tabs" id="chat-tabs" role="tablist">'
-      + '<button type="button" class="chat-tab chat-tab-room' + (t.activeTabId === "room" || !t.activeTabId ? " is-on" : "") + (roomUnread ? " has-unread" : "") + '" data-chat-tab="room" role="tab">Room</button>';
+    // How this works (?v=20260906at): Room = blue group chat; Private = orange PM tabs (wiki colors).
+    var html = '<div class="chat-tabs chat-tabs-fidelity" id="chat-tabs" role="tablist" aria-label="Chat channels">'
+      + '<button type="button" class="chat-tab chat-tab-room' + (t.activeTabId === "room" || !t.activeTabId ? " is-on" : "") + (roomUnread ? " has-unread" : "") + '" data-chat-tab="room" role="tab" title="Room group chat" aria-label="Room chat">Room</button>';
     (t.openPMs || []).forEach(function (p) {
       var tid = "pm:" + p.userId;
       var un = !!(t.unread && t.unread[tid]);
-      html += '<button type="button" class="chat-tab chat-tab-pm' + (t.activeTabId === tid ? " is-on" : "") + (un ? " has-unread" : "") + '" data-chat-tab="' + esc(tid) + '" role="tab">'
-        + '<span>' + esc(p.name || p.userId) + '</span>'
+      html += '<button type="button" class="chat-tab chat-tab-pm' + (t.activeTabId === tid ? " is-on" : "") + (un ? " has-unread" : "") + '" data-chat-tab="' + esc(tid) + '" role="tab" title="Private whisper" aria-label="Private chat with ' + esc(p.name || p.userId) + '">'
+        + '<span class="chat-tab-kind" aria-hidden="true">Private</span>'
+        + '<span class="chat-tab-name">' + esc(p.name || p.userId) + '</span>'
         + '<span class="chat-tab-x" data-chat-tab-close="' + esc(p.userId) + '" title="Close">×</span></button>';
     });
     (t.openGroups || []).forEach(function (g) {
@@ -4901,7 +5130,8 @@
     if (el) el.remove();
     var sh = document.getElementById("shortcuts-overlay");
     if (sh) sh.remove();
-    if (cmd === "help") { helpOpen = true; paint("help"); return; }
+    if (cmd === "help") { helpOpen = true; devHubOpen = false; paint("help"); return; }
+    if (cmd === "dev" || cmd === "docs" || cmd === "developers") { devHubOpen = true; helpOpen = false; paint("dev"); return; }
     if (cmd === "shortcuts") { shortcutsOpen = true; ensureModernOverlays(); return; }
     if (cmd === "clear-chat") {
       clearActiveChatTab(true);
@@ -5157,10 +5387,14 @@
     var menu;
     if (p.you) {
       // How this works (20260906ak): Change avatar… → recent 5 + tofu + Stuff list (classic).
+      // How this works (?v=20260906at): room self-menu — Profile, Change avatar, Emotes/actions.
       menu = '<div class="occ-menu" role="menu">'
         + '<button type="button" class="occ-menu-item" data-profile="' + esc(id) + '">View Profile</button>'
         + '<button type="button" class="occ-menu-item" data-me="profile">Edit profile</button>'
         + changeAvatarMenuHtml()
+        + '<div class="occ-menu-sep" aria-hidden="true"></div>'
+        + '<button type="button" class="occ-menu-item" data-open-avatar-emotes="1">Emotes / actions…</button>'
+        + '<button type="button" class="occ-menu-item" data-room-menu="decorate">Decorate Room…</button>'
         + '</div>';
     } else {
       menu = '<div class="occ-menu" role="menu">'
@@ -5230,7 +5464,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ao";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906av";
   }
   function roomShareUrl() {
     // How this works (20260906af): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
@@ -6022,6 +6256,11 @@
       ))
       + '</div>';
   }
+  // ---------------------------------------------------------------------------
+  // Stuff tab — shelves, upload, avatar wizard, Wear
+  // Beginner: Avatars category opens the multi-step wizard; Wear writes loft billboard.
+  // ENGINE DEV: Wear uses #avatar-wear-layer sibling — not inside #stage-slot until Pixi owns avatars.
+  // ---------------------------------------------------------------------------
   function stuffPage() {
     // What: Stuff tab inventory by category (Avatars, Furniture, …).
     // How: left teal rail picks category; main shows Your Stuff grid or upload/detail.
@@ -6693,7 +6932,7 @@
         paint("rooms");
         return;
       }
-      clearRoomChatDisplay(true);
+      beginRoomChatVisit(roomId);
       loftVisitOccupants = [];
       paint("rooms");
       loadOccupants();
@@ -6766,20 +7005,41 @@
     return all.filter(function (it) { return allow[itemCat(it)]; });
   }
   function decorateChipHtml(it) {
+    // How this works (?v=20260906at): chips show green door badge when doorTo is set.
+    // Beginner: decorate mode = drag/select; outside = only doors capture clicks (travel).
     var x = Number(it.x) || 40;
     var y = Number(it.y) || 40;
+    var isDoor = !!(it.doorTo);
+    var selected = decorateMode && selectedDecId && selectedDecId === it.id;
     var thumb = it.thumb
       ? '<img src="' + it.thumb + '" alt="" />'
       : '<span class="dec-chip-label">' + esc((it.name || "?").slice(0, 12)) + '</span>';
-    return '<div class="decorate-chip" data-dec-id="' + esc(it.id) + '" style="left:' + x + 'px;top:' + y + 'px" title="' + esc(it.name || "item") + '">'
+    var title = it.name || "item";
+    if (isDoor) title = (it.doorLabel || title) + " — door → " + (it.doorLabel || it.doorTo);
+    var cls = "decorate-chip"
+      + (isDoor ? " is-door" : "")
+      + (selected ? " is-selected" : "")
+      + (doorGlowPreview && isDoor ? " is-glowing" : "");
+    return '<div class="' + cls + '" data-dec-id="' + esc(it.id) + '"'
+      + (isDoor ? (' data-door-to="' + esc(it.doorTo) + '"') : "")
+      + ' style="left:' + x + 'px;top:' + y + 'px" title="' + esc(title) + '" role="button" tabindex="0">'
       + thumb
-      + '<button type="button" class="dec-chip-x" data-dec-remove="' + esc(it.id) + '" title="Take from room">×</button>'
+      + (isDoor ? '<span class="dec-door-badge" aria-hidden="true" title="Door">🚪</span>' : "")
+      + (decorateMode
+        ? '<button type="button" class="dec-chip-x" data-dec-remove="' + esc(it.id) + '" title="Take from room">×</button>'
+        : "")
       + '</div>';
   }
   function decorateLayerHtml() {
+    // How this works: empty → aria-hidden; doors get has-doors so travel clicks work without decorate.
     var layout = loadRoomLayout();
+    var hasDoors = (layout.items || []).some(function (it) { return it && it.doorTo; });
     if (!layout.items.length && !decorateMode) return '<div id="decorate-layer" class="decorate-layer" aria-hidden="true"></div>';
-    return '<div id="decorate-layer" class="decorate-layer' + (decorateMode ? " is-active" : "") + '" aria-label="Room decorations">'
+    var cls = "decorate-layer"
+      + (decorateMode ? " is-active" : "")
+      + (hasDoors && !decorateMode ? " has-doors" : "")
+      + (doorGlowPreview ? " show-door-glow" : "");
+    return '<div id="decorate-layer" class="' + cls + '" aria-label="Room decorations">'
       + layout.items.map(decorateChipHtml).join("")
       + '</div>';
   }
@@ -6793,7 +7053,8 @@
     var tracks = (pl && pl.tracks) ? pl.tracks : [];
     var placedRows = placed.length
       ? '<ul class="room-items-list">' + placed.map(function (it) {
-          return '<li><span class="room-item-chip">' + esc(it.name || "Item") + '</span> <span class="meta">(' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span></li>';
+          var usage = it.doorTo ? ("doorway → " + (it.doorLabel || it.doorTo)) : "furniture";
+          return '<li><span class="room-item-chip">' + esc(it.name || "Item") + '</span> <span class="meta">' + esc(usage) + ' · (' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span></li>';
         }).join("") + '</ul>'
       : '<p class="meta">No decorate items placed yet.</p>';
     var trackRows = tracks.length
@@ -6812,9 +7073,12 @@
       + '</div></div>';
   }
   function decoratePanel() {
+    // How this works (?v=20260906at): inventory + placed list + Make Door on selected chip.
+    try { ensureDoorStubFurniture(); } catch (eStub) {}
     var inv = decorateInventory();
     var layout = loadRoomLayout();
     var placed = layout.items || [];
+    var ridKey = roomLayoutStorageKey(currentRoomId || "loft");
     var invRows = inv.length
       ? inv.map(function (it) {
           var thumb = it.thumb ? '<img class="dec-inv-thumb" src="' + it.thumb + '" alt="" />' : '<span class="dec-inv-swatch"></span>';
@@ -6824,26 +7088,41 @@
             + '<button type="button" class="action-btn" data-dec-add="' + esc(it.id) + '">Add to room</button>'
             + '</div>';
         }).join("")
-      : '<p class="meta">No furniture, backdrops, toys, or images in Stuff yet. Upload some first.</p>';
+      : '<p class="meta">No furniture yet — a Doorframe stub will appear after refresh, or upload images.</p>';
     var placedRows = placed.length
       ? '<ul class="dec-placed-list">' + placed.map(function (it) {
-          return '<li><b>' + esc(it.name || "Item") + '</b> <span class="meta">(' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span> '
-            + '<button type="button" class="text-btn" data-dec-remove="' + esc(it.id) + '">Take from room</button></li>';
+          var doorNote = it.doorTo ? (' <span class="door-tag" title="Door">🚪 ' + esc(it.doorLabel || it.doorTo) + '</span>') : "";
+          var sel = (selectedDecId === it.id) ? " is-selected" : "";
+          return '<li class="dec-placed-row' + sel + '">'
+            + '<button type="button" class="text-btn dec-select-btn" data-dec-select="' + esc(it.id) + '"><b>' + esc(it.name || "Item") + '</b></button>'
+            + ' <span class="meta">(' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span>'
+            + doorNote
+            + ' <button type="button" class="text-btn" data-dec-remove="' + esc(it.id) + '">Take</button>'
+            + (it.doorTo
+              ? (' <button type="button" class="text-btn" data-drop-door="' + esc(it.id) + '">Drop Door</button>')
+              : (' <button type="button" class="text-btn" data-dec-select="' + esc(it.id) + '" data-open-make-door="1">Make Door…</button>'))
+            + '</li>';
         }).join("") + '</ul>'
-      : '<p class="meta">Nothing placed yet.</p>';
+      : '<p class="meta">Nothing placed yet — Add to room, then Make Door.</p>';
+    var selHint = selectedDecId
+      ? '<p class="meta dec-sel-hint">Selected chip ready — open <b>Make Door</b> to create/link a room.</p>'
+        + '<button type="button" class="action-btn" data-open-make-door="1">Make Door…</button>'
+      : '<p class="meta">Tip: tap a chip on the stage (or a name below) to select it for Make Door.</p>';
     return '<div class="room-side-panel decorate-panel" id="decorate-panel">'
       + '<div class="panel">'
       +   '<div class="room-side-head"><h2>Decorate Room</h2>'
       +     '<button type="button" class="text-btn" data-decorate-close="1">Close</button></div>'
-      +   '<p class="meta">Wiki Furniture shell — chips on a decorate layer (sibling of #stage-slot). Drag to move. Engine still mounts via getStageEl().</p>'
+      +   '<p class="meta">Wiki Furniture — drag chips. Select → <b>Make Door</b> (create/link rooms). ENGINE DEV: layer sibling of #stage-slot.</p>'
+      +   selHint
       +   '<div class="section-label">Your Stuff</div>'
       +   '<div class="dec-inv-list">' + invRows + '</div>'
       +   '<div class="section-label">View items (layout)</div>'
       +   placedRows
       +   '<div class="stuff-detail-actions">'
       +     '<button type="button" class="action-btn" data-dec-save="1">Save layout</button>'
+      +     '<button type="button" class="text-btn" data-door-glow-toggle="1">' + (doorGlowPreview ? "Hide" : "Show") + ' door glow</button>'
       +   '</div>'
-      +   '<p class="meta">Saved to <code>whirled2.roomLayout.loft</code>.</p>'
+      +   '<p class="meta">Saved to <code>' + esc(ridKey) + '</code>.</p>'
       + '</div></div>';
   }
   function partyPanel() {
@@ -6967,11 +7246,138 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906ar</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906av</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
-      + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
+      + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md / <button type="button" class="text-btn" data-dev-hub-open="1">Developers</button> — no external secrets.</p>'
       + '</div></section>';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Developer Information Hub (?v=20260906au)
+  // Beginner: in-site index of chrome/engine docs — pale-blue cards with plain-English
+  // summaries + links to full .md files. Open via Help → Developers, header Developers,
+  // #dev / #docs, or ?page=dev. ENGINE DEV: chrome-only — never mounts Pixi / #stage-slot.
+  // ---------------------------------------------------------------------------
+  function devHubDocUrl(name) {
+    // How this works: same-folder relative .md for local/static hosts.
+    return "./" + name;
+  }
+  function devHubCard(title, anchor, summary, mdFile, engineNote) {
+    // Beginner: one pale-blue card = one topic. Summary stays short; mdFile is the deep dive.
+    return '<article class="dev-hub-card panel" id="' + esc(anchor) + '">'
+      + '<h2>' + title + '</h2>'
+      + '<p>' + summary + '</p>'
+      + (engineNote ? ('<p class="meta engine-note"><b>ENGINE DEV:</b> ' + engineNote + '</p>') : '')
+      + '<p class="meta"><a href="' + esc(devHubDocUrl(mdFile)) + '" target="_blank" rel="noopener">' + esc(mdFile) + '</a>'
+      + ' · <a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/web-mock/' + esc(mdFile) + '" target="_blank" rel="noopener">GitHub</a></p>'
+      + '</article>';
+  }
+  function devHubPage() {
+    // What: Developer Information Hub — index of easy documentation for chrome + engine hires.
+    // How: paint overlay like Help; cards summarize DEV-HUB.md sections.
+    // Why: newbies need one place for #stage-slot, auth, avatars, cache versions.
+    var ghPages = "https://whirledclassic.github.io/whirled2/whirled2/web-mock/";
+    return '<section class="page help-page dev-hub-page"><div class="page-head"><div><h1>Developer Information Hub</h1>'
+      + '<p>Plain-English index for chrome + engine work. Pale-blue classic only.</p></div>'
+      + '<button type="button" class="text-btn" data-dev-hub-close="1">Close</button></div>'
+      + '<div class="panel dev-hub-intro">'
+      +   '<p><b>How to open this page:</b> Help → <b>Developers</b>, header <b>Developers</b>, hash <code>#dev</code> / <code>#docs</code>, or <code>?page=dev</code>. Mirror doc: <code>DEV-HUB.md</code>.</p>'
+      +   '<p class="meta">Rules: coins/bars earn-only · never invent shop catalog · say <b>Profile look</b> (never the old social-network nickname) · engine mounts only in <code>#stage-slot</code>.</p>'
+      +   '<nav class="dev-hub-toc" aria-label="Topics">'
+      +     '<a href="#dev-flash">Flash / old Whirled</a>'
+      +     '<a href="#dev-chrome">Chrome</a>'
+      +     '<a href="#dev-engine">Engine bridge</a>'
+      +     '<a href="#dev-avatars">PNG avatars</a>'
+      +     '<a href="#dev-auth">Auth</a>'
+      +     '<a href="#dev-rooms">Rooms / chat / music</a>'
+      +     '<a href="#dev-cache">Cache / STATUS</a>'
+      +     '<a href="#dev-fla">FLA / SWF lab</a>'
+      +     '<a href="#dev-files">Code map</a>'
+      +   '</nav>'
+      + '</div>'
+
+      + '<article class="dev-hub-card panel dev-hub-card-flash" id="dev-flash">'
+      + '<h2>Using old Whirled / Flash avatars</h2>'
+      + '<p><b>First-class path:</b> classic Flash/SWF avatars stay supported alongside modern PNG packs. '
+      + 'Upload / analyze / Ruffle playback is in progress on this build — use the docs below now; lab UI unlocks with <code>?avatarLab=1</code>.</p>'
+      + '<ul class="help-tips">'
+      + '<li><b>Import notes</b> — how legacy Whirled SWFs map into Stuff / wardrobe: '
+      + '<a href="' + esc(devHubDocUrl("AVATAR-IMPORT.md")) + '" target="_blank" rel="noopener">AVATAR-IMPORT.md</a></li>'
+      + '<li><b>Creator guide</b> — Flash/Animate → Publish SWF <i>or</i> export PNG sequences for Wear: '
+      + '<a href="' + esc(devHubDocUrl("AVATAR-CREATOR-GUIDE.md")) + '" target="_blank" rel="noopener">AVATAR-CREATOR-GUIDE.md</a>'
+      + ' · <button type="button" class="text-btn" data-avatar-guide-open="1">In-site guide</button></li>'
+      + '<li><b>FLA lab</b> — .fla alone cannot play in browser; publish SWF / export PNGs: '
+      + '<a href="' + esc(devHubDocUrl("FLA-TEST-AVATAR.md")) + '" target="_blank" rel="noopener">FLA-TEST-AVATAR.md</a></li>'
+      + '<li><b>Stub</b> — SWF upload → analyze → Ruffle preview (chrome lab; does not remount Pixi in <code>#stage-slot</code>).</li>'
+      + '</ul>'
+      + '<p class="meta engine-note"><b>ENGINE DEV:</b> Lab Wear / Ruffle stay on chrome layers — never force Flash into <code>#stage-slot</code>. Pixi owns the stage mount; SWF path is parallel.</p>'
+      + '<p class="meta"><a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/web-mock/AVATAR-IMPORT.md" target="_blank" rel="noopener">GitHub AVATAR-IMPORT</a>'
+      + ' · <a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/web-mock/FLA-TEST-AVATAR.md" target="_blank" rel="noopener">GitHub FLA lab</a></p>'
+      + '</article>'
+
+      + devHubCard(
+          "How the chrome works",
+          "dev-chrome",
+          "One IIFE in <code>app.js</code>: gate → <code>shell()</code> tabs + chat bar → <code>paint(tab)</code> fills <code>#main</code>. State lives in <code>localStorage</code> keys <code>whirled2.*</code>. Click handlers on <code>#app</code> drive almost all UI.",
+          "DEV-NOTES.md",
+          "Do not rewrite chrome into Pixi. Read session/room/chat via <code>window.WhirledChrome</code>."
+        )
+      + devHubCard(
+          "ENGINE-BRIDGE / mounting Pixi",
+          "dev-engine",
+          "Mount your Pixi app with <code>host.replaceChildren(app.canvas)</code> where <code>host = WhirledChrome.getStageEl()</code> (= <code>#stage-slot</code>). Wear billboard, decorate chips, and stage bubbles are chrome siblings — not inside your canvas until you own them.",
+          "ENGINE-BRIDGE.md",
+          "resizeTo: host. Never draw outside #stage-slot. Chrome walk yields when canvas / [data-whirled-engine] is present."
+        )
+      + devHubCard(
+          "Avatar packs + upload wizard + creator guide",
+          "dev-avatars",
+          "Stuff → Avatars → multi-step wizard (PNG/WebP, folders, zip, .aseprite). Wear → loft floor click walks; avatar click plays emotes. Cyan Hair is the reference pack (<code>states.idle/walk/…</code>, <code>artFaces</code>).",
+          "AVATAR-CREATOR-GUIDE.md",
+          "Bridge: getWornAvatar, setAvatarState, playAvatarEmote, listAvatarEmotes, getAvatarWalkTarget. See also STUFF-AVATARS.md."
+        )
+      + '<div class="panel meta" style="margin-top:-8px">Also: <button type="button" class="text-btn" data-avatar-guide-open="1">In-site How to make an avatar</button>'
+      + ' · <a href="' + esc(devHubDocUrl("STUFF-AVATARS.md")) + '" target="_blank" rel="noopener">STUFF-AVATARS.md</a>'
+      + ' · <a href="' + esc(devHubDocUrl("AVATAR-IMPORT.md")) + '" target="_blank" rel="noopener">AVATAR-IMPORT.md</a></div>'
+      + devHubCard(
+          "Auth / Discord / hybrid login",
+          "dev-auth",
+          "Username/password is primary (hybrid: API first, then offline localStorage). Discord OAuth needs demo <code>server/server.mjs</code> secrets — never in the client. Pages may set <code>WHIRLED_API</code> to the tunnel origin only.",
+          "SOCIAL-LOGIN.md",
+          "Auth is chrome session only — do not gate #stage-slot on OAuth."
+        )
+      + devHubCard(
+          "Rooms, chat, music",
+          "dev-rooms",
+          "Rooms lobby → preview → Enter loft. Chat: bottom bar + Overlay/Slide modes; stage bubbles optional. Room music: owner YouTube/Spotify embed; shared sync needs demo server. Lock triad Unlocked/Friends/Locked is chrome gate only. Make Door links decorate chips across rooms.",
+          "ROOMS-FIDELITY.md",
+          "#stage-slot appears only in roomView(); music dock is outside #main so paint never kills the iframe."
+        )
+      + devHubCard(
+          "Cache-bust versions / STATUS",
+          "dev-cache",
+          "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
+          "STATUS.md",
+          "Current build: ?v=20260906av (chat visit-scope + Make Door). Hard-refresh after pulls."
+        )
+      + devHubCard(
+          "FLA / SWF lab notes",
+          "dev-fla",
+          "See also <a href='#dev-flash'>Using old Whirled / Flash avatars</a> (first-class). Unlock lab with <code>?avatarLab=1</code>. FLA alone cannot play — publish SWF and/or export PNG sequences. Extracted FLA sketches are not Wearable until converted.",
+          "FLA-TEST-AVATAR.md",
+          "Lab Wear writes wardrobe.activeId only — never mounts Ruffle into #stage-slot."
+        )
+      + '<article class="dev-hub-card panel" id="dev-files"><h2>Code map (beginner)</h2>'
+      + '<ul class="help-tips">'
+      + '<li><b>app.js</b> — boot, gate/auth, paint/routes, loft/stage, avatar wear/walk/emote, Stuff wizard, chat, rooms, Profile look, WhirledChrome.</li>'
+      + '<li><b>src/api.js</b> — WhirledApi: hybrid login, chat, room music HTTP, Discord helpers.</li>'
+      + '<li><b>src/styles.css</b> — pale-blue classic chrome; themes via CSS vars on #app[data-theme].</li>'
+      + '<li><b>server/server.mjs</b> — optional demo API (chat, occupants, music, Discord callback).</li>'
+      + '<li><b>index.html</b> — loads css + api.js + app.js with cache-bust; sets WHIRLED_API on Pages.</li>'
+      + '</ul>'
+      + '<p class="meta">Full mirror: <a href="' + esc(devHubDocUrl("DEV-HUB.md")) + '" target="_blank" rel="noopener">DEV-HUB.md</a>. Live site folder: <a href="' + ghPages + '" target="_blank" rel="noopener">GitHub Pages web-mock</a>.</p>'
+      + '</article></section>';
   }
   function roomCommentsPanel() {
     var comments = loadRoomComments();
@@ -7062,7 +7468,10 @@
       // How this works: #room-embed-dock is NOT under the stage — shell() hosts it outside #main.
       // Beginner: Open player sheet is not wiped when mute / Room music taps re-paint the room.
       // ENGINE DEV: persistent shell dock + CSS fixed is-expanded; ensureRoomEmbedDock / ensurePlaylistPanel after paint.
-      +     chatTabsHtml()
+      +     '<div class="chat-toolbar-row">'
+      +       chatTabsHtml()
+      +       '<button type="button" class="text-btn chat-clear-view-btn" data-chat-clear-view="1" title="Clear room chat for this visit">Clear chat</button>'
+      +     '</div>'
       +     '<div class="chat-log" id="chat-log">' + activeChatMessages().map(chatRow).join('') + '</div>'
       +     '<div class="room-invite-row room-invite-desktop">'
       +       '<button type="button" class="text-btn" data-room-share="1">Share / embed room…</button>'
@@ -7072,6 +7481,7 @@
       +     (roomPanelOpen ? roomCommentsPanel() : '')
       +     (roomItemsPanelOpen ? roomItemsPanel() : '')
       +     (decorateMode ? decoratePanel() : '')
+      +     (makeDoorPanelOpen ? makeDoorPanelHtml() : '')
       +     (partyPanelOpen ? partyPanel() : '')
       +     '<button type="button" class="music-gesture-fab" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
       +   '</section>'
@@ -8528,7 +8938,10 @@
         var cur = Number(prog[st.action]) || 0;
         var pct = Math.min(100, Math.round((cur / Math.max(1, st.need)) * 100));
         var tip = got ? ("Earned: " + st.tip) : ("Locked — " + st.tip + (st.need > 1 ? (" (" + Math.min(cur, st.need) + "/" + st.need + ")") : ""));
+        // How this works (?v=20260906at): classic passport seal — pale-blue medal chip, no fake economy.
+        var seal = got ? "★" : "○";
         return '<div class="stamp-cell' + (got ? " is-earned" : " is-locked") + '" title="' + esc(tip) + '">'
+          + '<span class="stamp-seal" aria-hidden="true">' + seal + '</span>'
           + '<span class="stamp-name">' + esc(st.name) + '</span>'
           + '<span class="meta">' + (got ? "Earned" : "Locked") + '</span>'
           + (got ? "" : '<div class="stamp-prog" aria-hidden="true"><i style="width:' + pct + '%"></i></div>')
@@ -9036,6 +9449,11 @@
       + '</section>';
   }
 
+  // ---------------------------------------------------------------------------
+  // Me tab — profile, mail, friends, Profile look, Club, Transactions
+  // Beginner: Profile look = BG/font/modules on your profile page (not room stage).
+  // ENGINE DEV: profile skins never apply to #stage-slot.
+  // ---------------------------------------------------------------------------
   function mePage() {
     if (viewingId && session() && viewingId !== session().user.id) {
       if (isBlocked(viewingId)) {
@@ -9103,6 +9521,11 @@
       +     '<button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button></p>'
       + '</div></section>';
   }
+  // ---------------------------------------------------------------------------
+  // Shell — topbar tabs + persistent chat bar + room music dock
+  // Beginner: Help | Developers | Legal live in the who-links row.
+  // ENGINE DEV: #room-embed-dock stays outside #main so paint never kills music iframe.
+  // ---------------------------------------------------------------------------
   function shell() {
     var me = you();
     return ''
@@ -9130,6 +9553,8 @@
       +       '<button type="button" class="text-btn" data-me="club" title="Membership">Club</button>'
       +       '<span class="sep">|</span>'
       +       '<button type="button" class="text-btn" data-help-open="1">Help</button>'
+      +       '<span class="sep">|</span>'
+      +       '<button type="button" class="text-btn" data-dev-hub-open="1" title="Developer Information Hub">Developers</button>'
       +       '<span class="sep">|</span>'
       +       '<button type="button" class="text-btn" data-legal-open="1">Legal</button>'
       +       '<span class="sep">|</span>'
@@ -9174,6 +9599,7 @@
       +         '<button type="button" data-room-menu="comment">Comment or rate</button>'
       +         '<button type="button" data-room-menu="decorate">Decorate Room</button>'
       +         '<button type="button" data-room-menu="view-items">View items</button>'
+      +         '<button type="button" data-room-menu="clickable">View clickable furniture</button>'
       +         '<button type="button" data-room-menu="snapshot">Take snapshot (stub)</button>'
       +         '<button type="button" data-room-menu="zoom">Zoom (stub)</button>'
       +         '<button type="button" data-room-menu="playlist">View room music</button>'
@@ -9197,6 +9623,11 @@
       +   '</span>'
       + '</form>';
   }
+  // ---------------------------------------------------------------------------
+  // paint / routes — redraw #main (Me/Stuff/Games/Rooms/Groups/Shop + Help/Dev/Legal)
+  // Beginner: one paint path; overlays (help/dev/legal/avatar guide) take priority.
+  // ENGINE DEV: #stage-slot only appears inside rooms() roomView — never on Me/Stuff.
+  // ---------------------------------------------------------------------------
   function paint(tab) {
     // What: redraw the logged-in shell's #main (or gate) for the chosen tab.
     // How: set data-tab, applyBrowserTheme, replace main HTML, then profile skin or clearProfileSkinDom.
@@ -9249,9 +9680,10 @@
     // How this works: #room-embed-dock is outside #main — no park needed before innerHTML.
     // Beginner: Open player stays open when you mute or switch YouTube/Spotify in Room music.
     // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts only when playlistPanelDirty (never while paste field focused; clears dirty instead).
-    if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; main.innerHTML = legalPage(); }
-    else if (avatarGuideOpen) { helpOpen = false; legalOpen = false; main.innerHTML = avatarGuidePage(); }
-    else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; avatarGuideOpen = false; main.innerHTML = helpPage(); }
+    if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; devHubOpen = false; avatarGuideOpen = false; main.innerHTML = legalPage(); }
+    else if (devHubOpen || tab === "dev" || tab === "docs") { devHubOpen = true; helpOpen = false; legalOpen = false; avatarGuideOpen = false; main.innerHTML = devHubPage(); }
+    else if (avatarGuideOpen) { helpOpen = false; legalOpen = false; devHubOpen = false; main.innerHTML = avatarGuidePage(); }
+    else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; avatarGuideOpen = false; devHubOpen = false; main.innerHTML = helpPage(); }
     // How this works (QA 20260906ai): rooms-lobby is a CSS state on #app, not a paint tab.
     // Beginner: if something still calls paint("rooms-lobby"), show the Rooms lobby — never the old Groups stub.
     else if (tab === "rooms" || tab === "rooms-lobby") main.innerHTML = rooms();
@@ -9291,6 +9723,7 @@
     } catch (e) {}
     try { ensureStagePlaceholder(); } catch (e) {}
     try { if (decorateMode) bindDecorateDrag(); } catch (e) {}
+    try { bindDoorLayerClicks(); } catch (eDoorBind) {}
     try { syncRoomAudio(); } catch (e) {}
     try { ensurePlaylistPanel(); } catch (ePl) {}
     try { if (roomPreviewOpen && !inRoom) ensureRoomPreviewPanel(); } catch (eRp) {}
@@ -9440,18 +9873,75 @@
   // How this works: room chat is visit-scoped on this mock. Leaving the room,
   // logging off, or a fresh page load wipes history so old sessions don't linger.
   // Chat Options → Clear all chat does the same. clearStorage defaults to true.
-  function clearRoomChatDisplay(clearStorage) {
-    if (clearStorage === undefined) clearStorage = true;
+  function chatStorageKey(roomId) {
+    // How this works: offline fallback key per room (demo API uses in-memory server log).
+    roomId = String(roomId || currentRoomId || "loft");
+    return "whirled2.chat." + roomId;
+  }
+  function beginRoomChatVisit(roomId) {
+    // How this works (?v=20260906av): Enter room = clean slate. Stamp visit time; wipe display.
+    // Beginner: you will NOT see other people's old demo messages from hours ago.
+    roomId = String(roomId || currentRoomId || "loft");
+    roomChatRoomId = roomId;
+    roomChatVisitSince = new Date().toISOString();
     chat = [];
-    refreshChatLog();
-    clearStageBubbles();
+    try { clearStageBubbles(); } catch (eB) {}
+    try { localStorage.removeItem(chatStorageKey(roomId)); } catch (e) {}
+    // Also clear legacy loft key so Pages offline cannot resurrect cemetery lines.
+    try { localStorage.removeItem("whirled2.chat.loft"); } catch (e2) {}
+    try { refreshChatLog(); } catch (e3) {}
+    try {
+      pushSystemChat("Room chat — fresh for this visit. Older shared log stays on the server until you tap Load earlier.");
+    } catch (e4) {}
+  }
+  function filterMsgsSinceVisit(messages) {
+    // How this works: keep only messages at/after this visit (and never resurrect pre-visit cemetery).
+    var since = roomChatVisitSince || "";
+    var list = Array.isArray(messages) ? messages : [];
+    if (!since) return [];
+    return list.filter(function (m) {
+      if (!m) return false;
+      if (m.system) return true; // local system lines already in chat; remote rarely has system
+      var at = String(m.at || "");
+      return at >= since;
+    });
+  }
+  function mergeVisitChat(incoming) {
+    // How this works: merge by id — never replace the whole log with a server dump.
+    incoming = filterMsgsSinceVisit(incoming || []);
+    if (!incoming.length) return false;
+    var have = {};
+    chat.forEach(function (m) { if (m && m.id) have[m.id] = true; });
+    var added = [];
+    incoming.forEach(function (m) {
+      if (!m || !m.id || have[m.id]) return;
+      // Skip pure seed ghosts with empty text
+      if (!m.system && !String(m.text || "").trim()) return;
+      chat.push(m);
+      have[m.id] = true;
+      added.push(m);
+    });
+    if (chat.length > 120) chat = chat.slice(-100);
+    return added;
+  }
+  function clearRoomChatDisplay(clearStorage) {
+    // How this works (?v=20260906av): Clear my view — empty display + bump visit since so poll cannot refill old lines.
+    if (clearStorage === undefined) clearStorage = true;
+    roomChatVisitSince = new Date().toISOString();
+    if (inRoom) roomChatRoomId = String(currentRoomId || "loft");
+    chat = [];
+    try { refreshChatLog(); } catch (eR) {}
+    try { clearStageBubbles(); } catch (eB) {}
     if (clearStorage) {
-      try { localStorage.removeItem("whirled2.chat.loft"); } catch (e) {}
+      try { localStorage.removeItem(chatStorageKey(roomChatRoomId || currentRoomId || "loft")); } catch (e) {}
+      try { localStorage.removeItem("whirled2.chat.loft"); } catch (e2) {}
     }
   }
   function leaveRoomResetChat() {
-    // Baby step: exiting Studio Loft ends this room visit → empty the chat.
+    // Baby step: leaving a room ends this visit — empty chat and stop visit scoping until next Enter.
     clearRoomChatDisplay(true);
+    roomChatVisitSince = "";
+    roomChatRoomId = "";
     occFilterQ = "";
     roomEmbedExpanded = false;
     try { removeRoomEmbedDock(); } catch (eD) {}
@@ -9460,6 +9950,11 @@
       if (a) a.pause();
     } catch (eA) {}
   }
+  // ---------------------------------------------------------------------------
+  // Gate / auth binding — Sign Up, Logon, Discord CTA
+  // Beginner: username/password primary; Discord when WHIRLED_API + server secrets.
+  // ENGINE DEV: chrome session only — never touches #stage-slot.
+  // ---------------------------------------------------------------------------
   function bindGate() {
     var err = document.getElementById("gate-err");
     function hook(id, fn) {
@@ -9508,8 +10003,10 @@
   }
   var _decDrag = null;
   function bindDecorateDrag() {
+    // How this works (?v=20260906at): decorate drag + click-select for Make Door.
     var layer = document.getElementById("decorate-layer");
-    if (!layer || layer._decBound) return;
+    if (!layer) return;
+    if (layer._decBound) return;
     layer._decBound = true;
     layer.addEventListener("pointerdown", function (ev) {
       if (!decorateMode) return;
@@ -9517,20 +10014,26 @@
       var chip = ev.target.closest(".decorate-chip");
       if (!chip) return;
       ev.preventDefault();
+      ev.stopPropagation();
       var id = chip.getAttribute("data-dec-id");
-      var rect = layer.getBoundingClientRect();
+      selectedDecId = id;
       _decDrag = {
         id: id,
         chip: chip,
         ox: ev.clientX - chip.offsetLeft,
         oy: ev.clientY - chip.offsetTop,
         layer: layer,
-        rect: rect
+        startX: ev.clientX,
+        startY: ev.clientY,
+        moved: false
       };
       try { chip.setPointerCapture(ev.pointerId); } catch (e) {}
     });
     layer.addEventListener("pointermove", function (ev) {
       if (!_decDrag) return;
+      if (Math.abs(ev.clientX - _decDrag.startX) > 4 || Math.abs(ev.clientY - _decDrag.startY) > 4) {
+        _decDrag.moved = true;
+      }
       var x = ev.clientX - _decDrag.ox;
       var y = ev.clientY - _decDrag.oy;
       var maxX = Math.max(0, _decDrag.layer.clientWidth - 56);
@@ -9540,9 +10043,10 @@
       _decDrag.chip.style.left = x + "px";
       _decDrag.chip.style.top = y + "px";
     });
-    function endDrag() {
+    function endDrag(ev) {
       if (!_decDrag) return;
       var id = _decDrag.id;
+      var moved = _decDrag.moved;
       var x = parseFloat(_decDrag.chip.style.left) || 0;
       var y = parseFloat(_decDrag.chip.style.top) || 0;
       var layout = loadRoomLayout();
@@ -9555,9 +10059,37 @@
       }
       saveRoomLayout(layout);
       _decDrag = null;
+      // Tap without drag → select chip (highlight + enable Make Door).
+      if (!moved) {
+        selectedDecId = id;
+        try {
+          layer.querySelectorAll(".decorate-chip.is-selected").forEach(function (el) {
+            el.classList.remove("is-selected");
+          });
+          var c = layer.querySelector('.decorate-chip[data-dec-id="' + id + '"]');
+          if (c) c.classList.add("is-selected");
+        } catch (eSel) {}
+      }
     }
     layer.addEventListener("pointerup", endDrag);
     layer.addEventListener("pointercancel", endDrag);
+  }
+  function bindDoorLayerClicks() {
+    // How this works: outside decorate mode, door chips travel on click/tap.
+    // Beginner: green 🚪 chips = doors. ENGINE DEV: does not steal floor walk (only .is-door).
+    var layer = document.getElementById("decorate-layer");
+    if (!layer) return;
+    if (layer._doorBound) return;
+    layer._doorBound = true;
+    layer.addEventListener("click", function (ev) {
+      if (decorateMode) return;
+      var chip = ev.target.closest(".decorate-chip.is-door");
+      if (!chip) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      var id = chip.getAttribute("data-dec-id");
+      travelThroughDoor(id);
+    });
   }
   // ---------------------------------------------------------------------------
   // Stage avatar bubbles (#stage-bubbles) — temporary chrome until Pixi nametags
@@ -9680,7 +10212,7 @@
       getSession: function () { return session(); },
       getRoom: function () { return { id: "loft", name: ROOM }; },
       onChat: function (fn) { listeners.chat.push(fn); },
-      sendChat: function (text) { return window.WhirledApi.postChat("loft", text); },
+      sendChat: function (text) { return window.WhirledApi.postChat(String(currentRoomId || roomChatRoomId || "loft"), text); },
       onOccupants: function (fn) { listeners.occupants.push(fn); fn(occupants()); },
       getChatUi: function () { return loadChatUi(); },
       getWallet: function () {
@@ -9725,8 +10257,10 @@
     text = String(text || "").trim();
     if (!text) return;
     if (/^\/clear$/i.test(text)) {
-      // Wiki /clear — wipe active tab only (Room or current PM).
-      clearActiveChatTab(true);
+      // Wiki /clear — wipe active tab; Room tab also bumps visit since (?v=20260906av).
+      var tabsClr = loadChatTabs();
+      if (!tabsClr.activeTabId || tabsClr.activeTabId === "room") clearRoomChatDisplay(true);
+      else clearActiveChatTab(true);
       pushSystemChat("Chat cleared.");
       return;
     }
@@ -9815,7 +10349,7 @@
       try { awardAction("chat"); } catch (eG) {}
       return;
     }
-    var result = await window.WhirledApi.postChat("loft", sendText);
+    var result = await window.WhirledApi.postChat(String(currentRoomId || roomChatRoomId || "loft"), sendText);
     var msg2 = result.message || result;
     if (emote) msg2.emote = true;
     if (thought) msg2.thought = true;
@@ -9859,7 +10393,9 @@
     } else {
       menu.innerHTML += '<p class="meta" style="margin:4px 8px 8px;font-size:11px">Join a local group to open a group chat tab.</p>';
     }
-    menu.innerHTML += '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear all chat</button>';
+    menu.innerHTML += '<button type="button" class="action-btn chat-opts-clear" data-chat-clear-view="1">Clear my view</button>'
+      + '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear all chat</button>'
+      + '<button type="button" class="text-btn" data-chat-load-earlier="1">Load earlier messages…</button>';
   }
   function openChatNameMenu(id, name, x, y) {
     var existing = document.getElementById("chat-name-menu");
@@ -9872,18 +10408,51 @@
     menu.style.top = Math.max(8, Math.min(window.innerHeight - 160, y)) + "px";
     var sid = session() && session().user ? session().user.id : "";
     var self = sid && id && sid === id;
-    // How this works: classic chat name context menu — Profile / Whisper / Invite friend / Block.
+    // How this works (?v=20260906at): classic name-click — Profile / Add friend / Whisper / Block / Complain stub.
+    // Beginner: underlined chat names open this pale-blue menu (wiki Chat).
     menu.innerHTML = ''
+      + '<div class="chat-name-menu-head">' + esc(name || "Player") + '</div>'
       + '<button type="button" data-profile="' + esc(id) + '">Profile</button>'
+      + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Add friend</button>')
       + (self ? '' : '<button type="button" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(name) + '">Whisper</button>')
-      + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Invite friend</button>')
-      + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>');
+      + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>')
+      + (self ? '' : '<button type="button" data-complain-stub="' + esc(id) + '" title="Report — Coming Soon">Complain…</button>');
     document.body.appendChild(menu);
   }
-  async function loadHistory() {
-    var result = await window.WhirledApi.history("loft");
-    chat = result.messages || [];
-    refreshChatLog();
+  async function loadHistory(opts) {
+    // How this works (?v=20260906av): NEVER dump the full demo cemetery into the UI.
+    // Beginner: by default only fetch messages since this room visit. Optional loadEarlier for history.
+    // ENGINE DEV: display merge only — music polling unchanged.
+    opts = opts || {};
+    if (!session()) return;
+    if (!inRoom && !opts.force) return;
+    var rid = String(currentRoomId || roomChatRoomId || "loft");
+    var since = opts.loadEarlier ? "" : (roomChatVisitSince || "");
+    if (!since && !opts.loadEarlier) {
+      // No active visit stamp → keep clean (do not rehydrate).
+      return;
+    }
+    try {
+      var result = await window.WhirledApi.history(rid, since || undefined);
+      var msgs = result.messages || [];
+      if (opts.loadEarlier) {
+        // One-shot: show older shared lines, but still cap; user asked explicitly.
+        var older = (msgs || []).slice(-60);
+        var have = {};
+        chat.forEach(function (m) { if (m && m.id) have[m.id] = true; });
+        older.forEach(function (m) {
+          if (m && m.id && !have[m.id]) chat.unshift(m);
+        });
+        if (chat.length > 120) chat = chat.slice(-100);
+        refreshChatLog();
+        return;
+      }
+      var added = mergeVisitChat(msgs);
+      if (added && added.length) {
+        refreshChatLog();
+        added.forEach(function (m) { try { spawnStageBubble(m); } catch (eS) {} });
+      }
+    } catch (e) {}
   }
 
   function refreshOccupantRail() {
@@ -9941,23 +10510,26 @@
   }
 
   function startPoll() {
-    // How this works: ~2.5s poll for loft chat + shared room soundtrack (same cadence).
-    // Beginner: when demo server is on, guests pick up the owner's YouTube without pasting.
+    // How this works (?v=20260906av): ~2.5s poll for NEW room chat since this visit + soundtrack.
+    // Beginner: poll MUST pass since=roomChatVisitSince or old demo names (e.g. qjeczg) haunt every Enter.
+    // ENGINE DEV: music poll unchanged; chat merge never replaces the whole log.
     if (pollTimer) clearInterval(pollTimer);
     try { bindRoomMusicStorageListener(); } catch (eBind) {}
     pollTimer = setInterval(async function () {
       if (!session()) return;
-      var result = await window.WhirledApi.pollChat("loft");
-      var next = result.messages || [];
-      if (next.length !== chat.length) {
-        var prevIds = {};
-        chat.forEach(function (m) { if (m && m.id) prevIds[m.id] = true; });
-        chat = next;
-        refreshChatLog();
-        next.forEach(function (m) {
-          if (m && m.id && !prevIds[m.id]) spawnStageBubble(m);
-        });
-      }
+      try {
+        if (inRoom && roomChatVisitSince) {
+          var rid = String(currentRoomId || roomChatRoomId || "loft");
+          var result = await window.WhirledApi.pollChat(rid, roomChatVisitSince);
+          var added = mergeVisitChat(result.messages || []);
+          if (added && added.length) {
+            refreshChatLog();
+            added.forEach(function (m) {
+              try { spawnStageBubble(m); } catch (eS) {}
+            });
+          }
+        }
+      } catch (eChat) {}
       try { await pollSharedRoomMusic(); } catch (eMusic) {}
     }, 2500);
   }
@@ -9970,7 +10542,8 @@
   function syncHashRoute(tab) {
     if (!session()) return;
     var hash = "";
-    if (helpOpen || tab === "help") hash = "help";
+    if (devHubOpen || tab === "dev" || tab === "docs") hash = "dev";
+    else if (helpOpen || tab === "help") hash = "help";
     else if (legalOpen || tab === "legal") hash = "legal";
     else if (tab === "me") {
       if (viewingId) hash = "me/player/" + encodeURIComponent(viewingId);
@@ -9996,6 +10569,9 @@
     var head = (parts[0] || "").toLowerCase();
     helpOpen = false;
     legalOpen = false;
+    devHubOpen = false;
+    avatarGuideOpen = false;
+    if (head === "dev" || head === "docs" || head === "developers") { devHubOpen = true; paint("dev"); return true; }
     if (head === "help") { helpOpen = true; paint("help"); return true; }
     if (head === "legal") { legalOpen = true; paint("legal"); return true; }
     if (head === "me") {
@@ -10017,7 +10593,7 @@
     if (head === "rooms") {
       if ((parts[1] || "") === "loft") {
         if (tryEnterLoft()) {
-          clearRoomChatDisplay(true);
+          beginRoomChatVisit("loft");
           loftVisitOccupants = [];
           paint("rooms");
           loadOccupants();
@@ -10054,7 +10630,12 @@
   function boot() {
     // How this works: ?avatarLab=1 unlocks the deferred SWF wardrobe lab for side work only.
     // Discord: if URL has discord_token, accept it before paint (async me fetch).
+    // Beginner (?v=20260906au): ?page=dev|docs|developers opens Developer Information Hub after login.
     syncAvatarLabFlagFromUrl();
+    try {
+      var pageQ = new URL(location.href).searchParams.get("page");
+      if (pageQ && /^(dev|docs|developers)$/i.test(pageQ)) devHubOpen = true;
+    } catch (ePage) {}
     applyBrowserTheme();
     var discordTok = consumeDiscordTokenFromUrl();
     if (discordTok && window.WhirledApi && window.WhirledApi.acceptDiscordToken) {
@@ -10091,9 +10672,13 @@
         try { awayMode = isAway(session().user.id); } catch (eAw) {}
         try { pushNotice("green", you().name + " logged on.", { transient: true }); } catch (eN) {}
       }
-      // How this works: a new page load is a new session visit — wipe leftover loft
-      // chat from earlier. Do not loadHistory() on boot (that rehydrated old chats).
-      try { clearRoomChatDisplay(true); } catch (eClr) {}
+      // How this works (?v=20260906av): fresh page = no room visit yet — wipe leftover display.
+      // Do not loadHistory() on boot (demo API cemetery). Enter room calls beginRoomChatVisit.
+      try {
+        roomChatVisitSince = "";
+        roomChatRoomId = "";
+        clearRoomChatDisplay(true);
+      } catch (eClr) {}
       try {
         paint(hasUser ? "rooms" : "");
       } catch (ePaint) {
@@ -10109,7 +10694,9 @@
         try { startPoll(); } catch (eP) {}
         try { startOccPoll(); } catch (eO) {}
         try { ensureNoticeBar(); } catch (eNb) {}
-        try { applyHashRoute(); } catch (eH) {}
+        try {
+          if (!applyHashRoute() && devHubOpen) paint("dev");
+        } catch (eH) {}
       }
     } catch (eBoot) {
       showBootRecover(!!(session() && session().user), eBoot);
@@ -10171,7 +10758,10 @@
       boot();
       return;
     }
-    loadHistory();
+    // How this works (?v=20260906av): resume poll/occupants; do NOT loadHistory() full dump.
+    if (inRoom && roomChatVisitSince) {
+      try { loadHistory(); } catch (eH) {}
+    }
     startPoll();
     startOccPoll();
   }
@@ -10187,9 +10777,8 @@
       boot();
       return;
     }
-    if (ev.key.indexOf("whirled2.chat.") === 0 && session()) {
-      loadHistory();
-    }
+    // Visit-scoped: ignore raw chat key writes from other tabs (would resurrect cemetery).
+    // Live lines arrive via pollChat(?since=visit).
   });
 
   var app = document.getElementById("app");
@@ -10376,6 +10965,27 @@
       uiB.bubbleDuration = (bd === "short" || bd === "long") ? bd : "medium";
       saveChatUi(uiB);
       renderChatOptsMenu();
+      return;
+    }
+    if (ev.target.closest("[data-chat-clear-view]")) {
+      // How this works (?v=20260906av): Clear my view — empty room display + bump visit since (poll cannot refill cemetery).
+      // Beginner: Private tabs are left alone; only Room chat on screen clears.
+      clearRoomChatDisplay(true);
+      try { pushSystemChat("Chat cleared for this visit."); } catch (e) {}
+      chatOptsOpen = false;
+      var comV = document.getElementById("chat-opts-menu");
+      if (comV) comV.hidden = true;
+      pushNotice("green", "Room chat cleared.", { transient: true });
+      return;
+    }
+    if (ev.target.closest("[data-chat-load-earlier]")) {
+      // Optional: pull older shared demo/server lines once (user asked).
+      chatOptsOpen = false;
+      var comE = document.getElementById("chat-opts-menu");
+      if (comE) comE.hidden = true;
+      loadHistory({ loadEarlier: true, force: true }).then(function () {
+        pushNotice("orange", "Loaded earlier shared messages (optional). Clear my view anytime.", { transient: true });
+      });
       return;
     }
     if (ev.target.closest("[data-chat-clear]")) {
@@ -11032,7 +11642,7 @@
 
     // ---- Avatar wizard (?v=20260906ar) ----
     if (ev.target.closest("[data-avatar-guide-open]") && session()) {
-      avatarGuideOpen = true; helpOpen = false; legalOpen = false;
+      avatarGuideOpen = true; helpOpen = false; legalOpen = false; devHubOpen = false;
       paint("help");
       return;
     }
@@ -11243,6 +11853,8 @@
     if (ev.target.closest("[data-help-open]") && session()) {
       helpOpen = true;
       legalOpen = false;
+      devHubOpen = false;
+      avatarGuideOpen = false;
       partyPanelOpen = false;
       paint("help");
       return;
@@ -11252,10 +11864,27 @@
       paint("rooms");
       return;
     }
+    // Developer Information Hub (?v=20260906au) — Help → Developers / #dev / ?page=dev
+    if (ev.target.closest("[data-dev-hub-open]") && session()) {
+      devHubOpen = true;
+      helpOpen = false;
+      legalOpen = false;
+      avatarGuideOpen = false;
+      partyPanelOpen = false;
+      paint("dev");
+      return;
+    }
+    if (ev.target.closest("[data-dev-hub-close]") && session()) {
+      devHubOpen = false;
+      paint("rooms");
+      return;
+    }
     // Legal works logged-in or from the gate.
     if (ev.target.closest("[data-legal-open]")) {
       legalOpen = true;
       helpOpen = false;
+      devHubOpen = false;
+      avatarGuideOpen = false;
       partyPanelOpen = false;
       paint("legal");
       return;
@@ -11274,7 +11903,107 @@
     }
     if (ev.target.closest("[data-decorate-close]") && session()) {
       decorateMode = false;
+      makeDoorPanelOpen = false;
+      selectedDecId = null;
       paint("rooms");
+      try { bindDoorLayerClicks(); } catch (e) {}
+      return;
+    }
+    if (ev.target.closest("[data-make-door-close]") && session()) {
+      makeDoorPanelOpen = false;
+      paint("rooms");
+      return;
+    }
+    var decSel = ev.target.closest("[data-dec-select]");
+    if (decSel && session()) {
+      selectedDecId = decSel.getAttribute("data-dec-select");
+      if (decSel.getAttribute("data-open-make-door") === "1") makeDoorPanelOpen = true;
+      decorateMode = true;
+      paint("rooms");
+      bindDecorateDrag();
+      return;
+    }
+    if (ev.target.closest("[data-open-make-door]") && session()) {
+      if (!selectedDecId) {
+        pushNotice("orange", "Select a furniture chip first (tap it on the stage).", { transient: true });
+        return;
+      }
+      makeDoorPanelOpen = true;
+      decorateMode = true;
+      paint("rooms");
+      return;
+    }
+    if (ev.target.closest("[data-door-glow-toggle]") && session()) {
+      doorGlowPreview = !doorGlowPreview;
+      paint("rooms");
+      return;
+    }
+    var dropD = ev.target.closest("[data-drop-door]");
+    if (dropD && session()) {
+      var did = dropD.getAttribute("data-drop-door");
+      if (dropDoor(did)) {
+        pushNotice("green", "Door dropped — furniture stays; room still exists.", { transient: true });
+        makeDoorPanelOpen = false;
+        paint("rooms");
+        if (decorateMode) bindDecorateDrag();
+      }
+      return;
+    }
+    var mkLink = ev.target.closest("[data-make-door-link]");
+    if (mkLink && session()) {
+      if (!selectedDecId) {
+        pushNotice("orange", "Select furniture first.", { transient: true });
+        return;
+      }
+      var sel = document.getElementById("make-door-target");
+      var target = sel ? sel.value : "";
+      var linked = makeDoorLink(selectedDecId, target);
+      if (!linked.ok) {
+        pushNotice("orange", linked.error || "Could not link door.");
+        return;
+      }
+      pushNotice("green", "Door linked → “" + linked.doorLabel + "”. Leave Decorate and tap the green door to travel.", { transient: true });
+      makeDoorPanelOpen = true;
+      paint("rooms");
+      bindDecorateDrag();
+      return;
+    }
+    var mkCreate = ev.target.closest("[data-make-door-create]");
+    if (mkCreate && session()) {
+      if (!selectedDecId) {
+        pushNotice("orange", "Select furniture first.", { transient: true });
+        return;
+      }
+      var nameEl = document.getElementById("make-door-name");
+      var nm = nameEl ? nameEl.value : "Home";
+      var created = makeDoorCreateRoom(selectedDecId, {
+        name: nm,
+        payWith: mkCreate.getAttribute("data-make-door-create") || "coins"
+      });
+      if (!created.ok) {
+        pushNotice("orange", created.error || "Could not create room.");
+        return;
+      }
+      pushNotice("green", "Room “" + (created.room && created.room.name) + "” created + door linked"
+        + (created.free ? " (free home)." : "."), { transient: true });
+      makeDoorPanelOpen = false;
+      paint("rooms");
+      bindDecorateDrag();
+      refreshWalletChrome();
+      return;
+    }
+    if (ev.target.closest("[data-complain-stub]") && session()) {
+      var cnmC = document.getElementById("chat-name-menu");
+      if (cnmC) cnmC.remove();
+      pushNotice("orange", "Complain / report — Coming Soon (moderation).", { transient: true });
+      return;
+    }
+    if (ev.target.closest("[data-open-avatar-emotes]") && session()) {
+      occMenuId = null;
+      paint("rooms");
+      var bill = document.querySelector("[data-avatar-hit]") || document.querySelector(".avatar-wear-billboard") || document.querySelector("#avatar-wear-layer .avatar-billboard");
+      if (bill) openAvatarEmoteMenu(bill);
+      else pushNotice("orange", "Wear an avatar with emotes first (Stuff → Wear).", { transient: true });
       return;
     }
     if (ev.target.closest("[data-party-close]") && session()) {
@@ -11670,10 +12399,12 @@
         loadOccupants();
       } else if (rm === "decorate") {
         if (!inRoom) { inRoom = true; }
+        try { ensureDoorStubFurniture(); } catch (eSt) {}
         decorateMode = true;
         roomPanelOpen = false;
         playlistPanelOpen = false;
         partyPanelOpen = false;
+        makeDoorPanelOpen = false;
         paint("rooms");
         loadOccupants();
         bindDecorateDrag();
@@ -11698,6 +12429,14 @@
         partyPanelOpen = false;
         paint("rooms");
         loadOccupants();
+      } else if (rm === "clickable") {
+        // How this works (?v=20260906at): wiki green glow for doors (clickable furniture).
+        doorGlowPreview = !doorGlowPreview;
+        pushNotice("green", doorGlowPreview
+          ? "Door glow on — green chips are doors. Tap a door to travel."
+          : "Door glow off.", { transient: true });
+        if (inRoom) paint("rooms");
+        try { bindDoorLayerClicks(); } catch (eGl) {}
       } else if (rm === "snapshot") {
         pushNotice("orange", "Snapshot stub — engine will capture the stage later.");
       } else if (rm === "zoom") {
