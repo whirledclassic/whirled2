@@ -1,8 +1,8 @@
 # Stuff avatars (Aseprite / PNG packs)
 
 **Audience:** beginners + ENGINE DEV  
-**Cache:** `?v=20260906ar` (`LOGO_V`)  
-**Status:** Unified **Cyan Hair** Wearable (idle+walk+pose) + chrome **click-to-walk**. Classic **SWF / Ruffle** wardrobe stays **On hold** (`AVATAR-IMPORT.md`, unlock only with `?avatarLab=1`).  
+**Cache:** `?v=20260906aw` (`LOGO_V`)  
+**Status:** Unified **Cyan Hair** Wearable (idle+walk+pose) + chrome **click-to-walk**. Classic **Flash upload** is **Experimental** via Stuff panel (`src/classic-avatar.js`, `AVATAR-IMPORT.md`). Legacy wardrobe lab still `?avatarLab=1`.  
 **Fidelity notes:** [AVATAR-STUFF-FIDELITY.md](./AVATAR-STUFF-FIDELITY.md)
 
 ## Beginner — upload, Wear & walk
@@ -74,14 +74,25 @@ Legacy single-state packs still work (treated as `idle` only).
 
 Output: `assets/avatars/user-pack/<slug>/…` + `index.json`. Re-export parts: `scripts/export_aseprite_avatars.py`.
 
+## Classic Flash upload (?v=20260906aw)
+
+| Step | What happens |
+|------|----------------|
+| Upload `.swf` (+ optional PNG) | Saved to Stuff + IndexedDB by SHA-1 |
+| Analyze | Header/size — not full tag parse |
+| Wear + Experimental | `#avatar-ruffle-host` Ruffle overlay; PNG walk if present |
+| No Flash opt-in | PNG / tofu only (safe default) |
+
+Cyan Hair and the PNG wizard are unchanged.
+
 ## Coming Soon
 
-- SWF states / custom actions / Ruffle in loft (lab locked).
+- Full AvatarControl host shim (walk/state sync). Ruffle play-as-is works Experimental today.
 - Viewer sound + idle/sleep icons (classic chrome).
 - Pixi-owned walk inside `#stage-slot` (replaces chrome click-to-walk).
 
 ## Do not
 
-- Do not unlock avatar lab for normal users.
+- Do not unlock the *legacy wardrobe lab* for normal users (`?avatarLab=1`). User classic uploads use Experimental opt-in instead.
 - Do not scrape whirled.club shop media.
 - Do not put engine canvas outside `#stage-slot`.

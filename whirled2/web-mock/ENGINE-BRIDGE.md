@@ -212,7 +212,7 @@ Use (1) while iterating. Use (3) for the first public GitHub Pages prototype.
 - **Do not** rebuild login / register / profile / shop in Pixi.
 - **Do not** edit the private engine from this public repo (or copy private sources here) without asking.
 - **Do not** treat coins as real money — labels only.
-- **Do not** bring Flash / SWF / Ruffle into this stack.
+- **Do not** put Flash / SWF / Ruffle **inside `#stage-slot`**. Chrome may mount Ruffle on **`#avatar-ruffle-host`** (sibling wear layer) for Experimental classic avatars (`src/classic-avatar.js`, ?v=20260906aw). Pixi remains authoritative for room coords; full AvatarControl host shim is later.
 - **Avatar lab deferred** — see AVATAR-IMPORT.md; wardrobe APIs experimental, not wired to stage.
 - **Do not** assume `#decorate-layer` is yours — that is chrome furniture chips (sibling overlay).
 - **Do not** replace Slide/Overlay chat history — that stays chrome. Stage speech/thought bubbles near avatars may move to Pixi later (see section 11).
@@ -340,3 +340,16 @@ Pack states may include `wave` / `sit` / `happy` in addition to `idle` / `walk` 
 ## 14) Avatar upload wizard (?v=20260906ar)
 
 Creators build Stuff packs in chrome (data URLs / absolutized paths) with the same `states` schema as Cyan Hair. Prefer consuming `WhirledChrome.getWornAvatar().states` + `artFaces` in Pixi. Wizard remount does not touch `#stage-slot`.
+
+
+## 15) Classic Flash overlay (?v=20260906aw)
+
+**Beginner:** Users can upload their own `.swf` in Stuff and opt into Experimental Flash. Chrome may show Ruffle on the wear billboard.
+
+**ENGINE DEV:**
+
+- Mount point: `#avatar-ruffle-host` inside `#avatar-wear-layer` (not `#stage-slot`).
+- Worn row may include `swfUrl` / `swfSha1` / `classicFlashOptIn` / PNG `states` (hybrid).
+- When your canvas mounts in `#stage-slot`, prefer consuming PNG `states` first; coordinate before owning Ruffle yourself.
+- Study community Ruffle + host-shim architecture — **do not copy AGPL code**.
+- Chat visit-scope (?v=20260906av) is unrelated — do not regress `roomChatVisitSince`.

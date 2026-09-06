@@ -1,3 +1,16 @@
+## What shipped (?v=20260906aw)
+
+- **Classic Flash / Whirled avatars (CRITICAL path):** Stuff → Avatars → **Classic Flash / Whirled avatars** panel (`src/classic-avatar.js`).
+  - Accept `.swf`, `.fla` (archive + explain), zip with swf+thumb, optional PNG idle/walk.
+  - **Analyze** — size, magic header (FWS/CWS/ZWS), honest “no Flash internals in JS” + paths: Ruffle play-as-is / PNG attach / hybrid.
+  - **Hybrid pack** — one Stuff item can hold `swfSha1`/`swfDataUrl`/`swfUrl` + PNG `states`.
+  - **Wear** without obscure `?avatarLab=1` when user opts into Classic Flash (Experimental badge).
+  - **Loft:** Ruffle on `#avatar-ruffle-host` when opted in; else PNG states; else tofu. Cyan Hair unchanged.
+  - Legacy IndexedDB wardrobe lab remains On hold (`?avatarLab=1`).
+- **Docs:** in-site “Using old Whirled / Flash avatars” + AVATAR-IMPORT / STUFF-AVATARS / creator guide updates.
+- **Merge notes:** additive module + minimal app.js hooks — does **not** regress chat visit-since / Clear chat from **av**. Dev Hub from **au** kept.
+- Cache: **`?v=20260906aw`**. Parent push script: `/tmp/push-aw.js`.
+
 ## What shipped (?v=20260906av)
 
 - **Chat visit-scope (P0 pain fix):** Entering a room starts a **clean slate**. Demo API / localStorage cemetery (old names like qjeczg) no longer dumps into every visit.

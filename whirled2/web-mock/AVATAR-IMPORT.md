@@ -1,13 +1,13 @@
 # AVATAR-IMPORT — classic Whirled avatars → Whirled2
 
-**STATUS: DEFERRED / SIDE PROJECT — locked off for normal users.**
+**STATUS (?v=20260906aw): USER CLASSIC UPLOAD SHIPPED (Experimental).** Legacy wardrobe lab still deferred behind `?avatarLab=1`.
 
 **Audience:** beginners on the web-mock chrome + ENGINE DEV on the Pixi (or later) room engine.  
 **Status:** Phase 0–1 wardrobe foundation exists behind a feature flag; **not** active for visitors (Sep 2026). **Do not** treat this as a license to scrape whirled.club shop media.  
 **Unlock side work:** URL `?avatarLab=1` (sets `localStorage whirled2.avatarLab = "1"`) or set that storage key manually. Default **OFF**.  
 **Related:** `ENGINE-BRIDGE.md` (Flash/Ruffle still banned for live rooms; Phase 2 deferred), Stuff upload UI in `app.js`, research clones under `/workspace/research/`.
 
-**What normal users see:** Stuff → Avatars keeps the stub thumbnail upload + a quiet **“Classic SWF wardrobe — On hold”** note. No SWF upload UI, no Wear that affects the room.
+**What normal users see:** Stuff → Avatars → **Classic Flash / Whirled avatars** panel (upload/analyze/Ruffle Experimental) + PNG wizard + Cyan Hair. Legacy lab note remains On hold. Wear can show Ruffle on `#avatar-ruffle-host` when opted in.
 
 ---
 
@@ -335,6 +335,16 @@ window.WhirledChrome = {
 2. Add **Export wardrobe** (JSON + optional zip of blobs user already uploaded as stubs).  
 3. Encourage creators to keep original `.swf` + thumb on disk / Git LFS personally.  
 4. **Do not** scrape whirled.club.
+
+### Phase 1.5 — Classic upload UI shipped (?v=20260906aw)
+
+Implemented in `src/classic-avatar.js` (additive) + minimal `app.js` hooks:
+
+- Stuff panel: `.swf` / `.fla` / zip+thumb / optional PNG idle/walk
+- Analyze: magic header + size; honest no-tag-parse
+- Hybrid Stuff row: `swfSha1` + `states` + `classicFlashOptIn`
+- Wear → loft `#avatar-ruffle-host` via Ruffle CDN when Experimental
+- No AGPL host shim yet (play-as-is only)
 
 ### Phase 1 — Upload UI “Coming Soon” shell → then real stub+SWF accept
 

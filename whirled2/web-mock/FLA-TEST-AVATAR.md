@@ -2,7 +2,9 @@
 
 **File saved:** `assets/avatars/fla-lab/user-test-avatar.fla` (~1.8 MB)  
 **Format:** Old Adobe Flash **OLE compound document** (not zip FLA). Metadata: *Saved by Adobe Flash Windows 9.0* (~2010).  
-**Status (?v=20260906aq):** Advanced as far as the file allows — **no SWF / no PNG sprite sequence inside**. Extracted camera JPEGs are **concept sketches** (multi-tail fox on lined paper), not loft-ready frames. Cyan Hair remains the working Wearable.
+**Status (?v=20260906aw):** Classic Flash **upload UI is ready** — drop a published `.swf` on Stuff → Classic Flash panel. FLA extracts still not Wearable.
+
+**Prior (?v=20260906aq):** Advanced as far as the file allows — **no SWF / no PNG sprite sequence inside**. Extracted camera JPEGs are **concept sketches** (multi-tail fox on lined paper), not loft-ready frames. Cyan Hair remains the working Wearable.
 
 ## What we inspected (aq)
 
@@ -25,7 +27,7 @@
 
 ### Track A — Classic fidelity (Flash in a sandbox)
 1. Open the `.fla` in **Adobe Animate** (or Flash CS3–CS5) → **File → Publish → SWF**.
-2. Drop the `.swf` next to the FLA (e.g. `assets/avatars/fla-lab/user-test-avatar.swf`) **or** upload via Stuff → Avatars with `?avatarLab=1`.
+2. Upload the `.swf` via Stuff → Avatars → **Classic Flash / Whirled avatars** (Experimental). Optional: also keep a copy under `assets/avatars/fla-lab/`.
 3. Phase 2 (policy bump in ENGINE-BRIDGE): **Ruffle + host shim** loads the SWF; Pixi keeps room floor / click / nametags.
 
 ### Track B — Modern engine power (recommended)

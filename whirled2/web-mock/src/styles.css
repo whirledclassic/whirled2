@@ -5792,3 +5792,25 @@ button.tb.tb-music,
   background: #eef7fc;
   border-radius: 8px;
 }
+
+/* Shared Ruffle host (av coexistence + aw classic mount) */
+.avatar-ruffle-host {
+  position: relative;
+  width: min(140px, 100%);
+  height: min(160px, 40vh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.avatar-ruffle-host ruffle-player,
+.avatar-ruffle-host ruffle-embed {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 140px;
+  max-height: 180px;
+}
+.avatar-wear-layer.is-swf-hybrid .avatar-ruffle-host {
+  /* Hybrid: show SWF above PNG idle; walk still flips PNG when chrome walk runs */
+  z-index: 1;
+}

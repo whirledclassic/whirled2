@@ -1,7 +1,7 @@
 # Avatar Stuff fidelity (classic whirled.club → Whirled2 mock)
 
 **Audience:** beginners + ENGINE DEV  
-**Cache:** `?v=20260906ao`  
+**Cache:** `?v=20260906aw`  
 **Refs:** `_qa/wiki-refs/Stuff-My_Avatars.png`, `Stuff-My_Avatars-Avatar_viewer.png`
 
 ## Wiki / classic findings (research)
@@ -31,7 +31,7 @@ Whirled2 mock cannot run classic SWF wardrobe in rooms yet (lab locked: `?avatar
 | **Click floor → walk** | **Yes** — chrome overlay on `#avatar-wear-layer` until Pixi mounts |
 | States / custom actions (SWF) | Partial — sprite `idle/walk/stand/pose`; SWF Coming Soon |
 | Sound / sleep icons in viewer | **Coming Soon** |
-| Ruffle / SWF in loft | **Not shipped** — lab locked |
+| Ruffle / SWF in loft | **Experimental** — user upload + opt-in (`#avatar-ruffle-host`); full SDK host shim Coming Soon |
 
 ## Unified pack schema (chrome + Pixi)
 
@@ -51,6 +51,6 @@ See `assets/avatars/user-pack/cyan-hair/pack.json`. Shape:
 
 ## Do not
 
-- Do not unlock the avatar lab for normal users.
+- Do not unlock the *legacy* avatar lab for normal users; classic user upload uses Experimental opt-in.
 - Do not invent shop catalog avatars.
 - Do not say MySpace — say Profile look.

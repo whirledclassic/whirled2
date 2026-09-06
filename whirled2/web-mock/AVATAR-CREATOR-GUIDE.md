@@ -1,7 +1,7 @@
 # How to make an avatar (Whirled2)
 
 **Audience:** creators + beginners  
-**Cache:** `?v=20260906ar`  
+**Cache:** `?v=20260906aw`  
 **In-site:** Stuff → **How to make an avatar** (or Help)
 
 ## What frames you need
@@ -63,5 +63,17 @@ Chrome: `WhirledChrome.getWornAvatar()`, `setAvatarState`, `playAvatarEmote`, `a
 ## Do not
 
 - Invent shop catalog avatars.
-- Unlock SWF lab for all users (`?avatarLab=1` only).
+- Force everyone into Ruffle; keep Experimental opt-in. Legacy wardrobe lab stays `?avatarLab=1` only.
 - Say MySpace — say **Profile look**.
+
+
+## Classic Flash / old Whirled SWF (?v=20260906aw)
+
+1. Stuff → Avatars → **Classic Flash / Whirled avatars** (pale-blue panel).
+2. Drop your **own** `.swf` (optional thumb ~80×60, optional PNG idle/walk).
+3. **Analyze file…** — size + Flash header. We cannot read AvatarControl states in the browser.
+4. Check **Classic Flash avatar (experimental)** → Save → open card → **Wear**.
+5. Loft: Ruffle overlay when Experimental is on; PNG frames drive click-to-walk if you attached them.
+6. Raw `.fla` is stored/explained only — publish SWF from Animate (see `FLA-TEST-AVATAR.md`).
+
+**Do not** scrape whirled.club shop media. **Do not** require `?avatarLab=1` for your own classic uploads (that flag is the legacy wardrobe lab only).

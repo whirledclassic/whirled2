@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906av";
+  var LOGO_V = "20260906aw";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1278,7 +1278,7 @@
 
   var STUFF_CATS = [
     // How this works: wiki Stuff rail categories. howBlurb = empty-state “How do I get stuff?”
-    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Add Cyan Hair (idle+walk) or upload idle+walk PNGs / .aseprite. Wear, then click the loft floor to walk — not Ruffle. Classic SWF lab stays On hold — see STUFF-AVATARS.md." },
+    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Add Cyan Hair (idle+walk) or upload idle+walk PNGs / .aseprite. Wear, then click the loft floor to walk — not Ruffle. Classic Flash upload is Experimental (see Classic panel) — STUFF-AVATARS.md / AVATAR-IMPORT.md." },
     { id: "furniture", label: "Furniture", empty: "You have no furniture yet.", how: "Furniture fills your loft. Upload a named piece with optional thumb, then Decorate Room to place chips." },
     { id: "backdrops", label: "Backdrops", empty: "You have no backdrops yet.", how: "Backdrops set the room scene. Upload an image you have rights to, then place it while decorating." },
     { id: "toys", label: "Toys", empty: "You have no toys yet.", how: "Toys are playful room items. Create your own stub here — no fake catalog fillers." },
@@ -1597,6 +1597,28 @@
       at: new Date().toISOString()
     };
     if (!(row.frames && row.frames.length) && row.preview) row.frames = [row.preview];
+    // ---- MERGE NOTE (?v=20260906aw): classic Flash enrich via src/classic-avatar.js ----
+    // Beginner: copies swfSha1 / swfDataUrl / classicFlashOptIn onto the worn row for Ruffle loft.
+    // ENGINE DEV: still chrome #avatar-wear-layer / #avatar-ruffle-host — never #stage-slot.
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.enrichWornRow) {
+        row = WhirledClassicAvatar.enrichWornRow(row, item);
+      } else {
+        if (item.swfSha1) row.swfSha1 = item.swfSha1;
+        if (item.swfDataUrl) row.swfDataUrl = item.swfDataUrl;
+        if (item.swfUrl) row.swfUrl = item.swfUrl;
+        if (item.swfName) row.swfName = item.swfName;
+        row.classicFlashOptIn = !!(item.classicFlashOptIn || (item.pack && item.pack.classicFlashOptIn));
+        if (row.classicFlashOptIn && (row.swfDataUrl || row.swfUrl || row.swfSha1)) {
+          row.mediaKind = "swf";
+          if (row.swfDataUrl && !row.swfUrl) row.swfUrl = row.swfDataUrl;
+        }
+      }
+      if (row.classicFlashOptIn && (row.swfDataUrl || row.swfUrl)) {
+        row.mediaKind = "swf";
+        if (!row.swfUrl) row.swfUrl = row.swfDataUrl;
+      }
+    } catch (eClassicWear) {}
     saveWornAvatar(normalizeWornAvatar(row));
     pushRecentAvatarId(item.id);
     return true;
@@ -1621,13 +1643,15 @@
     var face = worn.face === -1 ? -1 : 1;
     var posStyle = "--wear-scale:" + scale + ";--wear-x:" + x + "%;--wear-face:" + face + ";";
     var isSwf = !!(worn.swfUrl || worn.mediaKind === "swf" || worn.kind === "swf");
-    if (isSwf && worn.swfUrl && !(worn.frames && worn.frames.length) && !worn.preview) {
-      // Parallel au path: host div only — Ruffle mounts later when lab unlocks (never #stage-slot).
-      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Flash avatar (Ruffle hook)" data-swf-url="' + esc(worn.swfUrl) + '">'
+    // ---- MERGE NOTE (?v=20260906aw): user-uploaded classic Flash — Ruffle via classic-avatar.js ----
+    var wantsClassic = !!(worn.classicFlashOptIn || worn.useClassicFlash
+      || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemWantsClassicFlash && WhirledClassicAvatar.itemWantsClassicFlash(worn)));
+    if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && !(worn.frames && worn.frames.length) && !worn.preview) {
+      var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '">'
         + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
-        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host" data-swf-url="' + esc(worn.swfUrl) + '" title="Ruffle mount point — lab in progress"></div>'
-        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar") + '</div>'
-        +   '<p class="meta avatar-swf-pending">Flash avatar — Ruffle lab Coming Soon (<code>?avatarLab=1</code>)</p>'
+        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host" data-swf-url="' + swfAttr + '" title="Ruffle experimental"></div>'
+        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar") + ' <span class="classic-exp-badge">Experimental</span></div>'
         + '</div></div>';
     }
     if (isTofu) {
@@ -1658,10 +1682,22 @@
     var meta = ' data-wear-frames="' + esc(JSON.stringify(frames)) + '"'
       + ' data-wear-durs="' + esc(JSON.stringify(durs)) + '"'
       + ' data-wear-state="' + esc(stateName) + '"';
-    return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on" aria-label="Worn avatar">'
+    // Hybrid (?v=20260906aw): PNG frames for walk + optional #avatar-ruffle-host when classic Flash opted in.
+    var classicSlot = "";
+    try {
+      if (wantsClassic && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1)) {
+        var swfU = esc(worn.swfUrl || worn.swfDataUrl || "");
+        classicSlot = '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host" data-swf-url="' + swfU + '" title="Classic Flash (experimental)"></div>'
+          + '<span class="classic-exp-badge classic-exp-badge-overlay">Flash</span>';
+      } else if (window.WhirledClassicAvatar && WhirledClassicAvatar.classicWearSlotHtml) {
+        classicSlot = WhirledClassicAvatar.classicWearSlotHtml(worn) || "";
+      }
+    } catch (eSlot) { classicSlot = ""; }
+    return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on' + (classicSlot ? " is-swf-hybrid" : "") + '" aria-label="Worn avatar">'
       + '<div class="avatar-wear-billboard" data-avatar-hit="1"' + meta + ' style="' + posStyle + '">'
+      +   classicSlot
       +   '<img class="avatar-wear-sprite" src="' + src0 + '" alt="' + esc(worn.name || "Avatar") + '" />'
-      +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + '</div>'
+      +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + (classicSlot ? ' <span class="classic-exp-badge">Experimental</span>' : "") + '</div>'
       + '</div></div>';
   }
   function startAvatarWearAnim() {
@@ -2193,8 +2229,17 @@
       +       wearBtn
       +       '<button type="button" class="text-btn" data-avatar-states-soon="1" title="Classic SWF states — Coming Soon">States / actions…</button>'
       +     '</div>'
-      +     '<p class="meta avatar-viewer-note">Preview play flips sprite-pack frames when available. Classic SWF states stay Coming Soon (lab locked).</p>'
+      +     '<p class="meta avatar-viewer-note">Preview play flips sprite-pack frames when available. '
+      +       'Classic Flash: enable <b>Classic Flash avatar (experimental)</b> on the item for Ruffle preview — full AvatarControl states Coming Soon.</p>'
       +   '</div>'
+      +   (function () {
+            try {
+              if (window.WhirledClassicAvatar && WhirledClassicAvatar.classicViewerSlotHtml) {
+                return WhirledClassicAvatar.classicViewerSlotHtml(item) || "";
+              }
+            } catch (e) {}
+            return "";
+          })()
       + '</div>';
   }
   function startAvatarViewerAnim() {
@@ -2571,11 +2616,13 @@
     return btoa(parts.join(""));
   }
   function avatarLabHoldPanelHtml() {
-    // How this works: default users only see this quiet note — no SWF upload, no Wear.
+    // How this works (?v=20260906aw): legacy wardrobe lab stays On hold; user classic upload is above.
     return '<div class="panel avatar-lab-hold-panel" id="avatar-lab-hold">'
-      + '<h3>Classic SWF wardrobe — On hold</h3>'
-      + '<p class="meta">Side project — not active for visitors. Room look stays the stub thumbnail path. '
-      + 'Devs: see <code>AVATAR-IMPORT.md</code> and unlock local tools with <code>?avatarLab=1</code>.</p>'
+      + '<h3>Legacy SWF wardrobe lab — On hold</h3>'
+      + '<p class="meta">The old IndexedDB wardrobe lab stays locked for normal visitors. '
+      + '<b>Prefer the Classic Flash / Whirled avatars panel above</b> to upload your own .swf (Experimental). '
+      + 'Devs: <code>?avatarLab=1</code> still unlocks the side-project lab. See <code>AVATAR-IMPORT.md</code>.</p>'
+      + '<p class="meta classic-hold-bridge">No shop scrapes. Coins/Bars stay earn-only.</p>'
       + '</div>';
   }
   function avatarLabPanelHtml() {
@@ -5906,7 +5953,7 @@
         +   '<input type="file" id="avatar-wiz-zip" accept=".zip,application/zip" /></label>'
         + '<label class="avatar-wiz-drop">Aseprite source (stored + note — export PNGs for loft)'
         +   '<input type="file" id="avatar-wiz-ase" accept=".aseprite,.ase,application/octet-stream" multiple /></label>'
-        + '<label class="avatar-wiz-drop">SWF (experimental — needs ?avatarLab=1 to Wear via lab)'
+        + '<label class="avatar-wiz-drop">SWF (experimental Classic Flash — Wear with PNG states or Ruffle overlay)'
         +   '<input type="file" id="avatar-wiz-swf" accept=".swf,application/x-shockwave-flash" /></label>'
         + '<div class="avatar-wiz-filelist">' + (d.files.length
           ? d.files.map(function (f) {
@@ -6094,10 +6141,16 @@
       row.pack.sourceFile = ases[0].name;
     }
     if (swfs[0]) {
-      row.swfNote = "SWF attached in wizard — use ?avatarLab=1 wardrobe for experimental lab; loft Wear stays sprite pack.";
+      // (?v=20260906aw): hybrid — PNG states for walk; SWF optional Experimental Flash on item detail.
+      row.swfNote = "SWF attached — enable Classic Flash (experimental) on the item for Ruffle; loft walk uses PNG states.";
       row.swfName = swfs[0].name;
-      // Do not auto-mount SWF; store name only if data huge — keep dataUrl if small enough
-      if (swfs[0].dataUrl && swfs[0].dataUrl.length < 2.5e6) row.swfDataUrl = swfs[0].dataUrl;
+      row.classicFlashOptIn = true;
+      row.mediaKind = "swf";
+      if (swfs[0].dataUrl && swfs[0].dataUrl.length < 2.5e6) {
+        row.swfDataUrl = swfs[0].dataUrl;
+        row.swfUrl = swfs[0].dataUrl;
+      }
+      if (row.pack) row.pack.classicFlashOptIn = true;
     }
     var replaced = false;
     if (d.editItemId) {
@@ -6238,11 +6291,19 @@
         + '<button type="button" class="action-btn danger" data-stuff-delete="' + esc(item.id) + '">Delete Item</button>'
         + '</div>'
         + (isAvatar
-          ? ('<p class="meta">Wear shows this avatar in your loft on <code>#avatar-wear-layer</code> (sprite billboard — not Ruffle/SWF). Scale applies to preview + loft.</p>'
+          ? ('<p class="meta">Wear shows this avatar in your loft on <code>#avatar-wear-layer</code> (PNG billboard; optional Experimental Ruffle overlay if classic SWF opted in). Scale applies to preview + loft.</p>'
             + '<div class="stuff-detail-actions">'
             +   '<button type="button" class="action-btn" data-avatar-wiz-remap="' + esc(item.id) + '">Remap states…</button>'
             +   '<button type="button" class="text-btn" data-avatar-guide-open="1">How to make an avatar</button>'
-            + '</div>')
+            + '</div>'
+            + (function () {
+                try {
+                  if (window.WhirledClassicAvatar && WhirledClassicAvatar.classicDetailExtrasHtml) {
+                    return WhirledClassicAvatar.classicDetailExtrasHtml(item) || "";
+                  }
+                } catch (e) {}
+                return "";
+              })())
           : "")
         + listBlock
         + '<div class="section-label">Send as Gift</div>'
@@ -6278,8 +6339,16 @@
     // How this works: quiet On hold note (default) OR full Avatar lab (flag on) — only on Avatars browse.
     var avatarExtra = "";
     if (stuffCat === "avatars" && stuffMode === "browse") {
-      // How this works: sprite packs first (Wear in loft); SWF lab stays On hold unless ?avatarLab=1.
+      // How this works (?v=20260906aw): classic Flash upload panel is first-class (Experimental).
+      // Old IndexedDB wardrobe lab still gated by ?avatarLab=1. Cyan Hair / PNG wizard unchanged.
+      var classicPanel = "";
+      try {
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.classicUploadPanelHtml) {
+          classicPanel = WhirledClassicAvatar.classicUploadPanelHtml();
+        }
+      } catch (eCp) { classicPanel = ""; }
       avatarExtra = ensureUserPackSeedButtonHtml()
+        + classicPanel
         + (isAvatarLabOn() ? avatarLabPanelHtml() : avatarLabHoldPanelHtml());
     }
     var body;
@@ -7196,7 +7265,7 @@
       + '<ul class="help-tips">'
       + '<li><b>Aseprite</b> — animate tags per state → Export PNG sequence (or sprite sheet then slice). Attach the .aseprite in the wizard for safekeeping; loft uses PNGs.</li>'
       + '<li><b>Photoshop / Pixelora / Piskel</b> — export frame PNGs into folders named idle, walk, wave…</li>'
-      + '<li><b>Flash / Animate</b> — Publish SWF for the experimental lab (<code>?avatarLab=1</code>), <b>or</b> export PNG sequences for the modern Wear path (recommended).</li>'
+      + '<li><b>Flash / Animate</b> — Publish <code>.swf</code> and upload via <b>Classic Flash / Whirled avatars</b> (Experimental Ruffle), <b>and/or</b> export PNG sequences for loft walk (recommended hybrid).</li>'
       + '<li><b>Zip pack</b> — zip folders <code>idle/</code> <code>walk/</code> <code>wave/</code> and upload the zip in the wizard.</li>'
       + '</ul></div>'
       + '<div class="panel"><h2>Wizard steps</h2>'
@@ -7209,6 +7278,15 @@
       + '<li>Open the card → <b>Wear</b> → Rooms → floor click walks, avatar click emotes.</li>'
       + '<li><b>Remap states…</b> anytime from the item detail.</li>'
       + '</ol></div>'
+      + '<div class="panel" id="classic-flash-guide"><h2>Using old Whirled / Flash avatars</h2>'
+      + '<ul class="help-tips">'
+      + '<li><b>Upload</b> — Stuff → Avatars → <b>Classic Flash / Whirled avatars</b> panel. Accepts <code>.swf</code>, <code>.fla</code> (archive only), or zip with swf+thumb.</li>'
+      + '<li><b>Analyze</b> — shows size + Flash header (FWS/CWS/ZWS). We cannot parse AvatarControl states in JS — honest limits.</li>'
+      + '<li><b>Paths</b> — (a) Ruffle play-as-is Experimental, (b) attach PNG idle/walk, (c) hybrid both.</li>'
+      + '<li><b>Wear</b> — no obscure flag required for your uploads; look for the Experimental badge. Loft: Ruffle if opted in, else PNG, else tofu.</li>'
+      + '<li><b>FLA</b> — source only; publish SWF from Animate. Sketch extracts in fla-lab are Coming Soon reference.</li>'
+      + '<li><b>ENGINE DEV</b> — Ruffle on <code>#avatar-ruffle-host</code> (chrome). Pixi keeps <code>#stage-slot</code>. Host shim later — no AGPL copy.</li>'
+      + '</ul></div>'
       + '<div class="panel"><h2>Troubleshooting</h2>'
       + '<ul class="help-tips">'
       + '<li><b>Invisible in loft</b> — relative paths 404; wizard stores data URLs. Re-Wear after remap. Cyan Hair uses absolutized <code>./assets/…</code> paths.</li>'
@@ -7246,7 +7324,7 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906av</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906aw</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md / <button type="button" class="text-btn" data-dev-hub-open="1">Developers</button> — no external secrets.</p>'
@@ -7359,7 +7437,7 @@
           "dev-cache",
           "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
           "STATUS.md",
-          "Current build: ?v=20260906av (chat visit-scope + Make Door). Hard-refresh after pulls."
+          "Current build: ?v=20260906aw (classic Flash upload + Ruffle experimental; chat visit-scope from av kept). Hard-refresh after pulls."
         )
       + devHubCard(
           "FLA / SWF lab notes",
@@ -9774,6 +9852,14 @@
     try { bindAvatarEmoteClicks(); } catch (eEmBind) {}
     // Stuff Avatar viewer preview play (when detail is open).
     try { startAvatarViewerAnim(); } catch (eViewAnim) {}
+    // ---- MERGE NOTE (?v=20260906aw): mount Ruffle in chrome slots via classic-avatar.js ----
+    // Beginner: Experimental Flash preview in Stuff / loft. Never touches chat visit-since.
+    // ENGINE DEV: #avatar-ruffle-host only — not #stage-slot.
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.afterPaint) {
+        WhirledClassicAvatar.afterPaint();
+      }
+    } catch (eClassicPaint) {}
   }
   function ensureStagePlaceholder() {
     // How this works (20260906ak): keep loft backdrop if engine has not mounted yet.
@@ -10632,6 +10718,29 @@
     // Discord: if URL has discord_token, accept it before paint (async me fetch).
     // Beginner (?v=20260906au): ?page=dev|docs|developers opens Developer Information Hub after login.
     syncAvatarLabFlagFromUrl();
+    // ---- MERGE NOTE (?v=20260906aw): wire classic-avatar.js hooks (additive) ----
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.bindEvents) {
+        WhirledClassicAvatar.bindEvents({
+          findStuff: findStuff,
+          saveStuff: saveStuff,
+          loadStuff: loadStuff,
+          session: session,
+          paint: paint,
+          pushNotice: pushNotice,
+          wearStuffAvatar: wearStuffAvatar,
+          awardAction: typeof awardAction === "function" ? awardAction : function () {}
+        });
+        WhirledClassicAvatar.setOpenStuffDetail(function (id) {
+          stuffCat = "avatars";
+          stuffMode = "detail";
+          stuffItemId = id;
+          stuffModeAvatarWizard = false;
+          avatarWizard = null;
+          paint("stuff");
+        });
+      }
+    } catch (eClassicBind) {}
     try {
       var pageQ = new URL(location.href).searchParams.get("page");
       if (pageQ && /^(dev|docs|developers)$/i.test(pageQ)) devHubOpen = true;
@@ -11590,8 +11699,13 @@
         pushNotice("status", "Avatar not found in Stuff.");
         return;
       }
-      if (!wearItem.thumb && !wearItem.preview && !(wearItem.frames && wearItem.frames.length)) {
-        pushNotice("status", "This avatar needs a preview image before Wear.");
+      var classicOk = false;
+      try {
+        classicOk = !!(window.WhirledClassicAvatar && WhirledClassicAvatar.canWearWithoutPng
+          && WhirledClassicAvatar.canWearWithoutPng(wearItem));
+      } catch (eCo) { classicOk = false; }
+      if (!wearItem.thumb && !wearItem.preview && !(wearItem.frames && wearItem.frames.length) && !classicOk) {
+        pushNotice("status", "This avatar needs a preview image (or Classic Flash opt-in + SWF) before Wear.");
         return;
       }
       wearStuffAvatar(wearItem);
@@ -14286,7 +14400,7 @@
       var msgS = document.getElementById("avatar-wiz-msg");
       if (!sw) return;
       if (!isAvatarLabOn()) {
-        if (msgS) msgS.textContent = "SWF noted. Unlock lab with ?avatarLab=1 for experimental wardrobe; loft Wear still needs PNG frames.";
+        if (msgS) msgS.textContent = "SWF will be stored. Add PNG idle/walk for loft walk; enable Classic Flash on the item for Ruffle.";
       }
       readBlobAsDataUrl(sw, 5 * 1024 * 1024).then(function (dataUrl) {
         avatarWizard.files.push({
@@ -14295,7 +14409,7 @@
           dataUrl: dataUrl,
           kind: "swf"
         });
-        if (msgS) msgS.textContent = "SWF attached (experimental). Add PNG idle/walk for modern loft Wear.";
+        if (msgS) msgS.textContent = "SWF attached (Experimental). Add PNG idle/walk for loft walk — or Wear SWF-only with Classic Flash.";
         paint("stuff");
       }).catch(function (err) {
         if (msgS) msgS.textContent = String(err && err.message || err);
