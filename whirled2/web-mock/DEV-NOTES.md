@@ -162,7 +162,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Meta app setup**: developers.facebook.com → Facebook Login for Web → App Domains / Valid OAuth Redirect URIs include `https://whirledclassic.github.io/`.
 - **Safety**: never invent FB users without SDK success; no payments; Discord/Google Coming Soon only.
 - **Engine**: auth is chrome; session only — do not break `#stage-slot` / `syncRoomAudio` / ♪ Music.
-- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906w`.
+- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906x`.
 
 ## Room music embeds + Profile BG (20260906t)
 
@@ -175,10 +175,17 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Bug**: dock under `#main` was wiped by every `paint("rooms")`; park-to-`document.body` fixed the wipe but broke `#app` click delegation (Open/Close/Room music died after expand on phone).
 - **Fix**: `#room-embed-dock` persistent in `shell()` after `#main` / before `.bar`. `ensureRoomEmbedDock` always uses that host — never `.stage-body`, never `document.body`. `applyRoomEmbedExpanded` only toggles `is-expanded` + Close visibility (CSS fixed sheet z-index 100). Document capture listener backup for embed controls. `ensurePlaylistPanel()` mounts `#room-playlist-panel` on `#app`. Prefer `classList` (never wipe `is-expanded` via `className=`).
 - **Panel**: closes only via Close / leave room / `clearStrayUI` — keep open across source tabs.
-- **Cache**: `LOGO_V` / `?v=20260906w`. Do not push unless instructed.
+- **Cache**: `LOGO_V` / `?v=20260906w` (superseded by x).
 
 ## Room music paste-URL (20260906w)
 
 - **Bug**: `ensurePlaylistPanel()` always `replaceChild`ed on every `paint()` → destroyed `#playlist-embed-form` / `#playlist-smart-embed-form` mid-tap/paste; `type="url"` harsh on mobile; expanded dock (z=100) could cover panel (z=50/5).
 - **Fix**: `playlistPanelDirty` gate; never rebuild while panel form control focused; `type="text"` `inputmode="url"` + 44px/16px; open paths `collapseRoomEmbedSheet()` + `focusPlaylistEmbedUrl()`; panel `#app > #room-playlist-panel` z-index 110; owner paste steps 1–2–3.
-- **Cache**: `LOGO_V` / `?v=20260906w`. Do not push unless instructed.
+- **Cache**: superseded by `?v=20260906x`.
+
+## Room music modal sheet (20260906x)
+
+- **Bug A**: narrow fixed side panel (`min(320px,92vw)`) — most of the phone is outside; taps look like "close"; focus blur + deferred `playlistPanelDirty` remount wiped paste; `data-tab==="rooms"` strictness could unmount.
+- **Bug B**: Set embed unreliable — blur/keyboard → miss button / hit stage; `isLoftOwner()` false for FB users ≠ `FIRST_USER_KEY` → orange "Owner controls" only; submit-only path flaky on mobile.
+- **Fix**: `#room-playlist-panel.room-music-modal` full-screen dim (z=120) + `.room-music-card` (z=121); backdrop/Close/leave/`clearStrayUI` only; `ensurePlaylistPanel` keeps modal while `inRoom && playlistPanelOpen` (ignore flaky tab attr); clear dirty without remount when focused; `canControlRoomMusic()` + `playlist.ownerId` claim; `data-playlist-set-embed` type=button + `applyPlaylistEmbedFromUi` (querySelector URL) + `#playlist-embed-msg`; document capture once.
+- **Cache**: `LOGO_V` / `?v=20260906x`. Do not push unless instructed.

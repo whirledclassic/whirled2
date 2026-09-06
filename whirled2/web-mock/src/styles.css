@@ -2036,8 +2036,12 @@ body > .party-panel {
     padding: 12px !important;
     line-height: 1.35;
   }
-  .room-side-panel, .decorate-panel, .chat-opts-menu, .go-menu, .room-menu {
+  .room-side-panel:not(.room-music-modal), .decorate-panel, .chat-opts-menu, .go-menu, .room-menu {
     max-width: min(320px, calc(100vw - 16px));
+  }
+  #app > #room-playlist-panel.room-music-modal {
+    max-width: none;
+    width: auto;
   }
   .bar {
     padding-bottom: max(8px, env(safe-area-inset-bottom));
@@ -2537,10 +2541,85 @@ body > .party-panel {
   flex-shrink: 0;
   margin: 0 10px 4px;
 }
-/* Room music side panel mounted on #app so paint does not flash-unmount it.
-   How this works: z-index ~110 so the panel sits above expanded Open player (z=100) and the chat bar.
-   Beginner: when Room music is open you can tap/paste in the link box; it is not covered by the player sheet.
-   ENGINE DEV: pointer-events auto on panel + form controls; never rely on lower .room-side-panel z-index:5. */
+/* Room music = modal sheet on #app (not a tiny side panel).
+   How this works: full-screen dim backdrop (z=120) + card (z=121). Expanded Open player is z=100.
+   Beginner: tap dim area or Close to dismiss; taps inside the card never close and never hit the stage.
+   ENGINE DEV: pointer-events auto on card + form controls; modal covers stage so focus-loss ≠ dismiss. */
+#app > #room-playlist-panel.room-music-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  width: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(8, 22, 36, 0.58);
+  overflow: hidden;
+  pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 720px) {
+  #app > #room-playlist-panel.room-music-modal {
+    align-items: center;
+    padding: 24px;
+  }
+}
+#app > #room-playlist-panel.room-music-modal .room-music-card {
+  position: relative;
+  z-index: 121;
+  pointer-events: auto;
+  width: min(460px, 100%);
+  max-height: min(88vh, 720px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.35);
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+@media (min-width: 720px) {
+  #app > #room-playlist-panel.room-music-modal .room-music-card {
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    padding: 16px;
+  }
+}
+#app > #room-playlist-panel.room-music-modal input,
+#app > #room-playlist-panel.room-music-modal textarea,
+#app > #room-playlist-panel.room-music-modal select,
+#app > #room-playlist-panel.room-music-modal button {
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+#app > #room-playlist-panel.room-music-modal .playlist-set-embed-btn {
+  min-height: 48px;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+@media (min-width: 520px) {
+  #app > #room-playlist-panel.room-music-modal .playlist-embed-form {
+    flex-wrap: nowrap;
+  }
+  #app > #room-playlist-panel.room-music-modal .playlist-set-embed-btn {
+    width: auto;
+    min-width: 132px;
+  }
+}
+.playlist-embed-msg {
+  min-height: 1.2em;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #4a6a80;
+}
+.playlist-embed-msg.is-ok { color: #1a7a3c; font-weight: 700; }
+.playlist-embed-msg.is-error { color: #a33; font-weight: 700; }
+/* Legacy side-panel host (other panels) — playlist uses .room-music-modal above */
 #app > #room-playlist-panel.room-side-panel {
   position: fixed;
   right: 8px;
@@ -2551,13 +2630,6 @@ body > .party-panel {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   pointer-events: auto;
-}
-#app > #room-playlist-panel.room-side-panel input,
-#app > #room-playlist-panel.room-side-panel textarea,
-#app > #room-playlist-panel.room-side-panel select,
-#app > #room-playlist-panel.room-side-panel button {
-  pointer-events: auto;
-  touch-action: manipulation;
 }
 .room-embed-head {
   display: flex; justify-content: space-between; align-items: center;
@@ -2617,9 +2689,11 @@ body > .party-panel {
   min-height: 44px;
   font-size: 16px; /* iOS: avoid zoom-on-focus */
 }
-.playlist-embed-form button {
-  padding: 10px 16px;
+.playlist-embed-form button,
+.playlist-embed-form .playlist-set-embed-btn {
+  padding: 12px 16px;
   font-weight: 700;
+  min-height: 48px;
 }
 .playlist-paste-steps {
   margin: 8px 0 10px;

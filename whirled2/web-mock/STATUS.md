@@ -2,9 +2,10 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906w)
+## What shipped (?v=20260906x)
 
-- **Room music paste-URL fix**: `ensurePlaylistPanel()` no longer `replaceChild`s the panel on every `paint()` — only when `playlistPanelDirty` (source/embed/mute/queue) or first open. Never rebuilds while an input/textarea/select inside the panel is focused (keyboard + paste survive). Embed fields are `type="text"` + `inputmode="url"` (large touch target). Opening Room music collapses the Open player sheet and focuses the paste field. Panel z-index ~110 above expanded dock (z=100). Clearer owner paste steps.
+- **Room music modal deep fix**: `#room-playlist-panel` is a full-screen modal sheet (dim backdrop z=120 + card z=121), not a 320px side panel. Backdrop / Close / leave / `clearStrayUI` only dismiss — never focus-loss or paint remount. `canControlRoomMusic()` lets loft owner OR claimed `playlist.ownerId` OR empty ownerId (claim on first save) Set embed — fixes FB/`fb_` users blocked by `isLoftOwner()`/`FIRST_USER_KEY`. `data-playlist-set-embed` type=button + shared `applyPlaylistEmbedFromUi` (reads input value); errors in `#playlist-embed-msg`. Document capture for Set embed / Close / backdrop. Collapses Open player; modal above dock.
+- Prior **?v=20260906w**: paste-URL / dirty-gate / focus-safe remount.
 - Prior **?v=20260906v**: room music dock outside `#main` (Open/Close survive paint).
 - Prior **?v=20260906u**: park/reattach attempt (superseded — body reparent broke clicks).
 - Prior **?v=20260906t**: room music embeds (mobile) + Profile look custom BG + Facebook Connect.
@@ -14,7 +15,7 @@ Date: 2026-09-06
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906w
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906x
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope

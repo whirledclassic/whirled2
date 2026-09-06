@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906w";
+  var LOGO_V = "20260906x";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -114,16 +114,46 @@
     } catch (e) {}
     return true;
   }
+  function canControlRoomMusic() {
+    // How this works: Pages mock — session may control music when loft owner OR playlist.ownerId
+    // matches session OR ownerId is empty (then claim on first save). Fixes FB/fb_ users who are
+    // not FIRST_USER_KEY and previously only saw "Owner controls" with no embed.
+    // Beginner: the person who opened their loft can Set embed; a foreign lock (other ownerId) stays locked.
+    // ENGINE DEV: use this for Set embed + source tabs (not bare isLoftOwner alone).
+    var s = session();
+    var sid = s && s.user && s.user.id;
+    if (!sid) return false;
+    if (isLoftOwner()) return true;
+    try {
+      var pl = loadPlaylist();
+      var oid = pl && pl.ownerId ? String(pl.ownerId) : "";
+      if (!oid) return true; // empty → claim on save
+      return oid === String(sid);
+    } catch (eCan) {
+      return true;
+    }
+  }
+  function claimPlaylistOwnerIfNeeded(pl) {
+    // How this works: first successful music-control save stamps playlist.ownerId = session user.
+    // Beginner: once claimed, that user (or loft owner) keeps control.
+    var s = session();
+    var sid = s && s.user && s.user.id;
+    if (!pl || !sid) return pl;
+    if (!pl.ownerId) pl.ownerId = String(sid);
+    return pl;
+  }
   function defaultPlaylist() {
     // How this works: current = track index (legacy currentIndex migrated on load).
     // ownerControlsMusic: only loft owner may switch source / paste embeds (hard).
     // ownerOnlyAdd: guests may add local tracks only when false; never change yt/spotify.
+    // ownerId: who claimed music control in this browser loft (empty until first control save).
     return {
       source: "local",
       tracks: [],
       current: 0,
       ownerOnlyAdd: true,
       ownerControlsMusic: true,
+      ownerId: "",
       embedUrl: "",
       embedSrc: "",
       embedTitle: ""
@@ -146,6 +176,7 @@
       delete p.currentIndex;
       if (typeof p.ownerOnlyAdd !== "boolean") p.ownerOnlyAdd = true;
       if (typeof p.ownerControlsMusic !== "boolean") p.ownerControlsMusic = true;
+      p.ownerId = String(p.ownerId || "");
       p.source = normalizePlaylistSource(p.source);
       p.embedUrl = String(p.embedUrl || "");
       p.embedSrc = String(p.embedSrc || "");
@@ -453,7 +484,7 @@
     });
   }
   function collapseRoomEmbedSheet() {
-    // How this works: expanded Open player sheet is z-index 100; Room music panel needs to sit above it.
+    // How this works: expanded Open player sheet is z-index 100; Room music modal is z-index 120.
     // Beginner: opening Room music collapses the big player so it does not cover the paste box.
     roomEmbedExpanded = false;
     try {
@@ -461,15 +492,106 @@
       if (dock) applyRoomEmbedExpanded(dock);
     } catch (eCol) {}
   }
+  function closePlaylistPanel() {
+    // How this works: explicit Close / backdrop / leave / clearStrayUI only — never focus-loss dismiss.
+    // Beginner: tapping the dim area or Close closes Room music; tapping inside the card never does.
+    playlistPanelOpen = false;
+    playlistPanelDirty = false;
+    try {
+      var el = document.getElementById("room-playlist-panel");
+      if (el) el.remove();
+    } catch (eClose) {}
+  }
+  function setPlaylistEmbedMsg(kind, msg) {
+    // How this works: show success/error inside the modal so phones do not miss the notice bar.
+    // Beginner: green = embed set; orange/red = fix the link and try again.
+    try {
+      var el = document.getElementById("playlist-embed-msg");
+      if (!el) return;
+      el.textContent = msg || "";
+      el.setAttribute("data-kind", kind || "");
+      el.className = "playlist-embed-msg" + (kind ? (" is-" + kind) : "");
+    } catch (eMsg) {}
+  }
+  function applyPlaylistEmbedFromUi(ev) {
+    // How this works: Set embed path — button click OR form submit. Read URL from input value
+    // (querySelector), not only FormData. Keep modal open on success + error.
+    // Beginner: paste link → tap Set embed → music docks; modal stays until you Close.
+    // ENGINE DEV: claim ownerId; clear data-embed-src so ensureRoomEmbedDock rewrites iframe.
+    if (ev && ev.preventDefault) ev.preventDefault();
+    if (!session()) return false;
+    if (!canControlRoomMusic()) {
+      setPlaylistEmbedMsg("error", "Owner controls room music.");
+      pushNotice("orange", "Owner controls room music.");
+      return false;
+    }
+    var panel = document.getElementById("room-playlist-panel");
+    var inp = panel
+      ? panel.querySelector('#playlist-embed-form input[name="embedUrl"], #playlist-smart-embed-form input[name="embedUrl"], input.playlist-embed-url[name="embedUrl"]')
+      : null;
+    var rawUrl = inp ? String(inp.value || "") : "";
+    if (!rawUrl && ev && ev.target && ev.target.closest) {
+      var form = ev.target.closest("form");
+      if (form) {
+        try {
+          var fd = new FormData(form);
+          rawUrl = String(fd.get("embedUrl") || "");
+        } catch (eFd) {}
+      }
+    }
+    rawUrl = String(rawUrl || "").trim();
+    if (!rawUrl) {
+      setPlaylistEmbedMsg("error", "Paste a YouTube or Spotify link first.");
+      return false;
+    }
+    var plE = loadPlaylist();
+    var srcE = normalizePlaylistSource(plE.source);
+    var detected = detectEmbedSourceFromUrl(rawUrl);
+    if (detected && (srcE === "local" || srcE !== detected)) {
+      srcE = detected;
+      plE.source = detected;
+    }
+    if (srcE !== "youtube" && srcE !== "spotify") {
+      setPlaylistEmbedMsg("error", "Switch Music source to YouTube or Spotify first (or paste a YouTube/Spotify link).");
+      pushNotice("orange", "Switch Music source to YouTube or Spotify first (or paste a YouTube/Spotify link).");
+      return false;
+    }
+    var parsed = parseRoomEmbed(srcE, rawUrl);
+    if (!parsed.ok) {
+      setPlaylistEmbedMsg("error", parsed.error || "Invalid embed URL.");
+      pushNotice("orange", parsed.error || "Invalid embed URL.");
+      return false;
+    }
+    plE.source = srcE;
+    plE.embedUrl = parsed.embedUrl;
+    plE.embedSrc = parsed.embedSrc;
+    plE.embedTitle = parsed.embedTitle;
+    plE.ownerControlsMusic = true;
+    if (typeof plE.ownerOnlyAdd !== "boolean") plE.ownerOnlyAdd = true;
+    claimPlaylistOwnerIfNeeded(plE);
+    savePlaylist(plE);
+    try {
+      var dockForce = document.getElementById("room-embed-dock");
+      if (dockForce) dockForce.removeAttribute("data-embed-src");
+    } catch (eForce) {}
+    playlistPanelOpen = true;
+    playlistPanelDirty = true; // after Set embed: OK to remount panel once with preview
+    paint("rooms");
+    try { syncRoomAudio(); } catch (eSync) {}
+    setPlaylistEmbedMsg("ok", "Embed set — press play in the player below (or Open player in the dock).");
+    pushNotice("green", "Room embed set — press play in the player. " + (srcE === "spotify" ? "Open on Spotify" : "Open on YouTube") + " is in the dock.", { transient: true });
+    return true;
+  }
   function ensurePlaylistPanel() {
-    // How this works: Room music side panel mounts on #app (outside #main) so paint does not flash-unmount it.
-    // Beginner: panel stays open across mute / source tabs until Close / leave / clearStrayUI.
+    // How this works: Room music is a full-screen modal sheet on #app (outside #main).
+    // Beginner: dim backdrop + card; stays open until Close / backdrop / leave / clearStrayUI.
     // ENGINE DEV: do NOT replaceChild on every paint — only when playlistPanelDirty (or first mount).
-    // Never rebuild while an input/textarea/select inside the panel is focused (paste/keyboard survive).
+    // Ignore strict data-tab==="rooms" when inRoom && playlistPanelOpen (tab attr can flicker).
+    // Never remount while dirty+focused; clear dirty without remount (stops blur→wipe Bug A).
     var app = document.getElementById("app");
     var existing = document.getElementById("room-playlist-panel");
-    var onRooms = app && app.getAttribute("data-tab") === "rooms";
-    if (!app || !playlistPanelOpen || !inRoom || !session() || !onRooms) {
+    var keepOpen = !!(playlistPanelOpen && inRoom && session());
+    if (!app || !keepOpen) {
       if (existing) existing.remove();
       playlistPanelDirty = false;
       return null;
@@ -487,7 +609,8 @@
     // Keep live DOM when open + already mounted unless explicitly dirty.
     if (existing && existing.parentNode === app) {
       if (playlistPanelHasFocus()) {
-        // Defer rebuild: leave dirty so a later paint refreshes once focus leaves.
+        // Never remount while focused — clear dirty so blur does not wipe paste state.
+        playlistPanelDirty = false;
         return existing;
       }
       if (!playlistPanelDirty) {
@@ -511,10 +634,6 @@
       else app.appendChild(next);
     }
     playlistPanelDirty = false;
-    try {
-      var panel = document.getElementById("room-playlist-panel");
-      if (panel) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    } catch (eSc) {}
     return document.getElementById("room-playlist-panel");
   }
 
@@ -576,12 +695,14 @@
     else syncRoomAudio();
   }
   function playlistPanel() {
-    // How this works: Room music panel — My uploads / YouTube / Spotify.
-    // Hard rule: only loft owner switches source / pastes embeds / locks. Guests may listen;
+    // How this works: Room music modal sheet — My uploads / YouTube / Spotify.
+    // Hard rule: canControlRoomMusic() gates source / pastes / locks. Guests may listen;
     // optional guest local-track adds when ownerOnlyAdd is false. Never guest yt/spotify edits.
+    // Beginner: full-screen dim + card; Set embed is a big type=button so phone taps always fire.
+    // ENGINE DEV: #room-playlist-panel.room-music-modal backdrop + .room-music-card stopPropagation.
     var pl = loadPlaylist();
-    var owner = isLoftOwner();
-    var canAddLocal = owner || !pl.ownerOnlyAdd;
+    var canCtrl = canControlRoomMusic();
+    var canAddLocal = canCtrl || !pl.ownerOnlyAdd;
     var src = normalizePlaylistSource(pl.source);
     var music = myMusicStuff();
     var rows = pl.tracks.length
@@ -590,7 +711,7 @@
           return '<div class="playlist-row' + (now ? " is-playing" : "") + '">'
             + (now ? "<b>" : "") + esc(t.name || "Track") + (now ? "</b>" : "")
             + ' <span class="meta">by ' + esc(t.by || "?") + '</span>'
-            + (owner ? (' <button type="button" class="text-btn" data-playlist-play="' + i + '">Play</button>'
+            + (canCtrl ? (' <button type="button" class="text-btn" data-playlist-play="' + i + '">Play</button>'
               + ' <button type="button" class="text-btn" data-playlist-remove="' + i + '">Remove</button>') : "")
             + '</div>';
         }).join("")
@@ -602,11 +723,11 @@
       : "";
     var sourceTabs = '<div class="section-label">Music source</div>'
       + '<div class="playlist-source-tabs" role="tablist">'
-      +   '<button type="button" class="action-btn' + (src === "local" ? " is-on" : "") + '" data-playlist-source="local"' + (owner ? "" : " disabled") + '>My uploads</button>'
-      +   '<button type="button" class="action-btn' + (src === "youtube" ? " is-on" : "") + '" data-playlist-source="youtube"' + (owner ? "" : " disabled") + '>YouTube</button>'
-      +   '<button type="button" class="action-btn' + (src === "spotify" ? " is-on" : "") + '" data-playlist-source="spotify"' + (owner ? "" : " disabled") + '>Spotify</button>'
+      +   '<button type="button" class="action-btn' + (src === "local" ? " is-on" : "") + '" data-playlist-source="local"' + (canCtrl ? "" : " disabled") + '>My uploads</button>'
+      +   '<button type="button" class="action-btn' + (src === "youtube" ? " is-on" : "") + '" data-playlist-source="youtube"' + (canCtrl ? "" : " disabled") + '>YouTube</button>'
+      +   '<button type="button" class="action-btn' + (src === "spotify" ? " is-on" : "") + '" data-playlist-source="spotify"' + (canCtrl ? "" : " disabled") + '>Spotify</button>'
       + '</div>'
-      + (owner
+      + (canCtrl
           ? ""
           : '<p class="meta owner-music-note">Owner controls room music — you can listen, but only the loft owner changes source or embeds.</p>');
     var localBody = ''
@@ -617,12 +738,12 @@
       +   '</div>'
       +   '<div class="playlist-controls">'
       +     '<button type="button" class="action-btn" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
-      +     (owner ? '<button type="button" class="action-btn" data-playlist-next="1">Next</button>' : "")
+      +     (canCtrl ? '<button type="button" class="action-btn" data-playlist-next="1">Next</button>' : "")
       +     '<button type="button" class="action-btn" data-room-mute="1">' + (roomAudioMuted ? "Unmute" : "Mute") + '</button>'
       +   '</div>'
       +   '<div class="section-label">Queue (' + pl.tracks.length + '/99)</div>'
       +   '<div class="playlist-list">' + rows + '</div>'
-      +   (owner
+      +   (canCtrl
           ? ('<label class="check-row"><input type="checkbox" data-playlist-owner-only="1"' + (pl.ownerOnlyAdd ? " checked" : "") + ' /> Only owner may add local tracks</label>'
             + '<p class="meta">YouTube / Spotify source &amp; URLs stay owner-only even if guests may add uploads.</p>')
           : ('<p class="meta">' + (pl.ownerOnlyAdd ? "Owner locked local adds." : "Guests may add local tracks (uploads only).") + '</p>'))
@@ -634,7 +755,7 @@
                 + '<button type="submit">Add to playlist</button></form>')
               : '<p class="meta">No Music in Stuff yet. Stuff → Music → Upload… (MP3/WAV/OGG; copyright checkbox required).</p>'))
           : (src === "local" ? '<p class="meta">Local adds locked to loft owner.</p>' : ""))
-      + (owner && src === "local"
+      + (canCtrl && src === "local"
           ? ('<div class="section-label">Or paste YouTube / Spotify</div>'
             + '<ol class="playlist-paste-steps">'
             + '<li>Pick <b>YouTube</b> or <b>Spotify</b> (or paste below to auto-pick)</li>'
@@ -643,14 +764,15 @@
             + '</ol>'
             + '<form id="playlist-smart-embed-form" class="playlist-embed-form">'
             + '<input name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="Paste YouTube or Spotify link here" />'
-            + '<button type="submit">Set embed</button></form>')
+            + '<button type="button" class="action-btn playlist-set-embed-btn" data-playlist-set-embed="1">Set embed</button></form>'
+            + '<p id="playlist-embed-msg" class="playlist-embed-msg" role="status" aria-live="polite"></p>')
           : "");
     var embedOpen = pl.embedUrl
       ? ('<a class="text-btn room-embed-open" href="' + esc(pl.embedUrl) + '" target="_blank" rel="noopener noreferrer">'
         + (src === "spotify" ? "Open on Spotify" : "Open on YouTube") + '</a>')
       : "";
     var embedBody = ''
-      + (owner
+      + (canCtrl
           ? ('<ol class="playlist-paste-steps">'
             + '<li>Pick <b>YouTube</b> or <b>Spotify</b> above</li>'
             + '<li>Paste the share link in the box</li>'
@@ -660,10 +782,11 @@
       + '<p class="meta">' + (src === "youtube"
           ? "Accepts youtube.com / music.youtube.com / youtu.be / Shorts / Live / playlist (si= share links OK). Embeds use youtube-nocookie. Video must allow embedding."
           : "Accepts open.spotify.com (intl- paths OK) track / album / playlist / episode. Playlists must be <b>public</b>. Prefer Copy link over spotify.link shorts.") + '</p>'
-      + (owner
+      + (canCtrl
           ? ('<form id="playlist-embed-form" class="playlist-embed-form">'
             + '<input name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="' + (src === "youtube" ? "Paste YouTube link here" : "Paste Spotify link here") + '" value="' + esc(pl.embedUrl || "") + '" />'
-            + '<button type="submit">Set embed</button></form>')
+            + '<button type="button" class="action-btn playlist-set-embed-btn" data-playlist-set-embed="1">Set embed</button></form>'
+            + '<p id="playlist-embed-msg" class="playlist-embed-msg" role="status" aria-live="polite"></p>')
           : '<p class="meta">Owner controls room music — embed URL is read-only for guests.</p>')
       + (pl.embedSrc
           ? ('<div class="playlist-embed-preview" data-embed-kind="' + esc(src) + '">'
@@ -673,8 +796,8 @@
             + 'allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>')
           : '<p class="meta">No embed set yet.</p>')
       + '<p class="meta legal-embed-note">Embedded players use YouTube/Spotify’s own embeds. Respect their ToS; Whirled2 does not host that audio. Local uploads still require you own the rights.</p>';
-    return '<div class="room-side-panel" id="room-playlist-panel">'
-      + '<div class="panel">'
+    return '<div class="room-music-modal" id="room-playlist-panel" data-playlist-backdrop="1" role="dialog" aria-modal="true" aria-label="Room music">'
+      + '<div class="room-music-card panel" data-playlist-card="1">'
       +   '<div class="room-side-head"><h2>Room music</h2>'
       +     '<button type="button" class="text-btn" data-playlist-close="1">Close</button></div>'
       +   '<p class="meta">Classic wiki Music vibe, plus optional YouTube / Spotify embeds. Offline localStorage — no shared server yet.</p>'
@@ -682,7 +805,6 @@
       +   (src === "local" ? localBody : embedBody)
       + '</div></div>';
   }
-
   var STUFF_CATS = [
     // How this works: wiki Stuff rail categories. howBlurb = empty-state “How do I get stuff?”
     { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload a stub avatar thumbnail here, or earn/list later — never invent demo avatars." },
@@ -713,6 +835,7 @@
   var roomPanelOpen = false;
   var playlistPanelOpen = false; // Room menu → View room music
   // How this works: playlistPanelDirty = true when source/embed/mute/queue changes so ensurePlaylistPanel may rebuild once.
+  // Modal never closes on focus loss / paint — only Close, backdrop, leave room, clearStrayUI.
   // Beginner: while you are typing/pasting a link, the panel HTML is never replaced (keyboard stays up).
   // ENGINE DEV: set dirty before paint(); clear after successful remount; Close/leave/clearStrayUI remove the node.
   var playlistPanelDirty = false;
@@ -2828,7 +2951,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906w";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906x";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3674,7 +3797,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Room music paste-URL fix (panel no longer rebuilds mid-paste; paste-friendly text fields; panel above Open player). Cache <code>?v=20260906w</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Room music modal sheet (full-screen dim + card; Set embed type=button; canControlRoomMusic for FB users). Cache <code>?v=20260906x</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5861,7 +5984,7 @@ function helpPage() {
     applyBrowserTheme();
     // How this works: #room-embed-dock is outside #main — no park needed before innerHTML.
     // Beginner: Open player stays open when you mute or switch YouTube/Spotify in Room music.
-    // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts only when playlistPanelDirty (never while paste field focused).
+    // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts only when playlistPanelDirty (never while paste field focused; clears dirty instead).
     if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; main.innerHTML = legalPage(); }
     else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; main.innerHTML = helpPage(); }
     else if (tab === "rooms") main.innerHTML = rooms();
@@ -6630,16 +6753,46 @@ function helpPage() {
   // Beginner: even if a tap does not bubble to #app the way we expect, these still fire.
   // ENGINE DEV: once; stopPropagation so #app handlers do not double-run. Dock stays under #app.
   (function bindEmbedDockCaptureOnce() {
+    // How this works: document capture for embed dock + Room music modal (Set embed / Close / backdrop).
+    // Beginner: even if a tap does not bubble to #app, Set embed and Close still fire.
+    // ENGINE DEV: once; stopPropagation so #app handlers do not double-run. Modal z > dock.
     if (window.__whirledEmbedCapture) return;
     window.__whirledEmbedCapture = true;
     document.addEventListener("click", function (ev) {
       var t = ev.target;
       if (!t || !t.closest) return;
+      var setEmbed = t.closest("[data-playlist-set-embed]");
+      var closePl = t.closest("[data-playlist-close]");
+      var card = t.closest("[data-playlist-card]");
       var expand = t.closest("[data-embed-expand]");
       var collapse = t.closest("[data-embed-collapse]");
       var focusBtn = t.closest("[data-embed-focus]");
       var openPanel = t.closest("[data-playlist-open-panel]");
-      if (!expand && !collapse && !focusBtn && !openPanel) return;
+      // Backdrop: click on modal root (dim area), not the card.
+      var isBackdrop = !!(t.id === "room-playlist-panel" || (t.getAttribute && t.getAttribute("data-playlist-backdrop") === "1" && !card));
+      // Only handle modal chrome + embed dock here. Other card controls (source tabs, mute, …)
+      // must reach the #app bubble handler — do not stopPropagation on every card tap.
+      if (!setEmbed && !closePl && !isBackdrop && !expand && !collapse && !focusBtn && !openPanel) return;
+      if (setEmbed && session()) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        applyPlaylistEmbedFromUi(ev);
+        return;
+      }
+      if (closePl && session()) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        closePlaylistPanel();
+        try { paint("rooms"); } catch (ePc) {}
+        return;
+      }
+      if (isBackdrop && session()) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        closePlaylistPanel();
+        try { paint("rooms"); } catch (ePb) {}
+        return;
+      }
       if (expand) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -6689,6 +6842,18 @@ function helpPage() {
         try { ensurePlaylistPanel(); } catch (eP) {}
         focusPlaylistEmbedUrl();
       }
+    }, true);
+    // How this works: Set embed is type=button (mobile-reliable); Enter in the paste field still applies.
+    // Beginner: paste link → press Enter or tap Set embed.
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Enter") return;
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      if (!t.closest("#room-playlist-panel")) return;
+      if (!t.classList || !t.classList.contains("playlist-embed-url")) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (session()) applyPlaylistEmbedFromUi(ev);
     }, true);
   })();
   app.addEventListener("click", function (ev) {
@@ -7736,13 +7901,28 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-playlist-close]") && session()) {
-      playlistPanelOpen = false;
-      playlistPanelDirty = false;
-      try {
-        var plClose = document.getElementById("room-playlist-panel");
-        if (plClose) plClose.remove();
-      } catch (eClose) {}
+      // How this works: explicit Close only (also backdrop via capture binder).
+      closePlaylistPanel();
       paint("rooms");
+      return;
+    }
+    // Backdrop tap: target is the modal root itself (not the card).
+    if (ev.target && ev.target.id === "room-playlist-panel" && session()) {
+      closePlaylistPanel();
+      paint("rooms");
+      return;
+    }
+    // Card taps must never dismiss — stopPropagation so stage/chat behind do not steal the gesture.
+    var plCard = ev.target.closest("[data-playlist-card]");
+    if (plCard && session()) {
+      ev.stopPropagation();
+      // fall through to specific playlist controls below
+    }
+    var setEmbedBtn = ev.target.closest("[data-playlist-set-embed]");
+    if (setEmbedBtn && session()) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      applyPlaylistEmbedFromUi(ev);
       return;
     }
     // How this works: mobile embed controls live OUTSIDE the iframe (iOS often blocks tiny YT taps).
@@ -7801,8 +7981,8 @@ function helpPage() {
     }
     var plSrcBtn = ev.target.closest("[data-playlist-source]");
     if (plSrcBtn && session()) {
-      // Hard rule: only loft owner may switch music source (local / youtube / spotify).
-      if (!isLoftOwner()) {
+      // Hard rule: canControlRoomMusic gates source tabs (loft owner OR claimed playlist.ownerId).
+      if (!canControlRoomMusic()) {
         pushNotice("orange", "Owner controls room music.");
         return;
       }
@@ -7810,6 +7990,7 @@ function helpPage() {
       var plS = loadPlaylist();
       plS.source = nextSrc;
       plS.ownerControlsMusic = true;
+      claimPlaylistOwnerIfNeeded(plS);
       // When switching to embeds, keep local tracks but prefer owner-only adds.
       if (nextSrc !== "local" && typeof plS.ownerOnlyAdd !== "boolean") plS.ownerOnlyAdd = true;
       // How this works: local source tears down embed dock — clear expanded sheet flag.
@@ -7841,13 +8022,13 @@ function helpPage() {
       }
       return;
     }
-    if (ev.target.closest("[data-playlist-next]") && session() && isLoftOwner()) {
+    if (ev.target.closest("[data-playlist-next]") && session() && canControlRoomMusic()) {
       // playlistNext already increments once + paints/syncs — do not double-increment or double-paint.
       playlistNext(false);
       return;
     }
     var plPlay = ev.target.closest("[data-playlist-play]");
-    if (plPlay && session() && isLoftOwner()) {
+    if (plPlay && session() && canControlRoomMusic()) {
       var pl = loadPlaylist();
       pl.current = Math.max(0, Number(plPlay.getAttribute("data-playlist-play")) || 0);
       savePlaylist(pl);
@@ -7857,7 +8038,7 @@ function helpPage() {
       return;
     }
     var plRem = ev.target.closest("[data-playlist-remove]");
-    if (plRem && session() && isLoftOwner()) {
+    if (plRem && session() && canControlRoomMusic()) {
       var pl2 = loadPlaylist();
       var ri = Number(plRem.getAttribute("data-playlist-remove"));
       if (ri >= 0 && ri < pl2.tracks.length) {
@@ -8218,7 +8399,7 @@ function helpPage() {
     }
   });
   app.addEventListener("change", function (ev) {
-    if (ev.target.matches("[data-playlist-owner-only]") && session() && isLoftOwner()) {
+    if (ev.target.matches("[data-playlist-owner-only]") && session() && canControlRoomMusic()) {
       var plO = loadPlaylist();
       plO.ownerOnlyAdd = !!ev.target.checked;
       savePlaylist(plO);
@@ -8929,48 +9110,9 @@ function helpPage() {
       return;
     }
     if ((ev.target.id === "playlist-embed-form" || ev.target.id === "playlist-smart-embed-form") && session()) {
-      // Hard rule: only loft owner may paste/change YouTube or Spotify embed URLs.
-      // How this works: parse URL → save embedSrc → force dock refresh → keep panel open + success notice.
-      // Beginner: if you paste while still on My uploads, we auto-switch to YouTube or Spotify.
-      // ENGINE DEV: clear data-embed-src so ensureRoomEmbedDock rewrites the iframe after Set embed.
-      if (!isLoftOwner()) {
-        pushNotice("orange", "Owner controls room music.");
-        return;
-      }
-      var em = new FormData(ev.target);
-      var rawUrl = String(em.get("embedUrl") || "");
-      var plE = loadPlaylist();
-      var srcE = normalizePlaylistSource(plE.source);
-      var detected = detectEmbedSourceFromUrl(rawUrl);
-      if (detected && (srcE === "local" || srcE !== detected)) {
-        srcE = detected;
-        plE.source = detected;
-      }
-      if (srcE !== "youtube" && srcE !== "spotify") {
-        pushNotice("orange", "Switch Music source to YouTube or Spotify first (or paste a YouTube/Spotify link).");
-        return;
-      }
-      var parsed = parseRoomEmbed(srcE, rawUrl);
-      if (!parsed.ok) {
-        pushNotice("orange", parsed.error || "Invalid embed URL.");
-        return;
-      }
-      plE.source = srcE;
-      plE.embedUrl = parsed.embedUrl;
-      plE.embedSrc = parsed.embedSrc;
-      plE.embedTitle = parsed.embedTitle;
-      plE.ownerControlsMusic = true;
-      if (typeof plE.ownerOnlyAdd !== "boolean") plE.ownerOnlyAdd = true;
-      savePlaylist(plE);
-      try {
-        var dockForce = document.getElementById("room-embed-dock");
-        if (dockForce) dockForce.removeAttribute("data-embed-src");
-      } catch (eForce) {}
-      playlistPanelOpen = true;
-      playlistPanelDirty = true; // after Set embed: OK to remount panel once with preview
-      paint("rooms");
-      syncRoomAudio();
-      pushNotice("green", "Room embed set — press play in the player. " + (srcE === "spotify" ? "Open on Spotify" : "Open on YouTube") + " is in the dock.", { transient: true });
+      // How this works: form submit (Enter) shares applyPlaylistEmbedFromUi with Set embed button.
+      // Beginner: Enter after paste also sets the embed; modal stays open.
+      applyPlaylistEmbedFromUi(ev);
       return;
     }
     if (ev.target.id === "playlist-add-form" && session()) {
@@ -8983,7 +9125,7 @@ function helpPage() {
         pushNotice("orange", "Switch to My uploads to add local tracks.");
         return;
       }
-      if (!isLoftOwner() && plA.ownerOnlyAdd) {
+      if (!canControlRoomMusic() && plA.ownerOnlyAdd) {
         pushNotice("orange", "Only the loft owner may add tracks right now.");
         return;
       }

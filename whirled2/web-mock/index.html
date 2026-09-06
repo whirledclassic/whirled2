@@ -19,8 +19,8 @@
       .brand .logo, img.logo { width: 96px !important; height: 36px !important; max-width: 96px !important; max-height: 36px !important; }
     }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906w" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906w" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906x" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906x" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
@@ -32,16 +32,16 @@
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       var msg = (ev && ev.message) ? ev.message : "Script error";
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260906w">Tap to reload fresh</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260906x">Tap to reload fresh</a></p></div></section>';
     });
     setTimeout(function () {
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       if (el.textContent.indexOf("Loading chrome") === -1) return;
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Old phone cache. Open a fresh link.</p><p><a href="./?v=20260906w">Reload fresh build</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Old phone cache. Open a fresh link.</p><p><a href="./?v=20260906x">Reload fresh build</a></p></div></section>';
     }, 2500);
   </script>
-  <script src="./src/api.js?v=20260906w"></script>
-  <script src="./app.js?v=20260906w"></script>
+  <script src="./src/api.js?v=20260906x"></script>
+  <script src="./app.js?v=20260906x"></script>
 </body>
 </html>
