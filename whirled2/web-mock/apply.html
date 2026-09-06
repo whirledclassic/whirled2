@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Whirled 2 — Apply</title>
+  <meta name="description" content="Apply for paid or volunteer work on Whirled 2: art, code, Discord." />
+  <style>
+    :root { --sky:#d7eaf6; --card:#f4fbff; --ink:#16324a; --blue:#2b7bb9; --blue-dark:#1a5a8a; --line:#9ec4dc; --ok:#1e6b3a; --ok-bg:#e8f7ee; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Trebuchet MS","Segoe UI",sans-serif; background:var(--sky); color:var(--ink); line-height:1.45; }
+    header { background:linear-gradient(#eaf6fd,#cce6f6); border-bottom:2px solid var(--blue); padding:16px 20px 12px; }
+    header .row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    header img { height:48px; width:auto; }
+    header h1 { margin:0; font-size:1.45rem; }
+    header p { margin:4px 0 0; font-size:.95rem; }
+    nav { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+    nav a { background:#fff; border:1px solid var(--line); color:var(--blue-dark); text-decoration:none; padding:4px 10px; border-radius:4px; font-size:.9rem; }
+    main { max-width:920px; margin:0 auto; padding:20px; }
+    section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin-bottom:16px; }
+    h2 { margin:0 0 10px; font-size:1.2rem; color:var(--blue-dark); }
+    h3 { margin:0 0 6px; font-size:1.02rem; }
+    .opp { background:var(--ok-bg); border-color:#8dca9a; }
+    .opp strong { color:var(--ok); }
+    .roles { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
+    .role { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px; }
+    .role ul { margin:6px 0 0; padding-left:18px; }
+    .tag { display:inline-block; font-size:.75rem; background:#e3f1fa; color:var(--blue-dark); padding:1px 6px; border-radius:3px; margin-bottom:6px; }
+    label { display:block; font-weight:bold; margin:12px 0 4px; }
+    input, select, textarea { width:100%; padding:8px; border:1px solid var(--line); border-radius:4px; font:inherit; background:#fff; }
+    textarea { min-height:88px; resize:vertical; }
+    .checks { column-count:2; }
+    @media (max-width:700px) { .checks { column-count:1; } }
+    .checks label { font-weight:normal; display:flex; gap:8px; align-items:flex-start; margin:6px 0; break-inside:avoid; }
+    .checks input { width:auto; margin-top:3px; }
+    button,.btn { display:inline-block; margin-top:14px; background:var(--blue); color:#fff; border:0; padding:10px 16px; border-radius:4px; font:inherit; font-weight:bold; cursor:pointer; text-decoration:none; }
+    button:hover,.btn:hover { background:var(--blue-dark); }
+    .muted { color:#4a6a80; font-size:.92rem; }
+    footer { text-align:center; padding:20px; color:#4a6a80; font-size:.9rem; }
+    .ok { display:none; background:#e7f8ea; border:1px solid #8dca9a; padding:12px; border-radius:6px; }
+    .pay-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+    @media (max-width:700px) { .pay-grid { grid-template-columns:1fr; } }
+    .pay-opt { display:block; background:#fff; border:2px solid var(--line); border-radius:6px; padding:10px; cursor:pointer; font-weight:normal; }
+    .pay-opt input { width:auto; margin-right:6px; }
+    .pay-opt strong { display:block; margin-bottom:4px; }
+    .pay-box { display:none; margin-top:12px; padding:12px; background:#fff; border:1px dashed var(--line); border-radius:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="row">
+      <img src="./assets/whirled2-logo.svg" alt="Whirled 2" />
+      <div>
+        <h1>Join the team</h1>
+        <p>Art, code, Discord — one application. Paid spots are open.</p>
+      </div>
+    </div>
+    <nav>
+      <a href="./">Demo</a>
+      <a href="#pay">Pay</a>
+      <a href="#roles">Roles</a>
+      <a href="#apply">Apply</a>
+      <a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/ARTISTS.md">Notes</a>
+    </nav>
+  </header>
+  <main>
+    <section>
+      <h2>What this is</h2>
+      <p>Whirled 2 is a <strong>new</strong> browser world in the spirit of Whirled (2007–2017): your room, walk-around avatars, user-made stuff. No Flash. No ripped old shop items.</p>
+      <p>We need people across the whole project — not only illustrators. Pick every role you can actually do. Send links to work you already shipped.</p>
+    </section>
+    <section class="opp" id="pay">
+      <h2>There is a paid opportunity</h2>
+      <p><strong>Yes, you can get paid.</strong> Apply, show the work, tell us what you want to charge. If we accept you and we like what you bring, we pay for that work.</p>
+      <p>Acceptance is not automatic. It depends on the application, the links you send, and whether the first job is a fit. If we say yes, we pay for that job.</p>
+      <p>Want to stay on after the first job? Say so. Right now that still looks like <em>one payment per drop</em> (a walk cycle, a room, a feature, a month of Discord). We stay in touch and do the next payment when the next drop is agreed.</p>
+      <p>You can also apply as volunteer / credit-only if money is not the point. Credit either way.</p>
+    </section>
+    <section id="roles">
+      <h2>Open roles</h2>
+      <p class="muted">Discord mod / community manager is a real need right now.</p>
+      <div class="roles">
+        <article class="role"><span class="tag">Need this</span><h3>Discord mod / community manager</h3><p>Run the server so Josh is not the only adult in the room.</p><ul><li>Roles, rules, welcome flow</li><li>Keep spam and drama down</li><li>Relay useful reports back to the project</li></ul></article>
+        <article class="role"><span class="tag">Code</span><h3>Room engine (PixiJS + TypeScript)</h3><p>Click-to-walk, camera, avatars, furniture.</p></article>
+        <article class="role"><span class="tag">Code</span><h3>Website chrome</h3><p>Tabs, login, profile, chat. Classic whirled.com feel.</p></article>
+        <article class="role"><span class="tag">Code</span><h3>Server / networking</h3><p>Tiny HTTPS API, sockets, cheap VPS deploy.</p></article>
+        <article class="role"><span class="tag">Code</span><h3>Classic lab</h3><p>msoy notes and tooling. No leaking the VM.</p></article>
+        <article class="role"><span class="tag">Art</span><h3>Avatar / room / props / UI / shop / animation</h3><p>Readable at game scale. Classic blue chrome for UI. Original work only.</p></article>
+        <article class="role"><span class="tag">Audio / other</span><h3>Music, SFX, QA, writing</h3><p>Name it on the form.</p></article>
+      </div>
+    </section>
+    <section id="apply">
+      <h2>Application</h2>
+      <p class="muted">Goes to Josh. Links to previous work are required.</p>
+      <div class="ok" id="ok">Sent.</div>
+      <form id="app-form" action="https://formsubmit.co/josh.awe99@gmail.com" method="POST">
+        <input type="hidden" name="_subject" value="[W2 APPLY] New application" />
+        <input type="hidden" name="_template" value="table" />
+        <input type="hidden" name="_captcha" value="false" />
+        <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off" />
+        <input type="hidden" name="_next" value="https://whirledclassic.github.io/whirled2/whirled2/web-mock/apply.html?sent=1" />
+        <label for="name">Name / handle</label>
+        <input id="name" name="name" required />
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required />
+        <label for="discord">Discord handle</label>
+        <input id="discord" name="discord" required placeholder="username" />
+        <label for="portfolio">Main link to previous work</label>
+        <input id="portfolio" name="portfolio" type="url" placeholder="https://" required />
+        <label for="more_links">More links (GitHub, ArtStation, itch, clips, a Discord you already run)</label>
+        <textarea id="more_links" name="more_links" placeholder="One URL per line"></textarea>
+        <label>What do you want to do?</label>
+        <div class="checks">
+          <label><input type="checkbox" name="roles[]" value="discord-mod" /> Discord mod / community manager</label>
+          <label><input type="checkbox" name="roles[]" value="engine" /> PixiJS / TypeScript engine</label>
+          <label><input type="checkbox" name="roles[]" value="chrome" /> Website chrome</label>
+          <label><input type="checkbox" name="roles[]" value="server" /> Server / networking / deploy</label>
+          <label><input type="checkbox" name="roles[]" value="classic-lab" /> Classic msoy lab</label>
+          <label><input type="checkbox" name="roles[]" value="avatar" /> Avatar art</label>
+          <label><input type="checkbox" name="roles[]" value="room" /> Room / environment art</label>
+          <label><input type="checkbox" name="roles[]" value="props" /> Furniture / props</label>
+          <label><input type="checkbox" name="roles[]" value="ui" /> UI / chrome art</label>
+          <label><input type="checkbox" name="roles[]" value="shop" /> Shop / item art</label>
+          <label><input type="checkbox" name="roles[]" value="animator" /> Animation</label>
+          <label><input type="checkbox" name="roles[]" value="audio" /> Music / SFX</label>
+          <label><input type="checkbox" name="roles[]" value="other" /> Other</label>
+        </div>
+        <label for="other_role">If other, what?</label>
+        <input id="other_role" name="other_role" />
+        <label>Pay</label>
+        <div class="pay-grid">
+          <label class="pay-opt"><input type="radio" name="track" value="paid" required /><strong>I want to be paid</strong>If we accept you and like the work, we pay for that job.</label>
+          <label class="pay-opt"><input type="radio" name="track" value="either" /><strong>Paid preferred</strong>Take paid if accepted; otherwise still want in.</label>
+          <label class="pay-opt"><input type="radio" name="track" value="volunteer" /><strong>Volunteer / credit</strong>Money is not the point for me.</label>
+        </div>
+        <div class="pay-box" id="pay-box">
+          <label for="rate">What do you charge for the first job?</label>
+          <input id="rate" name="rate" placeholder="$80 walk cycle, $150 Discord setup week…" />
+          <label for="pay_shape">One job or ongoing?</label>
+          <select id="pay_shape" name="pay_shape">
+            <option value="">Choose…</option>
+            <option>One-time payment for this first job</option>
+            <option>Ongoing — still one payment per drop for now</option>
+            <option>Would talk retainer later if the project can carry it</option>
+          </select>
+        </div>
+        <label for="first_drop">What would you actually do first?</label>
+        <textarea id="first_drop" name="first_drop" required></textarea>
+        <label for="license">If we ship your work</label>
+        <select id="license" name="license" required>
+          <option value="">Choose…</option>
+          <option>Repo license is fine</option>
+          <option>CC-BY</option>
+          <option>CC-BY-SA</option>
+          <option>Written grant, ask me first</option>
+          <option>Code under the repo license / not applicable</option>
+        </select>
+        <label for="terms_ok">Got it</label>
+        <div class="checks" style="column-count:1">
+          <label><input type="checkbox" name="terms_ok" value="yes" required /> I sent real links to previous work. Paid work happens if I am accepted and the first job is a fit.</label>
+        </div>
+        <label for="notes">Anything else</label>
+        <textarea id="notes" name="notes"></textarea>
+        <button type="submit">Send application</button>
+        <button type="button" class="btn" id="gh-btn" style="background:#16324a;margin-left:8px;">Also open a GitHub issue</button>
+      </form>
+    </section>
+  </main>
+  <footer>Whirled 2 · <a href="https://github.com/whirledclassic/whirled2">github.com/whirledclassic/whirled2</a></footer>
+  <script>
+    if (/sent=1/.test(location.search)) document.getElementById("ok").style.display = "block";
+    function selectedTrack() {
+      var el = document.querySelector("input[name='track']:checked");
+      return el ? el.value : "";
+    }
+    function togglePayBox() {
+      var t = selectedTrack();
+      document.getElementById("pay-box").style.display = (t === "paid" || t === "either") ? "block" : "none";
+    }
+    document.querySelectorAll("input[name='track']").forEach(function (el) { el.addEventListener("change", togglePayBox); });
+    document.getElementById("gh-btn").addEventListener("click", function () {
+      var name = document.getElementById("name").value || "(name)";
+      var roles = Array.prototype.slice.call(document.querySelectorAll("input[name='roles[]']:checked")).map(function (el) { return el.value; }).join(", ") || "(none)";
+      var nl = "\n";
+      var body = ["### Application","","- Name: "+name,"- Email: "+(document.getElementById("email").value||""),"- Discord: "+(document.getElementById("discord").value||""),"- Main work link: "+(document.getElementById("portfolio").value||""),"- More links:",document.getElementById("more_links").value||"","- Roles: "+roles,"- Track: "+(selectedTrack()||""),"- Rate: "+(document.getElementById("rate").value||""),"","### First job",document.getElementById("first_drop").value||"","","### Notes",document.getElementById("notes").value||""].join(nl);
+      window.open("https://github.com/whirledclassic/whirled2/issues/new?labels=whirled2&title="+encodeURIComponent("[apply] "+name+" — "+roles)+"&body="+encodeURIComponent(body),"_blank");
+    });
+  </script>
+</body>
+</html>
