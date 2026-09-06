@@ -1,15 +1,16 @@
-# QA-FLASH — Flash / loft interact checklist (?v=20260906cj)
+# QA-FLASH — Flash / loft interact checklist (?v=20260906ck)
 
-Dual modes: `playbackMode` png-hybrid|ruffle. **ci** = no letter-glyph stand; `demo-avatar.swf` on Pages (flash-qa + ruffle); companion-only fail→DIRECT. **ch** companion-only nest.
+Dual modes: `playbackMode` png-hybrid|ruffle. **ck** = companion hostWalk + DemoAvatar continuous walk + DIRECT EI fallback. **cj** = tofu CSS walk + chrome floor-click with Pixi canvas.
 
-## Success criteria (?v=20260906cj)
+## Success criteria (?v=20260906ck)
 
 0. Loft NEVER shows grey letter "T" (or any initial glyph) as the avatar.
 1. Worn Classic Flash never blank loft — stand PNG/tofu-SVG cover until connected, or DIRECT outer SWF.
-2. `?flashQa=1` wears **demo-avatar.swf** (green walk / blue idle) — curl both paths **200**.
-3. Debug: `?avatarDebug=1` → `WhirledClassicAvatar.getLoftHostDebug()` — `hostReady`, `companionConnected`, `wearCompanionOnly`.
-4. Wear **Whirled2 Smooth** → PNG walk; Ruffle not mounted.
-5. Dual Wear radio cards still present.
+2. `?flashQa=1` wears **demo-avatar.swf** — floor click → **green continuous walk** → blue idle on arrive.
+3. Debug: `?avatarDebug=1` → `WhirledClassicAvatar.getLoftHostDebug()` — `companionConnected` **or** `directEiWalk`.
+4. Default tofu Wear → CSS legs bob on floor click (cj).
+5. Wear **Whirled2 Smooth** → PNG walk; Ruffle not mounted.
+6. Status badge honest: connected / DIRECT / DIRECT+walk / failed.
 
 ## Commands
 
@@ -18,7 +19,8 @@ node --check src/classic-avatar.js && node --check app.js
 node scripts/qa-flash-check.cjs
 curl -sI https://whirledclassic.github.io/whirled2/whirled2/web-mock/assets/ruffle/demo-avatar.swf | head -5
 curl -sI https://whirledclassic.github.io/whirled2/whirled2/web-mock/assets/avatars/flash-qa/demo-avatar.swf | head -5
-WHIRLED_DO_PUSH=1 node /tmp/push-ci.js
+curl -sI https://whirledclassic.github.io/whirled2/whirled2/web-mock/assets/avatar-host/avatar-host.swf | head -5
+WHIRLED_DO_PUSH=1 node /tmp/push-ck.js
 ```
 
-Live: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906cj&flashQa=1&avatarDebug=1
+Live: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ck&flashQa=1&avatarDebug=1

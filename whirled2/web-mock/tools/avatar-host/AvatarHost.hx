@@ -220,10 +220,16 @@ class AvatarHost extends Sprite {
   }
 
   function onControlConnect(evt:Dynamic):Void {
-    var props:Dynamic = evt;
+    // (?v=20260906ck) Prefer evt.props (ConnectEvent / ConnectBag public field). Fallback: evt itself.
+    // Beginner: avatar sends userProps in the event bag; we fill hostProps and walk works.
+    // ENGINE DEV: plain Event dynamic props drop under Ruffle — DemoAvatar uses ConnectBag subclass.
+    var props:Dynamic = null;
     try {
-      if (Reflect.hasField(evt, "props") && evt.props != null) props = evt.props;
+      if (evt != null && Reflect.hasField(evt, "props") && Reflect.field(evt, "props") != null) {
+        props = Reflect.field(evt, "props");
+      }
     } catch (e:Dynamic) {}
+    if (props == null) props = evt;
 
     if (userProps != null) {
       try { Reflect.setField(props, "alreadyConnected", true); } catch (e2:Dynamic) {}
@@ -236,7 +242,8 @@ class AvatarHost extends Sprite {
       userProps = null;
     }
     if (userProps == null) {
-      bridge("error", "no-userProps");
+      // Soft — do NOT bridge "error" (JS would remount DIRECT). Avatar may retry connect.
+      bridge("connect_soft_fail", "no-userProps");
       return;
     }
 

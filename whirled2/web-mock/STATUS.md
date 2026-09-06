@@ -1,3 +1,17 @@
+## What shipped (?v=20260906ck — companion hostWalk + DemoAvatar continuous walk)
+
+- **Goal:** Classic Flash floor click plays **real walk animation** for the whole trek (not chrome bob only).
+- **DemoAvatar rebuild:** `ConnectBag` public `props` (Ruffle drops dynamic Event props) + ENTER_FRAME leg cycle + EI `hostWalk` for DIRECT fallback.
+- **AvatarHost:** soft `connect_soft_fail` (no remount on no-userProps race); stronger `evt.props` read.
+- **classic-avatar:** soft bridge errors; status badge `connected` / `DIRECT` / `DIRECT+walk`; DIRECT EI walk without flipping companion flag.
+- **Preserve cj:** tofu CSS leg/bob; chrome floor-click always on unless `data-engine-owns-avatar-walk=1`.
+- Assets: `demo-avatar.swf` (both paths), `avatar-host.swf` rebuilt.
+- Cache: **`?v=20260906ck`**. Docs: `SMOOTH-RUFFLE.md`, `QA-FLASH.md`.
+
+## ?v=20260906cj (preserve)
+- Default tofu: floor click + CSS leg/bob (was early-return blocked).
+- Chrome Wear walk always binds unless `#stage-slot[data-engine-owns-avatar-walk=1]` (Pixi canvas no longer kills click-walk).
+
 ## ?v=20260906cj
 - Default tofu: floor click enabled + CSS leg/bob walk (was early-return blocked).
 - Full Ruffle smooth walk still cooking in parallel.

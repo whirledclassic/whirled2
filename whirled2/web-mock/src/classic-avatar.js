@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906cj
+ * Cache: ?v=20260906ck
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906cj";
+  var VERSION = "20260906ck";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -68,15 +68,14 @@
   var BODY_DEMO_SWF = "./assets/avatars/flash-qa/demo-avatar.swf"; // controlConnect + appearanceChanged_v2
   var BODY_DEMO_SWF_ALT = "./assets/ruffle/demo-avatar.swf"; // (?v=20260906cj) mirror — Pages must 200
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906cj): COMPANION-ONLY nest; stand = PNG/tofu SVG NEVER letter glyph.
+  // How this works (?v=20260906ck): COMPANION-ONLY nest; hostWalk → Body walk frames; tofu CSS from cj.
   // Beginner: we load OUR tiny host.swf first; your avatar is rebuilt inside it from bytes.
   // Stand thumb covers the host (opacity 1) until bridge "connected" — never a blank loft.
-  // ENGINE DEV: cg dual-layer raced loftActivePlayer + EI silent-miss → never connected.
-  // Single Ruffle = host nest + sharedEvents; fail/watchdog → remount DIRECT (chrome bob).
-  // loftUsesCompanionHost ONLY on bridge "connected". Reject nested blob:/data: — hostLoadBytes only.
-  // Gate hostLoadBytes on bridge "ready" (addCallback race). LIVE club: appearanceChanged_v2 walk.
-  // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
-  var WEAR_COMPANION_ONLY = true; // (?v=20260906ch) single-player host nest + stand cover
+  // ENGINE DEV: DemoAvatar ConnectBag + continuous walk; DIRECT remount still EI-hostWalk (demo).
+  // Soft connect_soft_fail (no remount). loftUsesCompanionHost ONLY on bridge "connected".
+  // Reject nested blob:/data: — hostLoadBytes only. Gate hostLoadBytes on bridge "ready".
+  // Status badge: connected | DIRECT | failed. Preserve cj chrome-walk + tofu leg fixes.
+  var WEAR_COMPANION_ONLY = true; // (?v=20260906ch/ck) single-player host nest + stand cover
   var WEAR_SAFE_COMPANION_UPGRADE = false; // cg Option A dual-layer OFF
   var WEAR_AUTO_COMPANION_UPGRADE = false; // legacy ce flag kept false (dangerous remount-into-host)
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
@@ -406,7 +405,11 @@
   }
   function getRuffleStatus() { return ruffleUiStatus; }
   function ruffleStatusLabel(st) {
+    // (?v=20260906ck) Honest loft badge: connected nest / DIRECT paint / failed.
     st = st || ruffleUiStatus.state;
+    if (st === "connected") return "Ruffle connected";
+    if (st === "direct") return "Ruffle DIRECT";
+    if (st === "direct-ei") return "Ruffle DIRECT+walk";
     if (st === "loading") return "Ruffle loading…";
     if (st === "ready") return "Ruffle ready";
     if (st === "mounting") return "Ruffle mounting";
@@ -439,7 +442,7 @@
       var el = nodes[i];
       try {
         el.setAttribute("data-state", st);
-        el.className = String(el.className || "").replace(/\bis-(idle|loading|ready|mounting|playing|failed)\b/g, "").trim();
+        el.className = String(el.className || "").replace(/\bis-(idle|loading|ready|mounting|playing|failed|connected|direct|direct-ei)\b/g, "").trim();
         el.classList.add("ruffle-status-badge", "is-" + st);
         el.title = title;
         if (el.classList.contains("ruffle-status-badge-overlay")) {
@@ -1032,6 +1035,7 @@
     connected: false,
     gotControl: false,
     hostReady: false, // (?v=20260906ch) AvatarHost ctor registered addCallback + bridge ready
+    directEiWalk: false, // (?v=20260906ck) DemoAvatar (or Body) EI hostWalk on DIRECT player
     bytesLoading: false,
     moving: false,
     orient: 180,
@@ -1493,6 +1497,8 @@
         slot.classList.add("is-playing", "is-on");
         slot.setAttribute("data-mount-mode", "direct");
       } catch (eCl) {}
+      loftHostState.directEiWalk = false;
+      setRuffleStatus("direct", "DIRECT outer SWF (chrome bob + EI walk if demo)");
       logAvatarDebug("remountDirect OK", { hasPlayer: !!player });
       return player;
     }
@@ -1591,16 +1597,37 @@
         loftHostState.gotControl = (payload === true || payload === "true" || payload === 1);
         logAvatarDebug("gotControl", loftHostState.gotControl, payload);
       }
+      if (kind === "demo_ei_ready") {
+        // DemoAvatar DIRECT EI registered — walk can work without nest.
+        loftHostState.directEiWalk = true;
+        setRuffleStatus("direct-ei", "demo EI hostWalk ready");
+        logAvatarDebug("demo_ei_ready — DIRECT walk EI live");
+      }
+      if (kind === "connect_soft_fail") {
+        // (?v=20260906ck) no-userProps race — retry flush, do NOT remount DIRECT yet.
+        logAvatarDebug("connect_soft_fail — retry load", payload);
+        setTimeout(function () {
+          if (loftHostState.connected) return;
+          tryFlushPendingAvatarLoad();
+        }, 80);
+        setTimeout(function () {
+          if (loftHostState.connected) return;
+          tryFlushPendingAvatarLoad();
+        }, 280);
+        return true;
+      }
       if (kind === "connected") {
-        // (?v=20260906ch) ONLY flip companion flags here — never at host mount (blank loft).
+        // (?v=20260906ch/ck) ONLY flip companion flags here — never at host mount (blank loft).
         // Beginner: walk frames work now because host can call appearanceChanged_v2.
         // ENGINE DEV: companion-ONLY drops stand cover; Option A promotes sibling if present.
         loftHostState.connected = true;
         loftHostState.hostReady = true;
         loftHostState.hostMode = true;
         loftUsesCompanionHost = true;
+        loftHostState.directEiWalk = false;
         clearCompanionWatch();
         loftFallbackInFlight = false;
+        setRuffleStatus("connected", "companion nest connected — hostWalk live");
         if (loftCompanionPlayer) loftActivePlayer = loftCompanionPlayer;
         try {
           var slotC = document.getElementById("avatar-ruffle-host")
@@ -1642,8 +1669,15 @@
         }
       }
       if (kind === "error" || kind === "ei_error" || kind === "appearance_error") {
-        logAvatarDebug("companion host error → keep DIRECT / remount if needed", kind, payload);
-        remountDirectAvatarImmediate("bridge:" + kind + ":" + String(payload || "").slice(0, 60));
+        var pay = String(payload || "");
+        // Soft / transient — do not wipe nest on appearance glitches.
+        if (kind === "appearance_error" || /no-userProps|alreadyConnected/i.test(pay)) {
+          logAvatarDebug("companion soft error (no remount)", kind, payload);
+          return true;
+        }
+        logAvatarDebug("companion host error → remount DIRECT", kind, payload);
+        setRuffleStatus("direct", "companion failed → DIRECT: " + pay.slice(0, 80));
+        remountDirectAvatarImmediate("bridge:" + kind + ":" + pay.slice(0, 60));
       }
       return true;
     };
@@ -2135,11 +2169,13 @@
     if (loftUsesCompanionHost || loftHostState.hostMode) {
       result = callHostWalk(!!moving, orient);
     } else {
-      // Fallback: try hostWalk anyway (callbacks may exist), then legacy EI appearance probes.
+      // (?v=20260906ck) DIRECT fallback: DemoAvatar registers hostWalk via EI — animate without nest.
+      // Beginner: even if companion failed, flashQa demo still green-walks on floor click.
+      // ENGINE DEV: do NOT set loftUsesCompanionHost here (that means nest connected).
       var hr = tryCallHostMethod("hostWalk", [!!moving, orient]);
       if (hr.ok) {
-        loftUsesCompanionHost = true;
-        loftHostState.hostMode = true;
+        loftHostState.directEiWalk = true;
+        if (!loftHostState.connected) setRuffleStatus("direct-ei", "DIRECT hostWalk EI");
         result = hr;
       } else {
         result = notifyLoftAppearance(!!moving, orient);
@@ -2208,6 +2244,7 @@
       companionConnected: !!loftHostState.connected,
       gotControl: !!loftHostState.gotControl,
       wearCompanionOnly: !!WEAR_COMPANION_ONLY,
+      directEiWalk: !!loftHostState.directEiWalk,
       wearSafeCompanionUpgrade: !!WEAR_SAFE_COMPANION_UPGRADE,
       hostReady: !!loftHostState.hostReady,
       bytesLoading: !!loftHostState.bytesLoading,
@@ -2240,7 +2277,7 @@
       whyIdle: "Stock Whirled SWFs dispatch ConnectEvent type controlConnect on loaderInfo.sharedEvents (NOT ExternalInterface).",
       protocol: "Nested host: Ruffle loads avatar-host.swf (http) → hostLoadBytes(base64) → Loader.loadBytes → sharedEvents controlConnect → hostProps → gotControl_v1 → appearanceChanged_v2. http(s) avatars may use hostLoadUrl.",
       liveClub: "whirled.club world-client: ActorSprite floor move → appearanceChanged_v2(loc,orient,moving,sleeping) → Body state_*_walking / towalking / fromwalking. Embed allowScriptAccess sameDomain; nested avatar inside host SWF (same nest as ours).",
-      whatWorksNow: "ch: COMPANION-ONLY host nest + stand cover until connected; hostLoadBytes gated on ready; EI silent-miss fixed; hostWalk→appearanceChanged_v2; fail→DIRECT; spoke/sleep.",
+      whatWorksNow: "ck: companion nest hostWalk→Body walk; DemoAvatar ConnectBag+ENTER_FRAME walk; DIRECT EI hostWalk fallback; soft connect_soft_fail; cj tofu/chrome-walk preserved.",
       hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
       hostShim: "assets/avatar-host/avatar-host.swf compiled from tools/avatar-host/AvatarHost.hx (Haxe --swf). No AGPL copy.",
       debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
