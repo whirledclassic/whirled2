@@ -6,11 +6,7 @@
   <meta name="theme-color" content="#e8f4fb" />
   <meta http-equiv="Cache-Control" content="no-cache" />
   <title>Whirled2</title>
-  <!-- How this works: load styles → api.js (WhirledApi) → app.js (chrome). Cache-bust ?v= on assets.
-       Pages sets WHIRLED_API to the demo tunnel (origin only — no secrets) so Discord + shared chat work.
-       Demo server overwrites WHIRLED_API with location.origin when it serves this file. -->
   <style>
-    /* Critical: never let the logo blow up before CSS loads (iPhone Safari). */
     .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
     .gate-logo, img.gate-logo { width: 160px !important; height: auto !important; max-width: 70vw !important; max-height: 100px !important; object-fit: contain; display: block; margin: 0 auto 10px; }
     body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; background: #89C6E3; color: #16324a; }
@@ -20,35 +16,30 @@
       .brand .logo, img.logo { width: 96px !important; height: 36px !important; max-width: 96px !important; max-height: 36px !important; }
     }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906cp" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906cp" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906cq" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906cq" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
-  <!-- Sign-in: username/password primary. Social OAuth needs a developer app (not wired on Pages). -->
   <script>
-    // Beginner (?v=20260906cp): Pages → live demo tunnel so Create account with Discord works.
-    // Only the API origin is public here — never client secrets. Demo server replaces with location.origin.
     window.WHIRLED_API = window.WHIRLED_API || "https://norfolk-approved-discussing-recognised.trycloudflare.com";
     window.__whirledBoot = false;
     window.addEventListener("error", function (ev) {
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       var msg = (ev && ev.message) ? ev.message : "Script error";
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260906cp">Tap to reload fresh</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260906cq">Tap to reload fresh</a></p></div></section>';
     });
     setTimeout(function () {
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       if (el.textContent.indexOf("Loading chrome") === -1) return;
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Old phone cache. Open a fresh link.</p><p><a href="./?v=20260906cp">Reload fresh build</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Old phone cache. Open a fresh link.</p><p><a href="./?v=20260906cq">Reload fresh build</a></p></div></section>';
     }, 2500);
   </script>
-  <script src="./src/api.js?v=20260906cp"></script>
-  <!-- Classic Flash / SWF avatars (additive module) — before app.js -->
-  <script src="./src/classic-avatar.js?v=20260906cp"></script>
-  <script src="./app.js?v=20260906cp"></script>
-  <!-- (?v=20260906cp) Park live Pixi stage across chrome paint — no loft-first flash. -->
-  <script src="./src/room-stream.js?v=20260906cp"></script>
+  <script src="./src/api.js?v=20260906cq"></script>
+  <script src="./src/classic-avatar.js?v=20260906cq"></script>
+  <script src="./app.js?v=20260906cq"></script>
+  <script src="./src/room-stream.js?v=20260906cq"></script>
 </body>
 </html>
