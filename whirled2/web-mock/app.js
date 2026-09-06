@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906g";
+  var LOGO_V = "20260906h";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -3022,12 +3022,20 @@ function helpPage() {
     if (chat.length > 120) chat = chat.slice(-100);
     refreshChatLog();
   }
+  // How this works: room chat is visit-scoped on this mock. Leaving the room,
+  // logging off, or a fresh page load wipes history so old sessions don't linger.
+  // Chat Options → Clear all chat does the same. clearStorage defaults to true.
   function clearRoomChatDisplay(clearStorage) {
+    if (clearStorage === undefined) clearStorage = true;
     chat = [];
     refreshChatLog();
     if (clearStorage) {
       try { localStorage.removeItem("whirled2.chat.loft"); } catch (e) {}
     }
+  }
+  function leaveRoomResetChat() {
+    // Baby step: exiting Studio Loft ends this room visit → empty the chat.
+    clearRoomChatDisplay(true);
   }
   function bindGate() {
     var err = document.getElementById("gate-err");
@@ -3122,7 +3130,9 @@ function helpPage() {
     text = String(text || "").trim();
     if (!text) return;
     if (/^\/clear$/i.test(text)) {
-      clearRoomChatDisplay(false);
+      // Wiki /clear — wipe this tab's display + saved loft history.
+      clearRoomChatDisplay(true);
+      pushSystemChat("Chat cleared.");
       return;
     }
     var now = Date.now();
@@ -3160,7 +3170,7 @@ function helpPage() {
       +   '<button type="button" class="action-btn' + (ui.textSize === "md" ? " is-on" : "") + '" data-chat-size="md">M</button>'
       +   '<button type="button" class="action-btn' + (ui.textSize === "lg" ? " is-on" : "") + '" data-chat-size="lg">L</button>'
       + '</div>'
-      + '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear room chat</button>';
+      + '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear all chat</button>';
   }
   function openChatNameMenu(id, name, x, y) {
     var existing = document.getElementById("chat-name-menu");
@@ -3242,8 +3252,11 @@ function helpPage() {
   function boot() {
     applyBrowserTheme();
     if (session()) stripStuckPokeNotices();
+    // How this works: a new page load is a new session visit — wipe leftover loft
+    // chat from earlier. Do not loadHistory() on boot (that rehydrated old chats).
+    clearRoomChatDisplay(true);
     paint(session() ? "rooms" : "");
-    if (session()) { loadHistory(); startPoll(); startOccPoll(); ensureNoticeBar(); }
+    if (session()) { startPoll(); startOccPoll(); ensureNoticeBar(); }
     try { window.__whirledBoot = true; } catch (e) {}
   }
 
@@ -3339,10 +3352,9 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-chat-clear]")) {
-      if (confirm("Clear room chat display? Also clear saved local history?")) {
+      // Wiki: Clear all chat — one confirm, wipe display + saved loft history.
+      if (confirm("Clear all chat in this room?")) {
         clearRoomChatDisplay(true);
-      } else if (confirm("Clear display only (keep saved history)?")) {
-        clearRoomChatDisplay(false);
       }
       chatOptsOpen = false;
       var com2 = document.getElementById("chat-opts-menu");
@@ -3386,7 +3398,8 @@ function helpPage() {
 
     if (ev.target.id === "logout-btn") {
       window.WhirledApi.logout();
-      chat = []; liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
+      leaveRoomResetChat();
+      liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
       shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
       gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
       decorateMode = false; partyPanelOpen = false; playlistPanelOpen = false; helpOpen = false; legalOpen = false; galleryViewId = null; stuffListMode = false;
@@ -3397,6 +3410,8 @@ function helpPage() {
     var enter = ev.target.closest("[data-enter-room]");
     if (enter && session()) {
       inRoom = true;
+      // Fresh visit: empty room chat (old sessions stay wiped).
+      clearRoomChatDisplay(true);
       paint("rooms");
       loadOccupants();
       return;
@@ -3406,6 +3421,7 @@ function helpPage() {
       decorateMode = false;
       roomPanelOpen = false;
       playlistPanelOpen = false;
+      leaveRoomResetChat();
       paint("rooms");
       return;
     }
@@ -3414,6 +3430,7 @@ function helpPage() {
       inRoom = false;
       decorateMode = false;
       roomPanelOpen = false;
+      leaveRoomResetChat();
       paint("rooms");
       return;
     }
@@ -3433,6 +3450,7 @@ function helpPage() {
       if (gm) gm.hidden = true;
       if (g === "home" || g === "recent") {
         inRoom = true;
+        clearRoomChatDisplay(true);
         paint("rooms");
         loadOccupants();
       } else if (g === "friends") {
@@ -3976,6 +3994,7 @@ function helpPage() {
     if (gHall && session()) {
       inRoom = false;
       roomPanelOpen = false;
+      leaveRoomResetChat();
       pushNotice("blue", "Group hall → Rooms lobby / Studio Loft (shared halls later).");
       paint("rooms");
       return;
@@ -3991,6 +4010,7 @@ function helpPage() {
         roomPanelOpen = false;
         playlistPanelOpen = false;
         decorateMode = false;
+        leaveRoomResetChat();
         paint("rooms");
       } else if (rm === "comment") {
         if (!inRoom) { inRoom = true; }

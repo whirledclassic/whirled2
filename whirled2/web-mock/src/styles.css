@@ -1845,3 +1845,39 @@ body > .party-panel {
   }
 }
 
+
+/* ---- 20260906h: smoother chat + visit-scoped history ---- */
+.chat-overlay {
+  scroll-behavior: smooth;
+}
+.chat-overlay .chat-row,
+.chat-log .chat-row {
+  animation: chat-row-in 0.18s ease-out;
+}
+@keyframes chat-row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 0.92; transform: translateY(0); }
+}
+.chat-overlay .chat-bubble:not(.emote):not(.system) {
+  border-radius: 12px;
+  border: 1px solid rgba(197, 222, 238, 0.85);
+  box-shadow: 0 2px 10px rgba(10, 30, 50, 0.16);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.chat-log {
+  scroll-behavior: smooth;
+}
+.chat-log .chat-bubble:not(.emote):not(.system) {
+  border-radius: 10px;
+  transition: background 0.12s ease;
+}
+.chat-opts-menu {
+  animation: chat-opts-in 0.14s ease-out;
+}
+@keyframes chat-opts-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.bar input {
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}

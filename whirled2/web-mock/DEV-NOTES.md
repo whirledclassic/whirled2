@@ -21,6 +21,12 @@ Plain-English map of the chrome. Read this before changing chat, notices, themes
 4. Mention the token in `STATUS.md` and Help text.
 5. Push to `whirledclassic/whirled2` `main` so GitHub Pages picks it up. Hard-refresh or open the new `?v=` URL on phones.
 
+## Room chat lifetime (visit-scoped)
+
+- Leaving the room, logoff, or a fresh page load calls `clearRoomChatDisplay(true)` and removes `whirled2.chat.loft`.
+- Entering a room starts with an empty chat. Old sessions do not reappear.
+- Chat Options → **Clear all chat** (or `/clear`) wipes the same way.
+
 ## Chat modes (classic)
 
 - Wiki: https://wiki.whirled.club/wiki/Chat
