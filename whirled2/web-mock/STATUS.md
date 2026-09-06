@@ -1,3 +1,10 @@
+## What shipped (?v=20260906ce — DIRECT-first + safe companion upgrade for walk frames)
+
+- **Root cause:** cd Wear skipped companion auto-upgrade → stock SWFs never got `appearanceChanged_v2` walk scenes (chrome bob only). See `ROOT-CAUSE.md`.
+- **Fix:** loft Wear still mounts avatar **DIRECT** first (visible). After paint (~450ms), upgrade to companion `hostLoadBytes` nest. `loftUsesCompanionHost` only on bridge `connected`. Watchdog ~3.5s / error → remount DIRECT. Stand stays on TOP during `companion-pending`.
+- Preserve: cb blank-loft safety, by hostLoadBytes, walk-lerp/spoke/sleep, dual Wear, Whirl
+- Cache: **`?v=20260906ce`**. Push: `/tmp/push-ce.js` (`WHIRLED_DO_PUSH=1`).
+
 ## What shipped (?v=20260906cd (config before ruffle.js inject; callExternalInterface first))
 
 - **Ruffle integration (docs-correct):** `publicPath` for self-host wasm; load via `player.ruffle().load`; IDB avatars prefer `{data: ArrayBuffer}` via `resolveSwfBytes`; EI via `callExternalInterface` first; `RUFFLE-INTEGRATION.md`

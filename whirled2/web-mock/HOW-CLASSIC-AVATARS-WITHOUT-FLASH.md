@@ -1,6 +1,6 @@
 # Classic Whirled avatars — without Adobe Flash
 
-**Cache:** `?v=20260906cd`  
+**Cache:** `?v=20260906ce`  
 **Audience:** beginners + ENGINE DEV. In-site: Help → **Developers** → *Classic Whirled avatars — without Adobe Flash*. Groups → **Dev Updates** thread.
 
 ---
@@ -11,7 +11,7 @@ Classic Flash users want the real `.swf`. Modern Whirled2 users want smooth clic
 
 | Mode | What you get | When to use |
 |------|----------------|-------------|
-| **A — Classic Flash (Ruffle)** | Nested **companion host SWF** + your avatar via `hostLoadUrl`. Floor click → `hostWalk` → in-SWF `appearanceChanged_v2` walk scenes (plus chrome bob). Click avatar → `hostEmote`. Stand thumb backup. Badge: `Appearance: Ruffle (SWF)` | You have a SWF and want classic walk/emote feel. |
+| **A — Classic Flash (Ruffle)** | DIRECT avatar paint first, then nested **companion host** (`hostLoadBytes` / `hostLoadUrl`). Floor click → `hostWalk` → in-SWF `appearanceChanged_v2` walk scenes (plus chrome bob). Click avatar → `hostEmote`. Stand thumb backup. Badge: `Appearance: Ruffle (SWF)` | You have a SWF and want classic walk/emote feel. |
 | **B — Whirled2 Smooth (PNG hybrid)** | Idle+walk PNG/WebP chrome walk like Whirl (+ emotes). **No Ruffle** in loft. Badge: `Walking: PNG hybrid (no Ruffle)` | You have (or can attach) PNG frames. Best feel on mobile / HTTPS Pages. |
 
 Persist choice on the Stuff item as `playbackMode: 'png-hybrid' | 'ruffle'`.  
@@ -82,7 +82,7 @@ From `greyhavens/whirled-api` `AbstractControl.as` / `ActorControl.as` / `Avatar
 1. Stuff → Avatars → **Classic Flash / Whirled avatars** panel.  
 2. Drop your **own** `.swf` (plus optional PNG idle + walk).  
 3. **Analyze** → pick **Wear mode** → **Save** → **Wear & enter loft**.  
-4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906cd`.
+4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906ce`.
 
 ---
 
@@ -121,7 +121,7 @@ Whirl starter, chat visit-since, pale-blue chrome, transparent Ruffle, PE-none l
 Stock Wear from IDB uses companion `hostLoadBytes(base64)` → `Loader.loadBytes` (not nested blob URLs). See `FLASH-SYNC-RESEARCH.md`.
 
 
-## How Ruffle is integrated (?v=20260906cd)
+## How Ruffle is integrated (?v=20260906ce)
 
 See **[RUFFLE-INTEGRATION.md](./RUFFLE-INTEGRATION.md)** for the full research summary (Using-Ruffle wiki + js-docs).
 
