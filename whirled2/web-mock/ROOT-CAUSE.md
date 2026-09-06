@@ -1,34 +1,20 @@
-# ROOT-CAUSE — Classic Flash Wear visibility (?v=20260906cg)
+# ROOT-CAUSE — Classic Flash click-to-walk (?v=20260906ch)
 
-## Short note (cg)
+## Short note (ch)
 
-**ce wiped loft by remounting companion into the same host; cg uses SAFE Option A sibling layer.**
+**Broken hop (cg):** `hostLoadBytes` / bridge `"ready"` did not reliably run on the **host** Ruffle (`tryCallIntoSwf` treated Ruffle EI `undefined` as `{ok:true}`; dual-layer ready-flush could hit DIRECT). Nest never `"connected"` → `loftUsesCompanionHost` stayed false → floor click = chrome bob only.
 
-`?v=20260906ce` scheduled a delayed companion nest after DIRECT paint (`startCompanionWithPayload` ~450ms). That called `mountRuffle(#avatar-ruffle-host, host.swf)` which **clears the container** → blank loft / companion wipe. **`?v=20260906cf`** gated Wear to DIRECT-only (`WEAR_AUTO_COMPANION_UPGRADE=false`).
+**Fix (ch):** COMPANION-ONLY mount of `avatar-host.swf` into `#avatar-ruffle-host` with **stand cover** until bridge `"connected"`. Gate `hostLoadBytes` on `"ready"`. Prefer `loftCompanionPlayer` for host EI. Fail/watchdog → remount DIRECT. See `WALK-E2E-ANALYSIS.md`.
 
-**`?v=20260906cg`** re-enables walk upgrade safely:
+## Historical — cg Option A / ce wipe / cf OFF
 
-1. Wear stays **DIRECT-first** — outer avatar SWF mounts and stays visible in `#avatar-ruffle-host`.
-2. `WEAR_SAFE_COMPANION_UPGRADE = true` mounts companion `avatar-host.swf` in sibling `#avatar-companion-layer` at **opacity 0**.
-3. **Never** destroy DIRECT until bridge `"connected"` (+ nest success). Then promote companion and remove DIRECT players only.
-4. Fail / watchdog ~4s / bridge error → **tear companion layer**, keep DIRECT.
-5. `loftUsesCompanionHost = true` **only** on bridge `"connected"`. Reject nested `blob:`/`data:` — `hostLoadBytes` / http(s) only.
-6. Stand thumb opacity 1 until DIRECT or companion has `.is-playing`. Floor click → chrome bob always; `hostWalk` once connected.
-
-## Historical — click-to-walk no animation (?v=20260906ce / cf)
-
-### Symptom
-
-Worn Classic Flash (Ruffle) avatars **move** on loft floor click (chrome billboard lerp + CSS bob/flip) but the **SWF walk frames** need companion nest (`appearanceChanged_v2`).
-
-### Why
-
-1. Stock Whirled SWFs do not walk via ExternalInterface alone — need nested host + `sharedEvents` (`GREY-HAVENS-PROTOCOL.md`, `RUFFLE-SOURCE-DEEP.md`).
-2. `notifyLoftWalk` → `hostWalk` only when `loftUsesCompanionHost` (set on bridge `"connected"`).
-3. ce tried upgrade by remounting into the same host → wiped paint. cf turned upgrade OFF. cg = Option A dual-layer.
+- **ce:** remount companion into same host → wiped paint (blank loft).
+- **cf:** `WEAR_AUTO_COMPANION_UPGRADE=false` — DIRECT stable, no walk frames.
+- **cg:** Option A sibling layer — paint preserved, but connect hop still failed (EI silent-miss + race).
 
 ### Non-goals
 
 - No AGPL msoy/world-client copy.
 - Ruffle stays in `#avatar-ruffle-host` only (never `#stage-slot`).
 - PNG / Whirled2 Smooth path unchanged.
+- `demo-qa.swf` = paint smoke only; walk QA = `demo-avatar.swf` (AvatarControl mimic).

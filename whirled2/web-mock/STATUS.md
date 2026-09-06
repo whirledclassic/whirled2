@@ -1,3 +1,11 @@
+## What shipped (?v=20260906ch — COMPANION-ONLY walk nest; EI ready-gate)
+
+- **Root cause:** cg companion never `"connected"` — EI silent-miss + ready flush could hit DIRECT; `hostLoadBytes` not gated on ready. See `WALK-E2E-ANALYSIS.md` / `ROOT-CAUSE.md`.
+- **Fix:** `WEAR_COMPANION_ONLY=true` — mount `avatar-host.swf` into `#avatar-ruffle-host` with stand cover (`companion-cover`) until bridge connected; `hostLoadBytes` after ready; `resolveHostEiPlayer`; undefined EI = miss; fail→DIRECT.
+- flashQa wears `demo-avatar.swf` (AvatarControl mimic), not paint-only `demo-qa.swf`.
+- Preserve: dual Wear, Smooth PNG, chrome bob, no `#stage-slot` Ruffle, no AGPL.
+- Cache: **`?v=20260906ch`**. Push: `/tmp/push-ch.js` (`WHIRLED_DO_PUSH=1`).
+
 ## What shipped (?v=20260906cg — SAFE companion Option A; DIRECT preserved)
 
 - **Fix:** Wear stays DIRECT-first. Companion upgrade uses sibling `#avatar-companion-layer` (opacity 0) — never `mountRuffle(host)` into the visible host until bridge `"connected"`. Fail/watchdog ~4s tears companion only; DIRECT stays.

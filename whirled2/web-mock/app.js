@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906cg";
+  var LOGO_V = "20260906ch";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -13164,16 +13164,20 @@
         wearStuffAvatar(seeded);
         return { mode: "seeded", id: seeded.id };
       }
-      var demoUrl = "./assets/ruffle/demo-qa.swf?v=" + LOGO_V;
+      // (?v=20260906ch) Use AvatarControl mimic (demo-avatar.swf) — demo-qa.swf is paint-only.
+      var demoUrl = "./assets/avatars/flash-qa/demo-avatar.swf?v=" + LOGO_V;
       try {
-        if (window.WhirledClassicAvatar && WhirledClassicAvatar.getDemoQaSwfUrl) {
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.getBodyDemoSwfUrl) {
+          demoUrl = WhirledClassicAvatar.getBodyDemoSwfUrl();
+        } else if (window.WhirledClassicAvatar && WhirledClassicAvatar.getDemoQaSwfUrl) {
+          // fallback paint-only if body demo helper missing
           demoUrl = WhirledClassicAvatar.getDemoQaSwfUrl();
         }
       } catch (eD) {}
       var row = {
         stuffId: "flashqa-demo",
         id: "flashqa-demo",
-        name: "Flash QA demo",
+        name: "Flash QA Body demo",
         swfUrl: demoUrl,
         mediaKind: "swf",
         playbackMode: "ruffle",

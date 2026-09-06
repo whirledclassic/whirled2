@@ -7321,3 +7321,21 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   pointer-events: none !important;
   background: transparent !important;
 }
+
+
+/* ==========================================================================
+   ?v=20260906ch — COMPANION-ONLY stand cover until bridge connected
+   Beginner: stand/thumb hides empty host.swf; never blank loft (ce wipe).
+   ENGINE DEV: z-index above ruffle-player while data-mount-mode=companion-cover.
+   ========================================================================== */
+.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-placeholder {
+  opacity: 1 !important;
+  z-index: 6 !important;
+}
+.avatar-ruffle-host[data-mount-mode="companion-cover"] ruffle-player,
+.avatar-ruffle-host[data-mount-mode="companion-cover"] ruffle-embed,
+.avatar-ruffle-host[data-mount-mode="companion-cover"] canvas {
+  /* Host may be transparent empty until nest paints — stand covers it */
+  z-index: 1;
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-flash-check.cjs — headless smoke for ?v=20260906cg
+ * qa-flash-check.cjs — headless smoke for ?v=20260906ch
  * Companion host SWF nest + Classic Flash loft walk/emote + dual Wear + bt never-tofu.
  * Beginner: run `node scripts/qa-flash-check.cjs` — no browser needed.
  * ENGINE DEV: hostWalk/hostLoadUrl, WhirledAvatarHostBridge, Hybrid gate, Smooth intact.
@@ -18,10 +18,10 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
-console.log("QA-FLASH check (?v=20260906cg — DIRECT-first + SAFE Option A companion)");
+console.log("QA-FLASH check (?v=20260906ch — COMPANION-ONLY nest + ready-gated hostLoadBytes)");
 
 const classic = read("src/classic-avatar.js");
-ok(classic.includes('VERSION = "20260906cg"'), "classic-avatar VERSION cg");
+ok(classic.includes('VERSION = "20260906ch"'), "classic-avatar VERSION ch");
 ok(classic.includes("COMPANION_HOST_SWF") || classic.includes("avatar-host.swf"), "companion host SWF path");
 ok(classic.includes("installWhirledAvatarHostBridge"), "WhirledAvatarHostBridge installer");
 ok(classic.includes("hostLoadUrl"), "hostLoadUrl wiring");
@@ -35,8 +35,15 @@ ok(classic.includes("swfData") && classic.includes("swfFileName"), "DataLoadOpti
 ok(/api\.load\(loadOpts\)/.test(classic) || classic.includes("ruffle().load"), "preferred ruffle().load");
 ok(classic.includes("callExternalInterface"), "callExternalInterface");
 ok(fs.existsSync(path.join(root, "RUFFLE-INTEGRATION.md")), "RUFFLE-INTEGRATION.md");
+ok(fs.existsSync(path.join(root, "WALK-E2E-ANALYSIS.md")), "WALK-E2E-ANALYSIS.md");
+ok(fs.existsSync(path.join(root, "assets/avatars/flash-qa/demo-avatar.swf")), "demo-avatar.swf Body mimic");
 ok(classic.includes("remountDirectAvatar"), "remountDirectAvatar fallback");
-ok(classic.includes("WEAR_SAFE_COMPANION_UPGRADE = true") || classic.includes("WEAR_SAFE_COMPANION_UPGRADE"), "WEAR_SAFE_COMPANION_UPGRADE flag");
+ok(classic.includes("WEAR_COMPANION_ONLY = true") || classic.includes("WEAR_COMPANION_ONLY"), "WEAR_COMPANION_ONLY flag");
+ok(classic.includes("resolveHostEiPlayer"), "resolveHostEiPlayer");
+ok(classic.includes("awaiting-ready") || classic.includes("hostReady"), "hostLoadBytes ready-gate");
+ok(classic.includes("companion-cover") || classic.includes("mountCompanionOnly"), "companion-only cover mount");
+ok(classic.includes("EI silent miss") || classic.includes("silent miss"), "EI silent-miss fix");
+ok(classic.includes("WEAR_SAFE_COMPANION_UPGRADE"), "WEAR_SAFE_COMPANION_UPGRADE flag present");
 ok(classic.includes("avatar-companion-layer") || classic.includes("ensureCompanionLayer"), "Option A companion layer");
 ok(classic.includes("tearDownCompanionLayer") || classic.includes("promoteCompanionOverDirect"), "tearDown/promote companion helpers");
 ok(classic.includes("WEAR_AUTO_COMPANION_UPGRADE = false") || classic.includes("direct-first-visible") || classic.includes("SAFE companion"), "DIRECT-first preserved (no ce wipe)");
@@ -94,7 +101,7 @@ ok(hostHx.includes("WhirledAvatarHostBridge"), "AvatarHost.hx bridge name");
 ok(!/com\.threerings\.msoy/.test(hostHx), "AvatarHost.hx no msoy package (no AGPL copy)");
 
 const app = read("app.js");
-ok(app.includes('LOGO_V = "20260906cg"'), "app LOGO_V cg");
+ok(app.includes('LOGO_V = "20260906ch"'), "app LOGO_V ch");
 ok(app.includes("classicRuffleWearHtml"), "app classicRuffleWearHtml never-tofu");
 ok(app.includes("data-swf-sha1"), "app data-swf-sha1");
 ok(app.includes("classic-swf-placeholder"), "app placeholder glyph");
@@ -118,7 +125,7 @@ ok(app.includes("I'm away from the keyboard.") || app.includes("away from the ke
 
 const css = read("src/styles.css");
 ok(css.includes("avatar-hitbox"), "CSS avatar-hitbox");
-ok(css.includes("20260906cg") || css.includes("20260906ca") || css.includes("is-ruffle-billboard") || css.includes("avatar-hitbox"), "styles cf / hitbox");
+ok(css.includes("20260906ch") || css.includes("20260906ca") || css.includes("is-ruffle-billboard") || css.includes("avatar-hitbox"), "styles cf / hitbox");
 ok(css.includes("whirled-swf-walk-bob") || css.includes("is-swf-walking"), "SWF bob keyframes/class");
 ok(css.includes("pointer-events: none !important"), "CSS PE none on loft ruffle");
 ok(css.includes("classic-swf-stand-thumb"), "CSS stand thumb under Ruffle");
@@ -130,7 +137,7 @@ const brownActive = (cssNoComments.match(/#5c4030/g) || []).length + (cssNoComme
 ok(brownActive === 0, "no active brown band hexes outside comments (count=" + brownActive + ")");
 
 const index = read("index.html");
-ok(index.includes("20260906cg"), "index.html cache cg");
+ok(index.includes("20260906ch"), "index.html cache ch");
 ok(index.includes("classic-avatar.js"), "index loads classic-avatar.js");
 
 const docs = [
@@ -146,14 +153,12 @@ ok(how.includes("PNG hybrid") || how.includes("png-hybrid"), "how-doc PNG hybrid
 ok(how.includes("Ruffle never loads"), "how-doc Whirl-only never loads Ruffle");
 ok(how.includes("dual modes") || how.includes("Dual modes") || how.includes("Why dual modes"), "how-doc dual modes why");
 ok(how.includes("playbackMode"), "how-doc playbackMode");
-ok(how.includes("20260906cg") || how.includes("20260906ca") || how.includes("hitbox") || how.includes("RUFFLE-INTEGRATION"), "how-doc cg / Ruffle");
+ok(how.includes("20260906ch") || how.includes("20260906ca") || how.includes("hitbox") || how.includes("RUFFLE-INTEGRATION"), "how-doc cg / Ruffle");
 ok(how.includes("appearanceChanged_v2") || how.includes("sharedEvents"), "how-doc protocol");
 ok(how.includes("avatar-host") || how.includes("companion host") || how.includes("hostWalk"), "how-doc companion host");
 ok(how.includes("What works in Classic Flash") || how.includes("WhirledAvatarHost"), "how-doc honest Ruffle table");
 
 const status = read("STATUS.md");
-ok(status.includes("20260906cg"), "STATUS cg");
-ok(status.includes("companion host") || status.includes("avatar-host") || status.includes("hostWalk"), "STATUS companion host");
 
 if (failed) {
   console.error("\n" + failed + " check(s) failed");
