@@ -653,3 +653,94 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   .info-form { grid-template-columns: 1fr; }
   .info-row { grid-template-columns: 1fr; }
 }
+
+
+/* Stuff / Shop category rail — dark teal, pale-blue selected (no gold/orange) */
+.stuff-layout {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 0;
+  min-height: 360px;
+  border: 1px solid #1a4a5c;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.stuff-rail {
+  background: linear-gradient(180deg, #1a5a6e, #0f3d4a);
+  color: #d0e8f0;
+  padding: 8px 0;
+  border-right: 1px solid #0a2a34;
+}
+.stuff-cats { list-style: none; margin: 0; padding: 0; }
+.stuff-cat {
+  display: block; width: 100%; text-align: left;
+  border: 0; background: transparent; color: #c5e0ea;
+  font: 700 12px/1.2 var(--ui); padding: 9px 12px; cursor: pointer;
+}
+.stuff-cat:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.stuff-cat.is-on {
+  background: linear-gradient(#f7fbfe, #e8f4fb);
+  color: #0b3a5a;
+  box-shadow: inset 3px 0 0 #7ec8f0;
+}
+.stuff-main { padding: 12px 14px 18px; background: var(--paper); }
+.stuff-cat-title { margin: 0 0 10px; color: #1e6fa8; font-size: 16px; }
+
+/* Friends list */
+.friend-list-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px dotted #c5deee;
+}
+.friend-list-photo {
+  width: 40px; height: 40px; object-fit: cover; border-radius: 4px;
+  border: 1px solid #b7d3e8; background: #e8f4fb;
+}
+.friend-list-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.friend-list-row.is-online .friend-list-name { color: #1e6fa8; }
+
+/* Mail */
+.mail-btn {
+  border: 0; background: transparent; color: #1e6fa8; font: 700 11px var(--ui);
+  cursor: pointer; padding: 0;
+}
+.mail-btn u { text-decoration: underline; }
+.mail-layout { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; }
+.mail-row { padding: 10px 0; border-bottom: 1px dotted #c5deee; font-size: 13px; }
+.mail-row.unread { background: #eef7fc; margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 4px; }
+.mail-meta { display: flex; justify-content: space-between; gap: 8px; }
+.mail-meta time { color: var(--muted); font-size: 11px; }
+.mail-subject { font-weight: 700; color: #1e6fa8; margin: 2px 0; }
+.mail-body { color: #16324a; white-space: pre-wrap; }
+.mail-form { display: flex; flex-direction: column; gap: 8px; }
+.mail-form label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 700; color: #4a6a80; }
+.mail-form input, .mail-form select, .mail-form textarea {
+  border: 1px solid #b7d3e8; border-radius: 4px; padding: 8px 10px;
+  font: 13px var(--ui); color: #16324a; font-weight: 400;
+}
+.mail-form button {
+  align-self: start; border: 0; background: #3aa3e0; color: #fff;
+  border-radius: 4px; padding: 8px 14px; font: 700 12px var(--ui); cursor: pointer;
+}
+
+/* Rooms lobby extras */
+.rooms-lobby-links { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.room-rating { color: #1e6fa8; font-size: 12px; font-weight: 700; margin: 2px 0; }
+
+@media (max-width: 900px) {
+  .stuff-layout { grid-template-columns: 1fr; }
+  .stuff-rail {
+    display: flex; overflow-x: auto; padding: 6px;
+    border-right: 0; border-bottom: 1px solid #0a2a34;
+  }
+  .stuff-cats { display: flex; gap: 4px; }
+  .stuff-cat { white-space: nowrap; border-radius: 6px; padding: 8px 10px; }
+  .stuff-cat.is-on { box-shadow: none; }
+  .mail-layout { grid-template-columns: 1fr; }
+  .friend-list-row { grid-template-columns: 40px 1fr; }
+  .friend-list-actions { grid-column: 1 / -1; }
+}

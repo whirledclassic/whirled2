@@ -15,6 +15,23 @@
   var PEOPLE = []; // real occupants only — filled from presence API / session
   var STUFF_KEY = "whirled2.stuff";
   var SHOP_KEY = "whirled2.shop";
+  var MAIL_KEY = "whirled2.mail";
+  var STUFF_CATS = [
+    { id: "avatars", label: "Avatars", empty: "You have no avatars yet." },
+    { id: "furniture", label: "Furniture", empty: "You have no furniture yet." },
+    { id: "backdrops", label: "Backdrops", empty: "You have no backdrops yet." },
+    { id: "toys", label: "Toys", empty: "You have no toys yet." },
+    { id: "pets", label: "Pets", empty: "You have no pets yet." },
+    { id: "games", label: "Games", empty: "You have no games yet." },
+    { id: "launchers", label: "Launchers", empty: "You have no launchers yet." },
+    { id: "levelpacks", label: "Level Packs", empty: "You have no level packs yet." },
+    { id: "itempacks", label: "Item Packs", empty: "You have no item packs yet." },
+    { id: "images", label: "Images", empty: "You have no images yet." },
+    { id: "music", label: "Music", empty: "You have no music yet." },
+    { id: "videos", label: "Videos", empty: "You have no videos yet." }
+  ];
+  var stuffCat = "avatars";
+  var shopCat = "avatars";
   var FEED = [];
   function loadStuff() {
     try { return JSON.parse(localStorage.getItem(STUFF_KEY) || "[]"); } catch (e) { return []; }
@@ -28,7 +45,7 @@
   var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
-  var meSub = "home"; // home | profile | friends
+  var meSub = "home"; // home | profile | friends | mail
   var inRoom = false;
   var viewingId = null; // profile being viewed
   var FRIENDS_KEY = "whirled2.friends";
@@ -55,6 +72,82 @@
     saveFriends(list);
     return list;
   }
+
+  function loadMail() {
+    try { return JSON.parse(localStorage.getItem(MAIL_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveMail(list) {
+    localStorage.setItem(MAIL_KEY, JSON.stringify((list || []).slice(0, 200)));
+  }
+  function unreadCount() {
+    var s = session();
+    if (!s || !s.user) return 0;
+    var me = s.user.id;
+    return loadMail().filter(function (m) { return m.toId === me && !m.read; }).length;
+  }
+  function sendMail(opts) {
+    opts = opts || {};
+    var s = session();
+    if (!s || !s.user) return null;
+    var list = loadMail();
+    var msg = {
+      id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      fromId: opts.fromId || s.user.id,
+      fromName: opts.fromName || s.user.name,
+      toId: String(opts.toId || "").trim(),
+      toName: String(opts.toName || opts.toId || "").trim(),
+      subject: String(opts.subject || "").trim().slice(0, 120) || "(no subject)",
+      body: String(opts.body || "").trim().slice(0, 2000),
+      at: new Date().toISOString(),
+      read: !!opts.read
+    };
+    if (!msg.toId) return null;
+    list.unshift(msg);
+    saveMail(list);
+    return msg;
+  }
+  function markMailRead(id) {
+    var list = loadMail();
+    var changed = false;
+    list.forEach(function (m) {
+      if (m.id === id && !m.read) { m.read = true; changed = true; }
+    });
+    if (changed) saveMail(list);
+  }
+  function removeFriend(id) {
+    saveFriends(loadFriends().filter(function (f) { return f.id !== id; }));
+  }
+  function itemCat(item) {
+    var k = String((item && (item.kind || item.type || item.category)) || "").toLowerCase().replace(/[\s_]+/g, "");
+    if (k.indexOf("avatar") >= 0) return "avatars";
+    if (k.indexOf("furn") >= 0) return "furniture";
+    if (k.indexOf("back") >= 0 || k.indexOf("decor") >= 0) return "backdrops";
+    if (k.indexOf("toy") >= 0) return "toys";
+    if (k.indexOf("pet") >= 0) return "pets";
+    if (k.indexOf("launcher") >= 0) return "launchers";
+    if (k.indexOf("level") >= 0) return "levelpacks";
+    if (k.indexOf("itempack") >= 0 || k === "pack") return "itempacks";
+    if (k.indexOf("game") >= 0) return "games";
+    if (k.indexOf("image") >= 0 || k.indexOf("photo") >= 0) return "images";
+    if (k.indexOf("music") >= 0 || k.indexOf("audio") >= 0) return "music";
+    if (k.indexOf("video") >= 0) return "videos";
+    return k || "furniture";
+  }
+  function catRail(mode, active) {
+    return '<aside class="stuff-rail" aria-label="Categories"><ul class="stuff-cats">'
+      + STUFF_CATS.map(function (c) {
+          return '<li><button type="button" class="stuff-cat' + (c.id === active ? " is-on" : "") + '" data-' + mode + '-cat="' + c.id + '">' + esc(c.label) + '</button></li>';
+        }).join("")
+      + '</ul></aside>';
+  }
+  function filterByCat(items, catId) {
+    return (items || []).filter(function (it) { return itemCat(it) === catId; });
+  }
+  function catMeta(catId) {
+    for (var i = 0; i < STUFF_CATS.length; i++) if (STUFF_CATS[i].id === catId) return STUFF_CATS[i];
+    return STUFF_CATS[0];
+  }
+
   function session() { return window.WhirledApi ? window.WhirledApi.session() : null; }
   function you() {
     var s = session();
@@ -84,23 +177,59 @@
     return '<article class="card"><div class="swatch ' + tone + '"></div><div class="body"><h3>' + esc(item.name) + '</h3><p class="meta">' + esc(item.kind) + " · " + esc(item.creator) + '</p><div class="price">' + (item.owned ? "owned" : item.coins + " coins") + "</div></div></article>";
   }
   function stuffPage() {
-    var items = loadStuff();
-    if (!items.length) {
-      return '<section class="page"><div class="page-head"><div><h1>Stuff</h1><p>What you already own.</p></div></div>'
-        + '<div class="panel"><p class="meta">Your inventory is empty. Items you create or earn will show up here.</p></div></section>';
+    var meta = catMeta(stuffCat);
+    var all = loadStuff();
+    var items = filterByCat(all, stuffCat);
+    var body;
+    if (!all.length) {
+      body = '<div class="panel"><p class="meta">Your inventory is empty. Items you create or earn will show up here.</p></div>';
+    } else if (!items.length) {
+      body = '<div class="panel"><p class="meta">' + esc(meta.empty) + '</p></div>';
+    } else {
+      body = '<div class="grid">' + items.map(card).join("") + '</div>';
     }
-    return catalog("Stuff", "What you already own.", items);
+    return '<section class="page stuff-page"><div class="page-head"><div><h1>Stuff</h1><p>What you already own.</p></div></div>'
+      + '<div class="stuff-layout">' + catRail("stuff", stuffCat)
+      + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + body + '</div></div></section>';
   }
   function shopPage() {
-    var items = loadShop();
-    if (!items.length) {
-      return '<section class="page"><div class="page-head"><div><h1>Shop</h1><p>Coins are labels only. No payments.</p></div></div>'
-        + '<div class="panel"><p class="meta">No listings yet. Catalog packs will show up here when they are published. Coins stay labels only.</p></div></section>';
+    var meta = catMeta(shopCat);
+    var all = loadShop();
+    var items = filterByCat(all, shopCat);
+    var body;
+    if (!all.length) {
+      body = '<div class="panel"><p class="meta">No listings yet. Catalog packs will show up here when they are published. Coins stay labels only.</p></div>';
+    } else if (!items.length) {
+      body = '<div class="panel"><p class="meta">No ' + esc(meta.label.toLowerCase()) + ' listed yet.</p></div>';
+    } else {
+      body = '<div class="grid">' + items.map(card).join("") + '</div>';
     }
-    return catalog("Shop", "Coins are labels only. No payments.", items);
+    return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1><p>Coins are labels only. No payments.</p></div></div>'
+      + '<div class="stuff-layout">' + catRail("shop", shopCat)
+      + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + body + '</div></div></section>';
   }
   function catalog(title, blurb, items) {
     return '<section class="page"><div class="page-head"><div><h1>' + esc(title) + '</h1><p>' + esc(blurb) + '</p></div></div><div class="grid">' + items.map(card).join('') + '</div></section>';
+  }
+  function gamesPage() {
+    return '<section class="page">'
+      + '<div class="featured">Featured Games</div>'
+      + '<p class="lobby-blurb">Parlor games and room launchers live here. Play with friends when games are published — no fake player lists.</p>'
+      + '<div class="section-label">Your games</div>'
+      + '<div class="panel"><p class="meta">No games listed yet. Room toys and launchers arrive with the engine track.</p></div>'
+      + '<div class="section-label">Recently played</div>'
+      + '<div class="panel"><p class="meta">Nothing played yet.</p></div>'
+      + '</section>';
+  }
+  function groupsPage() {
+    return '<section class="page">'
+      + '<div class="featured">Featured Groups</div>'
+      + '<p class="lobby-blurb">Groups are social clubs with discussion boards. Shared whirleds come later.</p>'
+      + '<div class="section-label">Your groups</div>'
+      + '<div class="panel"><p class="meta">You have not joined any groups yet.</p></div>'
+      + '<div class="section-label">Discussion</div>'
+      + '<div class="panel"><p class="meta">No discussions yet. Threads appear when groups go live.</p></div>'
+      + '</section>';
   }
   function roomsLobby() {
     var me = you();
@@ -108,19 +237,26 @@
     return '<section class="page rooms-lobby">'
       + '<div class="featured">Featured Rooms</div>'
       + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Decorate, chat and play — engine mounts inside the loft.</p>'
+      + '<div class="rooms-lobby-links">'
+      +   '<button type="button" class="text-btn" data-enter-room="loft">My Rooms</button>'
+      +   '<span class="sep">·</span>'
+      +   '<span class="meta" title="Tour comes later">Take the Whirled Tour</span>'
+      + '</div>'
       + '<div class="section-label">Active rooms</div>'
       + '<div class="room-tiles">'
       +   '<button type="button" class="room-tile" data-enter-room="loft">'
-      +     '<div class="thumb"></div>'
+      +     '<div class="thumb" aria-hidden="true"></div>'
       +     '<div class="body"><h3>Studio Loft</h3>'
       +       '<p class="meta">owner: ' + esc(me.name) + ' · home</p>'
+      +       '<div class="room-rating" title="Rating">★★★★☆ <span class="meta">new</span></div>'
       +       '<div class="online">' + online + ' online now!</div>'
       +       '<span class="enter-label">Enter</span></div>'
       +   '</button>'
       + '</div>'
-      + '<p class="meta">More public rooms arrive when the shared server lists them.</p>'
+      + '<p class="meta">More public rooms arrive when the shared server lists them. No placeholder rooms.</p>'
       + '</section>';
   }
+
   function roomView() {
     var me = you();
     var here = liveOccupants.slice();
@@ -258,8 +394,11 @@
   }
   function profileActionRow(opts) {
     opts = opts || {};
+    var mailBtn = opts.mail
+      ? '<button type="button" class="profile-action" ' + opts.mail + '><span class="pa-ico">✉</span><span>Send Mail</span></button>'
+      : '<button type="button" class="profile-action" data-me="mail"><span class="pa-ico">✉</span><span>Mail</span></button>';
     return '<div class="profile-action-row">'
-      + '<button type="button" class="profile-action" disabled title="Mail needs shared server"><span class="pa-ico">✉</span><span>Send Mail</span></button>'
+      + mailBtn
       + '<button type="button" class="profile-action" data-tab="rooms"><span class="pa-ico">⌂</span><span>Visit Home</span></button>'
       + '<button type="button" class="profile-action" data-tab="rooms"><span class="pa-ico">▣</span><span>View Rooms</span></button>'
       + '<button type="button" class="profile-action" data-tab="stuff"><span class="pa-ico">▤</span><span>Browse Items</span></button>'
@@ -279,6 +418,8 @@
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "friends" ? " is-on" : "") + '" data-me="friends">Friends</button>'
       + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link' + (meSub === "mail" ? " is-on" : "") + '" data-me="mail">Mail</button>'
+      + '<span class="sep">|</span>'
       + '<button type="button" class="me-link" disabled title="Coming soon">Account</button>'
       + '</nav></div>';
   }
@@ -289,10 +430,18 @@
     var news = wall.map(function (w) {
       return '<div class="news-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
     }).join("") || '<p class="meta">No news yet. Post a status on My Profile.</p>';
-    var friendsOnline = liveOccupants.filter(function (p) { return !p.you; });
+    var friendIds = {};
+    loadFriends().forEach(function (f) { friendIds[f.id] = true; });
+    var friendsOnline = liveOccupants.filter(function (p) {
+      return !p.you && friendIds[p.id];
+    });
     var friendBox = friendsOnline.length
-      ? friendsOnline.map(function (p) { return '<div class="friend-row"><span class="ava">' + esc(p.initials) + '</span><div><b>' + esc(p.name) + '</b><div class="sub">In ' + esc(p.room || ROOM) + '</div></div></div>'; }).join("")
-      : '<p class="meta">No other players online in this room right now.</p>';
+      ? friendsOnline.map(function (p) {
+          return '<div class="friend-row"><span class="ava">' + esc(p.initials || "?") + '</span><div><b>' + esc(p.name) + '</b><div class="sub">In ' + esc(p.room || ROOM) + '</div></div></div>';
+        }).join("")
+      : '<p class="meta">None of your friends are online right now.</p>';
+    var peopleNow = liveOccupants.length || (session() ? 1 : 0);
+    var unread = unreadCount();
     return '<section class="page me-page">' + meSubnav()
       + '<div class="me-grid">'
       +   '<div class="me-main">'
@@ -303,16 +452,18 @@
       +   '</div>'
       +   '<aside class="me-side">'
       +     '<div class="panel links-panel">'
-      +       '<div class="online-count">People in loft: <b>' + (liveOccupants.length || 1) + '</b></div>'
+      +       '<div class="online-count">People Online Now: <b>' + peopleNow + '</b></div>'
       +       '<button type="button" class="text-btn" data-me="profile">My Profile</button>'
       +       '<button type="button" class="text-btn" data-tab="rooms">My Rooms</button>'
       +       '<button type="button" class="text-btn" data-me="profile">My Passport</button>'
+      +       '<button type="button" class="text-btn" data-me="mail">Mail' + (unread ? ' (' + unread + ')' : '') + '</button>'
       +       '<span class="meta">Passport stamps come later with the engine track.</span>'
       +     '</div>'
       +     '<div class="panel"><h2>My Friends Online</h2>' + friendBox + '</div>'
       +   '</aside>'
       + '</div></section>';
   }
+
   function meProfile() {
     var me = you();
     var sid = session().user.id;
@@ -382,19 +533,87 @@
   }
 
   function meFriends() {
-    var list = loadFriends();
-    var rows = list.length ? list.map(function (f) {
-      return '<div class="friend-row">'
-        + '<button type="button" class="text-btn" data-profile="' + esc(f.id) + '"><b>' + esc(f.name) + '</b></button>'
-        + '<span class="meta">friended ' + esc((f.at || "").slice(0, 10)) + '</span>'
-        + '<button type="button" class="action-btn" data-profile="' + esc(f.id) + '">Visit</button>'
-        + '</div>';
-    }).join("") : '<p class="meta">No friends yet. Open someone\'s profile and hit Add Friend.</p>';
+    var list = loadFriends().slice();
+    var onlineIds = {};
+    liveOccupants.forEach(function (p) { if (p && p.id) onlineIds[p.id] = p; });
+    var online = list.filter(function (f) { return onlineIds[f.id]; })
+      .sort(function (a, b) { return String(a.name || "").localeCompare(String(b.name || "")); });
+    var offline = list.filter(function (f) { return !onlineIds[f.id]; })
+      .sort(function (a, b) { return String(b.at || "").localeCompare(String(a.at || "")); });
+    function friendListRow(f, isOn) {
+      var occ = onlineIds[f.id];
+      var st = loadStatus(f.id);
+      var loc = (occ && occ.room) || "offline";
+      var ph = "";
+      try { ph = localStorage.getItem("whirled2.photo." + f.id) || ""; } catch (e) {}
+      var thumb = ph
+        ? '<img class="friend-list-photo" src="' + ph + '" alt="" width="40" height="40" />'
+        : '<span class="ava">' + esc(String(f.name || "?").slice(0, 1).toUpperCase()) + '</span>';
+      return '<div class="friend-list-row' + (isOn ? " is-online" : "") + '">'
+        + thumb
+        + '<div class="friend-list-main">'
+        +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(f.id) + '"><b>' + esc(f.name) + '</b></button>'
+        +   '<div class="sub">' + (st ? esc(st) : '<span class="meta">No status</span>') + '</div>'
+        +   '<div class="meta">' + (isOn ? "Online · " : "") + esc(loc) + '</div>'
+        + '</div>'
+        + '<div class="friend-list-actions">'
+        +   '<button type="button" class="action-btn" data-mail-to="' + esc(f.id) + '" data-mail-name="' + esc(f.name) + '">Send Mail</button>'
+        +   '<button type="button" class="action-btn" data-profile="' + esc(f.id) + '">Visit Home</button>'
+        +   '<button type="button" class="action-btn" data-remove-friend="' + esc(f.id) + '">Remove</button>'
+        + '</div></div>';
+    }
+    var rows = "";
+    if (online.length) {
+      rows += '<div class="section-label">Online</div>' + online.map(function (f) { return friendListRow(f, true); }).join("");
+    }
+    if (offline.length) {
+      rows += '<div class="section-label">Recent</div>' + offline.map(function (f) { return friendListRow(f, false); }).join("");
+    }
+    if (!list.length) {
+      rows = '<p class="meta">No friends yet. Open someone\'s profile and hit Add Friend.</p>';
+    }
     return '<section class="page me-page">' + meSubnav()
       + '<div class="panel"><h2>Friends</h2>'
       + '<p class="meta">Invite Them! Search comes with the shared server. For now, add people you meet in the loft.</p>'
       + rows + '</div></section>';
   }
+  function meMail(composeTo) {
+    var s = session();
+    var me = s.user;
+    var inbox = loadMail().filter(function (m) {
+      return m.toId === me.id || m.fromId === me.id;
+    });
+    var friends = loadFriends();
+    var preTo = (composeTo && composeTo.id) || "";
+    var preName = (composeTo && composeTo.name) || "";
+    var listHtml = inbox.length ? inbox.map(function (m) {
+      var mine = m.fromId === me.id;
+      var unread = !m.read && m.toId === me.id;
+      return '<div class="mail-row' + (unread ? " unread" : "") + '" data-mail-id="' + esc(m.id) + '">'
+        + '<div class="mail-meta"><b>' + esc(mine ? ("To " + m.toName) : ("From " + m.fromName)) + '</b>'
+        + '<time>' + esc((m.at || "").slice(0, 16).replace("T", " ")) + '</time></div>'
+        + '<div class="mail-subject">' + esc(m.subject) + '</div>'
+        + '<div class="mail-body">' + esc(m.body) + '</div></div>';
+    }).join("") : '<p class="meta">No mail yet.</p>';
+    var friendOpts = friends.map(function (f) {
+      return '<option value="' + esc(f.id) + '"' + (f.id === preTo ? " selected" : "") + '>' + esc(f.name) + '</option>';
+    }).join("");
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="mail-layout">'
+      +   '<div class="panel"><h2>Inbox</h2>' + listHtml + '</div>'
+      +   '<div class="panel"><h2>Compose</h2>'
+      +     '<form class="mail-form" id="mail-form">'
+      +       '<label>To friend <select name="friendId"><option value="">— pick a friend —</option>' + friendOpts + '</select></label>'
+      +       '<label>Or free id <input name="toId" maxlength="40" placeholder="player id" value="' + esc(preTo && !friends.some(function(f){return f.id===preTo;}) ? preTo : "") + '" /></label>'
+      +       '<label>Name <input name="toName" maxlength="40" placeholder="display name" value="' + esc(preName) + '" /></label>'
+      +       '<label>Subject <input name="subject" maxlength="120" required /></label>'
+      +       '<label>Message <textarea name="body" rows="5" maxlength="2000" required></textarea></label>'
+      +       '<button type="submit">Send Mail</button>'
+      +       '<p class="meta" id="mail-msg">Stored in this browser (localStorage).</p>'
+      +     '</form></div>'
+      + '</div></section>';
+  }
+
   function otherProfile(id) {
     var occ = liveOccupants.filter(function (p) { return p.id === id; })[0];
     var friend = loadFriends().filter(function (f) { return f.id === id; })[0];
@@ -422,7 +641,8 @@
       +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
       +       profileActionRow({
             poke: isSelf ? '' : ('data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '"'),
-            friend: isSelf ? '' : ('data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '"')
+            friend: isSelf ? '' : ('data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '"'),
+            mail: isSelf ? '' : ('data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name) + '"')
           })
       +     '</div>'
       +     '<aside class="cp-meta-box">'
@@ -443,6 +663,7 @@
     if (viewingId && session() && viewingId !== session().user.id) return otherProfile(viewingId);
     if (viewingId && session() && viewingId === session().user.id) { meSub = "profile"; viewingId = null; }
     if (meSub === "friends") return meFriends();
+    if (meSub === "mail") return meMail(window.__mailCompose || null);
     if (meSub === "profile") return meProfile();
     return meHome();
   }
@@ -479,7 +700,7 @@
           }).join("") + '</nav>'
       +   '<div class="who">'
       +     '<div class="row who-links">'
-      +       '<span class="mail" title="Mail">&#9993; <u>(0)</u></span>'
+      +       '<button type="button" class="mail mail-btn" data-me="mail" title="Mail">&#9993; <u>(' + unreadCount() + ')</u></button>'
       +       '<b>' + esc(me.name) + '</b>'
       +       '<span class="sep">|</span>'
       +       '<span class="text-btn">Help</span>'
@@ -526,9 +747,14 @@
     else if (tab === "me") main.innerHTML = mePage();
     else if (tab === "stuff") main.innerHTML = stuffPage();
     else if (tab === "shop") main.innerHTML = shopPage();
-    else if (tab === "games") main.innerHTML = '<section class="page"><h1>Games</h1><p class="meta">No games listed yet. Room toys arrive with the engine track.</p></section>';
+    else if (tab === "games") main.innerHTML = gamesPage();
+    else if (tab === "groups") main.innerHTML = groupsPage();
     else main.innerHTML = '<section class="page"><h1>Groups</h1><p class="meta">No groups yet. Shared whirleds come later.</p></section>';
     refreshChatLog();
+    try {
+      var badge = document.querySelector(".mail-btn u");
+      if (badge) badge.textContent = "(" + unreadCount() + ")";
+    } catch (e) {}
     exposeBridge();
     if (session()) ensureNoticeBar();
     else {
@@ -697,8 +923,27 @@
     }
     var addF = ev.target.closest("[data-add-friend]");
     if (addF && session()) {
-      addFriend({ id: addF.getAttribute("data-add-friend"), name: addF.getAttribute("data-friend-name") });
-      pushNotice("gray", "You friended " + (addF.getAttribute("data-friend-name") || "someone") + ".");
+      var fid = addF.getAttribute("data-add-friend");
+      var fname = addF.getAttribute("data-friend-name") || fid;
+      addFriend({ id: fid, name: fname });
+      // Local same-browser: leave a short note for both sides.
+      sendMail({
+        toId: session().user.id,
+        toName: session().user.name,
+        fromId: fid,
+        fromName: fname,
+        subject: "New friend",
+        body: fname + " is now on your friends list.",
+        read: false
+      });
+      sendMail({
+        toId: fid,
+        toName: fname,
+        subject: "You have a new friend",
+        body: session().user.name + " added you as a friend.",
+        read: false
+      });
+      pushNotice("gray", "You friended " + fname + ".");
       meSub = "friends";
       viewingId = null;
       paint("me");
@@ -712,10 +957,51 @@
       pushNotice("orange", "You poked " + pname + ".");
       return;
     }
+    var remF = ev.target.closest("[data-remove-friend]");
+    if (remF && session()) {
+      removeFriend(remF.getAttribute("data-remove-friend"));
+      pushNotice("gray", "Friend removed.");
+      meSub = "friends";
+      viewingId = null;
+      paint("me");
+      return;
+    }
+    var mailTo = ev.target.closest("[data-mail-to]");
+    if (mailTo && session()) {
+      window.__mailCompose = {
+        id: mailTo.getAttribute("data-mail-to"),
+        name: mailTo.getAttribute("data-mail-name") || ""
+      };
+      meSub = "mail";
+      viewingId = null;
+      paint("me");
+      return;
+    }
+    var stuffCatBtn = ev.target.closest("[data-stuff-cat]");
+    if (stuffCatBtn && session()) {
+      stuffCat = stuffCatBtn.getAttribute("data-stuff-cat") || "avatars";
+      paint("stuff");
+      return;
+    }
+    var shopCatBtn = ev.target.closest("[data-shop-cat]");
+    if (shopCatBtn && session()) {
+      shopCat = shopCatBtn.getAttribute("data-shop-cat") || "avatars";
+      paint("shop");
+      return;
+    }
+    var mailRow = ev.target.closest("[data-mail-id]");
+    if (mailRow && session() && !ev.target.closest("form")) {
+      markMailRead(mailRow.getAttribute("data-mail-id"));
+      // refresh unread badge in header without full navigation reset
+      var badge = document.querySelector(".mail-btn u");
+      if (badge) badge.textContent = "(" + unreadCount() + ")";
+      mailRow.classList.remove("unread");
+    }
     var meBtn = ev.target.closest("[data-me]");
     if (meBtn && session()) {
       meSub = meBtn.getAttribute("data-me") || "home";
       viewingId = null;
+      if (meSub !== "mail") window.__mailCompose = null;
       paint("me");
       return;
     }
@@ -816,6 +1102,32 @@
       pushNotice("blue", you().name + " commented on a profile.");
       if (targetWall === session().user.id) { viewingId = null; meSub = "profile"; }
       else viewingId = targetWall;
+      paint("me");
+      return;
+    }
+    if (ev.target.id === "mail-form" && session()) {
+      var md = new FormData(ev.target);
+      var friendId = String(md.get("friendId") || "").trim();
+      var toId = friendId || String(md.get("toId") || "").trim();
+      var toName = String(md.get("toName") || "").trim();
+      if (friendId) {
+        var fr = loadFriends().filter(function (f) { return f.id === friendId; })[0];
+        if (fr) toName = fr.name;
+      }
+      if (!toId) {
+        var mm = document.getElementById("mail-msg");
+        if (mm) mm.textContent = "Pick a friend or enter an id.";
+        return;
+      }
+      sendMail({
+        toId: toId,
+        toName: toName || toId,
+        subject: String(md.get("subject") || ""),
+        body: String(md.get("body") || "")
+      });
+      // Same-browser peer copy already stored as one message to toId.
+      window.__mailCompose = null;
+      meSub = "mail";
       paint("me");
       return;
     }
