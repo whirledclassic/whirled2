@@ -1,50 +1,72 @@
 {
   "name": "User Aseprite avatar packs",
   "source": "aseprite",
-  "version": "20260906ai",
+  "version": "20260906ao",
+  "preferred": "cyan-hair",
   "packs": [
     {
+      "slug": "cyan-hair",
+      "name": "Cyan Hair",
+      "path": "assets/avatars/user-pack/cyan-hair/",
+      "thumb": "assets/avatars/user-pack/cyan-hair/thumb.png",
+      "preview": "assets/avatars/user-pack/cyan-hair/preview.png",
+      "pack": "assets/avatars/user-pack/cyan-hair/pack.json",
+      "frameCount": 9,
+      "states": ["idle", "walk", "stand", "pose"],
+      "source": "aseprite-unified",
+      "preferred": true,
+      "ok": true
+    },
+    {
       "slug": "char-a-dress-idle",
-      "name": "Cyan Hair Idle",
+      "name": "Cyan Hair Idle (part)",
       "path": "assets/avatars/user-pack/char-a-dress-idle/",
       "thumb": "assets/avatars/user-pack/char-a-dress-idle/thumb.png",
       "preview": "assets/avatars/user-pack/char-a-dress-idle/preview.png",
       "pack": "assets/avatars/user-pack/char-a-dress-idle/pack.json",
       "frameCount": 2,
       "source": "aseprite",
+      "partOf": "cyan-hair",
+      "role": "idle",
       "ok": true
     },
     {
       "slug": "char-b-dress-walk",
-      "name": "Cyan Hair Walk",
+      "name": "Cyan Hair Walk (part)",
       "path": "assets/avatars/user-pack/char-b-dress-walk/",
       "thumb": "assets/avatars/user-pack/char-b-dress-walk/thumb.png",
       "preview": "assets/avatars/user-pack/char-b-dress-walk/preview.png",
       "pack": "assets/avatars/user-pack/char-b-dress-walk/pack.json",
       "frameCount": 4,
       "source": "aseprite",
+      "partOf": "cyan-hair",
+      "role": "walk",
       "ok": true
     },
     {
       "slug": "char-c-dress-stand",
-      "name": "Cyan Hair Stand",
+      "name": "Cyan Hair Stand (part)",
       "path": "assets/avatars/user-pack/char-c-dress-stand/",
       "thumb": "assets/avatars/user-pack/char-c-dress-stand/thumb.png",
       "preview": "assets/avatars/user-pack/char-c-dress-stand/preview.png",
       "pack": "assets/avatars/user-pack/char-c-dress-stand/pack.json",
       "frameCount": 1,
       "source": "aseprite",
+      "partOf": "cyan-hair",
+      "role": "stand",
       "ok": true
     },
     {
       "slug": "char-d-dress-pose",
-      "name": "Cyan Hair Pose",
+      "name": "Cyan Hair Pose (part)",
       "path": "assets/avatars/user-pack/char-d-dress-pose/",
       "thumb": "assets/avatars/user-pack/char-d-dress-pose/thumb.png",
       "preview": "assets/avatars/user-pack/char-d-dress-pose/preview.png",
       "pack": "assets/avatars/user-pack/char-d-dress-pose/pack.json",
       "frameCount": 2,
       "source": "aseprite",
+      "partOf": "cyan-hair",
+      "role": "pose",
       "ok": true
     }
   ]
