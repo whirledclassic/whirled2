@@ -4,16 +4,14 @@ Date: 2026-09-05
 
 ## What shipped (this pass)
 
-- **Passport** (Me→Passport): classic shell with Mingle / Play / Create / Shop stamp categories (empty “No stamps yet”), disabled Go! (coins labels later), empty Group Medals. Optional `whirled2.passport.{userId}` array.
-- **Account** (Me→Account): permaname, display name, member since, email placeholder (disabled / local-only), password managed by register/login, delete disabled (“not available on Pages”).
-- **Rooms lobby**: Featured / Active / Hot New / My Rooms tiles (Studio Loft enterable); rating stub “Rating: new”; Whirled Tour cycles local Me/Stuff/Rooms/Mail tips.
-- **Toolbar**: Go menu (home, recent loft, friends, games awaiting); Friends → Me→Friends; Room → leave/lobby; volume/party Coming soon.
-- Profile: Send Mail; Browse Items → Stuff; Visit Home → enter loft.
-- Cache bust `?v=20260905p`. Coins labels only. `window.WhirledChrome` unchanged; engine only in `#stage-slot`.
+- **Shop** (wiki Shop): Popular selections empty panels (Avatars, Furniture, Backdrops, Toys, Pets, Games, Images, Music, Videos); category rail + sort stubs (rating / price / popularity / date) over real `whirled2.shop` only — never invent listings; item detail for saved items (favorite → `whirled2.favorites`, stars → `whirled2.shopRatings`, Post Comment local); Buy disabled (“labels only, no payments”); banner: “Coins are labels only — no payments on Whirled Classic yet.”
+- **Groups** (wiki Group): list from `whirled2.groups` (starts empty) + Create group; detail with discussion (`whirled2.groupThreads.{groupId}`), members, Join/Leave, Enter hall → Rooms lobby / loft meta; plain-text threads/replies. Empty: “No groups yet. Create one to start a discussion.”
+- **Room** (wiki Comment): Room toolbar menu — Comment or rate, Decorate Room (coming soon), lock Unlocked/Friends/Locked (`whirled2.roomLock.loft`, visual on Pages); comments `whirled2.roomComments.loft`; rate 1–5 `whirled2.roomRating.loft` shown on lobby tile.
+- Cache bust `?v=20260905q`. Coins labels only. `window.WhirledChrome` unchanged; engine only in `#stage-slot`. No fake NPCs/catalog. No gold/purple.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905p
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905q
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
@@ -21,4 +19,4 @@ Date: 2026-09-05
 - No payments / bars purchase
 - No fake NPCs or invented catalog items
 - No WhirledClassicGame / private engine edits
-- No new framework
+- No TinyMCE / no new framework

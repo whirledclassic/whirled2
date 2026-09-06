@@ -32,7 +32,30 @@
   ];
   var stuffCat = "avatars";
   var shopCat = "avatars";
+  var shopSort = "popularity";
+  var shopItemId = null;
+  var groupViewId = null;
+  var groupThreadId = null;
+  var roomMenuOpen = false;
+  var roomPanelOpen = false;
   var FEED = [];
+  var GROUPS_KEY = "whirled2.groups";
+  var FAV_KEY = "whirled2.favorites";
+  var SHOP_RATINGS_KEY = "whirled2.shopRatings";
+  var ROOM_LOCK_KEY = "whirled2.roomLock.loft";
+  var ROOM_RATING_KEY = "whirled2.roomRating.loft";
+  var ROOM_COMMENTS_KEY = "whirled2.roomComments.loft";
+  var SHOP_POPULAR = [
+    { id: "avatars", label: "Avatars", empty: "No popular avatars yet." },
+    { id: "furniture", label: "Furniture", empty: "No popular furniture yet." },
+    { id: "backdrops", label: "Backdrops", empty: "No popular backdrops yet." },
+    { id: "toys", label: "Toys", empty: "No popular toys yet." },
+    { id: "pets", label: "Pets", empty: "No popular pets yet." },
+    { id: "games", label: "Games", empty: "No popular games yet." },
+    { id: "images", label: "Images", empty: "No popular images yet." },
+    { id: "music", label: "Music", empty: "No popular music yet." },
+    { id: "videos", label: "Videos", empty: "No popular videos yet." }
+  ];
   function loadStuff() {
     try { return JSON.parse(localStorage.getItem(STUFF_KEY) || "[]"); } catch (e) { return []; }
   }
@@ -41,6 +64,99 @@
   }
   function loadShop() {
     try { return JSON.parse(localStorage.getItem(SHOP_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function loadFavorites() {
+    try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveFavorites(ids) {
+    try { localStorage.setItem(FAV_KEY, JSON.stringify((ids || []).slice(0, 200))); } catch (e) {}
+  }
+  function toggleFavorite(itemId) {
+    var ids = loadFavorites();
+    var i = ids.indexOf(itemId);
+    if (i >= 0) ids.splice(i, 1); else ids.unshift(itemId);
+    saveFavorites(ids);
+    return ids.indexOf(itemId) >= 0;
+  }
+  function loadShopRatings() {
+    try { return JSON.parse(localStorage.getItem(SHOP_RATINGS_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function setShopRating(itemId, stars) {
+    var map = loadShopRatings();
+    map[itemId] = Math.max(1, Math.min(5, Number(stars) || 1));
+    try { localStorage.setItem(SHOP_RATINGS_KEY, JSON.stringify(map)); } catch (e) {}
+    return map[itemId];
+  }
+  function shopCommentsKey(itemId) { return "whirled2.shopComments." + itemId; }
+  function loadShopComments(itemId) {
+    try { return JSON.parse(localStorage.getItem(shopCommentsKey(itemId)) || "[]"); } catch (e) { return []; }
+  }
+  function saveShopComments(itemId, rows) {
+    try { localStorage.setItem(shopCommentsKey(itemId), JSON.stringify((rows || []).slice(0, 100))); } catch (e) {}
+  }
+  function loadGroups() {
+    try { return JSON.parse(localStorage.getItem(GROUPS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveGroups(list) {
+    try { localStorage.setItem(GROUPS_KEY, JSON.stringify((list || []).slice(0, 100))); } catch (e) {}
+  }
+  function groupThreadsKey(gid) { return "whirled2.groupThreads." + gid; }
+  function loadGroupThreads(gid) {
+    try { return JSON.parse(localStorage.getItem(groupThreadsKey(gid)) || "[]"); } catch (e) { return []; }
+  }
+  function saveGroupThreads(gid, threads) {
+    try { localStorage.setItem(groupThreadsKey(gid), JSON.stringify((threads || []).slice(0, 100))); } catch (e) {}
+  }
+  function loadRoomLock() {
+    try { return localStorage.getItem(ROOM_LOCK_KEY) || "unlocked"; } catch (e) { return "unlocked"; }
+  }
+  function saveRoomLock(v) {
+    try { localStorage.setItem(ROOM_LOCK_KEY, v); } catch (e) {}
+  }
+  function loadRoomRating() {
+    try {
+      var n = Number(localStorage.getItem(ROOM_RATING_KEY) || 0);
+      return (n >= 1 && n <= 5) ? n : 0;
+    } catch (e) { return 0; }
+  }
+  function saveRoomRating(n) {
+    try { localStorage.setItem(ROOM_RATING_KEY, String(Math.max(1, Math.min(5, Number(n) || 1)))); } catch (e) {}
+  }
+  function loadRoomComments() {
+    try { return JSON.parse(localStorage.getItem(ROOM_COMMENTS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveRoomComments(rows) {
+    try { localStorage.setItem(ROOM_COMMENTS_KEY, JSON.stringify((rows || []).slice(0, 100))); } catch (e) {}
+  }
+  function loftRatingLabel() {
+    var n = loadRoomRating();
+    return n ? ("Rating: " + n + "/5") : "Rating: new";
+  }
+  function sortShopItems(items, sort) {
+    var arr = (items || []).slice();
+    var ratings = loadShopRatings();
+    function priceOf(it) { return Number(it.coins != null ? it.coins : it.price) || 0; }
+    function ratingOf(it) {
+      var id = it.id || it.name;
+      if (ratings[id] != null) return Number(ratings[id]) || 0;
+      return Number(it.rating) || 0;
+    }
+    function dateOf(it) { return Date.parse(it.at || it.created || it.date || 0) || 0; }
+    function popOf(it) { return Number(it.popularity != null ? it.popularity : it.purchases) || 0; }
+    if (sort === "rating") arr.sort(function (a, b) { return ratingOf(b) - ratingOf(a); });
+    else if (sort === "price") arr.sort(function (a, b) { return priceOf(a) - priceOf(b); });
+    else if (sort === "date") arr.sort(function (a, b) { return dateOf(b) - dateOf(a); });
+    else arr.sort(function (a, b) { return popOf(b) - popOf(a); });
+    return arr;
+  }
+  function shopCard(item) {
+    var id = item.id || item.name || "";
+    var tone = item.kind === "backdrop" ? "night" : item.kind === "avatar" ? "fox" : "";
+    var price = item.owned ? "owned" : ((item.coins != null ? item.coins : item.price) || 0) + " coins";
+    return '<button type="button" class="card shop-card" data-shop-item="' + esc(id) + '">'
+      + '<div class="swatch ' + tone + '"></div><div class="body"><h3>' + esc(item.name || "Item") + '</h3>'
+      + '<p class="meta">' + esc(item.kind || itemCat(item)) + " · " + esc(item.creator || "member") + '</p>'
+      + '<div class="price">' + esc(String(price)) + '</div></div></button>';
   }
   var PASSPORT_KEY = "whirled2.passport.";
   var PASSPORT_CATS = [
@@ -212,21 +328,96 @@
       + '<div class="stuff-layout">' + catRail("stuff", stuffCat)
       + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + body + '</div></div></section>';
   }
+  function shopItemDetail(item) {
+    if (!item) {
+      return '<div class="panel"><p class="meta">Item not found in local shop listings.</p>'
+        + '<button type="button" class="text-btn" data-shop-back="1">Back to Shop</button></div>';
+    }
+    var id = item.id || item.name || "";
+    var favs = loadFavorites();
+    var isFav = favs.indexOf(id) >= 0;
+    var ratings = loadShopRatings();
+    var myRate = ratings[id] || 0;
+    var comments = loadShopComments(id);
+    var stars = [1,2,3,4,5].map(function (n) {
+      return '<button type="button" class="star-btn' + (myRate >= n ? " is-on" : "") + '" data-shop-rate="' + n + '" data-shop-rate-item="' + esc(id) + '" aria-label="' + n + ' stars">' + (myRate >= n ? "★" : "☆") + '</button>';
+    }).join("");
+    var commentRows = comments.length
+      ? comments.map(function (c) {
+          return '<div class="wall-row"><b>' + esc(c.who || "member") + '</b> ' + esc(c.text || "") + '<time>' + esc((c.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+        }).join("")
+      : '<p class="meta">No comments yet.</p>';
+    var priceLabel = ((item.coins != null ? item.coins : item.price) || 0) + " coins";
+    return '<div class="shop-detail">'
+      + '<button type="button" class="text-btn" data-shop-back="1">← Back to Shop</button>'
+      + '<div class="panel shop-detail-panel">'
+      +   '<h2>' + esc(item.name || "Item") + '</h2>'
+      +   '<p class="meta">' + esc(item.kind || itemCat(item)) + " · by " + esc(item.creator || "member") + '</p>'
+      +   '<p class="price">' + esc(priceLabel) + ' <span class="meta">(label only)</span></p>'
+      +   '<div class="shop-detail-actions">'
+      +     '<button type="button" class="action-btn fav-btn' + (isFav ? " is-on" : "") + '" data-shop-fav="' + esc(id) + '">' + (isFav ? "♥ Favorited" : "♡ Favorite") + '</button>'
+      +     '<button type="button" class="action-btn" disabled title="labels only, no payments">Buy — labels only, no payments</button>'
+      +   '</div>'
+      +   '<div class="section-label">Rate</div>'
+      +   '<div class="star-row" role="group" aria-label="Rate item">' + stars + '</div>'
+      +   '<div class="section-label">Comments</div>'
+      +   '<div class="comment-list">' + commentRows + '</div>'
+      +   '<form id="shop-comment-form" data-shop-comment-item="' + esc(id) + '">'
+      +     '<textarea name="text" maxlength="400" rows="3" placeholder="Post a comment…" required></textarea>'
+      +     '<button type="submit">Post Comment</button>'
+      +   '</form>'
+      + '</div></div>';
+  }
   function shopPage() {
+    if (shopItemId) {
+      var allForDetail = loadShop();
+      var found = null;
+      for (var i = 0; i < allForDetail.length; i++) {
+        var it = allForDetail[i];
+        if ((it.id || it.name) === shopItemId) { found = it; break; }
+      }
+      return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1>'
+        + '<p class="shop-banner">Coins are labels only — no payments on Whirled Classic yet.</p></div></div>'
+        + shopItemDetail(found) + '</section>';
+    }
     var meta = catMeta(shopCat);
     var all = loadShop();
-    var items = filterByCat(all, shopCat);
+    var items = sortShopItems(filterByCat(all, shopCat), shopSort);
     var body;
     if (!all.length) {
       body = '<div class="panel"><p class="meta">No listings yet. Catalog packs will show up here when they are published. Coins stay labels only.</p></div>';
     } else if (!items.length) {
       body = '<div class="panel"><p class="meta">No ' + esc(meta.label.toLowerCase()) + ' listed yet.</p></div>';
     } else {
-      body = '<div class="grid">' + items.map(card).join("") + '</div>';
+      body = '<div class="grid">' + items.map(shopCard).join("") + '</div>';
     }
-    return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1><p>Coins are labels only. No payments.</p></div></div>'
+    var popular = '<div class="section-label">Popular selections</div><div class="popular-grid">'
+      + SHOP_POPULAR.map(function (c) {
+          var popItems = sortShopItems(filterByCat(all, c.id), "popularity").slice(0, 4);
+          var inner = popItems.length
+            ? '<div class="grid tight">' + popItems.map(shopCard).join("") + '</div>'
+            : '<p class="meta">' + esc(c.empty) + '</p>';
+          return '<div class="popular-panel"><h3>' + esc(c.label) + '</h3>' + inner + '</div>';
+        }).join("")
+      + '</div>';
+    var sorts = [
+      ["rating", "Rating"],
+      ["price", "Price"],
+      ["popularity", "Popularity"],
+      ["date", "Date"]
+    ];
+    var sortUi = '<div class="shop-sort" role="group" aria-label="Sort listings">'
+      + '<span class="meta">Sort:</span> '
+      + sorts.map(function (s) {
+          return '<button type="button" class="sort-btn' + (shopSort === s[0] ? " is-on" : "") + '" data-shop-sort="' + s[0] + '">' + s[1] + '</button>';
+        }).join("")
+      + '</div>';
+    return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1>'
+      + '<p class="shop-banner">Coins are labels only — no payments on Whirled Classic yet.</p>'
+      + '<p class="meta">Browse popular selections, then pick a category. Purchases stay disabled (labels only, no payments).</p></div></div>'
+      + popular
       + '<div class="stuff-layout">' + catRail("shop", shopCat)
-      + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + body + '</div></div></section>';
+      + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + sortUi + body + '</div></div></section>';
   }
   function catalog(title, blurb, items) {
     return '<section class="page"><div class="page-head"><div><h1>' + esc(title) + '</h1><p>' + esc(blurb) + '</p></div></div><div class="grid">' + items.map(card).join('') + '</div></section>';
@@ -241,15 +432,121 @@
       + '<div class="panel"><p class="meta">Nothing played yet.</p></div>'
       + '</section>';
   }
-  function groupsPage() {
-    return '<section class="page">'
-      + '<div class="featured">Featured Groups</div>'
-      + '<p class="lobby-blurb">Groups are social clubs with discussion boards. Shared whirleds come later.</p>'
+  function findGroup(gid) {
+    var list = loadGroups();
+    for (var i = 0; i < list.length; i++) if (list[i].id === gid) return list[i];
+    return null;
+  }
+  function groupThreadView(g, thread) {
+    var replies = (thread.replies || []);
+    var rows = replies.map(function (r) {
+      return '<div class="wall-row"><b>' + esc(r.who || "member") + '</b> ' + esc(r.text || "")
+        + '<time>' + esc((r.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+    }).join("") || '<p class="meta">No replies yet.</p>';
+    return '<section class="page group-page">'
+      + '<button type="button" class="text-btn" data-group-open="' + esc(g.id) + '">← Back to ' + esc(g.name) + '</button>'
+      + '<div class="featured">Discussion</div>'
+      + '<h1>' + esc(thread.title || "Thread") + '</h1>'
+      + '<p class="meta">Started by ' + esc(thread.who || "member") + '</p>'
+      + '<div class="panel"><p>' + esc(thread.body || "") + '</p></div>'
+      + '<div class="section-label">Replies</div>'
+      + '<div class="comment-list">' + rows + '</div>'
+      + '<form id="group-reply-form" data-group-reply="' + esc(g.id) + '" data-thread-id="' + esc(thread.id) + '">'
+      +   '<textarea name="text" maxlength="800" rows="3" placeholder="Reply…" required></textarea>'
+      +   '<button type="submit">Post reply</button>'
+      + '</form></section>';
+  }
+  function groupDetailPage(g) {
+    if (!g) {
+      groupViewId = null; groupThreadId = null;
+      return groupsListPage();
+    }
+    if (groupThreadId) {
+      var threads0 = loadGroupThreads(g.id);
+      var th = null;
+      for (var t = 0; t < threads0.length; t++) if (threads0[t].id === groupThreadId) { th = threads0[t]; break; }
+      if (th) return groupThreadView(g, th);
+      groupThreadId = null;
+    }
+    var s = session();
+    var meId = s && s.user ? s.user.id : "";
+    var members = g.members || [];
+    var isMember = members.some(function (m) { return m.id === meId; });
+    var isCreator = g.creatorId === meId;
+    var memberRows = members.length
+      ? '<ul class="group-members">' + members.map(function (m) {
+          var tag = m.id === g.creatorId ? " (creator)" : "";
+          return '<li><button type="button" class="text-btn" data-profile="' + esc(m.id) + '">' + esc(m.name || m.id) + esc(tag) + '</button></li>';
+        }).join("") + '</ul>'
+      : '<p class="meta">No members yet.</p>';
+    var threads = loadGroupThreads(g.id);
+    var threadList = threads.length
+      ? '<ul class="thread-list">' + threads.map(function (th) {
+          return '<li><button type="button" class="text-btn" data-group-thread="' + esc(th.id) + '" data-group-open="' + esc(g.id) + '"><b>' + esc(th.title) + '</b></button>'
+            + ' <span class="meta">by ' + esc(th.who || "") + ' · ' + ((th.replies && th.replies.length) || 0) + ' replies</span></li>';
+        }).join("") + '</ul>'
+      : '<p class="meta">No threads yet. Start a discussion below.</p>';
+    var joinBtn = isMember
+      ? '<button type="button" class="action-btn" data-group-leave="' + esc(g.id) + '"' + (isCreator ? ' disabled title="Creators stay in their group"' : '') + '>Leave</button>'
+      : '<button type="button" class="action-btn" data-group-join="' + esc(g.id) + '">Join this group</button>';
+    return '<section class="page group-page">'
+      + '<button type="button" class="text-btn" data-group-back="1">← All groups</button>'
+      + '<div class="featured">Group</div>'
+      + '<h1>' + esc(g.name) + '</h1>'
+      + '<p class="lobby-blurb">' + esc(g.blurb || "") + '</p>'
+      + '<div class="group-actions">'
+      +   joinBtn
+      +   '<button type="button" class="action-btn" data-group-hall="' + esc(g.id) + '">Enter hall</button>'
+      + '</div>'
+      + '<p class="meta">Enter hall opens the Rooms lobby / Studio Loft (shared whirled halls come later).</p>'
+      + '<div class="section-label">Members</div>'
+      + '<div class="panel">' + memberRows + '</div>'
+      + '<div class="section-label">Discussion forum</div>'
+      + '<div class="panel">' + threadList
+      +   '<form id="group-thread-form" data-group-new-thread="' + esc(g.id) + '">'
+      +     '<input name="title" maxlength="120" placeholder="Thread title" required />'
+      +     '<textarea name="body" maxlength="800" rows="3" placeholder="Say something…" required></textarea>'
+      +     '<button type="submit">Start thread</button>'
+      +   '</form></div></section>';
+  }
+  function groupsListPage() {
+    var list = loadGroups();
+    var s = session();
+    var meId = s && s.user ? s.user.id : "";
+    var rows;
+    if (!list.length) {
+      rows = '<div class="panel"><p class="meta">No groups yet. Create one to start a discussion.</p></div>';
+    } else {
+      rows = '<div class="group-list">' + list.map(function (g) {
+        var n = (g.members && g.members.length) || 0;
+        var joined = (g.members || []).some(function (m) { return m.id === meId; });
+        return '<button type="button" class="group-row" data-group-open="' + esc(g.id) + '">'
+          + '<h3>' + esc(g.name) + '</h3>'
+          + '<p class="meta">' + esc(g.blurb || "") + '</p>'
+          + '<span class="meta">' + n + ' member' + (n === 1 ? "" : "s") + (joined ? " · joined" : "") + '</span>'
+          + '</button>';
+      }).join("") + '</div>';
+    }
+    return '<section class="page group-page">'
+      + '<div class="featured">Groups</div>'
+      + '<p class="lobby-blurb">Groups are social clubs with a discussion forum and a hall. Shared whirleds come later.</p>'
       + '<div class="section-label">Your groups</div>'
-      + '<div class="panel"><p class="meta">You have not joined any groups yet.</p></div>'
-      + '<div class="section-label">Discussion</div>'
-      + '<div class="panel"><p class="meta">No discussions yet. Threads appear when groups go live.</p></div>'
-      + '</section>';
+      + rows
+      + '<div class="section-label">Create group</div>'
+      + '<div class="panel"><form id="create-group-form">'
+      +   '<input name="name" maxlength="60" placeholder="Group name" required />'
+      +   '<textarea name="blurb" maxlength="240" rows="2" placeholder="Short blurb" required></textarea>'
+      +   '<button type="submit">Create group</button>'
+      + '</form></div></section>';
+  }
+  function groupsPage() {
+    if (groupViewId) {
+      var g = findGroup(groupViewId);
+      if (g) return groupDetailPage(g);
+      groupViewId = null;
+      groupThreadId = null;
+    }
+    return groupsListPage();
   }
   function roomTile(opts) {
     opts = opts || {};
@@ -275,7 +572,7 @@
       name: ROOM,
       meta: "owner: " + me.name + " · home",
       online: online || (session() ? 1 : 0),
-      rating: "Rating: new",
+      rating: loftRatingLabel(),
       enterable: true
     });
     var activeBody = online > 0
@@ -284,7 +581,7 @@
           name: ROOM,
           meta: "owner: " + me.name + " · active",
           online: online,
-          rating: "Rating: new",
+          rating: loftRatingLabel(),
           enterable: true
         })
       : '<div class="panel"><p class="meta">No active rooms right now. Enter Studio Loft to open one.</p></div>';
@@ -305,7 +602,7 @@
       + '<div class="panel"><p class="meta">No hot new rooms yet. Public listings arrive when the shared server publishes them.</p></div>'
       + '<div class="section-label">My Rooms</div>'
       + '<div class="room-tiles">'
-      +   roomTile({ id: "loft", name: ROOM, meta: "owner: " + me.name + " · home", online: online || (session() ? 1 : 0), rating: "Rating: new", enterable: true })
+      +   roomTile({ id: "loft", name: ROOM, meta: "owner: " + me.name + " · home", online: online || (session() ? 1 : 0), rating: loftRatingLabel(), enterable: true })
       + '</div>'
       + '<div class="rooms-lobby-links">'
       +   '<button type="button" class="action-btn" data-tour-tip="1">Take the Whirled Tour</button>'
@@ -317,6 +614,37 @@
       + '</section>';
   }
 
+  function roomCommentsPanel() {
+    var comments = loadRoomComments();
+    var rating = loadRoomRating();
+    var stars = [1,2,3,4,5].map(function (n) {
+      return '<button type="button" class="star-btn' + (rating >= n ? " is-on" : "") + '" data-room-rate="' + n + '" aria-label="Rate room ' + n + '">' + (rating >= n ? "★" : "☆") + '</button>';
+    }).join("");
+    var rows = comments.length
+      ? comments.map(function (c) {
+          return '<div class="wall-row"><b>' + esc(c.who || "member") + '</b> ' + esc(c.text || "")
+            + '<time>' + esc((c.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+        }).join("")
+      : '<p class="meta">No room comments yet.</p>';
+    return '<div class="room-side-panel" id="room-comment-panel">'
+      + '<div class="panel">'
+      +   '<div class="room-side-head"><h2>Comment or rate</h2>'
+      +     '<button type="button" class="text-btn" data-room-panel-close="1">Close</button></div>'
+      +   '<div class="section-label">Rate this room</div>'
+      +   '<div class="star-row">' + stars + ' <span class="meta">' + esc(loftRatingLabel()) + '</span></div>'
+      +   '<div class="section-label">Comments</div>'
+      +   '<div class="comment-list">' + rows + '</div>'
+      +   '<form id="room-comment-form">'
+      +     '<textarea name="text" maxlength="400" rows="3" placeholder="Leave a room comment…" required></textarea>'
+      +     '<button type="submit">Post comment</button>'
+      +   '</form>'
+      + '</div></div>';
+  }
+  function lockLabel(v) {
+    if (v === "friends") return "Friends";
+    if (v === "locked") return "Locked";
+    return "Unlocked";
+  }
   function roomView() {
     var me = you();
     var here = liveOccupants.slice();
@@ -329,6 +657,7 @@
       });
     }
     var empty = here.length === 0;
+    var lock = loadRoomLock();
     return ''
       + '<div class="workspace">'
       +   '<aside class="rail"><h2>In this room</h2>'
@@ -336,9 +665,13 @@
       +     '<button type="button" class="text-btn leave-room" data-leave-room="1">Back to Rooms</button>'
       +   '</aside>'
       +   '<section class="stage-wrap">'
-      +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span><span class="room-owner">owner: ' + esc(me.name) + '</span></div>'
+      +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span>'
+      +       '<span class="room-owner">owner: ' + esc(me.name) + '</span>'
+      +       '<span class="room-lock-badge" title="Visual only on Pages" data-lock="' + esc(lock) + '">🔒 ' + esc(lockLabel(lock)) + '</span>'
+      +       '<span class="room-rating-badge">' + esc(loftRatingLabel()) + '</span></div>'
       +     '<div id="stage-slot"><div class="stage-copy"><strong>Engine mounts here</strong>Click-to-walk belongs to the room engine.<code>#stage-slot</code></div></div>'
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
+      +     (roomPanelOpen ? roomCommentsPanel() : '')
       +   '</section>'
       + '</div>';
   }
@@ -859,7 +1192,18 @@
       +     '</span>'
       +     '<button type="button" class="tb tb-friends" title="Friends" aria-label="Friends" data-tb="friends"></button>'
       +     '<button type="button" class="tb tb-party" title="Coming soon" disabled aria-label="Parties"></button>'
-      +     '<button type="button" class="tb tb-room" title="' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '" aria-label="Room" data-tb="room"></button>'
+      +     '<span class="tb-go-wrap tb-room-wrap">'
+      +       '<button type="button" class="tb tb-room" title="Room" aria-label="Room" data-tb="room"></button>'
+      +       '<div class="go-menu room-menu" id="room-menu" hidden>'
+      +         '<button type="button" data-room-menu="comment">Comment or rate</button>'
+      +         '<button type="button" data-room-menu="decorate" disabled>Decorate Room (coming soon)</button>'
+      +         '<div class="room-lock-row meta">Lock (visual only)</div>'
+      +         '<button type="button" data-room-lock="unlocked"' + (loadRoomLock() === "unlocked" ? ' class="is-on"' : '') + '>🔓 Unlocked</button>'
+      +         '<button type="button" data-room-lock="friends"' + (loadRoomLock() === "friends" ? ' class="is-on"' : '') + '>👥 Friends</button>'
+      +         '<button type="button" data-room-lock="locked"' + (loadRoomLock() === "locked" ? ' class="is-on"' : '') + '>🔒 Locked</button>'
+      +         '<button type="button" data-room-menu="lobby">' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '</button>'
+      +       '</div>'
+      +     '</span>'
       +   '</span>'
       + '</form>';
   }
@@ -897,6 +1241,12 @@
       var nb = document.getElementById("notice-bar");
       if (nb) nb.remove();
     }
+    try {
+      var lk = loadRoomLock();
+      document.querySelectorAll("[data-room-lock]").forEach(function (btn) {
+        btn.classList.toggle("is-on", btn.getAttribute("data-room-lock") === lk);
+      });
+    } catch (e) {}
   }
   function refreshChatLog() {
     var log = document.getElementById("chat-log");
@@ -1035,10 +1385,13 @@
     if (!ev.target.closest(".tb-go-wrap")) {
       var gm0 = document.getElementById("go-menu");
       if (gm0 && !gm0.hidden) { gm0.hidden = true; goMenuOpen = false; }
+      var rm0 = document.getElementById("room-menu");
+      if (rm0 && !rm0.hidden) { rm0.hidden = true; roomMenuOpen = false; }
     }
     if (ev.target.id === "logout-btn") {
       window.WhirledApi.logout();
       chat = []; liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
+      shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
       paint("");
       return;
     }
@@ -1091,6 +1444,8 @@
     if (tb && session()) {
       var kind = tb.getAttribute("data-tb");
       if (kind === "go") {
+        var rmenuGo = document.getElementById("room-menu");
+        if (rmenuGo) { rmenuGo.hidden = true; roomMenuOpen = false; }
         var menu = document.getElementById("go-menu");
         if (menu) {
           menu.hidden = !menu.hidden;
@@ -1105,12 +1460,12 @@
         return;
       }
       if (kind === "room") {
-        if (inRoom) {
-          inRoom = false;
-          paint("rooms");
-        } else {
-          inRoom = false;
-          paint("rooms");
+        var rmenu = document.getElementById("room-menu");
+        var gmenu = document.getElementById("go-menu");
+        if (gmenu) { gmenu.hidden = true; goMenuOpen = false; }
+        if (rmenu) {
+          rmenu.hidden = !rmenu.hidden;
+          roomMenuOpen = !rmenu.hidden;
         }
         return;
       }
@@ -1178,7 +1533,138 @@
       paint("me");
       return;
     }
-    var stuffCatBtn = ev.target.closest("[data-stuff-cat]");
+    var shopSortBtn = ev.target.closest("[data-shop-sort]");
+    if (shopSortBtn && session()) {
+      shopSort = shopSortBtn.getAttribute("data-shop-sort") || "popularity";
+      paint("shop");
+      return;
+    }
+    var shopItemBtn = ev.target.closest("[data-shop-item]");
+    if (shopItemBtn && session()) {
+      shopItemId = shopItemBtn.getAttribute("data-shop-item") || null;
+      paint("shop");
+      return;
+    }
+    if (ev.target.closest("[data-shop-back]") && session()) {
+      shopItemId = null;
+      paint("shop");
+      return;
+    }
+    var shopFav = ev.target.closest("[data-shop-fav]");
+    if (shopFav && session()) {
+      toggleFavorite(shopFav.getAttribute("data-shop-fav"));
+      paint("shop");
+      return;
+    }
+    var shopRate = ev.target.closest("[data-shop-rate]");
+    if (shopRate && session()) {
+      setShopRating(shopRate.getAttribute("data-shop-rate-item"), shopRate.getAttribute("data-shop-rate"));
+      paint("shop");
+      return;
+    }
+    var gOpen = ev.target.closest("[data-group-open]");
+    if (gOpen && session() && !ev.target.closest("[data-group-thread]")) {
+      groupViewId = gOpen.getAttribute("data-group-open");
+      groupThreadId = null;
+      paint("groups");
+      return;
+    }
+    var gThread = ev.target.closest("[data-group-thread]");
+    if (gThread && session()) {
+      groupViewId = gThread.getAttribute("data-group-open") || groupViewId;
+      groupThreadId = gThread.getAttribute("data-group-thread");
+      paint("groups");
+      return;
+    }
+    if (ev.target.closest("[data-group-back]") && session()) {
+      groupViewId = null;
+      groupThreadId = null;
+      paint("groups");
+      return;
+    }
+    var gJoin = ev.target.closest("[data-group-join]");
+    if (gJoin && session()) {
+      var gjid = gJoin.getAttribute("data-group-join");
+      var glist = loadGroups();
+      for (var gi = 0; gi < glist.length; gi++) {
+        if (glist[gi].id === gjid) {
+          glist[gi].members = glist[gi].members || [];
+          if (!glist[gi].members.some(function (m) { return m.id === session().user.id; })) {
+            glist[gi].members.push({ id: session().user.id, name: session().user.name });
+          }
+          break;
+        }
+      }
+      saveGroups(glist);
+      paint("groups");
+      return;
+    }
+    var gLeave = ev.target.closest("[data-group-leave]");
+    if (gLeave && session()) {
+      var glid = gLeave.getAttribute("data-group-leave");
+      var gl = loadGroups();
+      for (var gj = 0; gj < gl.length; gj++) {
+        if (gl[gj].id === glid && gl[gj].creatorId !== session().user.id) {
+          gl[gj].members = (gl[gj].members || []).filter(function (m) { return m.id !== session().user.id; });
+        }
+      }
+      saveGroups(gl);
+      paint("groups");
+      return;
+    }
+    var gHall = ev.target.closest("[data-group-hall]");
+    if (gHall && session()) {
+      inRoom = false;
+      roomPanelOpen = false;
+      pushNotice("blue", "Group hall → Rooms lobby / Studio Loft (shared halls later).");
+      paint("rooms");
+      return;
+    }
+    var roomMenuBtn = ev.target.closest("[data-room-menu]");
+    if (roomMenuBtn && session()) {
+      var rm = roomMenuBtn.getAttribute("data-room-menu");
+      var rmenuEl = document.getElementById("room-menu");
+      if (rmenuEl) rmenuEl.hidden = true;
+      roomMenuOpen = false;
+      if (rm === "lobby") {
+        inRoom = false;
+        roomPanelOpen = false;
+        paint("rooms");
+      } else if (rm === "comment") {
+        if (!inRoom) { inRoom = true; }
+        roomPanelOpen = true;
+        paint("rooms");
+        loadOccupants();
+      } else if (rm === "decorate") {
+        pushNotice("gray", "Decorate Room — coming soon.");
+      }
+      return;
+    }
+    var roomLockBtn = ev.target.closest("[data-room-lock]");
+    if (roomLockBtn && session()) {
+      saveRoomLock(roomLockBtn.getAttribute("data-room-lock") || "unlocked");
+      var rmenu2 = document.getElementById("room-menu");
+      if (rmenu2) rmenu2.hidden = true;
+      roomMenuOpen = false;
+      if (inRoom) paint("rooms");
+      else {
+        // refresh menu state in shell
+        paint(document.querySelector(".tab.is-on") ? document.querySelector(".tab.is-on").getAttribute("data-tab") : "rooms");
+      }
+      return;
+    }
+    if (ev.target.closest("[data-room-panel-close]") && session()) {
+      roomPanelOpen = false;
+      paint("rooms");
+      return;
+    }
+    var roomRateBtn = ev.target.closest("[data-room-rate]");
+    if (roomRateBtn && session()) {
+      saveRoomRating(roomRateBtn.getAttribute("data-room-rate"));
+      paint("rooms");
+      return;
+    }
+        var stuffCatBtn = ev.target.closest("[data-stuff-cat]");
     if (stuffCatBtn && session()) {
       stuffCat = stuffCatBtn.getAttribute("data-stuff-cat") || "avatars";
       paint("stuff");
@@ -1220,6 +1706,8 @@
       var t = tab.getAttribute("data-tab");
       if (t === "me") { meSub = "home"; viewingId = null; }
       if (t === "rooms") { /* keep inRoom */ }
+      if (t === "shop") { shopItemId = null; }
+      if (t === "groups") { groupViewId = null; groupThreadId = null; }
       paint(t);
     }
   });
@@ -1330,6 +1818,93 @@
       window.__mailCompose = null;
       meSub = "mail";
       paint("me");
+      return;
+    }
+    if (ev.target.id === "shop-comment-form" && session()) {
+      var sc = new FormData(ev.target);
+      var sct = String(sc.get("text") || "").trim().slice(0, 400);
+      var scid = ev.target.getAttribute("data-shop-comment-item") || shopItemId;
+      if (!sct || !scid) return;
+      var scl = loadShopComments(scid);
+      scl.unshift({ who: you().name, text: sct, at: new Date().toISOString() });
+      saveShopComments(scid, scl);
+      paint("shop");
+      return;
+    }
+    if (ev.target.id === "create-group-form" && session()) {
+      var cg = new FormData(ev.target);
+      var gname = String(cg.get("name") || "").trim().slice(0, 60);
+      var gblurb = String(cg.get("blurb") || "").trim().slice(0, 240);
+      if (!gname) return;
+      var groups = loadGroups();
+      var gid = "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      groups.unshift({
+        id: gid,
+        name: gname,
+        blurb: gblurb,
+        creatorId: session().user.id,
+        creatorName: session().user.name,
+        members: [{ id: session().user.id, name: session().user.name }],
+        at: new Date().toISOString()
+      });
+      saveGroups(groups);
+      groupViewId = gid;
+      groupThreadId = null;
+      paint("groups");
+      return;
+    }
+    if (ev.target.id === "group-thread-form" && session()) {
+      var gt = new FormData(ev.target);
+      var gtid = ev.target.getAttribute("data-group-new-thread");
+      var title = String(gt.get("title") || "").trim().slice(0, 120);
+      var body = String(gt.get("body") || "").trim().slice(0, 800);
+      if (!gtid || !title || !body) return;
+      var threads = loadGroupThreads(gtid);
+      var tid = "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      threads.unshift({
+        id: tid,
+        title: title,
+        body: body,
+        who: you().name,
+        whoId: session().user.id,
+        at: new Date().toISOString(),
+        replies: []
+      });
+      saveGroupThreads(gtid, threads);
+      groupViewId = gtid;
+      groupThreadId = tid;
+      paint("groups");
+      return;
+    }
+    if (ev.target.id === "group-reply-form" && session()) {
+      var gr = new FormData(ev.target);
+      var grText = String(gr.get("text") || "").trim().slice(0, 800);
+      var grGid = ev.target.getAttribute("data-group-reply");
+      var grTid = ev.target.getAttribute("data-thread-id");
+      if (!grText || !grGid || !grTid) return;
+      var grThreads = loadGroupThreads(grGid);
+      for (var rti = 0; rti < grThreads.length; rti++) {
+        if (grThreads[rti].id === grTid) {
+          grThreads[rti].replies = grThreads[rti].replies || [];
+          grThreads[rti].replies.push({ who: you().name, whoId: session().user.id, text: grText, at: new Date().toISOString() });
+          break;
+        }
+      }
+      saveGroupThreads(grGid, grThreads);
+      groupViewId = grGid;
+      groupThreadId = grTid;
+      paint("groups");
+      return;
+    }
+    if (ev.target.id === "room-comment-form" && session()) {
+      var rc = new FormData(ev.target);
+      var rct = String(rc.get("text") || "").trim().slice(0, 400);
+      if (!rct) return;
+      var rcl = loadRoomComments();
+      rcl.unshift({ who: you().name, text: rct, at: new Date().toISOString() });
+      saveRoomComments(rcl);
+      roomPanelOpen = true;
+      paint("rooms");
       return;
     }
     var input = ev.target.querySelector("input");
