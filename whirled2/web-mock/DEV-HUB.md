@@ -1,6 +1,6 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906be` (`LOGO_V`)  
+**Cache:** `?v=20260906bf` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
@@ -67,7 +67,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906be` — club Music/Chat/Parties/Stuff polish on bd Flash loft chrome (see `STATUS.md`).
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bf` — Go/Friends/clickable glow/presence feed polish on be Music chrome (see `STATUS.md`). Flash dual-mode owned separately — do not regress `classic-avatar.js`.
 
 ---
 
@@ -88,7 +88,7 @@ Cross-link: [Using old Whirled / Flash avatars](#using-old-whirled--flash-avatar
 | `index.html` | cache-bust + `WHIRLED_API` on Pages |
 
 
-### Classic Flash module (?v=20260906be)
+### Classic Flash module (?v=20260906be+; dual-mode agent)
 
 `src/classic-avatar.js` — one-flow upload → Analyze → Wear & enter loft; Hybrid PNG walk; optional Ruffle; SWF bob walk. See HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md / QA-FLASH.md.
 

@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906be";
+  var LOGO_V = "20260906bf";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1447,7 +1447,7 @@
   var decorateSnapGrid = (function () {
     try { return localStorage.getItem("whirled2.decorateSnap") !== "0"; } catch (e) { return true; }
   })();
-  var doorGlowPreview = false; // Room menu → View clickable furniture (green door glow)
+  var doorGlowPreview = false; // Room menu → View clickable furniture (wiki glow: green/orange/white)
   var makeDoorPanelOpen = false; // side panel when linking/creating via a door chip
   var partyPanelOpen = false;
   var hangoutInvitePending = null; // [{id,name},…] after leave loft (real occupants only)
@@ -4759,7 +4759,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd + be) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be + bf) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4774,7 +4774,10 @@
       "• be: club Music playlist fidelity (bold current, added-by hover, ▶/✕, Bleep, info/report stubs),",
       "  chat Speak/Think/Shout mode colors + classic too-chatty copy, Parties board polish,",
       "  Stuff themed-Whirled Coming Soon filter note, share/embed beginner blurbs",
-      "• classic-avatar.js preserved (bb Flash walk/tofu)",
+      "• bf: Go menu wiki sections, Friends toolbar online+offline, clickable furniture glow legend",
+      "  (green door / orange link stub / white game stub), friend login-logout corner feed,",
+      "  room comment + volume beginner blurbs, chat name-menu Complain clarity",
+      "• classic-avatar.js preserved (bb Flash walk/tofu) — dual-mode agent owns Flash path",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -4906,16 +4909,16 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Music playlist (wiki): bold Now playing, hover who-added, owner ▶/✕, Bleep (you-only), info + Report stubs\n"
-        + "• Chat: Speak/Think/Shout mode tint on button+input; classic “too chatty” wait copy\n"
-        + "• Parties board: clearer create/join/invite + follow-host Coming Soon note\n"
-        + "• Stuff: themed Whirled inventory filter Coming Soon banner (no fake catalog)\n"
-        + "• Share/embed: beginner blurb + LOGO_V cache on room links\n"
-        + "Preserve: bd PNG/Ruffle badges + decorate/friends/lock/groups/passport, bc Groups/Admin/broadcast,\n"
-        + "  bb Flash hybrid, Whirl starter, chat visit-since, pale-blue, earn-only.",
+        + "• Go menu: wiki sections (home / recent / friends online / games)\n"
+        + "• Friends toolbar: online first + offline grey rows; Whisper / Profile / Join\n"
+        + "• Clickable furniture glow legend: green doors, orange link stub, white game stub\n"
+        + "• Friend login/logout corner feed (wiki Chat grey notices)\n"
+        + "• Room comment + volume beginner blurbs; Complain… Coming Soon clarity\n"
+        + "Preserve: be Music/Parties/Stuff, bd PNG/Ruffle + decorate/social, bc Groups/Admin/broadcast,\n"
+        + "  bb Flash hybrid (no classic-avatar.js edits this letter), Whirl, visit-since, pale-blue, earn-only.",
       at: new Date().toISOString()
     });
-    // How this works (?v=20260906be): refresh sticky OP body so Developers see the full overnight list.
+    // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
     updates.body = overnightChangelogBody();
     saveGroupThreads(g.id, threads);
   }
@@ -5408,6 +5411,35 @@
   var RECENT_ROOMS_KEY = "whirled2.recentRooms";
   var AWAY_KEY = "whirled2.away.";
   var PRESENCE_SNAP_KEY = "whirled2.presenceSnap";
+  // How this works (?v=20260906bf): wiki Chat login/logout grey list — local corner feed (occupant-diff heuristic).
+  // Beginner: friends entering/leaving the loft show in the lower-right presence corner; tap ▾ to expand.
+  var PRESENCE_FEED_KEY = "whirled2.presenceFeed";
+  var presenceFeedOpen = false;
+  function loadPresenceFeed() {
+    try { return JSON.parse(localStorage.getItem(PRESENCE_FEED_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function savePresenceFeed(rows) {
+    try { localStorage.setItem(PRESENCE_FEED_KEY, JSON.stringify((rows || []).slice(0, 40))); } catch (e) {}
+  }
+  function appendPresenceFeed(kind, text) {
+    var rows = loadPresenceFeed();
+    rows.unshift({ kind: kind || "gray", text: String(text || "").slice(0, 160), at: new Date().toISOString() });
+    savePresenceFeed(rows);
+  }
+  function presenceFeedHtml() {
+    // How this works (?v=20260906bf): compact corner log matching wiki Chat login/logout messages.
+    var rows = loadPresenceFeed().slice(0, presenceFeedOpen ? 12 : 3);
+    if (!rows.length) return "";
+    var body = rows.map(function (r) {
+      var cls = "presence-feed-row kind-" + esc(r.kind || "gray");
+      return '<div class="' + cls + '">' + esc(r.text || "") + '</div>';
+    }).join("");
+    return '<div class="presence-feed" id="presence-feed" aria-label="Friend login messages">'
+      + '<button type="button" class="presence-feed-toggle text-btn" data-presence-feed-toggle="1" title="Friend login / logout log">'
+      + (presenceFeedOpen ? "▾ Presence" : "▴ Presence") + '</button>'
+      + '<div class="presence-feed-body"' + (presenceFeedOpen ? "" : ' data-collapsed="1"') + '>' + body + '</div>'
+      + '</div>';
+  }
   var friendsPopupOpen = false;
   var cmdPaletteOpen = false;
   var shortcutsOpen = false;
@@ -5772,24 +5804,43 @@
     return html;
   }
   function friendsToolbarPopupHtml() {
+    // How this works (?v=20260906bf): wiki Room Friends list — Whisper / Profile / Join; online first.
+    // Beginner: green dot ≈ in this loft (local heuristic). Offline friends stay listed grey for Profile/Whisper.
     if (!friendsPopupOpen) return "";
     var list = loadFriends();
     var onlineIds = {};
     liveOccupants.forEach(function (p) { if (p && p.id) onlineIds[p.id] = p; });
     var online = list.filter(function (f) { return onlineIds[f.id]; });
-    var rows = online.length
-      ? online.map(function (f) {
-          return '<div class="friends-pop-row">'
-            + '<span class="dot on pulse"></span> <b>' + esc(f.name) + '</b>'
-            + '<div class="friends-pop-actions">'
-            +   '<button type="button" data-whisper="' + esc(f.id) + '" data-whisper-name="' + esc(f.name) + '">Whisper</button>'
-            +   '<button type="button" data-profile="' + esc(f.id) + '">Profile</button>'
-            +   '<button type="button" data-join-them="1" data-join-name="' + esc(f.name) + '">Join them</button>'
-            + '</div></div>';
-        }).join("")
-      : '<p class="meta">No friends online right now.</p>';
+    var offline = list.filter(function (f) { return !onlineIds[f.id]; });
+    function friendPopRow(f, isOn) {
+      return '<div class="friends-pop-row' + (isOn ? " is-online" : " is-offline") + '">'
+        + (isOn ? '<span class="dot on pulse"></span> ' : '<span class="dot"></span> ')
+        + '<b>' + esc(f.name) + '</b>'
+        + (isOn ? ' <span class="meta">here</span>' : ' <span class="meta">offline</span>')
+        + '<div class="friends-pop-actions">'
+        +   '<button type="button" data-whisper="' + esc(f.id) + '" data-whisper-name="' + esc(f.name) + '">Whisper</button>'
+        +   '<button type="button" data-profile="' + esc(f.id) + '">Profile</button>'
+        +   (isOn
+          ? '<button type="button" data-join-them="1" data-join-name="' + esc(f.name) + '">Join them</button>'
+          : '')
+        + '</div></div>';
+    }
+    var rows = "";
+    if (online.length) {
+      rows += '<div class="friends-pop-section meta">Online in this loft</div>'
+        + online.map(function (f) { return friendPopRow(f, true); }).join("");
+    } else {
+      rows += '<p class="meta">No friends online in this loft right now.</p>';
+    }
+    if (offline.length) {
+      rows += '<div class="friends-pop-section meta">Friends (offline / elsewhere)</div>'
+        + offline.slice(0, 10).map(function (f) { return friendPopRow(f, false); }).join("");
+      if (offline.length > 10) rows += '<p class="meta">+' + (offline.length - 10) + ' more — Me → Friends</p>';
+    }
+    if (!list.length) rows = '<p class="meta">Add friends from Me → Friends or invite someone in the loft.</p>';
     return '<div class="friends-toolbar-pop" id="friends-toolbar-pop">'
-      + '<div class="friends-pop-head">Friends online <button type="button" class="text-btn" data-friends-pop-close="1">×</button></div>'
+      + '<div class="friends-pop-head">Friends <button type="button" class="text-btn" data-friends-pop-close="1">×</button></div>'
+      + '<p class="meta friends-pop-hint">Wiki Friends list — chat, go to their room, or view profile. Presence is local until server presence ships.</p>'
       + rows + '</div>';
   }
 
@@ -5844,12 +5895,14 @@
     saveRecentRooms(list);
   }
   function goMenuHtml() {
+    // How this works (?v=20260906bf): wiki Room → Go… — home, recent rooms, friends, games.
+    // Beginner: Go opens this pale-blue menu. Recent rooms are from this browser only.
     var recent = loadRecentRooms();
     var recentBtns = recent.length
       ? recent.map(function (r) {
-          return '<button type="button" data-go-room="' + esc(r.id) + '">Recent — ' + esc(r.name || r.id) + '</button>';
+          return '<button type="button" data-go-room="' + esc(r.id) + '">' + esc(r.name || r.id) + '</button>';
         }).join("")
-      : '<button type="button" data-go="recent">Recent — Studio Loft</button>';
+      : '<button type="button" data-go="recent">Studio Loft</button>';
     var onlineFriends = loadFriends().filter(function (f) {
       return liveOccupants.some(function (p) { return p && p.id === f.id; });
     });
@@ -5857,13 +5910,17 @@
       ? onlineFriends.map(function (f) {
           return '<button type="button" data-go-friend="' + esc(f.id) + '" data-go-friend-name="' + esc(f.name) + '">👥 ' + esc(f.name) + '</button>';
         }).join("")
-      : '<button type="button" data-go="friends">Friends online</button>';
+      : '<button type="button" data-go="friends">No friends here — open Friends list</button>';
     return '<div class="go-menu" id="go-menu" hidden>'
-      + '<button type="button" data-go="home">Go home</button>'
+      + '<div class="go-menu-section meta">Go…</div>'
+      + '<button type="button" data-go="home">🏠 Go home</button>'
+      + '<div class="go-menu-section meta">Recently visited</div>'
       + recentBtns
-      + '<div class="room-lock-row meta">Friends online</div>'
+      + '<div class="go-menu-section meta">Friends online</div>'
       + friendBtns
+      + '<div class="go-menu-section meta">Games</div>'
       + '<button type="button" data-go="games">View games awaiting players</button>'
+      + '<p class="meta go-menu-hint">Classic Go menu — visit friends, recents, home, or parlor lobby.</p>'
       + '</div>';
   }
   function recentRoomsStripHtml() {
@@ -6080,10 +6137,18 @@
     var prev = {};
     try { prev = JSON.parse(localStorage.getItem(PRESENCE_SNAP_KEY) || "{}"); } catch (e) { prev = {}; }
     Object.keys(nowOnline).forEach(function (id) {
-      if (!prev[id]) pushNotice("green", nowOnline[id] + " logged on.", { transient: true });
+      if (!prev[id]) {
+        var onMsg = nowOnline[id] + " logged on.";
+        pushNotice("green", onMsg, { transient: true });
+        try { appendPresenceFeed("green", onMsg); } catch (eF1) {}
+      }
     });
     Object.keys(prev).forEach(function (id) {
-      if (!nowOnline[id] && friendIds[id]) pushNotice("gray", (friendIds[id] || prev[id]) + " logged off.", { transient: true });
+      if (!nowOnline[id] && friendIds[id]) {
+        var offMsg = (friendIds[id] || prev[id]) + " logged off.";
+        pushNotice("gray", offMsg, { transient: true });
+        try { appendPresenceFeed("gray", offMsg); } catch (eF2) {}
+      }
     });
     try { localStorage.setItem(PRESENCE_SNAP_KEY, JSON.stringify(nowOnline)); } catch (e2) {}
   }
@@ -6414,6 +6479,7 @@
       +   '<svg class="tb-ico tb-ico-caret" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 4l4 4 4-4z"/></svg>'
       + '</button>'
       + '<div class="tb-vol-pop" id="tb-vol-pop"' + (volPopoverOpen ? "" : " hidden") + ' role="dialog" aria-label="Room volume">'
+      +   '<p class="meta tb-vol-hint">Wiki Room volume — slider for room music loudness on this browser.</p>'
       +   '<label class="tb-vol-label">Volume <span id="tb-vol-pct">' + pct + '%</span>'
       +     '<input type="range" id="tb-vol-slider" min="0" max="100" step="1" value="' + pct + '" data-vol-slider="1" />'
       +   '</label>'
@@ -7992,10 +8058,23 @@
     if (isDoor) title = (it.doorLabel || title) + " — door → " + (it.doorLabel || it.doorTo);
     if (scale !== 1) title += " · " + Math.round(scale * 100) + "%";
     if (flipX) title += " · flipped";
+    // How this works (?v=20260906bf): wiki clickable furniture glow —
+    // green = door travel; orange = in-Whirled link stub; white = game stub (Coming Soon).
+    var glowKind = "";
+    if (doorGlowPreview) {
+      if (isDoor) glowKind = "door";
+      else {
+        var kGlow = String((it && (it.kind || it.type || it.category)) || "").toLowerCase();
+        if (kGlow.indexOf("game") >= 0 || kGlow.indexOf("launcher") >= 0) glowKind = "game";
+        else if (kGlow.indexOf("toy") >= 0 || kGlow.indexOf("pet") >= 0 || it.linkTo) glowKind = "link";
+      }
+    }
     var cls = "decorate-chip"
       + (isDoor ? " is-door" : "")
       + (selected ? " is-selected" : "")
-      + (doorGlowPreview && isDoor ? " is-glowing" : "")
+      + (glowKind === "door" ? " is-glowing" : "")
+      + (glowKind === "link" ? " is-glow-orange" : "")
+      + (glowKind === "game" ? " is-glow-white" : "")
       + (flipX ? " is-flipped" : "");
     var sx = (flipX ? -scale : scale);
     var style = "left:" + x + "px;top:" + y + "px;z-index:" + (10 + Math.round(z))
@@ -8453,10 +8532,13 @@
             + '<time>' + esc((c.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
         }).join("")
       : '<p class="meta">No room comments yet.</p>';
+    // How this works (?v=20260906bf): wiki Room → Comment or rate — local stars + wall comments.
+    // Beginner: rate 1–5 stars and leave a short note; saved on this browser only.
     return '<div class="room-side-panel" id="room-comment-panel">'
       + '<div class="panel">'
       +   '<div class="room-side-head"><h2>Comment or rate</h2>'
       +     '<button type="button" class="text-btn" data-room-panel-close="1">Close</button></div>'
+      +   '<p class="meta">Wiki Room comments — stars + notes for this loft (local). Not a fake public review catalog.</p>'
       +   '<div class="section-label">Rate this room</div>'
       +   '<div class="star-row">' + stars + ' <span class="meta">' + esc(loftRatingLabel()) + '</span></div>'
       +   '<div class="section-label">Comments</div>'
@@ -8546,6 +8628,7 @@
       +     (makeDoorPanelOpen ? makeDoorPanelHtml() : '')
       +     (partyPanelOpen ? partyPanel() : '')
       +     '<button type="button" class="music-gesture-fab" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
+      +     presenceFeedHtml()
       +   '</section>'
       + '</div>'
       + friendInvitePopup()
@@ -10773,13 +10856,13 @@
       +     '<span class="tb-go-wrap tb-room-wrap">'
       +       '<button type="button" class="tb tb-room" title="Room" aria-label="Room" data-tb="room">' + tbIconSvg("room") + '</button>'
       +       '<div class="go-menu room-menu" id="room-menu" hidden>'
-      +         '<button type="button" data-room-menu="comment">Comment or rate</button>'
-      +         '<button type="button" data-room-menu="decorate">Decorate Room</button>'
+      +         '<button type="button" data-room-menu="comment">💬 Comment or rate</button>'
+      +         '<button type="button" data-room-menu="decorate">✏️ Decorate Room</button>'
       +         '<button type="button" data-room-menu="view-items">View items</button>'
       +         '<button type="button" data-room-menu="clickable">View clickable furniture</button>'
-      +         '<button type="button" data-room-menu="snapshot">Take snapshot (stub)</button>'
-      +         '<button type="button" data-room-menu="zoom">Zoom (stub)</button>'
-      +         '<button type="button" data-room-menu="playlist">View room music</button>'
+      +         '<button type="button" data-room-menu="snapshot">📸 Take snapshot <span class="soon-tag">Coming Soon</span></button>'
+      +         '<button type="button" data-room-menu="zoom">🔍 Zoom room view <span class="soon-tag">Coming Soon</span></button>'
+      +         '<button type="button" data-room-menu="playlist">♪ View room music</button>'
       +         '<button type="button" data-room-share="1">Share / embed room…</button>'
       +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
       // How this works (20260906af): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
@@ -11650,15 +11733,22 @@
     menu.style.top = Math.max(8, Math.min(window.innerHeight - 160, y)) + "px";
     var sid = session() && session().user ? session().user.id : "";
     var self = sid && id && sid === id;
-    // How this works (?v=20260906at): classic name-click — Profile / Add friend / Whisper / Block / Complain stub.
-    // Beginner: underlined chat names open this pale-blue menu (wiki Chat).
+    // How this works (?v=20260906bf): classic name-click — Profile / Add friend / Whisper / Block / Complain.
+    // Beginner: underlined chat names open this pale-blue menu (wiki Chat). Complain is Coming Soon (no fake mod queue).
+    var partyInviteBtn = "";
+    try {
+      if (!self && currentParty()) {
+        partyInviteBtn = '<button type="button" data-party-invite="' + esc(id) + '" data-party-invite-name="' + esc(name || id) + '">Invite to party</button>';
+      }
+    } catch (ePi) {}
     menu.innerHTML = ''
       + '<div class="chat-name-menu-head">' + esc(name || "Player") + '</div>'
       + '<button type="button" data-profile="' + esc(id) + '">Profile</button>'
-      + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Add friend</button>')
+      + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Invite to be your friend</button>')
       + (self ? '' : '<button type="button" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(name) + '">Whisper</button>')
+      + partyInviteBtn
       + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>')
-      + (self ? '' : '<button type="button" data-complain-stub="' + esc(id) + '" title="Report — Coming Soon">Complain…</button>');
+      + (self ? '' : '<button type="button" data-complain-stub="' + esc(id) + '" title="Report player — Coming Soon">Complain… <span class="soon-tag">Coming Soon</span></button>');
     document.body.appendChild(menu);
   }
   async function loadHistory(opts) {
@@ -12384,6 +12474,12 @@
         var cin = document.getElementById("chat-input");
         if (cin) cin.focus();
       }
+      return;
+    }
+    if (ev.target.closest("[data-presence-feed-toggle]") && session()) {
+      // How this works (?v=20260906bf): expand/collapse wiki-style friend login/logout corner log.
+      presenceFeedOpen = !presenceFeedOpen;
+      if (inRoom) paint("rooms");
       return;
     }
     if (ev.target.closest("[data-friends-pop-close]")) {
@@ -13356,7 +13452,7 @@
     if (ev.target.closest("[data-complain-stub]") && session()) {
       var cnmC = document.getElementById("chat-name-menu");
       if (cnmC) cnmC.remove();
-      pushNotice("orange", "Complain / report — Coming Soon (moderation).", { transient: true });
+      pushNotice("orange", "Complain / report — Coming Soon. No fake moderation queue yet.", { transient: true });
       return;
     }
     if (ev.target.closest("[data-open-avatar-emotes]") && session()) {
@@ -13944,17 +14040,18 @@
         paint("rooms");
         loadOccupants();
       } else if (rm === "clickable") {
-        // How this works (?v=20260906at): wiki green glow for doors (clickable furniture).
+        // How this works (?v=20260906bf): wiki clickable furniture — green door / orange link / white game.
+        // Beginner: hold this preview to see glowing chips; green doors travel now; orange/white are Coming Soon.
         doorGlowPreview = !doorGlowPreview;
         pushNotice("green", doorGlowPreview
-          ? "Door glow on — green chips are doors. Tap a door to travel."
-          : "Door glow off.", { transient: true });
+          ? "Clickable glow on — green=door travel · orange=link stub · white=game stub."
+          : "Clickable furniture glow off.", { transient: true });
         if (inRoom) paint("rooms");
         try { bindDoorLayerClicks(); } catch (eGl) {}
       } else if (rm === "snapshot") {
-        pushNotice("orange", "Snapshot stub — engine will capture the stage later.");
+        pushNotice("orange", "Take snapshot — Coming Soon (engine stage capture).", { transient: true });
       } else if (rm === "zoom") {
-        pushNotice("orange", "Zoom stub — engine camera later.");
+        pushNotice("orange", "Zoom room view — Coming Soon (scrollable rooms / engine camera).", { transient: true });
       }
       return;
     }

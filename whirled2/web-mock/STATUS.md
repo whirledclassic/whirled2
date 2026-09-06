@@ -1,3 +1,14 @@
+## What shipped (?v=20260906bf)
+
+- **Go menu wiki sections:** Go home / Recently visited / Friends online / Games awaiting players + beginner hint
+- **Friends toolbar:** online-in-loft first + offline grey rows; Whisper / Profile / Join them
+- **Clickable furniture glow legend:** green=door travel, orange=link stub, white=game stub (wiki Room)
+- **Friend login/logout corner feed:** local presence feed (wiki Chat grey notices); expand/collapse
+- **UI polish:** room menu Snapshot/Zoom Coming Soon tags; volume + room-comment beginner blurbs; chat name-menu Invite/Complain clarity
+- **Updates thread:** Whirled2 Developers ship note + refreshed sticky OP (`overnightChangelogBody`)
+- Built on **be** Music/Parties — **did not regress** bd badges, bc Groups/Admin/broadcast, bb Flash (`classic-avatar.js` untouched this letter), Whirl, visit-since
+- Cache: **`?v=20260906bf`**. Push: `/tmp/push-bf.js` (dry-run default).
+
 ## What shipped (?v=20260906be)
 
 - **Club Music playlist fidelity (wiki Music):** bold Now playing, hover “Added by…”, owner ▶ (blue) / ✕ (red), **Bleep** (session mute/skip for you), info toast + Report stub

@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906be` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bf` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,22 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906be`)
+## Closed this pass (`?v=20260906bf`)
+
+| Item | Notes |
+|------|--------|
+| Go menu sections | Wiki Go… — home / recent / friends online / games + beginner hint |
+| Friends toolbar | Online-in-loft first + offline grey; Whisper / Profile / Join |
+| Clickable furniture glow | Green door / orange link stub / white game stub legend |
+| Login/logout corner feed | Friend presence feed (local heuristic) expand/collapse |
+| Room comment + volume blurbs | Beginner wiki copy; Snapshot/Zoom Coming Soon tags |
+| Chat name-menu | Invite to be your friend wording; Complain Coming Soon; party invite |
+| Updates thread | bf ship note + overnightChangelogBody refresh |
+| Preserve | be Music/Parties; bd badges; bc Groups/Admin/broadcast; bb Flash (classic-avatar.js untouched); Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906be`)
 
 | Item | Notes |
 |------|--------|
@@ -133,9 +148,11 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Enter loft / multi-room catalog | **Working** (local rooms map) | — |
 | `#stage-slot` + loft placeholder | **Working** | Pixi engine ownership **P0** |
 | Decorate / place | Partial | Full furniture edit **P1** |
-| Lock / share / embed | Working chrome + pale-blue dock (ax) | Lock triad + preview blurbs `bd`; wiki-complete share/embed **P2** |
+| Lock / share / embed | Working chrome + pale-blue dock (ax) | Lock triad + preview blurbs `bd`; share/embed `be`; clickable glow legend `bf` |
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
 | Parties | **Improved** (`be`) board create/join/invite; follow-host Coming Soon | Follow-host presence **P1** |
+| Go / Friends toolbar | **Improved** (`bf`) Go sections + Friends online/offline popup | Server presence **P1** |
+| Clickable furniture glow | **Improved** (`bf`) green/orange/white legend | Orange/white actions still stubs **P2** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |
 
 ### Door (wiki)
@@ -152,7 +169,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 |------|----------|-----|
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
 | Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors | Group tabs still limited |
-| Name click menu | **Working** (`at`) Profile / friend / whisper / block / complain stub | Complain moderation **P2** |
+| Name click menu | **Improved** (`bf`) Invite wording + party invite + Complain Coming Soon tag | Complain moderation **P2** |
 | Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`) | — |
 | “Too chatty” throttle | **Working** (`be`) classic wiki copy | — |
 
@@ -177,6 +194,8 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Friendly People auto-accept | **Working** | — |
 | Friends toolbar popup / online approx | **Working** (occupant-diff heuristic) | Server presence **P1** |
 | Rich search (email/permaname) | **Improved** (`ba`) name/id/email/realName/interests (local) | Server directory **P1** |
+| Friends toolbar popup | **Improved** (`bf`) online + offline rows; Join/Whisper/Profile | Server presence **P1** |
+| Login/logout notices | **Improved** (`bf`) corner presence feed (local) | Full grey corner log fidelity **P2** |
 | Room avatar “Invite to be your friend” | Partial vs wiki | **P2** |
 
 ### Music (wiki)

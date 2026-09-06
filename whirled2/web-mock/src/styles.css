@@ -6740,3 +6740,58 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   background: #f7fbfd;
 }
 .stuff-cat-how { margin: 0 0 10px; font-size: 12px; }
+
+
+/* ---- ?v=20260906bf club UI polish ---- */
+.go-menu-section {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #5a7a92; padding: 8px 10px 2px;
+}
+.go-menu-hint, .friends-pop-hint, .tb-vol-hint {
+  margin: 6px 10px 8px; font-size: 11px; line-height: 1.35; opacity: 0.9;
+}
+.friends-pop-section {
+  font-size: 11px; font-weight: 700; margin: 8px 0 4px; color: #5a7a92;
+}
+.friends-pop-row.is-offline { opacity: 0.72; }
+.friends-pop-row.is-offline .dot {
+  background: #c5d4e0; box-shadow: none;
+}
+.decorate-chip.is-glow-orange {
+  box-shadow: 0 0 12px 4px rgba(240, 140, 40, 0.75), 0 2px 6px rgba(22, 50, 74, 0.25);
+  outline: 2px solid #e07a2a;
+}
+.decorate-chip.is-glow-white {
+  box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.85), 0 2px 6px rgba(22, 50, 74, 0.25);
+  outline: 2px solid #f4f8fb;
+}
+.presence-feed {
+  position: absolute; right: 10px; bottom: 56px; z-index: 40;
+  width: min(240px, 46vw); max-height: 42vh; overflow: hidden;
+  background: rgba(255, 254, 248, 0.94); border: 1px solid #9ec4de;
+  border-radius: 8px; box-shadow: 0 6px 18px rgba(22, 50, 74, 0.16);
+  font-size: 12px; pointer-events: auto;
+}
+.presence-feed-toggle {
+  display: block; width: 100%; text-align: left; padding: 4px 8px;
+  font-weight: 700; color: #1e6fa8; border-bottom: 1px solid #c5deee;
+}
+.presence-feed-body { padding: 4px 8px 8px; max-height: 180px; overflow: auto; }
+.presence-feed-body[data-collapsed="1"] { max-height: 72px; }
+.presence-feed-row { padding: 3px 0; color: #5a6a7a; border-bottom: 1px dotted #d7e6f0; }
+.presence-feed-row.kind-green { color: #2a7a3a; }
+.presence-feed-row.kind-gray { color: #6a7a88; }
+.chat-tab.has-unread {
+  animation: tab-glimmer 1s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(255, 210, 80, 0.7);
+}
+@keyframes tab-glimmer {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
+.room-menu .soon-tag, .chat-name-menu .soon-tag {
+  font-size: 9px; margin-left: 4px; vertical-align: middle;
+}
+@media (max-width: 700px) {
+  .presence-feed { bottom: 64px; right: 6px; width: min(200px, 55vw); }
+}
