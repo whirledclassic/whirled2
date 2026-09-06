@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906bt
+ * Cache: ?v=20260906bu
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906bt";
+  var VERSION = "20260906bu";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -27,7 +27,9 @@
   var THUMB_MAX_BYTES = 1 * 1024 * 1024;
   var RUFFLE_CDN = "https://unpkg.com/@ruffle-rs/ruffle";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906bt): dual Wear modes + loft EI shim — png-hybrid | ruffle (playbackMode).
+  // How this works (?v=20260906bu): nested companion host SWF (sharedEvents) + dual Wear modes.
+  // CRITICAL bu: loft mounts assets/avatar-host/avatar-host.swf then hostLoadUrl(avatar);
+  // hostWalk/hostEmote drive in-SWF appearanceChanged_v2 — chrome puppet still runs as backup.
   // CRITICAL bt: preserve stand thumb across mountRuffle; never silent-fail sha1-only Wear; SWF beats tofu.
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
   // SWF-only: transparent Ruffle + synthesized bob/flip walk — never broken tofu.
@@ -777,6 +779,15 @@
    * sharedEvents. This JS shim still helps hand-patched / community EI avatars and
    * logs what the SWF tries (?avatarDebug=1). Chrome always moves the billboard + bob.
    */
+
+  // (?v=20260906bu): companion host nest — outer Ruffle = host.swf; avatar via hostLoadUrl.
+  // Beginner: this is how stock Whirled SWFs get walk scenes without Adobe Flash Player.
+  // ENGINE DEV: host listens controlConnect on contentLoaderInfo.sharedEvents (see tools/avatar-host/).
+  var COMPANION_HOST_SWF = "./assets/avatar-host/avatar-host.swf?v=" + VERSION;
+  var loftUsesCompanionHost = false;
+  var loftPendingAvatarUrl = null;
+  var loftHostBridgeLog = [];
+
   var loftActivePlayer = null;
   var loftHostState = {
     connected: false,
@@ -786,7 +797,12 @@
     sleeping: false,
     location: [0.5, 0, 0.5],
     lastEiCalls: [],
-    lastJsToSwf: []
+    lastJsToSwf: [],
+    lastBridge: null,
+    actions: [],
+    states: [],
+    hostMode: false,
+    avatarUrl: null
   };
 
   function avatarDebugEnabled() {
@@ -846,6 +862,122 @@
     }
     rememberEi("js→swf", "MISS:" + tried.join("|"), args);
     return { ok: false, reason: "no-callback", tried: tried };
+  }
+
+
+  /**
+   * Resolve companion host SWF URL relative to this page (Pages subpath safe).
+   * Beginner: host.swf is OUR tiny Flash wrapper — not your avatar. It loads your SWF inside.
+   */
+  function getCompanionHostSwfUrl() {
+    try {
+      return new URL(COMPANION_HOST_SWF, global.location.href).href;
+    } catch (e) {
+      return COMPANION_HOST_SWF;
+    }
+  }
+
+  /**
+   * JS←host bridge. Host SWF calls ExternalInterface.call("WhirledAvatarHostBridge", kind, payload).
+   * Kinds: ready|loading|loaded|connected|actions|states|error|setLocation|action|appearance_error
+   */
+  function installWhirledAvatarHostBridge() {
+    global.WhirledAvatarHostBridge = function (kind, payload) {
+      kind = String(kind || "");
+      var row = { at: Date.now(), kind: kind, payload: payload };
+      loftHostState.lastBridge = row;
+      loftHostBridgeLog.unshift(row);
+      if (loftHostBridgeLog.length > 40) loftHostBridgeLog.length = 40;
+      rememberEi("swf→js", "bridge:" + kind, [payload]);
+      logAvatarDebug("hostBridge", kind, payload);
+
+      if (kind === "ready" || kind === "loaded") {
+        tryFlushPendingAvatarLoad();
+      }
+      if (kind === "connected") {
+        loftHostState.connected = true;
+        loftHostState.hostMode = true;
+        loftUsesCompanionHost = true;
+      }
+      if (kind === "actions") {
+        try {
+          loftHostState.actions = Array.isArray(payload) ? payload.slice() : (payload ? [].concat(payload) : []);
+        } catch (eA) { loftHostState.actions = []; }
+      }
+      if (kind === "states") {
+        try {
+          loftHostState.states = Array.isArray(payload) ? payload.slice() : (payload ? [].concat(payload) : []);
+        } catch (eS) { loftHostState.states = []; }
+      }
+      if (kind === "error" || kind === "ei_error" || kind === "appearance_error") {
+        logAvatarDebug("companion host error", kind, payload);
+      }
+      return true;
+    };
+  }
+
+  function tryCallHostMethod(name, args) {
+    args = args || [];
+    var player = loftActivePlayer;
+    if (!player) return { ok: false, reason: "no-player" };
+    // Direct EI callback on Ruffle player
+    try {
+      if (typeof player[name] === "function") {
+        var r = player[name].apply(player, args);
+        rememberEi("js→swf", name, args);
+        return { ok: true, via: "player." + name, result: r };
+      }
+    } catch (e1) { logAvatarDebug("host." + name + " threw", e1 && e1.message); }
+    // Fallback generic probe
+    return tryCallIntoSwf([name], args);
+  }
+
+  function tryFlushPendingAvatarLoad() {
+    var url = loftPendingAvatarUrl || loftHostState.avatarUrl;
+    if (!url || !loftActivePlayer) return { ok: false, reason: "no-pending" };
+    return callHostLoadUrl(url);
+  }
+
+  function callHostLoadUrl(url) {
+    if (!url) return { ok: false, reason: "empty-url" };
+    loftPendingAvatarUrl = url;
+    loftHostState.avatarUrl = url;
+    var r = tryCallHostMethod("hostLoadUrl", [url]);
+    logAvatarDebug("hostLoadUrl", r);
+    if (!r.ok) {
+      // EI callbacks sometimes appear a tick after player.load resolves
+      setTimeout(function () {
+        var r2 = tryCallHostMethod("hostLoadUrl", [url]);
+        logAvatarDebug("hostLoadUrl-retry", r2);
+        if (!r2.ok) {
+          setTimeout(function () {
+            tryCallHostMethod("hostLoadUrl", [url]);
+          }, 250);
+        }
+      }, 80);
+    }
+    return r;
+  }
+
+  function callHostWalk(moving, orient) {
+    loftHostState.moving = !!moving;
+    if (typeof orient === "number" && isFinite(orient)) loftHostState.orient = orient;
+    var o = loftHostState.orient;
+    var r = tryCallHostMethod("hostWalk", [!!moving, o]);
+    if (!r.ok) {
+      // Legacy EI-only path
+      return notifyLoftAppearance(!!moving, o);
+    }
+    return r;
+  }
+
+  function callHostEmote(name) {
+    name = String(name || "Wave");
+    var r = tryCallHostMethod("hostEmote", [name]);
+    if (!r.ok) {
+      return notifyLoftEmoteLegacy(name);
+    }
+    return r;
   }
 
   function buildAvatarHostShim(player) {
@@ -968,22 +1100,37 @@
   }
 
   function attachLoftAvatarHost(player, container) {
+    // (?v=20260906bu): attach after companion host OR direct-avatar mount.
     loftActivePlayer = player;
     loftHostState.connected = false;
+    installWhirledAvatarHostBridge();
     var shim = buildAvatarHostShim(player);
     installGlobalEiStubs(shim);
     try { player._whirledHost = shim; } catch (eP) {}
     try { if (container) container._whirledHost = shim; } catch (eC) {}
-    logAvatarDebug("loft host attached", { allowScriptAccess: true, debug: avatarDebugEnabled() });
-    // Probe common Whirled / community callback names — most stock SWFs miss; that's OK.
+    logAvatarDebug("loft host attached", {
+      allowScriptAccess: true,
+      companion: loftUsesCompanionHost,
+      debug: avatarDebugEnabled()
+    });
     setTimeout(function () {
+      // Prefer companion EI API
+      var ready = tryCallHostMethod("hostReady", []);
+      var isConn = tryCallHostMethod("hostIsConnected", []);
+      logAvatarDebug("post-mount host probe", { ready: ready, isConn: isConn });
+      tryFlushPendingAvatarLoad();
+      if (loftUsesCompanionHost || loftHostState.hostMode) {
+        callHostWalk(false, loftHostState.orient);
+        return;
+      }
+      // Direct-avatar fallback (bt): probe EI-only SWFs
       var probe = tryCallIntoSwf([
         "controlConnect", "whirledControlConnect", "connect",
+        "hostWalk", "hostLoadUrl",
         "appearanceChanged_v2", "appearanceChanged_v1", "appearanceChanged",
         "setBodyState", "setState", "bodyState"
       ], [false, loftHostState.orient, loftHostState.location]);
       logAvatarDebug("post-mount probe", probe);
-      // Edge-trigger idle appearance so EI-aware bodies leave frozen frame 1 if possible.
       notifyLoftAppearance(false, loftHostState.orient);
     }, 120);
     return shim;
@@ -1014,20 +1161,34 @@
   }
 
   function notifyLoftWalk(moving, orientHint) {
-    // Called from app.js chromeWalkTo — always bob host; try EI into SWF.
+    // (?v=20260906bu): chrome bob ALWAYS; companion hostWalk drives in-SWF walk scenes.
+    // Beginner: floor click moves your billboard AND tells the SWF to play walking frames.
+    // ENGINE DEV: hostWalk → appearanceChanged_v2(loc, orient, moving, sleeping) inside Ruffle.
     var faceForCss = (orientHint === -1 || orientHint === 1) ? orientHint : undefined;
     setLoftWalkMotion(!!moving, faceForCss);
     var orient = loftHostState.orient;
-    if (typeof orientHint === "number" && isFinite(orientHint)) orient = orientHint;
-    else if (moving) {
+    if (typeof orientHint === "number" && isFinite(orientHint) && orientHint !== -1 && orientHint !== 1) {
+      orient = orientHint;
+    } else if (moving) {
       // Whirled orient: 0 faces front, clockwise. Map chrome face ±1 → approx left/right.
       orient = (orientHint === -1) ? 90 : (orientHint === 1 ? 270 : orient);
+    }
+    loftHostState.orient = orient;
+    if (loftUsesCompanionHost || loftHostState.hostMode) {
+      return callHostWalk(!!moving, orient);
+    }
+    // Fallback: try hostWalk anyway (callbacks may exist), then legacy EI appearance probes.
+    var hr = tryCallHostMethod("hostWalk", [!!moving, orient]);
+    if (hr.ok) {
+      loftUsesCompanionHost = true;
+      loftHostState.hostMode = true;
+      return hr;
     }
     return notifyLoftAppearance(!!moving, orient);
   }
 
-  function notifyLoftEmote(actionName) {
-    // Try common action / state names; chrome bubble is always shown by app.js.
+  function notifyLoftEmoteLegacy(actionName) {
+    // Legacy EI-only / chrome-bob path (bt) when companion host is unavailable.
     actionName = String(actionName || "wave");
     var variants = [
       actionName,
@@ -1039,14 +1200,12 @@
       "triggerAction", "doAction", "action", "playAction",
       "setBodyState", "setState", "bodyState", "playEmote", "emote"
     ], [variants[0]]);
-    // Second pass with alternate casings if first miss
     if (!r.ok) {
       for (var i = 0; i < variants.length; i++) {
         r = tryCallIntoSwf(["triggerAction", "setBodyState", "setState", "bodyState"], [variants[i]]);
         if (r.ok) break;
       }
     }
-    // Brief bob so something visible always happens even without EI
     try {
       setLoftWalkMotion(true);
       setTimeout(function () { setLoftWalkMotion(false); }, 520);
@@ -1054,17 +1213,46 @@
     return r;
   }
 
+  function notifyLoftEmote(actionName) {
+    // (?v=20260906bu): prefer companion hostEmote → messageReceived_v1(ACTION_TRIGGERED).
+    actionName = String(actionName || "wave");
+    var pretty = actionName.charAt(0).toUpperCase() + actionName.slice(1);
+    try {
+      setLoftWalkMotion(true);
+      setTimeout(function () { setLoftWalkMotion(false); }, 520);
+    } catch (eB) {}
+    if (loftUsesCompanionHost || loftHostState.hostMode) {
+      var r1 = callHostEmote(pretty);
+      if (r1 && r1.ok) return r1;
+      var r2 = callHostEmote(actionName);
+      if (r2 && r2.ok) return r2;
+    }
+    var hr = tryCallHostMethod("hostEmote", [pretty]);
+    if (hr.ok) return hr;
+    return notifyLoftEmoteLegacy(actionName);
+  }
+
   function getLoftHostDebug() {
+    var hostDbg = tryCallHostMethod("hostGetDebug", []);
     return {
       version: VERSION,
       hasPlayer: !!loftActivePlayer,
+      companionHost: loftUsesCompanionHost || loftHostState.hostMode,
+      hostSwf: getCompanionHostSwfUrl(),
+      avatarUrl: !!(loftPendingAvatarUrl || loftHostState.avatarUrl),
       state: {
         connected: loftHostState.connected,
         moving: loftHostState.moving,
         orient: loftHostState.orient,
         state: loftHostState.state,
-        sleeping: loftHostState.sleeping
+        sleeping: loftHostState.sleeping,
+        hostMode: loftHostState.hostMode,
+        actions: (loftHostState.actions || []).slice(0, 12),
+        states: (loftHostState.states || []).slice(0, 12)
       },
+      lastBridge: loftHostState.lastBridge,
+      bridgeLog: loftHostBridgeLog.slice(0, 12),
+      hostGetDebug: hostDbg,
       lastEiCalls: loftHostState.lastEiCalls.slice(0, 12),
       lastJsToSwf: loftHostState.lastJsToSwf.slice(0, 12),
       nextSteps: describeAvatarControlNextSteps()
@@ -1074,12 +1262,12 @@
   function describeAvatarControlNextSteps() {
     return {
       whyIdle: "Stock Whirled SWFs dispatch ConnectEvent type controlConnect on loaderInfo.sharedEvents (NOT ExternalInterface).",
-      protocol: "AvatarControl→AbstractControl builds userProps (appearanceChanged_v2, stateSet_v1, …); host must set event.props.hostProps with setLocation_v1/setMoveSpeed_v1/setState_v1/…; avatar gotHostProps → isConnected. Drive walk via userProps.appearanceChanged_v2(loc, orient, moving, sleeping).",
-      whatWorksNow: "Chrome puppet: billboard move + CSS bob/flip; stand thumb never wiped; nameplate/hitbox emotes (bubble + EI try). JS WhirledAvatarHost helps only EI-patched SWFs.",
+      protocol: "Nested host: Ruffle loads avatar-host.swf → hostLoadUrl(avatar) → Loader + sharedEvents controlConnect → hostProps → appearanceChanged_v2.",
+      whatWorksNow: "Companion host SWF (ORIGINAL MIT, tools/avatar-host) + chrome billboard puppet. Floor → hostWalk; click avatar → hostEmote. Fallback = direct Ruffle + thumb (bt).",
       hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
-      hostShim: "JS EI shim cannot inject sharedEvents into Ruffle VM. Phase-2 = tiny companion host SWF (Loader+EI bridge) — only if we can compile without copying AGPL. Tonight: chrome puppet rock-solid.",
+      hostShim: "assets/avatar-host/avatar-host.swf compiled from tools/avatar-host/AvatarHost.hx (Haxe --swf). No AGPL copy.",
       debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
-      docs: ["HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md", "https://www.whirled.club/code/asdocs/com/whirled/AvatarControl.html", "greyhavens/whirled-api AbstractControl.as"]
+      docs: ["HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md", "tools/avatar-host/README.md", "greyhavens/whirled-api AbstractControl.as (study only)"]
     };
   }
 
@@ -1629,16 +1817,7 @@
       slot.classList.add("is-on");
       slot.classList.add("is-loft");
       var bill = slot.closest(".avatar-wear-billboard");
-      return mountRuffle(slot, url, {
-        maxWidth: "140px",
-        maxHeight: "180px",
-        height: "160px",
-        loftMount: true,
-        pointerEvents: "none",
-        wmode: "transparent",
-        backgroundColor: null,
-        allowScriptAccess: true
-      }).then(function () {
+      function afterMountUi() {
         if (bill) {
           var img = bill.querySelector(".avatar-wear-sprite");
           // SWF-only: hide empty PNG stub. Hybrid+Force Ruffle: keep PNG for walk under soft veil.
@@ -1647,6 +1826,44 @@
             img.classList.add("classic-png-under-swf-soft");
           }
         }
+      }
+      // (?v=20260906bu): nest companion host SWF → hostLoadUrl(avatar blob/url).
+      // Beginner: Ruffle plays OUR host first; host loads YOUR avatar and talks sharedEvents.
+      // ENGINE DEV: fallback = direct avatar Ruffle (bt chrome puppet) if host missing/fails.
+      installWhirledAvatarHostBridge();
+      loftPendingAvatarUrl = url;
+      loftHostState.avatarUrl = url;
+      loftUsesCompanionHost = false;
+      loftHostState.hostMode = false;
+      loftHostState.connected = false;
+      var hostUrl = getCompanionHostSwfUrl();
+      var loftOpts = {
+        maxWidth: "140px",
+        maxHeight: "180px",
+        height: "160px",
+        loftMount: true,
+        pointerEvents: "none",
+        wmode: "transparent",
+        backgroundColor: null,
+        allowScriptAccess: true
+      };
+      return mountRuffle(slot, hostUrl, loftOpts).then(function (player) {
+        loftUsesCompanionHost = true;
+        loftHostState.hostMode = true;
+        afterMountUi();
+        // Load avatar into host (bridge "ready" may also flush)
+        callHostLoadUrl(url);
+        setTimeout(function () { tryFlushPendingAvatarLoad(); }, 200);
+        setTimeout(function () { tryFlushPendingAvatarLoad(); }, 600);
+        return player;
+      }).catch(function (hostErr) {
+        logAvatarDebug("companion host mount failed — fallback direct avatar", hostErr && hostErr.message);
+        loftUsesCompanionHost = false;
+        loftHostState.hostMode = false;
+        return mountRuffle(slot, url, loftOpts).then(function (player) {
+          afterMountUi();
+          return player;
+        });
       });
     }).catch(function (err) {
       ensureStandFallback(slot, worn, (err && err.message) || "ruffle-mount-failed");
@@ -2056,6 +2273,10 @@
   api.classicHybridBadgeHtml = classicHybridBadgeHtml;
   api.describeAvatarControlNextSteps = describeAvatarControlNextSteps;
   api.notifyLoftWalk = notifyLoftWalk;
+  api.callHostWalk = callHostWalk;
+  api.callHostEmote = callHostEmote;
+  api.getCompanionHostSwfUrl = getCompanionHostSwfUrl;
+  api.installWhirledAvatarHostBridge = installWhirledAvatarHostBridge;
   api.notifyLoftEmote = notifyLoftEmote;
   api.notifyLoftAppearance = notifyLoftAppearance;
   api.getLoftHostDebug = getLoftHostDebug;

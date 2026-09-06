@@ -1,0 +1,5 @@
+-main AvatarHost
+-swf ../../assets/avatar-host/avatar-host.swf
+-swf-version 11
+-D swf-header=220:280:24:000000
+-D network-sandbox

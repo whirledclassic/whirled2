@@ -7095,7 +7095,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906bt — Never-tofu Classic Flash loft (stand thumb + hitbox)
+   ?v=20260906bu — Nested companion host + never-tofu Classic Flash loft (stand thumb + hitbox)
    Beginner: if Ruffle is slow/fails, last thumb still shows — not grey tofu bean.
    ENGINE DEV: stand thumb PE none; hitbox/nameplate keep emote clicks.
    ========================================================================== */
@@ -7145,7 +7145,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906bt — Rock-solid chrome puppet (Wear→loft never blank)
+   ?v=20260906bu — Companion hostWalk + chrome puppet backup (Wear→loft never blank)
    Beginner: stand thumb / initial glyph always visible; floor bob + face flip.
    ENGINE DEV: mountRuffle must not wipe stand; sha1-only Wear resolves via IDB.
    ========================================================================== */

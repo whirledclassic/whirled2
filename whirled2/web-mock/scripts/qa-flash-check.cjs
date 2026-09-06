@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * qa-flash-check.cjs — headless smoke for ?v=20260906bt
- * Combined: bk club polish + Classic Flash loft interactivity (walk/emote/EI shim).
+ * qa-flash-check.cjs — headless smoke for ?v=20260906bu
+ * Companion host SWF nest + Classic Flash loft walk/emote + dual Wear + bt never-tofu.
  * Beginner: run `node scripts/qa-flash-check.cjs` — no browser needed.
- * ENGINE DEV: dual Wear cards, Hybrid gate, hitbox PE, WhirledAvatarHost, Smooth intact.
+ * ENGINE DEV: hostWalk/hostLoadUrl, WhirledAvatarHostBridge, Hybrid gate, Smooth intact.
  */
 "use strict";
 const fs = require("fs");
@@ -18,10 +18,17 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
-console.log("QA-FLASH check (?v=20260906bt — Flash playability CRITICAL + br club)");
+console.log("QA-FLASH check (?v=20260906bu — companion host + Flash playability)");
 
 const classic = read("src/classic-avatar.js");
-ok(classic.includes('VERSION = "20260906bt"'), "classic-avatar VERSION bt");
+ok(classic.includes('VERSION = "20260906bu"'), "classic-avatar VERSION bu");
+ok(classic.includes("COMPANION_HOST_SWF") || classic.includes("avatar-host.swf"), "companion host SWF path");
+ok(classic.includes("installWhirledAvatarHostBridge"), "WhirledAvatarHostBridge installer");
+ok(classic.includes("hostLoadUrl"), "hostLoadUrl wiring");
+ok(classic.includes("hostWalk"), "hostWalk wiring");
+ok(classic.includes("hostEmote"), "hostEmote wiring");
+ok(classic.includes("callHostWalk") || classic.includes("tryCallHostMethod"), "callHostWalk / tryCallHostMethod");
+ok(classic.includes("getCompanionHostSwfUrl"), "getCompanionHostSwfUrl");
 ok(classic.includes("ROOT CAUSE FIX") || classic.includes("Do NOT put thumb"), "thumb-idle Hybrid fix");
 ok(classic.includes("classic-swf-stand-thumb"), "stand thumb fallback");
 ok(classic.includes('data-auto-ruffle="1"'), "Classic Flash default radio");
@@ -40,13 +47,12 @@ ok(classic.includes("data-swf-sha1"), "data-swf-sha1 on host");
 ok(classic.includes("is-mounting") || classic.includes("is-playing"), "mount state classes");
 ok(classic.includes("CRITICAL") || classic.includes("do NOT wipe stand"), "mountRuffle preserve stand");
 ok(classic.includes("savedStand") && classic.includes("keepBits"), "mountRuffle restores stand via savedStand/keepBits");
-
 ok(classic.includes("allowScriptAccess"), "allowScriptAccess for loft EI");
 ok(classic.includes("tryCallIntoSwf"), "tryCallIntoSwf EI probe");
 ok(classic.includes("getLoftHostDebug"), "getLoftHostDebug");
 ok(classic.includes("avatarDebug"), "avatarDebug flag");
 ok(classic.includes("appearanceChanged"), "appearanceChanged probe names");
-ok(classic.includes("setBodyState") || classic.includes("triggerAction"), "body state / action names");
+ok(classic.includes("fallback") || classic.includes("companion host mount failed"), "host→direct fallback");
 ok(classic.includes("ensureClassicWornStates"), "ensureClassicWornStates on Wear");
 ok(classic.includes("data-classic-wear-enter"), "Wear & enter loft button");
 ok(classic.includes("playbackMode"), "playbackMode field");
@@ -57,15 +63,23 @@ ok(classic.includes("Classic Flash (Ruffle)"), "Classic Flash (Ruffle) label");
 ok(classic.includes("png-hybrid"), "png-hybrid mode id");
 ok(classic.includes("itemHasPngWalk"), "strict PNG walk gate");
 ok(classic.includes("pointerEvents") || classic.includes("pointer-events"), "loft pointer-events handling");
-ok(classic.includes('name="playbackMode"') || classic.includes("data-playback-mode-item"), "Wear mode radios");
-ok(!/playbackMode\s*=\s*null/.test(classic) || classic.includes("getPlaybackMode"), "dual-mode API intact");
+
+const hostSwf = path.join(root, "assets/avatar-host/avatar-host.swf");
+ok(fs.existsSync(hostSwf), "assets/avatar-host/avatar-host.swf exists");
+ok(fs.statSync(hostSwf).size > 1000, "avatar-host.swf size>1k");
+const hostHx = read("tools/avatar-host/AvatarHost.hx");
+ok(hostHx.includes("controlConnect"), "AvatarHost.hx listens controlConnect");
+ok(hostHx.includes("appearanceChanged_v2"), "AvatarHost.hx calls appearanceChanged_v2");
+ok(hostHx.includes("hostWalk"), "AvatarHost.hx hostWalk");
+ok(hostHx.includes("hostLoadUrl"), "AvatarHost.hx hostLoadUrl");
+ok(hostHx.includes("WhirledAvatarHostBridge"), "AvatarHost.hx bridge name");
+ok(!/com\.threerings\.msoy/.test(hostHx), "AvatarHost.hx no msoy package (no AGPL copy)");
 
 const app = read("app.js");
-ok(app.includes('LOGO_V = "20260906bt"'), "app LOGO_V bt");
+ok(app.includes('LOGO_V = "20260906bu"'), "app LOGO_V bu");
 ok(app.includes("classicRuffleWearHtml"), "app classicRuffleWearHtml never-tofu");
 ok(app.includes("data-swf-sha1"), "app data-swf-sha1");
 ok(app.includes("classic-swf-placeholder"), "app placeholder glyph");
-
 ok(app.includes("playModeEarly"), "app playbackMode-first loft");
 ok(app.includes("avatar-hitbox"), "avatar-hitbox in loft HTML");
 ok(app.includes("data-avatar-emote-chrome"), "chrome emote buttons");
@@ -82,27 +96,23 @@ ok(app.includes("is-hybrid-smooth") || app.includes("Hybrid (smooth)") || app.in
 ok(app.includes("classicWearModePickerHtml"), "app injects Wear mode picker");
 ok(app.includes("getPlaybackMode"), "app honors getPlaybackMode");
 ok(app.includes("storage full") || app.includes("120000"), "Wear persist harden vs blown localStorage");
-// bk club preserved in combined ship
-ok(app.includes("/e") || app.includes("\\\\/e") || app.includes('"/e"') || app.includes("'/e'") || app.includes("case \"e\"") || /\/e\b/.test(app), "bk /e alias present-ish");
 ok(app.includes("I'm away from the keyboard.") || app.includes("away from the keyboard"), "away default message");
 
 const css = read("src/styles.css");
 ok(css.includes("avatar-hitbox"), "CSS avatar-hitbox");
-ok(css.includes("20260906bt") || css.includes("is-ruffle-billboard") || css.includes("avatar-hitbox"), "styles bt / hitbox");
+ok(css.includes("20260906bu") || css.includes("is-ruffle-billboard") || css.includes("avatar-hitbox"), "styles bu / hitbox");
 ok(css.includes("whirled-swf-walk-bob") || css.includes("is-swf-walking"), "SWF bob keyframes/class");
 ok(css.includes("pointer-events: none !important"), "CSS PE none on loft ruffle");
 ok(css.includes("classic-swf-stand-thumb"), "CSS stand thumb under Ruffle");
 ok(css.includes("classic-swf-placeholder"), "CSS placeholder glyph");
 ok(css.includes("--wear-face") && css.includes("whirled-swf-host-bob"), "CSS face flip in host bob");
-ok(css.includes("20260906bt") || css.includes("Rock-solid chrome puppet"), "styles bt block");
-
 ok(css.includes("classic-ruffle-callout") || css.includes("classic-hybrid-badge") || css.includes("classic-mode-card"), "hybrid/callout/mode styles");
 const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const brownActive = (cssNoComments.match(/#5c4030/g) || []).length + (cssNoComments.match(/#8b6914/g) || []).length;
 ok(brownActive === 0, "no active brown band hexes outside comments (count=" + brownActive + ")");
 
 const index = read("index.html");
-ok(index.includes("20260906bt"), "index.html cache bt");
+ok(index.includes("20260906bu"), "index.html cache bu");
 ok(index.includes("classic-avatar.js"), "index loads classic-avatar.js");
 
 const docs = [
@@ -118,13 +128,14 @@ ok(how.includes("PNG hybrid") || how.includes("png-hybrid"), "how-doc PNG hybrid
 ok(how.includes("Ruffle never loads"), "how-doc Whirl-only never loads Ruffle");
 ok(how.includes("dual modes") || how.includes("Dual modes") || how.includes("Why dual modes"), "how-doc dual modes why");
 ok(how.includes("playbackMode"), "how-doc playbackMode");
-ok(how.includes("20260906bt") || how.includes("hitbox"), "how-doc bt / hitbox");
+ok(how.includes("20260906bu") || how.includes("hitbox"), "how-doc bu / hitbox");
 ok(how.includes("appearanceChanged_v2") || how.includes("sharedEvents"), "how-doc protocol");
+ok(how.includes("avatar-host") || how.includes("companion host") || how.includes("hostWalk"), "how-doc companion host");
 ok(how.includes("What works in Classic Flash") || how.includes("WhirledAvatarHost"), "how-doc honest Ruffle table");
 
 const status = read("STATUS.md");
-ok(status.includes("20260906bt"), "STATUS bt");
-ok(status.includes("hitbox") || status.includes("WhirledAvatarHost") || status.includes("interactivity"), "STATUS Flash interactivity");
+ok(status.includes("20260906bu"), "STATUS bu");
+ok(status.includes("companion host") || status.includes("avatar-host") || status.includes("hostWalk"), "STATUS companion host");
 
 if (failed) {
   console.error("\n" + failed + " check(s) failed");

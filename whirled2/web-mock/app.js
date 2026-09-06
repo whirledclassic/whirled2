@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bt";
+  var LOGO_V = "20260906bu";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2189,7 +2189,7 @@
 
 
   function classicRuffleWearHtml(worn, posStyle) {
-    // (?v=20260906bt): Always mount Ruffle host + hitbox/nameplate + stand thumb OR glyph.
+    // (?v=20260906bu): Always mount Ruffle companion host + hitbox/nameplate + stand thumb OR glyph.
     // Beginner: never tofu / never blank when a .swf is worn (sha1-only OK — IDB resolves at mount).
     // ENGINE DEV: data-swf-sha1 on host; PE none on Ruffle; hitbox owns emotes; stand survives mountRuffle.
     var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");

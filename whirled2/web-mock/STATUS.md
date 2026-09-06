@@ -1,3 +1,12 @@
+## What shipped (?v=20260906bu)
+
+- **Flash/Ruffle CRITICAL:** nested **companion host SWF** (`assets/avatar-host/avatar-host.swf`, ORIGINAL MIT from `tools/avatar-host/AvatarHost.hx` via Haxe `--swf`)
+- Loft Classic Flash: Ruffle loads host → `hostLoadUrl(avatar blob/url)` → `controlConnect` sharedEvents → `appearanceChanged_v2` walk scenes
+- Floor click → `hostWalk(true,orient)` + chrome bob; arrive → `hostWalk(false)`; avatar click → `hostEmote` / action menu
+- Fallback: direct avatar Ruffle + stand thumb (bt never-tofu) if host missing
+- Preserve: bs Hybrid walk-gate, br club polish, bg dual Wear, Whirl, visit-since
+- Cache: **`?v=20260906bu`**. Push: `/tmp/push-bu.js` (dry-run default). **Do not push from executor.**
+
 ## What shipped (?v=20260906bt)
 
 - **Flash/Ruffle Wear→loft CRITICAL fix:** never blank/tofu when SWF worn — `mountRuffle` no longer wipes stand thumb; sha1-only Wear resolves IDB (no silent fail); placeholder glyph; face-flip bob; SWF markers beat stale `isTofu`
