@@ -271,3 +271,14 @@ Two different systems:
 | Auth / hosting notes | `NETWORKING.md` |
 
 Welcome aboard. Baby steps: standalone Pixi first → `mountWhirledEngine(host)` → iframe or bundle → walk + nametags.
+
+---
+
+## Avatar import / classic SWF wardrobe (ENGINE DEV)
+
+See **[AVATAR-IMPORT.md](./AVATAR-IMPORT.md)** for the full Grey Havens research:
+
+- Classic avatars = **SWF + thumb + scale**, addressed by **SHA-1** (`HashMediaDesc` in `greyhavens/msoy`).
+- Playback path = **Ruffle** (+ optional AvatarControl host shim); study community AGPL whirled2 architecture — do not paste their code without license review.
+- Chrome will own wardrobe upload/list/export; engine mounts active avatar media URL into `#stage-slot`.
+- Suggested hooks: `WhirledChrome.getWardrobe()`, `WhirledChrome.setActiveAvatar(idOrUrl)`.

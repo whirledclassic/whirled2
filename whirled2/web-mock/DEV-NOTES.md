@@ -235,3 +235,9 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **No payments.** Coins/Bars stay play labels.
 - ENGINE DEV: chrome only — do not gate `#stage-slot` on tier.
 - **Cache**: `LOGO_V` / `?v=20260906ab`. Do not push unless instructed.
+
+## Chat polish + Games expand (20260906ac)
+
+- **Chat**: CSS deep-fix Overlay/Slide/tabs/bar/opts/`#stage-bubbles`; mobile Overlay-only unchanged.
+- **Games**: `gamesHomeNavHtml`, parlor/AVR explainers, Coming Soon placeholders (not `whirled2.games` rows), `whirled2.gameScores` display stub, detail Play/Watch/Tables.
+- **Cache**: `LOGO_V` / `?v=20260906ac`. Do not push unless instructed.

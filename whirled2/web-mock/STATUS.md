@@ -2,21 +2,27 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906ab)
+## Avatar research (same wave)
 
-- **Club / Membership overhaul**: Me → Club shows cool tier cards — **Free / Supporter / Creator** (sell avatars, small platform cut) / **Studio**. All paid tiers Coming Soon; no payments. Design doc: `MEMBERSHIP.md` (Three Rings lessons + 2026 tiers).
-- Prior **?v=20260906aa** (folded):
-  - Shared loft soundtrack (demo server `GET/PUT /api/rooms/:id/music`; Pages local-only meta).
-  - Facebook Connect removed (username/password primary).
-  - Room preview before enter (lobby tile → sheet → Enter + soft curtain).
+- Deep dive of Grey Havens GitHub (`msoy`, `whirled-sdk`, `whirled-projects`) + community `lulzsun/whirled2` SWF/Ruffle path.
+- Plan doc: [AVATAR-IMPORT.md](./AVATAR-IMPORT.md) — SHA-1 wardrobe archive, user SWF upload, Ruffle bridge, sync so avatars are not lost.
+- Upload UI + demo media API still next (not in this chrome-only ship).
+
+## What shipped (?v=20260906ac)
+
+- **Chat visual polish**: Overlay bubbles (cyan names, contrast, soft fade), readable Slide panel, clearer tabs/unread, polished Send + 16px mobile input, tidy chat options, stage bubbles readability. Mobile still Overlay-only (no black hood).
+- **Games expand**: home nav Browse / Tables / AVR Coming Soon / My scores; Parlor vs AVR explainers; empty-state + How games work; labeled Coming Soon placeholder cards (not fake catalog); detail Play / Watch / Tables; local `whirled2.gameScores` stub.
+- Prior **?v=20260906ab** (folded): Club tier cards (Free / Supporter / Creator / Studio Coming Soon).
+- Prior **?v=20260906aa** (folded): shared loft soundtrack; Facebook Connect removed; room preview before enter.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ab
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ac
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
 
 - No payments / Buy Bars / live membership checkout
-- No fake NPCs / catalog / fake member counts
+- No fake NPCs / invented live game catalog titles
 - No zero-setup social OAuth on static Pages
+- Do not push unless instructed

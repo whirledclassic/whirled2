@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ab";
+  var LOGO_V = "20260906ac";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1303,6 +1303,7 @@
   var GAMES_KEY = "whirled2.games";
   var GAME_TABLES_KEY = "whirled2.gameTables";
   var GAME_FAV_KEY = "whirled2.gameFavorites";
+  var GAME_SCORES_KEY = "whirled2.gameScores"; // local high-score stub {gameId,name,score,at}[]
   var KNOWN_PROFILES_KEY = "whirled2.knownProfiles";
   var GAME_GENRES = [
     { id: "action", label: "Action/Arcade" },
@@ -1316,9 +1317,9 @@
     { id: "word", label: "Word" }
   ];
   var gameGenre = "all";
-  var gamesMode = "browse"; // browse | detail | lobby
+  var gamesMode = "browse"; // browse | detail | lobby | scores | avr
   var gameViewId = null;
-  var gameDetailTab = "play"; // play | trophies | comments
+  var gameDetailTab = "play"; // play | watch | tables | comments
   var friendSearchQ = "";
   var SHOP_POPULAR = [
     { id: "avatars", label: "Avatars", empty: "No popular avatars yet." },
@@ -1952,6 +1953,119 @@
   function saveGameFavorites(ids) {
     try { localStorage.setItem(GAME_FAV_KEY, JSON.stringify((ids || []).slice(0, 200))); } catch (e) {}
   }
+
+  // ---------------------------------------------------------------------------
+  // Game scores stub (localStorage whirled2.gameScores)
+  // How this works (beginner): when you finish a parlor game later, chrome can
+  // push { gameId, name, score, at }. Today we only DISPLAY whatever is already
+  // saved — we never invent fake leaderboards.
+  // ENGINE DEV: scores are chrome-only; parlor Pixi games will call a bridge later.
+  // ---------------------------------------------------------------------------
+  function loadGameScores() {
+    // Purpose: read local high-score rows (or []).
+    // How: JSON.parse whirled2.gameScores; bad data → empty list.
+    // Why: Games → My scores shows real local stubs only.
+    try { return JSON.parse(localStorage.getItem(GAME_SCORES_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveGameScores(list) {
+    // Purpose: persist capped local score rows.
+    // How: stringify up to 100 entries into whirled2.gameScores.
+    // Why: keep phone storage small; ENGINE DEV does not touch #stage-slot.
+    try { localStorage.setItem(GAME_SCORES_KEY, JSON.stringify((list || []).slice(0, 100))); } catch (e) {}
+  }
+  function gamesComingSoonPlaceholders() {
+    // Purpose: show clearly-labeled Coming Soon cards (NOT fake catalog titles).
+    // How: return static stub objects rendered without data-game-open.
+    // Why: wiki-accurate empty Games home without inventing live whirled2.games rows.
+    return [
+      { title: "Parlor tables", blurb: "Classic multiplayer tables on a separate Games screen. Engine mount Coming Soon." },
+      { title: "AVR hide & seek", blurb: "In-room AVR overlay games (play while hanging in a loft). Coming Soon." },
+      { title: "Passport play stamps", blurb: "Earn Play-category stamps from real parlor sessions. Stub until engine ships." }
+    ];
+  }
+  function gamesHomeNavHtml(active) {
+    // Purpose: top nav for Games home (Browse / Tables / AVR / My scores).
+    // How: pill buttons set gamesMode via data-games-home.
+    // Why: clearer wiki-style Games landing without inventing catalog.
+    var items = [
+      ["browse", "Browse"],
+      ["lobby", "Tables"],
+      ["avr", "AVR Coming Soon"],
+      ["scores", "My scores"]
+    ];
+    return '<nav class="games-home-nav" aria-label="Games sections">'
+      + items.map(function (it) {
+          return '<button type="button" class="games-nav-btn' + (active === it[0] ? " is-on" : "") + '" data-games-home="' + it[0] + '">' + it[1] + '</button>';
+        }).join("")
+      + '</nav>';
+  }
+  function parlorAvrExplainerHtml() {
+    // Purpose: wiki-accurate Parlor vs AVR explainer cards.
+    // How: two cards — parlor = separate screen; AVR = in-room overlay (Coming Soon).
+    // Why: teach beginners before any engine exists. ENGINE DEV: AVR will overlay #stage-slot later.
+    return '<div class="games-explain-grid">'
+      + '<div class="games-explain-card">'
+      +   '<h3>Parlor games</h3>'
+      +   '<p>Open on a <b>separate Games screen</b> (tables lobby). You leave the room stage to play. Tables and Create Game live under Tables.</p>'
+      + '</div>'
+      + '<div class="games-explain-card">'
+      +   '<h3>AVR (in-room)</h3>'
+      +   '<p>AVR games overlay <b>inside your room</b> while you hang out — hide &amp; seek style. Not a parlor table.</p>'
+      +   '<span class="soon-tag">Coming Soon</span>'
+      + '</div>'
+      + '</div>';
+  }
+  function gamesSoonCardsHtml() {
+    // Purpose: render Coming Soon placeholder cards (never pretend-real catalog).
+    // How: map gamesComingSoonPlaceholders() to .game-soon-card (no open handler).
+    // Why: fill empty shelf honestly.
+    return '<div class="games-soon-grid">' + gamesComingSoonPlaceholders().map(function (c) {
+      return '<div class="game-soon-card" aria-label="Coming Soon">'
+        + '<span class="soon-ribbon">Coming Soon</span>'
+        + '<h3>' + esc(c.title) + '</h3>'
+        + '<p>' + esc(c.blurb) + '</p></div>';
+    }).join("") + '</div>';
+  }
+  function gamesScoresPage() {
+    // Purpose: My scores — local stub list from whirled2.gameScores.
+    // How: loadGameScores(); empty → Passport stamps Coming Soon message.
+    // Why: never invent leaderboards. ENGINE DEV: parlor will write scores later.
+    var rows = loadGameScores();
+    var body;
+    if (!rows.length) {
+      body = '<div class="panel"><p class="meta">No local scores yet. Play to earn Passport stamps — <b>Coming Soon</b> with the parlor engine.</p>'
+        + '<p class="meta">Scores save under <code>whirled2.gameScores</code> when games can report results.</p></div>';
+    } else {
+      body = '<div class="game-scores-list">' + rows.map(function (r) {
+        return '<div class="game-score-row">'
+          + '<div><b>' + esc(r.name || r.gameId || "Game") + '</b>'
+          + '<p class="meta">' + esc((r.at || "").slice(0, 16).replace("T", " ")) + '</p></div>'
+          + '<span class="price">' + esc(String(r.score != null ? r.score : "—")) + '</span></div>';
+      }).join("") + '</div>';
+    }
+    return '<section class="page games-page">'
+      + gamesHomeNavHtml("scores")
+      + '<div class="page-head"><div><h1>My scores</h1>'
+      + '<p class="meta">Local stub only — nothing invented.</p></div></div>'
+      + body + '</section>';
+  }
+  function gamesAvrPage() {
+    // Purpose: AVR Coming Soon landing (wiki-accurate in-room overlay games).
+    // How: explainer + Coming Soon stubs; no fake live AVR catalog.
+    // ENGINE DEV: future AVR mounts as overlay over #stage-slot — not a parlor screen.
+    return '<section class="page games-page">'
+      + gamesHomeNavHtml("avr")
+      + '<div class="games-avr-panel">'
+      +   '<h2>AVR — in-room games</h2>'
+      +   '<p>Classic Whirled AVR means mini-games that play <b>on top of your room</b> (you stay in the loft). Hide &amp; seek is a common example.</p>'
+      +   '<p class="meta"><b>Coming Soon</b> — no AVR catalog is invented here. Parlor tables are under Tables.</p>'
+      +   '<span class="soon-tag">Coming Soon</span>'
+      + '</div>'
+      + '<div class="section-label">Placeholders (not live games)</div>'
+      + gamesSoonCardsHtml()
+      + '</section>';
+  }
+
   function toggleGameFavorite(gameId) {
     var ids = loadGameFavorites();
     var i = ids.indexOf(gameId);
@@ -2220,6 +2334,9 @@
   // How this works (20260906q): on phones, Slide's dark panel eats the green stage.
   // Auto-switch to Overlay once for the session preference so the black slab never returns.
   function ensureMobileChatOverlay() {
+    // Purpose: phones force Overlay chat so Slide never opens a black slab under the stage.
+    // How: if narrow viewport and mode was slide, flip to overlay once and notice once.
+    // Why: wiki mobile = Overlay-only. ENGINE DEV: keeps #stage-slot full-size.
     try {
       if (!window.matchMedia || !window.matchMedia("(max-width: 900px)").matches) {
         document.body.classList.remove("chat-mobile-overlay");
@@ -2873,6 +2990,9 @@
     saveChatTabs(t);
   }
   function chatTabsHtml() {
+    // Purpose: Room / PM / Group chat tabs above the log.
+    // How: build buttons from loadChatTabs(); unread → has-unread glimmer class.
+    // Why: classic wiki tabs; mobile CSS raises touch height. ENGINE DEV: chrome only.
     var t = loadChatTabs();
     var roomUnread = !!(t.unread && t.unread.room);
     var html = '<div class="chat-tabs" id="chat-tabs" role="tablist">'
@@ -3397,7 +3517,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ab";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ac";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3729,6 +3849,9 @@
     return '<section class="page"><div class="page-head"><div><h1>' + esc(title) + '</h1><p>' + esc(blurb) + '</p></div></div><div class="grid">' + items.map(card).join('') + '</div></section>';
   }
   function genreRail(active) {
+    // Purpose: left genre rail for Games browse (desktop).
+    // How: buttons with data-game-genre filter whirled2.games by genre id.
+    // Why: classic Stuff-style rail; empty list stays honest (no invented titles).
     return '<aside class="stuff-rail games-genre-rail" aria-label="Genres"><ul class="stuff-cats">'
       + '<li><button type="button" class="stuff-cat' + (active === "all" ? " is-on" : "") + '" data-game-genre="all">All</button></li>'
       + GAME_GENRES.map(function (c) {
@@ -3737,6 +3860,9 @@
       + '</ul></aside>';
   }
   function genreChips(active) {
+    // Purpose: mobile-friendly genre chip row under Games home.
+    // How: same data-game-genre filters as the rail; pills highlight active genre.
+    // Why: rail hides on narrow screens — chips keep browsing usable on phones.
     return '<div class="genre-chips" role="group" aria-label="Genres">'
       + '<button type="button" class="sort-btn' + (active === "all" ? " is-on" : "") + '" data-game-genre="all">All</button>'
       + GAME_GENRES.map(function (c) {
@@ -3745,6 +3871,9 @@
       + '</div>';
   }
   function gameCard(g) {
+    // Purpose: one real catalog card from localStorage whirled2.games.
+    // How: button data-game-open → detail page. Never used for Coming Soon stubs.
+    // Why: only show member-saved / local games — never invent live titles.
     var id = g.id || g.name || "";
     var coins = (g.coins != null ? g.coins : g.price);
     var price = coins != null ? formatShopPrice(coins, false) : "free";
@@ -3754,16 +3883,22 @@
       + '<div class="price">' + esc(String(price)) + '</div></div></button>';
   }
   function gameGenreLabel(id) {
+    // Purpose: human label for a genre id (Action/Arcade, Puzzle, …).
+    // How: look up GAME_GENRES; fallback "Other".
     for (var i = 0; i < GAME_GENRES.length; i++) if (GAME_GENRES[i].id === id) return GAME_GENRES[i].label;
     return "Other";
   }
   function gamesLobbyPage() {
+    // Purpose: Tables lobby — local multiplayer table list + create form.
+    // How: loadGameTables(); Join/Leave/Start are local stubs until parlor engine.
+    // Why: parlor = separate screen. ENGINE DEV: Start does not mount #stage-slot yet.
     var tables = loadGameTables();
     var s = session();
     var meId = s && s.user ? s.user.id : "";
     var rows;
     if (!tables.length) {
-      rows = '<div class="panel"><p class="meta">No tables awaiting players. Create a game below — local only for now.</p></div>';
+      rows = '<div class="panel"><p class="meta">No tables awaiting players. Create a game below — local only for now.</p>'
+        + '<p class="meta">Create / list from real parlor games is <b>Coming Soon</b> with the engine.</p></div>';
     } else {
       rows = '<div class="game-table-list">' + tables.map(function (t) {
         var seats = t.players || [];
@@ -3782,14 +3917,15 @@
           + (joined
             ? '<button type="button" class="action-btn" data-table-leave="' + esc(t.id) + '">Leave</button>'
               + '<button type="button" class="action-btn" data-table-start="' + esc(t.id) + '"' + (n < 1 ? " disabled" : "") + '>Start now</button>'
-            : '<button type="button" class="action-btn" data-table-join="' + esc(t.id) + '"' + (n >= max ? " disabled" : "") + '>Join</button>')
+            : '<button type="button" class="action-btn" data-table-join="' + esc(t.id) + '"' + (n >= max ? " disabled" : "") + '>Join table</button>')
           + '</div></div>';
       }).join("") + '</div>';
     }
     return '<section class="page games-page">'
-      + '<button type="button" class="text-btn" data-games-back="1">← All games</button>'
+      + gamesHomeNavHtml("lobby")
       + '<div class="featured">Games awaiting players</div>'
       + '<p class="shop-banner">Multiplayer lobby shell — not a real Pixi game. Tables are local-only.</p>'
+      + parlorAvrExplainerHtml()
       + '<div class="section-label">Tables</div>'
       + rows
       + '<div class="section-label">Create Game</div>'
@@ -3798,9 +3934,13 @@
       +   '<label class="meta">Max players <input name="max" type="number" min="2" max="8" value="4" /></label>'
       +   '<label class="meta"><input name="rated" type="checkbox" /> Rated</label>'
       +   '<button type="submit">Create Game</button>'
-      + '</form></div></section>';
+      + '</form>'
+      + '<p class="meta">Listing a published parlor game in the catalog is <b>Coming Soon</b>.</p></div></section>';
   }
   function gameDetailPage(g) {
+    // Purpose: detail for one real whirled2.games entry (Play / Watch / Tables / Comments).
+    // How: tabs switch gameDetailTab; Play → lobby; Watch = spectator stub; Tables = join UI.
+    // Why: polish without inventing trophies. ENGINE DEV: Play does not mount engine yet.
     if (!g) {
       gameViewId = null;
       gamesMode = "browse";
@@ -3818,12 +3958,31 @@
       : '<p class="meta">No comments yet.</p>';
     var coins = (g.coins != null ? g.coins : g.price);
     var price = coins != null ? formatShopPrice(coins, false) : "free";
-    var tabs = [["play", "Play"], ["trophies", "Trophies"], ["comments", "Comments"]].map(function (t) {
+    var tabs = [["play", "Play"], ["watch", "Watch"], ["tables", "Tables"], ["comments", "Comments"]].map(function (t) {
       return '<button type="button" class="sort-btn' + (gameDetailTab === t[0] ? " is-on" : "") + '" data-game-tab="' + t[0] + '">' + t[1] + '</button>';
     }).join("");
     var body;
-    if (gameDetailTab === "trophies") {
-      body = '<div class="panel"><p class="meta">No trophies yet. Achievements arrive with the engine track.</p></div>';
+    if (gameDetailTab === "watch") {
+      body = '<div class="panel"><p class="meta">Spectator / Watch mode is a shell — <b>Coming Soon</b> with the parlor engine. No live streams are invented.</p></div>';
+    } else if (gameDetailTab === "tables") {
+      var tables = loadGameTables().filter(function (t) {
+        return !t.gameId || t.gameId === id || t.gameName === (g.name || "");
+      });
+      if (!tables.length) {
+        body = '<div class="panel"><p class="meta">No open tables for this game. Open <b>Tables</b> to create one (local stub).</p>'
+          + '<button type="button" class="action-btn" data-games-lobby="1">Open Tables lobby</button></div>';
+      } else {
+        body = '<div class="game-table-list">' + tables.map(function (t) {
+          var n = (t.players || []).length;
+          var max = Number(t.maxPlayers) || 4;
+          return '<div class="game-table-row">'
+            + '<div><h3>' + esc(t.name || "Table") + '</h3>'
+            + '<p class="meta">' + n + '/' + max + ' players · Host: ' + esc(t.hostName || "member") + '</p></div>'
+            + '<div class="game-table-actions">'
+            + '<button type="button" class="action-btn" data-table-join="' + esc(t.id) + '"' + (n >= max ? " disabled" : "") + '>Join table</button>'
+            + '</div></div>';
+        }).join("") + '</div>';
+      }
     } else if (gameDetailTab === "comments") {
       body = '<div class="panel"><div class="comment-list">' + commentRows + '</div>'
         + '<form id="game-comment-form" data-game-comment="' + esc(id) + '">'
@@ -3832,6 +3991,7 @@
     } else {
       body = '<div class="panel">'
         + '<p class="meta">Open the multiplayer lobby to create or join a table. This is a shell — not a Pixi game.</p>'
+        + '<p class="meta">Trophies / Passport play stamps: <b>Coming Soon</b>.</p>'
         + '<button type="button" class="action-btn" data-game-play="' + esc(id) + '">Play</button>'
         + '</div>';
     }
@@ -3846,30 +4006,48 @@
       +       '<button type="button" class="action-btn" data-game-play="' + esc(id) + '">Play</button>'
       +       '<button type="button" class="action-btn fav-btn' + (isFav ? " is-on" : "") + '" data-game-fav="' + esc(id) + '">' + (isFav ? "♥ Favorited" : "♡ Favorite") + '</button>'
       +     '</div>'
-      +     '<div class="shop-sort" role="tablist">' + tabs + '</div>'
+      +     '<div class="shop-sort game-detail-tabs" role="tablist">' + tabs + '</div>'
       +     body
       +   '</div></div></section>';
   }
   function gamesBrowsePage() {
+    // Purpose: Games home — Browse catalog from whirled2.games only + honest empty state.
+    // How: genre filter; favorites; Coming Soon placeholders (not fake catalog); explainers.
+    // Why: never invent live titles. ENGINE DEV: parlor mount stays out of #stage-slot for now.
     var all = loadGames();
     var filtered = gameGenre === "all" ? all.slice() : all.filter(function (g) { return gameGenreOf(g) === gameGenre; });
     var favIds = loadGameFavorites();
     var favGames = all.filter(function (g) { return favIds.indexOf(g.id || g.name) >= 0; });
-    var listBody = filtered.length
-      ? '<div class="grid">' + filtered.map(gameCard).join("") + '</div>'
-      : '<div class="panel"><p class="meta">No games in this genre yet. Games come from localStorage <code>whirled2.games</code> only — nothing is invented.</p></div>';
+    var listBody;
+    if (filtered.length) {
+      listBody = '<div class="grid">' + filtered.map(gameCard).join("") + '</div>';
+    } else if (!all.length) {
+      listBody = '<div class="games-empty-state">'
+        + '<h3>No games in your catalog yet</h3>'
+        + '<p class="meta">Games come from localStorage <code>whirled2.games</code> only — nothing is invented.</p>'
+        + '<div class="section-label">How games work</div>'
+        + '<ul>'
+        +   '<li><b>Parlor</b> — play on a <b>separate screen</b> (Tables lobby). Create/list is Coming Soon with the engine.</li>'
+        +   '<li><b>AVR</b> — play as an <b>in-room overlay</b> while you hang out (Coming Soon).</li>'
+        + '</ul></div>'
+        + parlorAvrExplainerHtml()
+        + '<div class="section-label">Coming Soon (placeholders — not live catalog)</div>'
+        + gamesSoonCardsHtml();
+    } else {
+      listBody = '<div class="panel"><p class="meta">No games in this genre yet. Try All, or add entries under <code>whirled2.games</code>.</p></div>';
+    }
     var favBody = favGames.length
       ? '<div class="grid tight">' + favGames.map(gameCard).join("") + '</div>'
       : '<p class="meta">No favorites yet.</p>';
     return '<section class="page games-page">'
+      + gamesHomeNavHtml("browse")
       + '<div class="page-head"><div><h1>Games</h1>'
-      + '<p class="shop-banner">Parlor games mount later with the engine track. Coins from games are play currency (labels / earn later).</p></div>'
-      + '<button type="button" class="action-btn" data-games-lobby="1">Games awaiting players</button></div>'
+      + '<p class="shop-banner">Browse local catalog · Tables for parlor · AVR Coming Soon. Coins from games are play currency.</p></div></div>'
+      + parlorAvrExplainerHtml()
       + '<div class="stuff-layout">' + genreRail(gameGenre)
       + '<div class="stuff-main">'
       +   genreChips(gameGenre)
-      +   '<div class="section-label">Featured</div>'
-      +   '<div class="panel"><p class="meta">No featured games yet.</p></div>'
+      +   (all.length ? ('<div class="section-label">Coming Soon placeholders</div>' + gamesSoonCardsHtml()) : '')
       +   '<div class="section-label">My favorites</div>'
       +   '<div class="panel">' + favBody + '</div>'
       +   '<div class="section-label">Games</div>'
@@ -3877,13 +4055,19 @@
       + '</div></div></section>';
   }
   function gamesPage() {
+    // Purpose: Games tab router (browse / lobby / scores / avr / detail).
+    // How: gamesMode picks which page HTML to return into #main.
+    // Why: keep home nav consistent. ENGINE DEV: none of these mount #stage-slot.
     if (gamesMode === "lobby") return gamesLobbyPage();
+    if (gamesMode === "scores") return gamesScoresPage();
+    if (gamesMode === "avr") return gamesAvrPage();
     if (gamesMode === "detail" && gameViewId) {
       var g = findGame(gameViewId);
       return gameDetailPage(g);
     }
     return gamesBrowsePage();
   }
+
   function findGroup(gid) {
     var list = loadGroups();
     for (var i = 0; i < list.length; i++) if (list[i].id === gid) return list[i];
@@ -4382,7 +4566,7 @@ function helpPage() {
       + '<li><b>Ctrl+K</b> — command palette to jump Me / Mail / Rooms / … Press <b>?</b> for shortcuts.</li>'
       + '<li><b>Mail</b> — header count; compose from Me → Mail or profiles.</li>'
       + '<li><b>Groups</b> — local clubs with discussion + Enter hall (lobby meta).</li>'
-      + '<li><b>Games lobby</b> — genre filters and local tables from <code>whirled2.games</code> only — never invented titles.</li>'
+      + '<li><b>Games</b> — Browse / Tables / AVR Coming Soon / My scores. Catalog from <code>whirled2.games</code> only; Coming Soon cards are labeled stubs — never invented live titles.</li>'
       + '<li><b>Coins &amp; Bars</b> — classic dual currency. Daily login streak earns coins; Bars from streak milestones / weekly (earn-only). Buy stays disabled — no payments / no Buy Bars.</li>'
       + '<li><b>Transactions</b> — Me → Transactions (or click header balances / Ctrl+K). Filter All / Coins / Bars. Bling cash-out Coming Soon.</li>'
       + '<li><b>Parties</b> — toolbar party board: create/join/leave locally; follow-leader later on a shared server.</li>'
@@ -4390,7 +4574,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: shared soundtrack + FB removed + room preview + Club tier cards. Cache <code>?v=20260906ab</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: chat visual polish + Games home (Browse / Tables / AVR / scores). Cache <code>?v=20260906ac</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -6234,7 +6418,7 @@ function helpPage() {
   // Gate (logged out) + Shell (logged in chrome) + paint(tab) redraw
   // How this works: paint("rooms"|"me"|...) replaces #main innerHTML from state.
 
-  // Facebook Connect removed (?v=20260906ab): Meta App ID setup was required for a static
+  // Facebook Connect removed (?v=20260906ac): Meta App ID setup was required for a static
   // Pages deploy, so Continue with Facebook / Account link-unlink / SDK load paths are gone.
   // Username/password stays primary. Discord / Google remain Coming Soon labels only.
   // ENGINE DEV: auth is chrome session only — do not break #stage-slot / syncRoomAudio / ♪ Music.
@@ -6648,6 +6832,9 @@ function helpPage() {
   var _stageBubbleSeen = {};
   var _stageBubbleTimers = [];
   function bubbleDurationMs() {
+    // Purpose: how long stage speech bubbles stay visible.
+    // How: short≈2.5s / medium≈4s / long≈7s from chat options.
+    // ENGINE DEV: chrome #stage-bubbles timing until Pixi nametags own speech.
     var d = (loadChatUi().bubbleDuration || "medium");
     if (d === "short") return 2500;
     if (d === "long") return 7000;
@@ -6876,6 +7063,9 @@ function helpPage() {
     try { awardAction("chat"); } catch (e) {}
   }
   function renderChatOptsMenu() {
+    // Purpose: chat options popover (Overlay/Slide, text size, bubble duration, clear).
+    // How: fill #chat-opts-menu from loadChatUi(); F9 hide-history is Overlay-only.
+    // Why: tidy phone-readable layout. ENGINE DEV: bubble duration drives #stage-bubbles.
     var menu = document.getElementById("chat-opts-menu");
     if (!menu) return;
     var ui = loadChatUi();
@@ -8078,6 +8268,20 @@ function helpPage() {
     }
     if (ev.target.closest("[data-games-lobby]") && session()) {
       gamesMode = "lobby";
+      gameViewId = null;
+      paint("games");
+      return;
+    }
+    var gamesHomeBtn = ev.target.closest("[data-games-home]");
+    if (gamesHomeBtn && session()) {
+      // Purpose: Games home nav (Browse / Tables / AVR / My scores).
+      // How: data-games-home sets gamesMode; clears detail view.
+      // Why: one consistent landing without inventing catalog.
+      var gh = gamesHomeBtn.getAttribute("data-games-home") || "browse";
+      if (gh === "lobby") gamesMode = "lobby";
+      else if (gh === "scores") gamesMode = "scores";
+      else if (gh === "avr") gamesMode = "avr";
+      else gamesMode = "browse";
       gameViewId = null;
       paint("games");
       return;

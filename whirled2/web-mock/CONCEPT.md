@@ -16,7 +16,7 @@ Whirled = social network + virtual world. Chrome tabs: **Me, Stuff, Games, Rooms
 - **Games**: genre filters; Featured / favorites empty; list from `whirled2.games` only; detail + multiplayer lobby shell (local tables) — never invent players or catalog titles. Coins labels only.
 - **Occupants**: modernized left rail — “In this room (N)”, you-first, presence dots (here / away / in-game stub), friend highlight, loft-owner crown; click opens menu (Profile / Whisper / Invite / Block / …). Optional filter when >5. Real session occupants only — no fake NPCs.
 - **Stage**: empty `#stage-slot` shows “Your room — engine mounts here”; decorate chips live in sibling `#decorate-layer` inside `.stage-host`. Engine only via `window.WhirledChrome.getStageEl()`.
-- Visual: pale blue classic chrome (`?v=20260906ab` one type/color system: `--paper` `#e8f4fb`, `--ink`, `--accent`), dark teal stuff rail with pale selected state, logo `assets/whirled-classic-logo.png`. No gold/purple chrome. Engine mounts only in `#stage-slot` via `window.WhirledChrome`.
+- Visual: pale blue classic chrome (`?v=20260906ac` one type/color system: `--paper` `#e8f4fb`, `--ink`, `--accent`), dark teal stuff rail with pale selected state, logo `assets/whirled-classic-logo.png`. No gold/purple chrome. Engine mounts only in `#stage-slot` via `window.WhirledChrome`.
 
 ## Provenance (not a Flash / msoy port)
 

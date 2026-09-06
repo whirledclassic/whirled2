@@ -2,7 +2,7 @@
 
 **Status:** Coming Soon UI only (Me → Club / header Club). **No live payments**, no Buy Bars, no checkout. Coins & Bars stay earn-only play labels. Whirled2 is **not affiliated** with Three Rings Design, whirled.club, or any official Whirled commercial entity.
 
-Cache / chrome version when this doc was written: `?v=20260906ab` (see `LOGO_V` in `app.js`).
+Cache / chrome version when this doc was written: `?v=20260906ac` (see `LOGO_V` in `app.js`).
 
 ---
 
