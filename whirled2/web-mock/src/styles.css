@@ -6795,3 +6795,105 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 @media (max-width: 700px) {
   .presence-feed { bottom: 64px; right: 6px; width: min(200px, 55vw); }
 }
+
+
+/* === ?v=20260906bg — dual Wear mode cards (Smooth vs Classic Flash) ===
+ * Beginner: pick a card before Wear. Smooth = PNG. Classic = Ruffle SWF.
+ * ENGINE DEV: playbackMode on Stuff item; loft mounts read classic-avatar.js.
+ */
+.classic-mode-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+@media (max-width: 640px) {
+  .classic-mode-cards { grid-template-columns: 1fr; }
+}
+.classic-mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 2px solid #b7d3e8;
+  border-radius: 10px;
+  background: linear-gradient(#f7fbfe, #e8f4fb);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.classic-mode-card:hover { border-color: #1e6fa8; }
+.classic-mode-card.is-on,
+.classic-mode-card:has(input:checked) {
+  border-color: #1e6fa8;
+  box-shadow: 0 0 0 1px rgba(30,111,168,.25);
+  background: linear-gradient(#fff, #e0f0fa);
+}
+.classic-mode-card.is-recommended:has(input:checked),
+.classic-mode-card.is-recommended.is-on {
+  border-color: #1e6fa8;
+}
+.classic-mode-card.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #f0f5f9;
+}
+.classic-mode-card input[type="radio"] {
+  margin: 0 0 4px;
+  align-self: flex-start;
+}
+.classic-mode-card-title {
+  font-weight: 800;
+  font-size: 14px;
+  color: #16324a;
+}
+.classic-mode-card-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #1e6fa8;
+  background: #e8f4fb;
+  border: 1px solid #b7d3e8;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.classic-mode-card:has(input[value="ruffle"]:checked) .classic-mode-card-badge,
+.classic-mode-card.is-on:has(input[value="ruffle"]) .classic-mode-card-badge {
+  color: #a24f00;
+  background: #fff3e0;
+  border-color: #f0c090;
+}
+.classic-mode-card-detail {
+  font-size: 12px;
+  color: #3a5a72;
+  line-height: 1.35;
+}
+.classic-wear-mode-picker {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px dashed #7eb6d4;
+  border-radius: 8px;
+  background: #f7fbfe;
+}
+.classic-png-cta {
+  color: #a24f00 !important;
+  font-weight: 600;
+}
+.classic-loft-mode-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  background: #e8f4fb;
+  border: 1px solid #7eb6d4;
+  color: #1e6fa8;
+}
+.classic-loft-mode-pill[data-loft-mode="ruffle"] {
+  background: #fff3e0;
+  border-color: #f0c090;
+  color: #a24f00;
+}

@@ -1,3 +1,13 @@
+## What shipped (?v=20260906bg)
+
+- **Dual Wear modes (Flash):** clear radio/cards before Wear — **Whirled2 Smooth** (`playbackMode: png-hybrid`) vs **Classic Flash (Ruffle)** (`playbackMode: ruffle`)
+- Default: Smooth if PNG idle/walk exist, else Ruffle if SWF, else Whirl; SWF-only gets CTA to attach PNGs for Smooth
+- Reliable Wear/persist: strip huge SWF data URLs from worn snapshot (no tofu / blown localStorage); loft mount still resolves SWF from IndexedDB
+- Badges unchanged vocabulary: `Walking: PNG hybrid (no Ruffle)` / `Appearance: Ruffle (SWF)`
+- Docs: HOW-CLASSIC dual-mode why/when; Dev Hub + Dev Updates thread; prefer `src/classic-avatar.js` + minimal app.js hooks
+- Built beside **bf** club Go/Friends/glow/presence — did not regress club work; Whirl, chat visit-since, Groups, badges preserved
+- Cache: **`?v=20260906bg`**. Push: `/tmp/push-bg.js` (dry-run default).
+
 ## What shipped (?v=20260906bf)
 
 - **Go menu wiki sections:** Go home / Recently visited / Friends online / Games awaiting players + beginner hint

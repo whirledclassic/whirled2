@@ -1,3 +1,7 @@
+# QA Flash
+
+Dual modes bg: playbackMode png-hybrid|ruffle.
+
 # QA-FLASH — overnight Flash / loft interact checklist (?v=20260906bb)
 
 **Audience:** beginners verifying Wear + loft; ENGINE DEV confirming chrome vs Ruffle boundaries.

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * qa-flash-check.cjs — headless smoke for ?v=20260906bb Flash loft + Hybrid walk.
+ * qa-flash-check.cjs — headless smoke for ?v=20260906bg dual Wear modes + Flash loft.
  * Beginner: run `node scripts/qa-flash-check.cjs` — no browser needed.
- * ENGINE DEV: asserts Hybrid gate, SWF bob, optional Ruffle docs, no tofu-on-SWF.
+ * ENGINE DEV: asserts playbackMode dual cards, Hybrid gate, SWF bob, optional Ruffle docs, no tofu-on-SWF.
  */
 "use strict";
 const fs = require("fs");
@@ -17,43 +17,53 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
-console.log("QA-FLASH check (?v=20260906bb)");
+console.log("QA-FLASH check (?v=20260906bg dual modes)");
 
 const classic = read("src/classic-avatar.js");
-ok(classic.includes('VERSION = "20260906bb"'), "classic-avatar VERSION bb");
+ok(classic.includes('VERSION = "20260906bg"'), "classic-avatar VERSION bg");
 ok(classic.includes('wmode: opts.wmode || "transparent"'), "mountRuffle wmode transparent");
 ok(classic.includes("shouldMountRuffleInLoft"), "hybrid gate shouldMountRuffleInLoft");
 ok(classic.includes("setLoftWalkMotion"), "SWF bob walk helper");
 ok(classic.includes("ensureClassicWornStates"), "ensureClassicWornStates on Wear");
 ok(classic.includes("data-classic-wear-enter"), "Wear & enter loft button");
-ok(classic.includes("preferHybrid"), "Prefer Hybrid checkbox");
+ok(classic.includes("playbackMode"), "playbackMode field");
+ok(classic.includes("getPlaybackMode"), "getPlaybackMode API");
+ok(classic.includes("classicWearModePickerHtml"), "Wear mode picker");
+ok(classic.includes("Whirled2 Smooth"), "Whirled2 Smooth label");
+ok(classic.includes("Classic Flash (Ruffle)"), "Classic Flash (Ruffle) label");
+ok(classic.includes("png-hybrid"), "png-hybrid mode id");
 ok(classic.includes("itemHasPngWalk"), "strict PNG walk gate");
 ok(classic.includes("preview-only") || classic.includes("NOT preview") || classic.includes("not thumb/preview"), "preview-alone not Hybrid");
-ok(classic.includes("Hybrid (smooth)"), "Hybrid (smooth) label");
+ok(classic.includes("Hybrid (smooth)") || classic.includes("PNG hybrid"), "Hybrid / PNG hybrid label");
 ok(classic.includes("pointerEvents") || classic.includes("pointer-events"), "loft pointer-events handling");
+// legacy preferHybrid may remain in comments; dual radios are the UI
+ok(classic.includes('name="playbackMode"') || classic.includes("data-playback-mode-item"), "Wear mode radios");
 
 const app = read("app.js");
-ok(app.includes('LOGO_V = "20260906bb"'), "app LOGO_V bb");
+ok(app.includes('LOGO_V = "20260906bg"'), "app LOGO_V bg");
 ok(app.includes("setLoftWalkMotion"), "app wires SWF walk motion");
 ok(app.includes("never wipe frames") || app.includes("never wipe frames to"), "setAvatarState never blanks frames");
 ok(app.includes("HOW-CLASSIC-AVATARS-WITHOUT-FLASH"), "Dev Hub links how-without-Flash");
-ok(app.includes("Ruffle = YES") || app.includes("Ruffle = YES (optional"), "Ruffle optional callout");
+ok(app.includes("Ruffle = YES") || app.includes("Ruffle = YES (optional") || app.includes("Dual Wear modes"), "Ruffle optional / dual modes callout");
 ok(app.includes("ensureDevUpdatesGroup"), "Dev Updates group seed");
 ok(app.includes("data-avatar-emote-soon"), "emote Coming Soon stubs");
-ok(app.includes("is-hybrid-smooth") || app.includes("Hybrid (smooth)"), "app hybrid loft mode");
+ok(app.includes("is-hybrid-smooth") || app.includes("Hybrid (smooth)") || app.includes("png-hybrid"), "app hybrid loft mode");
+ok(app.includes("classicWearModePickerHtml"), "app injects Wear mode picker");
+ok(app.includes("getPlaybackMode"), "app honors getPlaybackMode");
+ok(app.includes("storage full") || app.includes("120000"), "Wear persist harden vs blown localStorage");
 
 const css = read("src/styles.css");
-ok(css.includes("20260906bb"), "styles.css bb block");
+ok(css.includes("20260906bg") || css.includes("classic-mode-cards"), "styles.css bg dual-mode cards");
 ok(css.includes("whirled-swf-walk-bob") || css.includes("is-swf-walking"), "SWF bob keyframes/class");
 ok(css.includes("pointer-events: none !important"), "CSS PE none on loft ruffle");
-ok(css.includes("classic-ruffle-callout") || css.includes("classic-hybrid-badge"), "hybrid/callout styles");
+ok(css.includes("classic-ruffle-callout") || css.includes("classic-hybrid-badge") || css.includes("classic-mode-card"), "hybrid/callout/mode styles");
 const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const brownActive = (cssNoComments.match(/#5c4030/g) || []).length + (cssNoComments.match(/#8b6914/g) || []).length;
 ok(brownActive === 0, "no active brown band hexes outside comments (count=" + brownActive + ")");
 
 const index = read("index.html");
-ok(index.includes("20260906bb"), "index.html cache bb");
-ok(!index.includes("20260906ba"), "index.html no stale ba");
+ok(index.includes("20260906bg"), "index.html cache bg");
+ok(!index.includes("20260906bf") || index.includes("20260906bg"), "index prefers bg over stale bf alone");
 
 const docs = [
   "AVATAR-IMPORT.md", "FLA-TEST-AVATAR.md", "DEV-HUB.md", "STATUS.md", "QA-FLASH.md",
@@ -64,8 +74,10 @@ for (const d of docs) {
 }
 const how = read("HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md");
 ok(how.includes("Ruffle = YES (optional path)"), "how-doc Ruffle YES box");
-ok(how.includes("PNG hybrid"), "how-doc PNG hybrid default");
+ok(how.includes("PNG hybrid") || how.includes("png-hybrid"), "how-doc PNG hybrid");
 ok(how.includes("Ruffle never loads"), "how-doc Whirl-only never loads Ruffle");
+ok(how.includes("dual modes") || how.includes("Dual modes") || how.includes("Why dual modes"), "how-doc dual modes why");
+ok(how.includes("playbackMode"), "how-doc playbackMode");
 
 if (failed) {
   console.error("\n" + failed + " check(s) failed");

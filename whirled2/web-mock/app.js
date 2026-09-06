@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bf";
+  var LOGO_V = "20260906bg";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1558,7 +1558,25 @@
       localStorage.removeItem(WORN_AVATAR_KEY);
       return;
     }
-    localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(row));
+    // Harden (?v=20260906bg): never blow localStorage with multi-MB SWF data URLs → Wear fails → tofu.
+    try {
+      if (row.swfDataUrl && String(row.swfDataUrl).length >= 120000) delete row.swfDataUrl;
+      if (row.swfUrl && String(row.swfUrl).indexOf("data:") === 0 && String(row.swfUrl).length >= 120000) {
+        delete row.swfUrl;
+      }
+    } catch (eStrip) {}
+    try {
+      localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(row));
+    } catch (eQuota) {
+      try {
+        var slim = Object.assign({}, row);
+        delete slim.swfDataUrl;
+        if (slim.swfUrl && String(slim.swfUrl).indexOf("data:") === 0) delete slim.swfUrl;
+        localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(slim));
+      } catch (e2) {
+        try { pushNotice("status", "Could not save Wear — storage full. Try smaller PNGs / re-upload SWF."); } catch (e3) {}
+      }
+    }
   }
   function absolutizeMediaUrl(url, packPath) {
     // How this works (?v=20260906ap): pack.json uses relative paths like frames/idle/frame_00.png.
@@ -1786,19 +1804,27 @@
   }
   function getAvatarPlaybackMode(wornOpt) {
     // Returns: tofu | ruffle | png-hybrid | png
+    // How this works (?v=20260906bg): dual Wear modes — honor item.playbackMode first.
     var worn = wornOpt;
     if (!worn) {
       try { worn = loadWornAvatar(); } catch (e) { worn = null; }
     }
     if (!worn) worn = makeTofuWornRow();
     if (worn.isTofu || worn.stuffId === TOFU_AVATAR_ID || worn.source === "tofu") return "tofu";
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.getPlaybackMode) {
+        var pm = WhirledClassicAvatar.getPlaybackMode(worn);
+        if (pm === "ruffle" || pm === "png-hybrid") return pm;
+      }
+    } catch (ePm) {}
     var isSwf = !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf" || worn.kind === "swf");
     var wantsClassic = !!(worn.classicFlashOptIn || worn.useClassicFlash
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemWantsClassicFlash && WhirledClassicAvatar.itemWantsClassicFlash(worn)));
     var forceRuffleLoft = !!(worn.forceRuffleInLoft
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.forceRuffleInLoft && WhirledClassicAvatar.forceRuffleInLoft(worn)));
     var hasPng = itemHasRealPngWalk(worn);
-    // Ruffle actually mounts only when Force Ruffle OR SWF-only (no PNG walk).
+    if (worn.playbackMode === "ruffle") return "ruffle";
+    if (worn.playbackMode === "png-hybrid" && hasPng) return "png-hybrid";
     if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && (!hasPng || forceRuffleLoft)) {
       return "ruffle";
     }
@@ -1829,10 +1855,10 @@
     if (!item) return "";
     var mode = getAvatarPlaybackMode(item);
     var whirl = isWhirlAvatarItem(item);
-    if (mode === "ruffle") return '<span class="stuff-playback-label is-ruffle">Wear mode: Ruffle SWF</span>';
+    if (mode === "ruffle") return '<span class="stuff-playback-label is-ruffle">Wear mode: Classic Flash (Ruffle)</span>';
     if (whirl) return '<span class="stuff-playback-label is-png">Wear mode: Whirl · PNG walk (no Ruffle)</span>';
-    if (mode === "png-hybrid") return '<span class="stuff-playback-label is-png-hybrid">Wear mode: Hybrid (PNG walk) — Ruffle not for loft walk</span>';
-    if (itemHasRealPngWalk(item)) return '<span class="stuff-playback-label is-png">Wear mode: Hybrid (PNG walk)</span>';
+    if (mode === "png-hybrid") return '<span class="stuff-playback-label is-png-hybrid">Wear mode: Whirled2 Smooth (PNG hybrid)</span>';
+    if (itemHasRealPngWalk(item)) return '<span class="stuff-playback-label is-png">Wear mode: PNG walk</span>';
     return '<span class="stuff-playback-label is-png">Wear mode: PNG sprites</span>';
   }
 
@@ -2535,6 +2561,14 @@
       +   '</div>'
       +   '<div class="avatar-viewer-toolbar">'
       +     stuffPlaybackModeLabel(item)
+      +     (function () {
+            try {
+              if (window.WhirledClassicAvatar && WhirledClassicAvatar.classicWearModePickerHtml) {
+                return WhirledClassicAvatar.classicWearModePickerHtml(item) || "";
+              }
+            } catch (ePick) {}
+            return "";
+          })()
       +     '<label class="avatar-scale-label" title="Scale (classic diagonal-arrow control)">'
       +       '<span class="avatar-scale-ico" aria-hidden="true">'
       +         '<svg viewBox="0 0 24 24" width="18" height="18" focusable="false">'
@@ -2550,7 +2584,7 @@
       +       '<button type="button" class="text-btn" data-avatar-states-soon="1" title="Classic SWF states — Coming Soon">States / actions…</button>'
       +     '</div>'
       +     '<p class="meta avatar-viewer-note">Preview play flips <b>PNG spritesheets</b> in HTML/JS when available — that is <b>not</b> Ruffle. '
-      +       'Ruffle only loads for .swf preview / Force Ruffle / SWF-only Wear. Full AvatarControl states Coming Soon.</p>'
+      +       'Ruffle only loads for Classic Flash Wear mode / Stuff SWF preview. Smooth = PNG hybrid (no Ruffle). Full AvatarControl Coming Soon.</p>'
       +   '</div>'
       +   (function () {
             try {
@@ -3644,7 +3678,7 @@
   function ensureDevUpdatesGroup() {
     // How this works (?v=20260906bb): seed Dev Updates group + without-Flash thread (once).
     var DEV_GID = "dev-updates";
-    var THREAD_ID = "classic-avatars-without-flash-bb";
+    var THREAD_ID = "classic-avatars-without-flash-bg";
     try {
       var list = loadGroups();
       var found = null;
@@ -3668,9 +3702,9 @@
       if (!has) {
         threads.unshift({
           id: THREAD_ID,
-          title: "Classic Whirled avatars — without Adobe Flash (?v=20260906bb)",
+          title: "Dual Wear modes — Smooth + Classic Flash (?v=20260906bg)",
           who: "Whirled2",
-          body: "CURRENTLY: Ruffle = YES (optional path). Default smooth room movement = PNG hybrid (Ruffle not required).\n\n"
+          body: "DUAL MODES (?v=20260906bg): A) Classic Flash (Ruffle) — real .swf in loft. B) Whirled2 Smooth (PNG hybrid) — idle+walk like Whirl, no Ruffle.\n\nPick radio cards before Wear. Persists playbackMode: png-hybrid | ruffle. Default: Smooth if PNGs, else Ruffle if SWF, else Whirl.\n\n"
             + "Browsers cannot run Flash Player anymore — we never ask you to install it.\n\n"
             + "Beauty of the approach — Hybrid (smooth): PNG/WebP idle+walk(+emotes) for click-to-walk in chrome (fast, mobile-friendly). "
             + "Optional Ruffle (open Flash emulator in WASM, CDN) plays real .swf files for Stuff preview / Force Ruffle / SWF-only Wear — transparent stage, pointer-events none so the room stays clickable.\n\n"
@@ -8444,7 +8478,7 @@
       + '<li><b>Hybrid (smooth)</b> — PNG/WebP idle+walk(+emotes) drive click-to-walk in chrome (fast, mobile-friendly). Optional SWF stays for archive / Stuff preview.</li>'
       + '<li><b>Ruffle (optional)</b> — open WASM Flash emulator (CDN) loads only when you opt into Classic Flash / Force Ruffle / Stuff SWF preview — to play real <code>.swf</code> files. Transparent stage + pointer-events none so the room stays clickable.</li>'
       + '<li><b>Whirl-only users</b> — if you never upload a SWF, <b>Ruffle never loads</b>.</li>'
-      + '<li><b>One-flow</b> — Drop SWF (+ optional PNG) → Analyze → auto Experimental/Hybrid → Save → <b>Wear &amp; enter loft</b>.</li>'
+      + '<li><b>One-flow</b> — Drop SWF (+ optional PNG) → Analyze → pick <b>Whirled2 Smooth</b> or <b>Classic Flash (Ruffle)</b> → Save → <b>Wear &amp; enter loft</b>.</li>'
       + '<li><b>Honest limits</b> — full AvatarControl host (SWF walk anim) still evolving; Hybrid is the delightful path today.</li>'
       + '</ul>'
       + '<p><b>Read:</b> <a href="' + esc(devHubDocUrl("HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md")) + '" target="_blank" rel="noopener">HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md</a>'
@@ -13044,12 +13078,14 @@
       wearStuffAvatar(wearItem);
       var wearMsg = "Wearing “" + (wearItem.name || "Avatar") + "” — visible in Stuff preview and your loft.";
       try {
-        if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemIsHybrid && WhirledClassicAvatar.itemIsHybrid(wearItem)
-          && !(wearItem.forceRuffleInLoft || (wearItem.pack && wearItem.pack.forceRuffleInLoft))) {
-          wearMsg = "Wearing “" + (wearItem.name || "Avatar") + "” — Hybrid (smooth): click loft floor to walk. SWF stays for Stuff Ruffle preview.";
-        } else if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasClassicSwf && WhirledClassicAvatar.itemHasClassicSwf(wearItem)
-          && !(wearItem.frames && wearItem.frames.length) && !wearItem.preview) {
-          wearMsg = "Wearing Flash “" + (wearItem.name || "Avatar") + "” — click floor to move. Attach PNG idle+walk for Hybrid smooth walk (SWF anim needs AvatarControl).";
+        var wearPm = null;
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.getPlaybackMode) {
+          wearPm = WhirledClassicAvatar.getPlaybackMode(wearItem);
+        }
+        if (wearPm === "png-hybrid") {
+          wearMsg = "Wearing “" + (wearItem.name || "Avatar") + "” — Whirled2 Smooth: click loft floor to walk (PNG hybrid, no Ruffle).";
+        } else if (wearPm === "ruffle" || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasClassicSwf && WhirledClassicAvatar.itemHasClassicSwf(wearItem))) {
+          wearMsg = "Wearing Classic Flash “" + (wearItem.name || "Avatar") + "” — Ruffle appearance; click floor to move. Attach PNGs for Smooth.";
         }
       } catch (eWm) {}
       pushNotice("green", wearMsg, { transient: true });
