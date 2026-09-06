@@ -15,17 +15,21 @@
 (function () {
   "use strict";
   // ---------------------------------------------------------------------------
-  // Branding: prefer whirled2-logo.png, then classic logo, then logo.svg
-  // ---------------------------------------------------------------------------
-  var LOGO = "./assets/whirled2-logo.png";
-  var LOGO_CLASSIC = "./assets/whirled-classic-logo.png";
-  var LOGO_FALLBACK = "./assets/logo.svg";
+  // How this works: brand mark is an SVG (crisp + true transparency).
+  // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
+  // Fallbacks: transparent PNG, then classic mark, then tiny svg.
+  var LOGO_V = "20260906c";
+  var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
+  var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
+  var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
+  var LOGO_FALLBACK = "./assets/logo.svg?v=" + LOGO_V;
   function logoImg(cls) {
-    var wh = cls.indexOf("gate") >= 0 ? ' width="180" height="120"' : ' width="120" height="48"';
-    return '<img class="' + cls + '" alt="Whirled2" src="' + LOGO + '"' + wh
-      + ' decoding="async" data-fb1="' + LOGO_CLASSIC + '" data-fb2="' + LOGO_FALLBACK + '"'
-      + " onerror=\"var i=this;if(i.getAttribute('data-fb1')){i.src=i.getAttribute('data-fb1');i.removeAttribute('data-fb1');}else if(i.getAttribute('data-fb2')){i.src=i.getAttribute('data-fb2');i.removeAttribute('data-fb2');}else{i.onerror=null;}\" />";
+    // How this works: if SVG fails, onerror swaps to PNG then classic then logo.svg.
+    return '<img class="' + cls + '" alt="Whirled2" src="' + LOGO + '"'
+      + ' decoding="async" data-fb1="' + LOGO_PNG + '" data-fb2="' + LOGO_CLASSIC + '" data-fb3="' + LOGO_FALLBACK + '"'
+      + ' onerror="var i=this,a=i.getAttribute(\'data-fb1\');if(a){i.setAttribute(\'data-fb1\',i.getAttribute(\'data-fb2\')||\'\');i.setAttribute(\'data-fb2\',i.getAttribute(\'data-fb3\')||\'\');i.removeAttribute(\'data-fb3\');i.src=a;}else{i.onerror=null;}" />';
   }
+
 
   // esc(s) escapes HTML so user names/chat cannot inject tags.
   function esc(s) {

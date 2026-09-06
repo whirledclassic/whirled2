@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" width="320" height="100" role="img" aria-label="Whirled2">
+  <defs>
+    <radialGradient id="orb" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#e8f7ff"/>
+      <stop offset="45%" stop-color="#7ec8f0"/>
+      <stop offset="100%" stop-color="#2a6fa3"/>
+    </radialGradient>
+    <linearGradient id="fil" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d7eef9"/>
+      <stop offset="100%" stop-color="#9ec9e4"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#1a4a68" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <!-- soft filigree ring -->
+  <g fill="none" stroke="url(#fil)" stroke-width="2.2" opacity="0.95">
+    <ellipse cx="52" cy="50" rx="40" ry="38"/>
+    <path d="M18 42c6-18 22-28 34-28s28 10 34 28" stroke-width="1.6" opacity="0.7"/>
+    <path d="M18 58c6 18 22 28 34 28s28-10 34-28" stroke-width="1.6" opacity="0.7"/>
+    <path d="M52 12c-4 6-5 12-5 18M52 88c-4-6-5-12-5-18M52 12c4 6 5 12 5 18M52 88c4-6 5-12 5-18" stroke-width="1.4" opacity="0.65"/>
+  </g>
+  <!-- orb -->
+  <circle cx="52" cy="50" r="26" fill="url(#orb)" filter="url(#soft)"/>
+  <path d="M38 44c8-10 22-12 28-2 4 6-2 12-8 14-8 2-14-2-12-8 1-4 6-6 10-4" fill="none" stroke="#163a5c" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M40 62c10 8 22 4 26-4" fill="none" stroke="#163a5c" stroke-width="2.4" stroke-linecap="round" opacity="0.85"/>
+  <ellipse cx="42" cy="40" rx="7" ry="4" fill="#fff" opacity="0.55"/>
+  <!-- wordmark -->
+  <g font-family="Verdana, Geneva, Arial, sans-serif" font-weight="700" font-size="42" letter-spacing="-0.5">
+    <text x="100" y="64" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round" paint-order="stroke">Whirled2</text>
+    <text x="100" y="64" fill="#1a3f66">Whirled2</text>
+  </g>
+</svg>

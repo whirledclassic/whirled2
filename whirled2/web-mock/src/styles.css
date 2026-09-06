@@ -1682,3 +1682,58 @@ body > .party-panel {
   body { overflow-x: hidden; }
   #app { overflow-x: hidden; }
 }
+
+/* ---- 20260906c: header logo + mobile chrome cleanup ---- */
+.brand .logo, img.logo {
+  height: 42px !important;
+  width: auto !important;
+  max-width: 150px !important;
+  background: transparent !important;
+  image-rendering: auto;
+}
+.gate-logo, img.gate-logo {
+  height: 88px !important;
+  width: auto !important;
+  max-width: 260px !important;
+  background: transparent !important;
+  margin: 0 auto 12px;
+}
+.topbar {
+  background: linear-gradient(#cfe6f5, #b7d7ec);
+  border-bottom: 1px solid #8eb6d0;
+}
+@media (max-width: 700px) {
+  .brand .logo, img.logo {
+    height: 32px !important;
+    max-width: 108px !important;
+  }
+  .topbar {
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    gap: 2px 8px;
+    padding: 8px 8px 0 !important;
+  }
+  .brand { grid-column: 1; grid-row: 1; align-self: center; }
+  .who { grid-column: 2; grid-row: 1; align-self: center; }
+  .tabs {
+    grid-column: 1 / -1; grid-row: 2;
+    width: 100%;
+    margin: 0;
+    padding: 0 0 0 !important;
+  }
+  .workspace, .stage-host, .room-view {
+    min-width: 0;
+  }
+  .stage-placeholder, #stage-slot .stage-placeholder, .stage-hint {
+    font-size: 12px !important;
+    padding: 12px !important;
+    line-height: 1.35;
+  }
+  .room-side-panel, .decorate-panel, .chat-opts-menu, .go-menu, .room-menu {
+    max-width: min(320px, calc(100vw - 16px));
+  }
+  .bar {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
