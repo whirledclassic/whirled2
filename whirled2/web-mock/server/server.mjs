@@ -1,3 +1,12 @@
+/**
+ * Optional tiny Node demo server for shared chat / occupants.
+ *
+ * How this works:
+ * - Run locally (see README). Point the page at it with window.WHIRLED_API = "http://localhost:PORT".
+ * - On GitHub Pages, WHIRLED_API is empty — app.js uses WhirledApi offline localStorage instead.
+ * - In-memory users + loft chat; not a production database.
+ * - Endpoints used by src/api.js: /api/register, /api/login, /api/me, /api/rooms/:id/chat, occupants.
+ */
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,6 +19,7 @@ const DATA = path.join(__dirname, "data.json");
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 
+// DB shape kept in server/data.json (created on first write).
 function emptyDb() { return { users: {}, sessions: {}, messages: [], presence: {} }; }
 function load() {
   try { return Object.assign(emptyDb(), JSON.parse(fs.readFileSync(DATA, "utf8"))); }
@@ -62,6 +72,7 @@ function mime(file) {
   const ext = path.extname(file).toLowerCase();
   return ({ ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".md": "text/plain; charset=utf-8" })[ext] || "application/octet-stream";
 }
+// How this works: Authorization Bearer <token> → session → user row.
 function authUser(db, req) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -71,6 +82,7 @@ function authUser(db, req) {
 }
 
 
+// Presence map: who is "in" a room (heartbeat from the client).
 function touchPresence(db, user, room) {
   if (!user) return;
   const roomId = room || user.room || "loft";
@@ -114,6 +126,7 @@ function occupantsInRoom(db, room) {
   return list;
 }
 
+// Information: HTTP server entry — routes /api/* JSON, else static files from web-mock root.
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (req.method === "OPTIONS") return send(res, 204, {});

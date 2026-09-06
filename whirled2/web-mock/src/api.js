@@ -1,7 +1,13 @@
 /**
- * Tiny client for the demo server.
- * If WHIRLED_API is empty or the server is down, the page falls back
- * to localStorage so index.html still works offline.
+ * WhirledApi — tiny client for accounts + room chat.
+ *
+ * How this works:
+ * - If window.WHIRLED_API is set and the server is up, requests go to server/server.mjs.
+ * - If not (GitHub Pages default), everything falls back to localStorage so the chrome
+ *   still works offline in one browser.
+ * - Session: localStorage key "whirled2.session" { token, user }.
+ * - Offline users: "whirled2.users". First register also sets "whirled2.firstUserId".
+ * - Offline loft chat: "whirled2.chat.loft" (array of messages).
  */
 (function (root) {
   "use strict";
@@ -74,6 +80,7 @@
           coins: 0
         };
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        // Information: remember the very first account on this browser (admin bootstrap in app.js).
         try {
           if (!localStorage.getItem("whirled2.firstUserId")) {
             localStorage.setItem("whirled2.firstUserId", id);
@@ -158,6 +165,7 @@
       }
     },
 
+    // How this works: try server POST; on failure append to whirled2.chat.loft locally.
     async postChat(room, text) {
       var session = loadSession();
       var msg = {

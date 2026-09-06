@@ -4,16 +4,14 @@ Date: 2026-09-05
 
 ## What shipped (this pass)
 
-- **Whirled2 branding**: logo prefers `assets/whirled2-logo.png` (fallback whirled-classic-logo.png → logo.svg). Gate/header/docs say **Whirled2**. Not affiliated with whirled.club / Three Rings.
-- **Club / Membership Coming Soon**: Me → Club + header Club. May-include list (extra rooms, cosmetics, supporter mark, early access, events) marked subject to change. Disclaimer (new engine, greyhavens/msoy reference, prototypes). Local “Notify me” stub — **no payments**.
-- **Roles / badges** (prior): `whirled2.roles`, Admin/Mod pills, `test`=admin, Account promote/demote.
-- **Room chat** (prior): Slide vs Overlay (`whirled2.chatUi`), chat opts, name menu, `/me` `/emote` `/clear`, rate-limit.
-- **Profile edit UX**: own profile is read-only by default; classic Edit status / photo / information links expand one panel at a time (Done/Cancel collapses). Others never see edit forms.
-- Cache bust `?v=20260905x`. Coins labels only. No gold/purple. No fake NPCs/catalog. Keep `WhirledChrome` + `#stage-slot` + `#decorate-layer`. No private engine.
+- **Beginner comments**: plain-English `//` / `/* */` section headers in `app.js`, `src/api.js`, `src/styles.css`, `server/server.mjs`, and a brief note in `index.html`. Top of `app.js` explains gate → shell → tabs → localStorage → WhirledChrome → Pages vs server. No behavior change intended.
+- Prior feature ship (same tree): Whirled2 logo/branding, Club/Membership Coming Soon, roles/badges (`test`=admin), chat Slide/Overlay, profile Edit collapse UX.
+- Cache bust `?v=20260905y`. Coins labels only. No gold/purple. No fake NPCs/catalog. Keep `WhirledChrome` + `#stage-slot` + `#decorate-layer`. No private engine.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905x
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905y
+- Prior feature URL: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905x
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope

@@ -1,6 +1,22 @@
-/* Whirled 2 page chrome. Classic whirled.club layout. No Pixi. */
+/*
+ * Whirled2 page chrome (classic whirled.club-style UI). No Pixi / no private engine.
+ *
+ * How this works (beginner overview):
+ * 1) index.html loads src/api.js then app.js. Everything runs in one IIFE (this file).
+ * 2) Gate: if no session, show register/login. Session lives in localStorage whirled2.session
+ *    (via WhirledApi). Offline Pages uses local users in whirled2.users; optional server/server.mjs
+ *    can share chat when WHIRLED_API is set.
+ * 3) After login, shell() builds the top tabs + chat bar; paint(tab) fills #main for Me / Stuff /
+ *    Games / Rooms / Groups / Shop. Room stage is empty #stage-slot for a future engine.
+ * 4) Most data is browser-local (localStorage keys whirled2.*). Coins are labels only — no payments.
+ * 5) Engine bridge: window.WhirledChrome.getStageEl() returns #stage-slot. See ENGINE-BRIDGE.md.
+ * 6) paint() redraws HTML from state; click/submit listeners on #app handle almost all UI actions.
+ */
 (function () {
   "use strict";
+  // ---------------------------------------------------------------------------
+  // Branding: prefer whirled2-logo.png, then classic logo, then logo.svg
+  // ---------------------------------------------------------------------------
   var LOGO = "./assets/whirled2-logo.png";
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png";
   var LOGO_FALLBACK = "./assets/logo.svg";
@@ -11,11 +27,17 @@
       + " onerror=\"var i=this;if(i.getAttribute('data-fb1')){i.src=i.getAttribute('data-fb1');i.removeAttribute('data-fb1');}else if(i.getAttribute('data-fb2')){i.src=i.getAttribute('data-fb2');i.removeAttribute('data-fb2');}else{i.onerror=null;}\" />";
   }
 
+  // esc(s) escapes HTML so user names/chat cannot inject tags.
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (ch) {
       return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
     });
   }
+  // ---------------------------------------------------------------------------
+  // localStorage keys + UI state
+  // Information: almost every feature persists under whirled2.* in this browser.
+  // There is no invented NPC catalog — empty lists stay empty until the user adds data.
+  // ---------------------------------------------------------------------------
   var PEOPLE = []; // real occupants only — filled from presence API / session
   var STUFF_KEY = "whirled2.stuff";
   var SHOP_KEY = "whirled2.shop";
@@ -98,6 +120,10 @@
     { id: "music", label: "Music", empty: "No popular music yet." },
     { id: "videos", label: "Videos", empty: "No popular videos yet." }
   ];
+  // ---------------------------------------------------------------------------
+  // Stuff / Shop / Parties / Blocklist / Galleries / Transactions loaders
+  // How this works: load* reads JSON from localStorage; save* writes a capped array.
+  // ---------------------------------------------------------------------------
   function loadStuff() {
     try { return JSON.parse(localStorage.getItem(STUFF_KEY) || "[]"); } catch (e) { return []; }
   }
@@ -354,6 +380,11 @@
     if (!found) list.unshift({ id: entry.id, name: entry.name || entry.id, at: new Date().toISOString() });
     saveKnownProfiles(list);
   }
+  // ---------------------------------------------------------------------------
+  // Roles (Admin / Mod / Player) — localStorage whirled2.roles
+  // Information: name/id "test" or "admin" always counts as admin. First registered
+  // account id is stored in whirled2.firstUserId (see api.js) and bootstrapped admin.
+  // ---------------------------------------------------------------------------
   function loadRoles() {
     try { return JSON.parse(localStorage.getItem(ROLES_KEY) || "{}"); } catch (e) { return {}; }
   }
@@ -449,6 +480,10 @@
     } catch (e4) {}
     saveRoles(map);
   }
+  // ---------------------------------------------------------------------------
+  // Chat UI prefs — localStorage whirled2.chatUi { mode, hideHistory, textSize }
+  // mode "overlay" (default) = floating log over the room; "slide" = dark side panel.
+  // ---------------------------------------------------------------------------
   function loadChatUi() {
     try {
       var raw = JSON.parse(localStorage.getItem(CHAT_UI_KEY) || "null");
@@ -648,6 +683,9 @@
     return STUFF_CATS[0];
   }
 
+  // ---------------------------------------------------------------------------
+  // Session helpers + occupant / chat row HTML builders
+  // ---------------------------------------------------------------------------
   function session() { return window.WhirledApi ? window.WhirledApi.session() : null; }
   function you() {
     var s = session();
@@ -693,7 +731,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905x";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905y";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -1428,7 +1466,7 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Whirled2 branding, Club/Membership Coming Soon, roles/badges, chat Slide/Overlay. Cache <code>?v=20260905x</code>.</p>'
+      + '<p class="meta">This pass: Whirled2 branding, Club/Membership Coming Soon, roles/badges, chat Slide/Overlay. Cache <code>?v=20260905y</code>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta">Live docs live in-repo as CONCEPT.md / STATUS.md — no external secrets.</p>'
       + '</div></section>';
@@ -1464,6 +1502,9 @@
     if (v === "locked") return "Locked";
     return "Unlocked";
   }
+  // ---------------------------------------------------------------------------
+  // Rooms: lobby tiles vs in-room stage (#stage-slot) + chat log / overlay
+  // ---------------------------------------------------------------------------
   function roomView() {
     var me = you();
     var here = liveOccupants.slice();
@@ -1803,6 +1844,10 @@
       + '</div></section>';
   }
 
+  // ---------------------------------------------------------------------------
+  // Me → My Profile (classic edit links: read-only until you click Edit)
+  // profileEditSection: null | "status" | "photo" | "info"
+  // ---------------------------------------------------------------------------
   function meProfile() {
     var me = you();
     var sid = session().user.id;
@@ -2312,6 +2357,9 @@
   }
 
 
+  // ---------------------------------------------------------------------------
+  // Club / Membership — Coming Soon (no payments; local notify stub only)
+  // ---------------------------------------------------------------------------
   function meClub() {
     var sid = session() && session().user ? session().user.id : "guest";
     var note = "";
@@ -2397,6 +2445,10 @@
 
 
 
+  // ---------------------------------------------------------------------------
+  // Gate (logged out) + Shell (logged in chrome) + paint(tab) redraw
+  // How this works: paint("rooms"|"me"|...) replaces #main innerHTML from state.
+  // ---------------------------------------------------------------------------
   function gate() {
     return ''
       + '<section class="gate"><div class="gate-card">'
@@ -2487,7 +2539,7 @@
       try { window.__whirledBoot = true; } catch (e) {}
       return;
     }
-    bootstrapRoles();
+    bootstrapRoles(); // ensure admin badges for test / first user before first paint
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
     var tabAttr = tab || "rooms";
     if (tabAttr === "rooms" && !inRoom) tabAttr = "rooms-lobby";
@@ -2547,6 +2599,7 @@
       host.insertAdjacentHTML("beforeend", decorateLayerHtml());
     }
   }
+  // Information: refreshChatLog writes both #chat-log (slide) and #chat-overlay (overlay).
   function refreshChatLog() {
     var ui = loadChatUi();
     var html = chat.map(chatRow).join("");
@@ -2668,6 +2721,9 @@
     layer.addEventListener("pointerup", endDrag);
     layer.addEventListener("pointercancel", endDrag);
   }
+  // ---------------------------------------------------------------------------
+  // WhirledChrome bridge — engine mounts only via getStageEl() → #stage-slot
+  // ---------------------------------------------------------------------------
   function exposeBridge() {
     window.WhirledChrome = {
       version: "0.4",
@@ -2683,6 +2739,10 @@
   function occupants() {
     return liveOccupants.slice();
   }
+  // ---------------------------------------------------------------------------
+  // Chat send / options / name menu / history poll
+  // Soft rate-limit: >5 messages in 3s → system "You're being too chatty…"
+  // ---------------------------------------------------------------------------
   async function pushChat(text) {
     text = String(text || "").trim();
     if (!text) return;
@@ -2801,6 +2861,9 @@
       if (next.length !== chat.length) { chat = next; refreshChatLog(); }
     }, 2500);
   }
+  // ---------------------------------------------------------------------------
+  // Boot + presence / chat polling timers
+  // ---------------------------------------------------------------------------
   function boot() {
     paint(session() ? "rooms" : "");
     if (session()) { loadHistory(); startPoll(); startOccPoll(); }
@@ -2840,6 +2903,10 @@
 
   var app = document.getElementById("app");
   boot();
+  // ---------------------------------------------------------------------------
+  // Event delegation: one click listener + one submit listener on #app
+  // Information: buttons use data-* attributes (data-tab, data-me, data-profile-edit, …).
+  // ---------------------------------------------------------------------------
   app.addEventListener("click", function (ev) {
     if (!ev.target.closest(".tb-go-wrap")) {
       var gm0 = document.getElementById("go-menu");

@@ -34,3 +34,7 @@ Staff vibe without purple/gold chrome: **Admin** (deeper blue + optional Agent l
 ## Club / Membership
 
 **Coming Soon.** Inspired by classic Club Whirled (extra rooms, cosmetics, supporter perks) — listed as *may / subject to change*. Coins/bars stay labels; **no live payments**. Whirled2 is not affiliated with Three Rings or whirled.club; same-game-spirit revival on a new engine (greyhavens/msoy is reference only).
+
+## Beginner comments
+
+Source files carry short `// Information` / `// How this works` notes so new contributors can follow tabs, localStorage keys, chat modes, and the engine bridge without reverse-engineering every line.

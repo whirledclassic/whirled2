@@ -1,3 +1,9 @@
+/* Whirled2 chrome styles
+ * How this works: pale blue classic chrome (no gold/purple). Layout: #app column →
+ * topbar + #main + .bar chat. Room stage uses .stage-host / #stage-slot / #decorate-layer.
+ * Chat: .chat-log (slide) vs .chat-overlay (overlay). Roles: .role-badge.
+ * Coins colors are decorative labels only.
+ */
 /* Classic Whirled / whirled.club chrome. Not editorial. */
 :root {
   --header: #eaf6fc;
@@ -78,6 +84,7 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 .text-btn { border: 0; background: transparent; color: #1e6fa8; font: 700 11px var(--ui); cursor: pointer; text-decoration: underline; }
 .note { display: none; }
 
+/* ---- Room workspace: occupant rail + stage ---- */
 .workspace { flex: 1; display: grid; grid-template-columns: 168px minmax(0,1fr); min-height: 0; background: #000; }
 .rail {
   background: linear-gradient(180deg, #1b2833, #121920);
@@ -143,6 +150,7 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 }
 .profile-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 
+/* ---- Bottom chat bar (only shown on rooms + inRoom via HTML/CSS) ---- */
 .bar {
   height: 46px; display: flex; align-items: center; gap: 6px;
   padding: 0 8px; background: var(--chat); color: #dce8f0; flex-shrink: 0;
@@ -576,6 +584,7 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 
 
 /* Classic Whirled profile layout */
+/* ---- Classic profile layout ---- */
 .classic-profile { max-width: 920px; }
 .cp-header {
   display: grid;
@@ -1154,6 +1163,7 @@ body > .party-panel {
 
 
 /* Roles + chat UI (20260905w) */
+/* ---- Admin / Mod role pills (no purple/gold) ---- */
 .role-badge {
   display: inline-block;
   font: 700 9px/1.2 var(--ui);
@@ -1217,7 +1227,8 @@ body > .party-panel {
 .stage-body.chat-mode-overlay .chat-log {
   display: none;
 }
-.stage-body.hide-history .chat-overlay {
+.stage-body.hide-history /* ---- Overlay chat floating over the left of the room ---- */
+.chat-overlay {
   display: none !important;
 }
 .chat-overlay {
@@ -1388,6 +1399,7 @@ body > .party-panel {
 
 
 /* Club / Membership Coming Soon (20260905x) */
+/* ---- Club / Membership Coming Soon ---- */
 .club-hero { position: relative; }
 .club-badge-soon {
   display: inline-block;
@@ -1441,6 +1453,7 @@ body > .party-panel {
 
 
 /* Profile edit-on-demand (classic whirled.club vibe) */
+/* ---- Profile Edit links (expand one section at a time) ---- */
 .edit-link {
   border: 0;
   background: transparent;
