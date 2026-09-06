@@ -162,17 +162,17 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Meta app setup**: developers.facebook.com → Facebook Login for Web → App Domains / Valid OAuth Redirect URIs include `https://whirledclassic.github.io/`.
 - **Safety**: never invent FB users without SDK success; no payments; Discord/Google Coming Soon only.
 - **Engine**: auth is chrome; session only — do not break `#stage-slot` / `syncRoomAudio` / ♪ Music.
-- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906t`.
+- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906v`.
 
 ## Room music embeds + Profile BG (20260906t)
 
-- **Mobile touch**: `#room-embed-dock` z-index 12, `pointer-events:auto`, iframe ≥200px (YT). Expanded sheet (`is-expanded`) for finger-sized player. External buttons do not rely on iframe chrome alone.
+- **Mobile touch**: `#room-embed-dock` z-index 12, `pointer-events:auto`, iframe ≥200px (YT). Expanded sheet (`is-expanded`, fixed, z-index 100, stays under `#app`) for finger-sized player. External buttons do not rely on iframe chrome alone.
 - **Parse**: music.youtube.com, Shorts/Live/embed/youtu.be/watch+list; Spotify intl- + parseable spotify.link only.
 - **Profile BG**: Upload custom background card; `applyProfileSkinDom` full-bleed on `.page.profile-page`; never call it MySpace — Profile look / Customize look only.
 
-## Room embed dock survives paint (20260906u)
+## Room embed dock outside #main (20260906v)
 
-- **Bug**: every `paint("rooms")` replaced `main.innerHTML`, wiping `#room-embed-dock` + remounting the iframe — Open player looked like it "closed" on mute / source tabs / panel taps.
-- **Fix**: `roomEmbedExpanded` flag; `parkRoomEmbedDock()` before `main.innerHTML`; `ensureRoomEmbedDock` adopts parked node and re-applies `is-expanded` + Close player. Expanded dock parents on `document.body` (z-index 100) above chat bar.
-- **Panel**: `#room-playlist-panel` closes only via Close / leave room / `clearStrayUI` — keep open across source tabs.
-- **Cache**: `LOGO_V` / `?v=20260906u`. Do not push unless instructed.
+- **Bug**: dock under `#main` was wiped by every `paint("rooms")`; park-to-`document.body` fixed the wipe but broke `#app` click delegation (Open/Close/Room music died after expand on phone).
+- **Fix**: `#room-embed-dock` persistent in `shell()` after `#main` / before `.bar`. `ensureRoomEmbedDock` always uses that host — never `.stage-body`, never `document.body`. `applyRoomEmbedExpanded` only toggles `is-expanded` + Close visibility (CSS fixed sheet z-index 100). Document capture listener backup for embed controls. `ensurePlaylistPanel()` mounts `#room-playlist-panel` on `#app`. Prefer `classList` (never wipe `is-expanded` via `className=`).
+- **Panel**: closes only via Close / leave room / `clearStrayUI` — keep open across source tabs.
+- **Cache**: `LOGO_V` / `?v=20260906v`. Do not push unless instructed.

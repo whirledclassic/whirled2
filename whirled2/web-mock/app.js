@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906u";
+  var LOGO_V = "20260906v";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -98,8 +98,8 @@
   // How this works: MP3/etc upload → Stuff (type music, data URL). Room menu opens
   // playlist panel. Tracks live in localStorage whirled2.playlist.loft.
   // source: local | youtube | spotify. Local uses HTML5 <audio id="room-audio">;
-  // embeds use #room-embed-dock iframe (chrome sibling under stage — not #stage-slot).
-  // ENGINE DEV: keep embed dock outside Pixi mount so stage stays clear.
+  // embeds use #room-embed-dock iframe (shell host outside #main — not #stage-slot).
+  // ENGINE DEV: keep embed dock outside Pixi mount + outside #main so paint never wipes it.
   // ---------------------------------------------------------------------------
   var PLAYLIST_KEY = "whirled2.playlist.loft";
   var MUSIC_WARN_BYTES = 2 * 1024 * 1024; // soft warn ~2MB
@@ -320,12 +320,10 @@
     return a;
   }
   function removeRoomEmbedDock() {
-    // How this works: hide/clear dock + any parked live node. Leaving room / local source pauses embed.
+    // How this works: hide/clear the shell dock. Leaving room / local source pauses embed.
     // Beginner: Close player is separate — this fully tears down the iframe when music should stop.
-    // ENGINE DEV: also clear #room-embed-dock-parked so paint never reattaches a stale player.
+    // ENGINE DEV: dock lives in shell() outside #main — never wipe via main.innerHTML.
     roomEmbedExpanded = false;
-    var parked = document.getElementById("room-embed-dock-parked");
-    if (parked) parked.remove();
     var dock = document.getElementById("room-embed-dock");
     if (!dock) return;
     dock.hidden = true;
@@ -333,99 +331,64 @@
     dock.innerHTML = "";
     dock.removeAttribute("data-embed-src");
     dock.removeAttribute("data-embed-kind");
-  }
-  function parkRoomEmbedDock() {
-    // How this works: before main.innerHTML = rooms(), detach the live dock so paint does not destroy the iframe.
-    // Beginner: without this, Open player / mute / source tabs look like they "close" the player.
-    // ENGINE DEV: rename id while parked so the fresh placeholder in roomView can keep id=room-embed-dock.
-    var dock = document.getElementById("room-embed-dock");
-    if (!dock) return null;
-    var hasLive = dock.getAttribute("data-embed-src") || dock.querySelector("iframe.room-embed-frame");
-    if (!hasLive) return null;
-    // Capture expansion from DOM if flag somehow lagged (defensive).
-    if (dock.classList.contains("is-expanded")) roomEmbedExpanded = true;
-    var oldParked = document.getElementById("room-embed-dock-parked");
-    if (oldParked && oldParked !== dock) oldParked.remove();
-    dock.id = "room-embed-dock-parked";
-    document.body.appendChild(dock);
-    return dock;
-  }
-  function adoptParkedRoomEmbedDock(placeholder) {
-    // How this works: swap empty roomView placeholder for the parked live dock (same iframe node).
-    var parked = document.getElementById("room-embed-dock-parked");
-    if (!parked) return placeholder || document.getElementById("room-embed-dock");
-    parked.id = "room-embed-dock";
-    if (placeholder && placeholder !== parked && placeholder.parentNode) {
-      placeholder.parentNode.replaceChild(parked, placeholder);
-    } else if (!parked.parentNode || parked.parentNode === document.body) {
-      // No placeholder — leave on body for now; caller may re-home.
-    }
-    return parked;
+    // Safety: if a stray dock somehow landed under #main, drop it (shell host is the only one).
+    try {
+      var main = document.getElementById("main");
+      if (main && main.contains(dock)) {
+        var app = document.getElementById("app");
+        var bar = app && document.getElementById("chat-form");
+        if (app && bar) app.insertBefore(dock, bar);
+        else if (app) app.appendChild(dock);
+      }
+    } catch (eHome) {}
   }
   function applyRoomEmbedExpanded(dock) {
-    // How this works: always re-apply is-expanded from roomEmbedExpanded (not only wasExpanded on old node).
-    // Beginner: Close player button shows only while the big sheet is open.
-    // ENGINE DEV: when expanded, keep dock on document.body so fixed sheet beats .bar stacking (z~15 in #app).
+    // How this works: toggle is-expanded + Close player visibility from roomEmbedExpanded.
+    // Beginner: Open player = big bottom sheet; Close player collapses it.
+    // ENGINE DEV: never reparent to document.body — dock stays under #app so click delegation works.
+    // CSS position:fixed; left/right/bottom:0; z-index:100 keeps the sheet above .bar.
     if (!dock) return;
     dock.classList.toggle("is-expanded", !!roomEmbedExpanded);
     var col = dock.querySelector("[data-embed-collapse]");
     if (col) col.hidden = !roomEmbedExpanded;
-    if (roomEmbedExpanded) {
-      if (dock.parentNode !== document.body) document.body.appendChild(dock);
-      dock.hidden = false;
-    }
-  }
-  function homeRoomEmbedDock(dock) {
-    // How this works: collapsed dock lives under stage (sibling of .stage-host); expanded stays on body.
-    if (!dock || roomEmbedExpanded) return;
-    var host = document.querySelector(".stage-wrap .stage-body") || document.querySelector(".stage-wrap");
-    if (!host) return;
-    if (dock.parentNode === host) return;
-    // Prefer replacing an empty placeholder still in the stage tree.
-    var placeholder = null;
-    var nodes = host.querySelectorAll(".room-embed-dock");
-    for (var i = 0; i < nodes.length; i++) {
-      if (nodes[i] !== dock) { placeholder = nodes[i]; break; }
-    }
-    var after = host.querySelector(".stage-host");
-    if (placeholder && placeholder.parentNode) {
-      placeholder.parentNode.replaceChild(dock, placeholder);
-    } else if (after && after.parentNode === host) {
-      if (after.nextSibling) host.insertBefore(dock, after.nextSibling);
-      else host.appendChild(dock);
-    } else {
-      host.appendChild(dock);
-    }
+    if (roomEmbedExpanded) dock.hidden = false;
   }
   function ensureRoomEmbedDock(pl) {
-    // How this works: iframe dock under the stage + big mobile buttons outside the iframe.
+    // How this works: iframe + big mobile buttons in the persistent shell dock (outside #main).
     // Beginner: on a phone, tap "Open player" / "Open on YouTube" — those always work even if the tiny iframe play button is hard to hit.
-    // ENGINE DEV: dock is chrome sibling of .stage-host (not #stage-slot). Park/reattach preserves iframe across paint().
+    // ENGINE DEV: #room-embed-dock is created in shell() after #main / before .bar — paint never destroys it.
     // Touch: raise z-index + pointer-events; expand sheet for ~220px tap target on iOS.
     if (!inRoom || !pl || (pl.source !== "youtube" && pl.source !== "spotify") || !pl.embedSrc) {
       removeRoomEmbedDock();
       return null;
     }
-    var host = document.querySelector(".stage-wrap .stage-body") || document.querySelector(".stage-wrap");
-    var placeholder = document.getElementById("room-embed-dock");
-    // Prefer parked live node over a fresh empty placeholder from roomView().
-    var dock = adoptParkedRoomEmbedDock(placeholder);
-    if (!dock) {
+    var app = document.getElementById("app");
+    var dock = document.getElementById("room-embed-dock");
+    if (!dock && app) {
       dock = document.createElement("div");
       dock.id = "room-embed-dock";
-      dock.className = "room-embed-dock";
+      dock.classList.add("room-embed-dock");
+      dock.hidden = true;
+      var bar = document.getElementById("chat-form");
+      if (bar) app.insertBefore(dock, bar);
+      else app.appendChild(dock);
     }
-    if (!host) {
-      // Not on rooms view — keep iframe alive on body so Me/Stuff paint does not kill audio.
-      // Beginner: player chrome hides while you browse other tabs; expanded sheet can stay if you left it open.
-      if (dock.parentNode !== document.body) document.body.appendChild(dock);
-    } else if (!roomEmbedExpanded) {
-      homeRoomEmbedDock(dock);
-    }
-    dock.className = "room-embed-dock";
-    // Hide collapsed dock when off the rooms stage; expanded sheet stays visible on body.
-    dock.hidden = !host && !roomEmbedExpanded;
-    if (host || roomEmbedExpanded) dock.hidden = false;
+    if (!dock) return null;
+    // Never append under .stage-body / #main — keep under #app shell host.
+    try {
+      var main = document.getElementById("main");
+      if (main && main.contains(dock) && app) {
+        var bar2 = document.getElementById("chat-form");
+        if (bar2) app.insertBefore(dock, bar2);
+        else app.appendChild(dock);
+      }
+    } catch (eMove) {}
+    // Use classList — never dock.className = "…" (that wiped is-expanded).
+    dock.classList.add("room-embed-dock");
+    var onRoomsStage = !!document.querySelector("#main .stage-wrap");
+    // Hide collapsed dock off the rooms stage; expanded fixed sheet can stay visible.
+    dock.hidden = !onRoomsStage && !roomEmbedExpanded;
+    if (onRoomsStage || roomEmbedExpanded) dock.hidden = false;
     var kind = pl.source === "spotify" ? "spotify" : "youtube";
     var title = esc(pl.embedTitle || (kind === "spotify" ? "Spotify" : "YouTube"));
     var src = roomEmbedSrcForIframe(pl);
@@ -461,9 +424,51 @@
       dock.setAttribute("data-embed-kind", kind);
     }
     applyRoomEmbedExpanded(dock);
-    if (!roomEmbedExpanded) homeRoomEmbedDock(dock);
     return dock;
   }
+  function ensurePlaylistPanel() {
+    // How this works: Room music side panel mounts on #app (outside #main) so paint does not flash-unmount it.
+    // Beginner: panel stays open across mute / source tabs until Close / leave / clearStrayUI.
+    // ENGINE DEV: refresh HTML in place when open; remove when closed or off Rooms tab.
+    var app = document.getElementById("app");
+    var existing = document.getElementById("room-playlist-panel");
+    var onRooms = app && app.getAttribute("data-tab") === "rooms";
+    if (!app || !playlistPanelOpen || !inRoom || !session() || !onRooms) {
+      if (existing) existing.remove();
+      return null;
+    }
+    // Drop any copy that landed under #main from an old paint.
+    try {
+      var main = document.getElementById("main");
+      if (main) {
+        var stray = main.querySelector("#room-playlist-panel");
+        if (stray && stray !== existing) stray.remove();
+        if (existing && main.contains(existing)) existing.remove(), existing = null;
+      }
+    } catch (eStray) {}
+    var html = playlistPanel();
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    var next = wrap.firstChild;
+    if (!next) return null;
+    if (existing && existing.parentNode) {
+      existing.parentNode.replaceChild(next, existing);
+    } else {
+      var dock = document.getElementById("room-embed-dock");
+      var bar = document.getElementById("chat-form");
+      if (dock && dock.parentNode === app) {
+        if (dock.nextSibling) app.insertBefore(next, dock.nextSibling);
+        else app.appendChild(next);
+      } else if (bar) app.insertBefore(next, bar);
+      else app.appendChild(next);
+    }
+    try {
+      var panel = document.getElementById("room-playlist-panel");
+      if (panel) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } catch (eSc) {}
+    return document.getElementById("room-playlist-panel");
+  }
+
   function syncRoomAudio() {
     // How this works: local → <audio>; youtube/spotify → #room-embed-dock iframe; pause local when not local.
     var a = ensureRoomAudioEl();
@@ -643,9 +648,9 @@
   var roomMenuOpen = false;
   var roomPanelOpen = false;
   var playlistPanelOpen = false; // Room menu → View room music
-  // How this works: paint("rooms") rebuilds main HTML and would wipe the expanded bottom-sheet.
+  // How this works: #room-embed-dock lives in shell() outside #main — paint never destroys the iframe.
   // Beginner: Open player sticks open across mute / YouTube↔Spotify taps until you Close player or leave.
-  // ENGINE DEV: roomEmbedExpanded survives paint; parkRoomEmbedDock keeps the live iframe node.
+  // ENGINE DEV: roomEmbedExpanded + CSS is-expanded (fixed sheet inside #app). Never reparent to body.
   var roomEmbedExpanded = false;
   var occFilterQ = ""; // optional occupant rail filter when >5 people
   var roomItemsPanelOpen = false; // Room menu → View items
@@ -1116,6 +1121,15 @@
     if (rm) rm.hidden = true;
     var orphanParty = document.getElementById("party-panel");
     if (orphanParty && !document.querySelector(".workspace #party-panel")) orphanParty.remove();
+    var plPanel = document.getElementById("room-playlist-panel");
+    if (plPanel) plPanel.remove();
+    try {
+      var dockClr = document.getElementById("room-embed-dock");
+      if (dockClr) {
+        dockClr.classList.remove("is-expanded");
+        // leave iframe; sync/leave paths clear fully when needed
+      }
+    } catch (eDockClr) {}
     var buddy = document.getElementById("buddy-invite-modal");
     if (buddy) buddy.remove();
     var fbModal = document.getElementById("fb-appid-modal");
@@ -2745,7 +2759,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906u";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906v";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3591,7 +3605,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: room music Open player sticks across paint (mute / source tabs) + embeds + Profile look custom BG + Facebook Connect. Cache <code>?v=20260906u</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: room music dock lives outside #main (Open/Close survive paint on phone) + embeds + Profile look custom BG + Facebook Connect. Cache <code>?v=20260906v</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -3668,16 +3682,14 @@ function helpPage() {
       // dark panel. Bottom #chat-form input stays in the chrome either way.
       +       '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       +     '</div>'
-      // How this works: placeholder for #room-embed-dock (chrome under stage, not #stage-slot).
-      // Beginner: if Open player was up, paint parks the live iframe and put it back — sheet should not vanish.
-      // ENGINE DEV: parkRoomEmbedDock before innerHTML; ensureRoomEmbedDock adopts parked node / roomEmbedExpanded.
-      +     '<div id="room-embed-dock" class="room-embed-dock" hidden></div>'
+      // How this works: #room-embed-dock is NOT under the stage — shell() hosts it outside #main.
+      // Beginner: Open player sheet is not wiped when mute / Room music taps re-paint the room.
+      // ENGINE DEV: persistent shell dock + CSS fixed is-expanded; ensureRoomEmbedDock / ensurePlaylistPanel after paint.
       +     chatTabsHtml()
       +     '<div class="chat-log" id="chat-log">' + activeChatMessages().map(chatRow).join('') + '</div>'
       +     '<div class="room-invite-row"><button type="button" class="text-btn" data-copy-invite="room">Copy room invite link</button></div>'
       +     '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
-      +     (playlistPanelOpen ? playlistPanel() : '')
       +     (roomItemsPanelOpen ? roomItemsPanel() : '')
       +     (decorateMode ? decoratePanel() : '')
       +     (partyPanelOpen ? partyPanel() : '')
@@ -5704,6 +5716,10 @@ function helpPage() {
       +   '</div>'
       + '</header>'
       + '<div id="main"></div>'
+      // How this works: persistent room music dock OUTSIDE #main so paint("rooms") never wipes the iframe.
+      // Beginner: Open / Close player keep working after expand — dock stays inside #app for click handlers.
+      // ENGINE DEV: do not put #room-embed-dock under .stage-body; do not move it to document.body.
+      + '<div id="room-embed-dock" class="room-embed-dock" hidden></div>'
       + '<form class="bar" id="chat-form">'
       +   '<div class="chat-opts-wrap">'
       +   '<button type="button" class="chat-opts" id="chat-opts-btn" title="Chat options" aria-label="Chat options" data-chat-opts="1">&#9679;</button>'
@@ -5774,10 +5790,9 @@ function helpPage() {
     var main = document.getElementById("main");
     if (!main) return;
     applyBrowserTheme();
-    // How this works: park live #room-embed-dock before any main.innerHTML wipe so the iframe survives paint.
+    // How this works: #room-embed-dock is outside #main — no park needed before innerHTML.
     // Beginner: Open player stays open when you mute or switch YouTube/Spotify in Room music.
-    // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock reattaches parked node (or rebuilds with roomEmbedExpanded).
-    try { parkRoomEmbedDock(); } catch (ePark) {}
+    // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts side panel on #app.
     if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; main.innerHTML = legalPage(); }
     else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; main.innerHTML = helpPage(); }
     else if (tab === "rooms") main.innerHTML = rooms();
@@ -5818,6 +5833,7 @@ function helpPage() {
     try { ensureStagePlaceholder(); } catch (e) {}
     try { if (decorateMode) bindDecorateDrag(); } catch (e) {}
     try { syncRoomAudio(); } catch (e) {}
+    try { ensurePlaylistPanel(); } catch (ePl) {}
     // How this works: after paint, apply profile skin on .page.profile-page via DOM styles.
     // ENGINE DEV: profile page chrome only; not #stage-slot.
     try {
@@ -6541,6 +6557,68 @@ function helpPage() {
     if (!document.getElementById("daily-reward-modal")) return;
     dismissDailyRewardModal();
   }, true);
+  // How this works: document capture backup for Open/Close player + Room music panel on phones.
+  // Beginner: even if a tap does not bubble to #app the way we expect, these still fire.
+  // ENGINE DEV: once; stopPropagation so #app handlers do not double-run. Dock stays under #app.
+  (function bindEmbedDockCaptureOnce() {
+    if (window.__whirledEmbedCapture) return;
+    window.__whirledEmbedCapture = true;
+    document.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var expand = t.closest("[data-embed-expand]");
+      var collapse = t.closest("[data-embed-collapse]");
+      var focusBtn = t.closest("[data-embed-focus]");
+      var openPanel = t.closest("[data-playlist-open-panel]");
+      if (!expand && !collapse && !focusBtn && !openPanel) return;
+      if (expand) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        roomEmbedExpanded = true;
+        var d1 = document.getElementById("room-embed-dock");
+        if (d1) {
+          applyRoomEmbedExpanded(d1);
+          try { d1.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e1) {}
+          var f1 = d1.querySelector("iframe.room-embed-frame");
+          if (f1) { try { f1.focus(); } catch (eF1) {} }
+        }
+        return;
+      }
+      if (collapse) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        roomEmbedExpanded = false;
+        var d2 = document.getElementById("room-embed-dock");
+        if (d2) applyRoomEmbedExpanded(d2);
+        return;
+      }
+      if (focusBtn) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        roomEmbedExpanded = true;
+        var d3 = document.getElementById("room-embed-dock");
+        if (d3) {
+          applyRoomEmbedExpanded(d3);
+          try { d3.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e3) {}
+          var f3 = d3.querySelector("iframe.room-embed-frame");
+          if (f3) { try { f3.focus(); } catch (eF3) {} }
+        }
+        return;
+      }
+      if (openPanel && session()) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!inRoom) inRoom = true;
+        playlistPanelOpen = true;
+        roomPanelOpen = false;
+        decorateMode = false;
+        partyPanelOpen = false;
+        paint("rooms");
+        try { syncRoomAudio(); } catch (eS) {}
+        try { ensurePlaylistPanel(); } catch (eP) {}
+      }
+    }, true);
+  })();
   app.addEventListener("click", function (ev) {
     if (!ev.target.closest(".tb-go-wrap")) {
       var gm0 = document.getElementById("go-menu");
@@ -7584,13 +7662,12 @@ function helpPage() {
     }
     // How this works: mobile embed controls live OUTSIDE the iframe (iOS often blocks tiny YT taps).
     // Beginner: Open player = bigger sheet; Tap play = scroll/focus iframe; Open on YouTube/Spotify = real browser tab.
-    // ENGINE DEV: do not put these buttons inside #stage-slot. roomEmbedExpanded persists across paint().
+    // ENGINE DEV: dock stays under #app (shell). Document capture listener is backup for weird mobile bubbling.
     var embedExpand = ev.target.closest("[data-embed-expand]");
     if (embedExpand) {
       roomEmbedExpanded = true;
-      var dockEx = document.getElementById("room-embed-dock") || document.getElementById("room-embed-dock-parked");
+      var dockEx = document.getElementById("room-embed-dock");
       if (dockEx) {
-        if (dockEx.id === "room-embed-dock-parked") dockEx.id = "room-embed-dock";
         applyRoomEmbedExpanded(dockEx);
         try { dockEx.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (eSc) {}
         var fr = dockEx.querySelector("iframe.room-embed-frame");
@@ -7601,20 +7678,15 @@ function helpPage() {
     var embedCollapse = ev.target.closest("[data-embed-collapse]");
     if (embedCollapse) {
       roomEmbedExpanded = false;
-      var dockCol = document.getElementById("room-embed-dock") || document.getElementById("room-embed-dock-parked");
-      if (dockCol) {
-        if (dockCol.id === "room-embed-dock-parked") dockCol.id = "room-embed-dock";
-        applyRoomEmbedExpanded(dockCol);
-        homeRoomEmbedDock(dockCol);
-      }
+      var dockCol = document.getElementById("room-embed-dock");
+      if (dockCol) applyRoomEmbedExpanded(dockCol);
       return;
     }
     var embedFocus = ev.target.closest("[data-embed-focus]");
     if (embedFocus) {
       roomEmbedExpanded = true;
-      var dockFo = document.getElementById("room-embed-dock") || document.getElementById("room-embed-dock-parked");
+      var dockFo = document.getElementById("room-embed-dock");
       if (dockFo) {
-        if (dockFo.id === "room-embed-dock-parked") dockFo.id = "room-embed-dock";
         applyRoomEmbedExpanded(dockFo);
         try { dockFo.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (eSc2) {}
         var fr2 = dockFo.querySelector("iframe.room-embed-frame");

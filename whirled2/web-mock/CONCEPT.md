@@ -64,7 +64,7 @@ Source files carry short `// Information` / `// How this works` notes so new con
 
 ## Room music / playlist
 
-Stuff → Music accepts audio (MP3/WAV/OGG/WebM) as data URLs in `whirled2.stuff` (copyright checkbox required). Room menu → **View room music** uses `whirled2.playlist.loft` with `source: local | youtube | spotify`. Local queue uses HTML5 `#room-audio`; YouTube/Spotify use normalized embed iframes in `#room-embed-dock` (chrome sibling under stage — **not** inside `#stage-slot`). Soft autoplay for local only; embeds require user play (browser policy). **Owner controls music**: only loft owner switches source / pastes embeds / locks; guests listen; optional guest local-track adds when `ownerOnlyAdd` is false — never guest yt/spotify edits. Max 99 local tracks. Offline Pages-safe.
+Stuff → Music accepts audio (MP3/WAV/OGG/WebM) as data URLs in `whirled2.stuff` (copyright checkbox required). Room menu → **View room music** uses `whirled2.playlist.loft` with `source: local | youtube | spotify`. Local queue uses HTML5 `#room-audio`; YouTube/Spotify use normalized embed iframes in `#room-embed-dock` (shell host outside `#main` — **not** inside `#stage-slot`). Soft autoplay for local only; embeds require user play (browser policy). **Owner controls music**: only loft owner switches source / pastes embeds / locks; guests listen; optional guest local-track adds when `ownerOnlyAdd` is false — never guest yt/spotify edits. Max 99 local tracks. Offline Pages-safe.
 
 ## Facebook Connect (20260906s)
 

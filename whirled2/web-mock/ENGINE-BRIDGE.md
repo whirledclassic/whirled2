@@ -39,7 +39,7 @@ Then open `http://127.0.0.1:8788/` (or port 8787 if using server.mjs).
 
 Cache-bust: assets use `?v=…` (see `LOGO_V` in `app.js` / `index.html`). Hard-refresh if the page looks stale.
 
-**Embeds / chrome docks:** YouTube/Spotify room music uses `#room-embed-dock` as a **sibling under/beside the stage** (not inside `#stage-slot`) so Pixi stays clear. Prefer the same pattern for any future chrome media UI.
+**Embeds / chrome docks:** YouTube/Spotify room music uses `#room-embed-dock` as a **shell host outside `#main`** (after `#main` / before `.bar`, not inside `#stage-slot`) so Pixi stays clear and `paint()` never wipes the iframe. Prefer the same pattern for any future chrome media UI.
 
 ---
 
