@@ -416,8 +416,8 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 }
 .bars-accent { color: #8a6a28; }
 .tx-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 12px; }
-.daily-reward-card { text-align: center; }
-.daily-reward-card .action-btn { margin-top: 8px; min-width: 120px; }
+.daily-reward-card { text-align: center; pointer-events: auto; }
+.daily-reward-card .action-btn { margin-top: 8px; min-width: 120px; pointer-events: auto; cursor: pointer; z-index: 1; position: relative; }
 .tab {
   min-width: 76px;
   min-height: 32px;

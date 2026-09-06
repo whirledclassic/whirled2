@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906o";
+  var LOGO_V = "20260906p";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -236,18 +236,19 @@
   }
 
   var STUFF_CATS = [
-    { id: "avatars", label: "Avatars", empty: "You have no avatars yet." },
-    { id: "furniture", label: "Furniture", empty: "You have no furniture yet." },
-    { id: "backdrops", label: "Backdrops", empty: "You have no backdrops yet." },
-    { id: "toys", label: "Toys", empty: "You have no toys yet." },
-    { id: "pets", label: "Pets", empty: "You have no pets yet." },
-    { id: "games", label: "Games", empty: "You have no games yet." },
-    { id: "launchers", label: "Launchers", empty: "You have no launchers yet." },
-    { id: "levelpacks", label: "Level Packs", empty: "You have no level packs yet." },
-    { id: "itempacks", label: "Item Packs", empty: "You have no item packs yet." },
-    { id: "images", label: "Images", empty: "You have no images yet." },
-    { id: "music", label: "Music", empty: "You have no music yet." },
-    { id: "videos", label: "Videos", empty: "You have no videos yet." }
+    // How this works: wiki Stuff rail categories. howBlurb = empty-state “How do I get stuff?”
+    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload a stub avatar thumbnail here, or earn/list later — never invent demo avatars." },
+    { id: "furniture", label: "Furniture", empty: "You have no furniture yet.", how: "Furniture fills your loft. Upload a named piece with optional thumb, then Decorate Room to place chips." },
+    { id: "backdrops", label: "Backdrops", empty: "You have no backdrops yet.", how: "Backdrops set the room scene. Upload an image you have rights to, then place it while decorating." },
+    { id: "toys", label: "Toys", empty: "You have no toys yet.", how: "Toys are playful room items. Create your own stub here — no fake catalog fillers." },
+    { id: "pets", label: "Pets", empty: "You have no pets yet.", how: "Pets were classic companions. Stub upload only for now; engine pets come later." },
+    { id: "games", label: "Games", empty: "You have no games yet.", how: "Games you own appear here. Publish under Games tab / whirled2.games — never invent titles." },
+    { id: "launchers", label: "Launchers", empty: "You have no launchers yet.", how: "Launchers start games from rooms (classic shop “Games”). Upload stub or list later." },
+    { id: "levelpacks", label: "Level Packs", empty: "You have no level packs yet.", how: "Level packs extend games. Empty until you create or receive one." },
+    { id: "itempacks", label: "Item Packs", empty: "You have no item packs yet.", how: "Item packs bundle content for games. Empty until you upload or are gifted one." },
+    { id: "images", label: "Images", empty: "You have no images yet.", how: "Images for galleries and decorate. Upload png/jpg/gif/webp you have rights to." },
+    { id: "music", label: "Music", empty: "You have no music yet.", how: "Music goes on the room playlist. Upload MP3/WAV/OGG you own (copyright checkbox required)." },
+    { id: "videos", label: "Videos", empty: "You have no videos yet.", how: "Videos are a classic Stuff shelf. Stub upload for now — no invented clips." }
   ];
   var stuffCat = "avatars";
   var stuffItemId = null;
@@ -452,6 +453,43 @@
     d.setDate(d.getDate() + toMon);
     return localDayKey(d);
   }
+  // How this works: soft Level from wallet.xp. Classic vibe ~Level 10 gate for Friendly
+  // People — Whirled2 demo ignores the gate (toggle freely on Account).
+  // ENGINE DEV: level is chrome-only; engine may read getWallet().level later.
+  function levelFromXp(xp) {
+    xp = Math.max(0, Number(xp) || 0);
+    // Simple curve: L1@0, L2@50, L3@120, then +100 xp per level.
+    if (xp < 50) return 1;
+    if (xp < 120) return 2;
+    return Math.min(99, 3 + Math.floor((xp - 120) / 100));
+  }
+  function xpToNext(xp) {
+    xp = Math.max(0, Number(xp) || 0);
+    var lvl = levelFromXp(xp);
+    if (lvl <= 1) return 50 - xp;
+    if (lvl === 2) return 120 - xp;
+    var nextAt = 120 + (lvl - 2) * 100;
+    return Math.max(0, nextAt - xp);
+  }
+  function grantXp(userId, amount, meta) {
+    // How this works: bump xp on daily login / stamp / status; recompute level.
+    if (!userId || !amount) return null;
+    var w = loadWallet(userId);
+    w.xp = Math.max(0, (Number(w.xp) || 0) + (Number(amount) || 0));
+    var prev = Number(w.level) || 1;
+    w.level = levelFromXp(w.xp);
+    saveWallet(userId, w);
+    if (w.level > prev) {
+      try {
+        pushNotice("green", "Level up! You are now Level " + w.level + ".", { transient: true });
+      } catch (eLv) {}
+    }
+    return w;
+  }
+  function levelBadgeHtml(userId) {
+    var snap = getWalletSnapshot(userId);
+    return '<span class="level-badge" title="XP ' + esc(String(snap.xp)) + ' · ' + esc(String(xpToNext(snap.xp))) + ' to next">Level ' + esc(String(snap.level)) + '</span>';
+  }
   function defaultWallet() {
     return {
       coins: 0,
@@ -461,7 +499,10 @@
       weekKey: "",
       weekLogins: 0,
       totalLogins: 0,
-      statusCoinDay: ""
+      statusCoinDay: "",
+      // How this works: soft level from xp (logins / stamps / status). Not a hard gate.
+      xp: 0,
+      level: 1
     };
   }
   function loadWallet(userId) {
@@ -480,6 +521,8 @@
       w.streakDays = Number(w.streakDays) || 0;
       w.weekLogins = Number(w.weekLogins) || 0;
       w.totalLogins = Number(w.totalLogins) || 0;
+      w.xp = Number(w.xp) || 0;
+      w.level = levelFromXp(w.xp);
       return w;
     } catch (e) { return defaultWallet(); }
   }
@@ -489,7 +532,15 @@
   }
   function getWalletSnapshot(userId) {
     var w = loadWallet(userId);
-    return { coins: w.coins || 0, bars: w.bars || 0, streakDays: w.streakDays || 0 };
+    var xp = Number(w.xp) || 0;
+    return {
+      coins: w.coins || 0,
+      bars: w.bars || 0,
+      streakDays: w.streakDays || 0,
+      xp: xp,
+      level: levelFromXp(xp),
+      totalLogins: Number(w.totalLogins) || 0
+    };
   }
   function barsLabelForCoins(coins) {
     var c = Number(coins) || 0;
@@ -580,6 +631,8 @@
       bars: barsGain,
       weekly: weekly
     };
+    // How this works: small XP on each daily claim (feeds Level badge).
+    try { grantXp(uid, 15, { kind: "login" }); } catch (eXp) {}
     return dailyRewardPending;
   }
   function tryStatusCoinGrant(userId) {
@@ -591,19 +644,28 @@
     w.statusCoinDay = today;
     saveWallet(userId, w);
     grantCurrency(userId, 5, 0, { kind: "status", label: "Status update", note: "+5 coins for setting status" });
+    try { grantXp(userId, 5, { kind: "status" }); } catch (eXpSt) {}
+  }
+  function dismissDailyRewardModal() {
+    // How this works: clear pending + remove modal. Modal lives on document.body (outside #app),
+    // so dismiss must NOT rely on #app click delegation alone.
+    dailyRewardPending = null;
+    var dm = document.getElementById("daily-reward-modal");
+    if (dm) dm.remove();
   }
   function dailyRewardModalHtml() {
     if (!dailyRewardPending) return "";
     var r = dailyRewardPending;
     var barBit = r.bars ? (" + " + r.bars + " Bar" + (r.bars > 1 ? "s" : "")) : "";
     var weekBit = r.weekly ? '<p class="meta">Weekly streak complete — bonus included.</p>' : "";
-    return '<div class="modal-backdrop" id="daily-reward-modal" data-daily-dismiss="1">'
-      + '<div class="modal-card daily-reward-card" role="dialog" aria-label="Daily reward" onclick="event.stopPropagation()">'
+    // No stopPropagation on the card — that blocked the Nice! button from reaching listeners.
+    return '<div class="modal-backdrop" id="daily-reward-modal" role="presentation">'
+      + '<div class="modal-card daily-reward-card" role="dialog" aria-modal="true" aria-label="Daily reward">'
       +   '<h2>Daily reward</h2>'
       +   '<p><b>Day ' + esc(String(r.streakDays)) + ' streak</b> — +' + esc(String(r.coins)) + ' coins' + esc(barBit) + '</p>'
       +   weekBit
       +   '<p class="meta">Coins &amp; Bars are play currency — no real-money purchases.</p>'
-      +   '<button type="button" class="action-btn" data-daily-dismiss="1">Nice!</button>'
+      +   '<button type="button" class="action-btn" id="daily-reward-ok" data-daily-dismiss="1">Nice!</button>'
       + '</div></div>';
   }
   function ensureDailyRewardModal() {
@@ -615,7 +677,28 @@
     if (existing) return;
     var wrap = document.createElement("div");
     wrap.innerHTML = dailyRewardModalHtml();
-    if (wrap.firstChild) document.body.appendChild(wrap.firstChild);
+    var modal = wrap.firstChild;
+    if (!modal) return;
+    // How this works: bind dismiss on the modal itself (body-level), not only #app clicks.
+    modal.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t) return;
+      if (t.getAttribute && t.getAttribute("data-daily-dismiss") === "1") {
+        dismissDailyRewardModal();
+        return;
+      }
+      if (t.closest && t.closest("[data-daily-dismiss]")) {
+        dismissDailyRewardModal();
+        return;
+      }
+      // Click dimmed backdrop (not the card) to dismiss
+      if (t === modal) dismissDailyRewardModal();
+    });
+    document.body.appendChild(modal);
+    try {
+      var ok = document.getElementById("daily-reward-ok");
+      if (ok) ok.focus();
+    } catch (eF) {}
   }
   function refreshWalletChrome() {
     var s = session();
@@ -632,6 +715,7 @@
     partyPanelOpen = false;
     playlistPanelOpen = false;
     roomItemsPanelOpen = false;
+    roomSharePanelOpen = false;
     helpOpen = false;
     legalOpen = false;
     invitePanelOpen = false;
@@ -1128,8 +1212,15 @@
           label: "Passport stamp",
           note: "+" + coinGrant + " coins for stamp" + (newly.length > 1 ? "s" : "") + ": " + newly.join(", ")
         });
+        try { grantXp(uid, 20 * newly.length, { kind: "passport" }); } catch (eXpPass) {}
         refreshWalletChrome();
       } catch (eCoin) {}
+      // How this works: stamp awards also feed My News → Stamps filter.
+      try {
+        newly.forEach(function (nm) {
+          pushNotice("stamp", "Passport stamp earned: " + nm, { transient: true });
+        });
+      } catch (eNewsSt) {}
     }
   }
   function findStamp(id) {
@@ -1159,6 +1250,8 @@
   var chat = [];
   var liveOccupants = [];
   var meSub = "home"; // home | profile | friends | mail | passport | account | themes | club | blocklist | galleries | transactions | contests | share
+  var newsFilter = "all"; // all | comments | friendings | status | stamps | rooms
+  var roomSharePanelOpen = false; // Room menu → Share / Embed
   var profileEditSection = null; // null | status | photo | info | skin
   var tourTip = 0;
   var goMenuOpen = false;
@@ -1282,7 +1375,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + dual currency / streaks (?v=20260906o)
+  // Fidelity + dual currency / streaks (?v=20260906p)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -2051,7 +2144,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906o";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906p";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -2896,7 +2989,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Coins + Bars dual currency, daily/weekly streaks, Transactions filters. Cache <code>?v=20260906o</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Coins + Bars dual currency, daily/weekly streaks, Transactions filters. Cache <code>?v=20260906p</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5339,6 +5432,12 @@ function helpPage() {
   // Event delegation: one click listener + one submit listener on #app
   // Information: buttons use data-* attributes (data-tab, data-me, data-profile-edit, …).
   // ---------------------------------------------------------------------------
+  // How this works: Esc closes daily reward even when modal is on document.body.
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Escape") return;
+    if (!document.getElementById("daily-reward-modal")) return;
+    dismissDailyRewardModal();
+  }, true);
   app.addEventListener("click", function (ev) {
     if (!ev.target.closest(".tb-go-wrap")) {
       var gm0 = document.getElementById("go-menu");
@@ -5783,9 +5882,7 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-daily-dismiss]")) {
-      dailyRewardPending = null;
-      var dm = document.getElementById("daily-reward-modal");
-      if (dm) dm.remove();
+      dismissDailyRewardModal();
       return;
     }
     var txFilt = ev.target.closest("[data-tx-filter]");
