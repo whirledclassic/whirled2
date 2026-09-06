@@ -1,12 +1,12 @@
-/* 20260906dl — phone chrome polish. Desktop rules must stay untouched. */
+/* 20260906dm — phone chrome + flush Now Playing strip. Desktop unchanged. */
 html.w2-phone, html.w2-phone body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 html.w2-phone #app[data-tab="rooms"] .stage-host,
 html.w2-phone #app[data-tab="rooms"] #stage-slot {
-  min-height: 42vh !important;
-  height: 42vh !important;
+  min-height: 44vh !important;
+  height: 44vh !important;
 }
 html.w2-phone .chat-tabs {
   background: #e8f3fa !important;
@@ -30,28 +30,97 @@ html.w2-phone .stage-body.chat-mode-slide .chat-log {
   color: #16324a !important;
   max-height: 88px !important;
 }
-html.w2-phone .room-embed-dock:not(.is-expanded) {
-  margin: 4px 8px !important;
-  padding: 6px 8px !important;
+
+/* YouTube / Now Playing — one club strip, not a floating card */
+html.w2-phone #app > #room-embed-dock.room-embed-dock,
+html.w2-phone #room-embed-dock.room-embed-dock {
+  margin: 0 !important;
+  padding: 6px 10px 4px !important;
+  border-radius: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-top: 1px solid #c5dcea !important;
+  box-shadow: none !important;
+  background: linear-gradient(180deg, #eef6fb 0%, #e4f0f8 100%) !important;
+  color: #16324a !important;
+}
+html.w2-phone .room-embed-now {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+html.w2-phone .room-embed-now-glyph {
+  width: 28px !important;
+  height: 28px !important;
+  background: linear-gradient(180deg, #7ec8f0, #3aa3e0) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+html.w2-phone .room-embed-now-title {
+  color: #1e6fa8 !important;
+  font: 700 10px/1.1 Trebuchet MS, sans-serif !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+html.w2-phone .room-embed-now-sub {
+  color: #16324a !important;
+  font-size: 12px !important;
+}
+html.w2-phone .room-embed-now-kind {
+  display: none !important;
 }
 html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-frame,
-html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-frame-wrap {
+html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-frame-wrap,
+html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-mobile-controls,
+html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-note {
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
 }
+html.w2-phone .room-embed-now-actions {
+  gap: 4px !important;
+  flex-shrink: 0;
+}
+html.w2-phone .room-embed-now-actions .action-btn,
+html.w2-phone .room-embed-now-actions .room-embed-play-btn {
+  min-height: 32px !important;
+  min-width: 48px !important;
+  padding: 4px 10px !important;
+  border-radius: 8px !important;
+  background: linear-gradient(#7ec8f0, #3aa3e0) !important;
+  border: 1px solid #2b87c0 !important;
+  color: #fff !important;
+}
+html.w2-phone .room-embed-now-actions .text-btn {
+  min-height: 32px !important;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d3e8 !important;
+  background: #fff !important;
+  color: #1e6fa8 !important;
+}
+html.w2-phone .room-embed-dock.is-expanded {
+  border-radius: 0 !important;
+  margin: 0 !important;
+}
+html.w2-phone .room-embed-dock.is-expanded .room-embed-frame {
+  border-radius: 8px;
+  margin-top: 6px;
+}
+
 html.w2-phone .room-embed-now-actions .action-btn,
 html.w2-phone .room-embed-now-actions button,
 html.w2-phone .room-embed-mobile-controls .action-btn,
 html.w2-phone .room-embed-mobile-controls button {
-  min-height: 36px;
-  min-width: 52px;
-  padding: 6px 10px !important;
-}
-html.w2-phone [data-clear-chat],
-html.w2-phone button[title*="Clear"],
-html.w2-phone .text-btn {
-  min-height: 36px;
+  min-height: 32px;
+  min-width: 48px;
 }
 html.w2-phone .occ-strip,
 html.w2-phone .occupants,
