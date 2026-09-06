@@ -5,57 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#e8f4fb" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Whirled2 db</title>
+  <title>Whirled2 dc</title>
   <style>
     .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
     body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; background: #89C6E3; color: #16324a; }
     #app[data-tab]:not([data-tab="rooms"]) .bar { display: none; }
     .person { width: 100%; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer; }
     #room-enter-curtain, .room-enter-curtain { display: none !important; }
+    .loft-hint-engine-waiting, .avatar-engine-waiting-note { display: none !important; }
     .stage-host, #stage-slot {
       min-height: 48vh !important;
-      background: linear-gradient(180deg,#7ec4ea 0 55%, #c9a36a 55% 100%) !important;
+      background: linear-gradient(180deg,#5fa8cc 0 56%, #c9a36a 56% 100%) !important;
       position: relative !important;
     }
-    #stage-slot .loft-backdrop { position: absolute; inset: 0; }
-    #stage-slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    #stage-slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906db" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906db" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906dc" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906dc" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
   <script>
-    window.WHIRLED_API = window.WHIRLED_API || "https://norfolk-approved-discussing-recognised.trycloudflare.com";
-    window.WHIRLED_ENGINE_SRC = window.WHIRLED_ENGINE_SRC || new URL("./src/pixi-bridge.js?v=20260906db", location.href).href;
-    window.__whirledBoot = false;
+    (function () {
+      function bad(u) { return /127\.0\.0\.1|localhost|0\.0\.0\.0/i.test(String(u || "")); }
+      try {
+        var ls = localStorage.getItem("whirled2.engineSrc") || "";
+        if (bad(ls)) localStorage.removeItem("whirled2.engineSrc");
+      } catch (e) {}
+      window.WHIRLED_API = window.WHIRLED_API || "https://norfolk-approved-discussing-recognised.trycloudflare.com";
+      window.WHIRLED_ENGINE_SRC = new URL("./src/pixi-bridge.js?v=20260906dc", location.href).href;
+      window.__whirledBoot = false;
+    })();
   </script>
-  <script src="./src/api.js?v=20260906db"></script>
-  <script src="./src/classic-avatar.js?v=20260906db"></script>
-  <script src="./app.js?v=20260906db"></script>
-  <script src="./src/engine-sync.js?v=20260906db"></script>
+  <script src="./src/api.js?v=20260906dc"></script>
+  <script src="./src/classic-avatar.js?v=20260906dc"></script>
+  <script src="./app.js?v=20260906dc"></script>
   <script>
     (function () {
-      var LOFT = '<div class="loft-backdrop" aria-hidden="true"><div class="loft-sky"></div><div class="loft-walls"><div class="loft-wall loft-wall-l"></div><div class="loft-wall loft-wall-r"></div><div class="loft-corner"></div></div><div class="loft-floor"><div class="loft-floor-grid"></div></div></div>';
-      function tick() {
-        var host = document.querySelector(".stage-host");
-        var slot = document.getElementById("stage-slot");
-        if (!slot && host) {
-          slot = document.createElement("div");
-          slot.id = "stage-slot";
-          host.insertBefore(slot, host.firstChild);
-        }
-        if (!slot) return;
-        if (slot.querySelector("canvas")) return;
-        if (!slot.querySelector(".loft-backdrop")) slot.innerHTML = LOFT;
-        try {
-          if (window.WhirledChrome && window.WhirledChrome.tryMountEngine) {
-            window.WhirledChrome.tryMountEngine();
-          }
-        } catch (e) {}
+      var mounting = false;
+      function slot() { return document.getElementById("stage-slot"); }
+      function mount() {
+        var host = slot();
+        if (!host || host.querySelector("canvas") || mounting) return;
+        var src = window.WHIRLED_ENGINE_SRC;
+        if (!src) return;
+        mounting = true;
+        import(src).then(function (mod) {
+          var fn = mod && (mod.mountWhirledEngine || mod.default);
+          if (typeof fn !== "function") { mounting = false; return; }
+          return fn(host);
+        }).then(function () {
+          mounting = false;
+          try {
+            if (window.WhirledChrome && window.WhirledChrome.getRoom) {
+              document.dispatchEvent(new CustomEvent("whirled:roomChanged", { detail: window.WhirledChrome.getRoom() }));
+            }
+          } catch (e) {}
+        }).catch(function () { mounting = false; });
       }
-      setInterval(tick, 350);
-      document.addEventListener("whirled:ready", tick);
+      document.addEventListener("whirled:ready", mount);
+      setInterval(mount, 500);
     })();
   </script>
 </body>
