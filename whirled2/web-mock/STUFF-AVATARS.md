@@ -1,7 +1,7 @@
 # Stuff avatars (Aseprite / PNG packs)
 
 **Audience:** beginners + ENGINE DEV  
-**Cache:** `?v=20260906ao` (`LOGO_V`)  
+**Cache:** `?v=20260906ar` (`LOGO_V`)  
 **Status:** Unified **Cyan Hair** Wearable (idle+walk+pose) + chrome **click-to-walk**. Classic **SWF / Ruffle** wardrobe stays **On hold** (`AVATAR-IMPORT.md`, unlock only with `?avatarLab=1`).  
 **Fidelity notes:** [AVATAR-STUFF-FIDELITY.md](./AVATAR-STUFF-FIDELITY.md)
 
@@ -12,7 +12,7 @@ Classic whirled.club avatars were mostly **Flash SWF**. Whirled2’s modern path
 1. Open **Stuff → Avatars**.
 2. Either:
    - **Add Cyan Hair to Stuff** (imports the unified pack from `assets/avatars/user-pack/cyan-hair/`), or
-   - **Upload…** idle PNG(s) + optional walk PNG(s) (multi-select). Optionally attach `.aseprite` source(s).
+   - **Upload avatar wizard…** (PNG sequences / folders / zip / .aseprite). Map idle+walk+emotes; Remap later. See `AVATAR-CREATOR-GUIDE.md`.
 3. Open the inventory card → **Avatar viewer** → **Wear avatar** (happy face).
 4. Go to **Rooms → Enter** your loft. Soft loft backdrop + your sprite on `#avatar-wear-layer`.
 5. **Click the loft floor** → avatar walks there (walk frames), then returns to idle. Face flips left/right.

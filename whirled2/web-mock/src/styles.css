@@ -5113,3 +5113,310 @@ button.tb.tb-music,
 @media (max-width: 700px) {
   .avatar-viewer-sprite { max-height: min(140px, 34vh); }
 }
+
+/* ---- 20260906aq: Avatar emote menu + clickable billboard ----
+ * Beginner: tap your worn avatar → pale-blue Emotes menu (Wave / Sit / Pose…).
+ * Floor click still walks. Billboard alone receives pointer events.
+ * ENGINE DEV: chrome-only until Pixi owns avatar clicks in #stage-slot.
+ */
+.avatar-wear-billboard[data-avatar-hit] {
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.avatar-wear-billboard[data-avatar-hit]:focus-visible {
+  outline: 2px solid #3aa3e0;
+  outline-offset: 2px;
+}
+.avatar-emote-menu {
+  position: absolute;
+  z-index: 8;
+  min-width: 128px;
+  max-width: 180px;
+  padding: 8px;
+  background: linear-gradient(#f4faff, #e2f1fa);
+  border: 1px solid #7eb6d4;
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(22, 50, 74, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+}
+.avatar-emote-title {
+  font: 700 11px var(--ui);
+  color: #1e6fa8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 4px 4px;
+}
+.avatar-emote-btn {
+  border: 1px solid #9ec4de;
+  background: #fffef8;
+  color: #16324a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: 700 13px var(--ui);
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+}
+.avatar-emote-btn:hover,
+.avatar-emote-btn:focus-visible {
+  background: #e8f4fb;
+  outline: none;
+  border-color: #3aa3e0;
+}
+.avatar-emote-cancel {
+  background: transparent;
+  font-weight: 600;
+  color: #4a6a80;
+  min-height: 40px;
+}
+.avatar-emote-bubble {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #7eb6d4;
+  color: #1e6fa8;
+  font: 700 11px var(--ui);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(22, 50, 74, 0.2);
+}
+
+/* ---- 20260906aq: Mobile room chat cleanup ----
+ * Beginner: stop floating reaction pills mid-floor; keep stage readable;
+ * composer gets iOS safe-area; Share lives in Room menu on phones.
+ */
+@media (max-width: 700px) {
+  /* Share / embed row under stage fights the composer on phones — use Room menu instead. */
+  .room-invite-row,
+  .room-invite-desktop {
+    display: none !important;
+  }
+
+  /* Compact overlay dock: bottom-left sheet, not a full-height left column. */
+  .chat-overlay {
+    left: 6px !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: 6px !important;
+    width: min(92%, 340px) !important;
+    max-height: min(34vh, 220px) !important;
+    padding: 6px 8px !important;
+    gap: 5px !important;
+    background: linear-gradient(180deg, rgba(14, 28, 40, 0.05), rgba(14, 28, 40, 0.22)) !important;
+    border-radius: 10px !important;
+    mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 100%);
+  }
+  .chat-overlay .chat-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 4px 0 !important;
+    position: relative;
+  }
+  .chat-overlay .chat-who {
+    font-size: 12px !important;
+    margin: 0 !important;
+  }
+  .chat-overlay .chat-bubble:not(.emote):not(.system) {
+    font-size: 14px !important;
+    padding: 8px 11px !important;
+    margin-top: 0 !important;
+    max-width: 100%;
+  }
+  .chat-overlay .role-badge,
+  .chat-overlay .chat-row time {
+    display: none !important;
+  }
+
+  /* Reaction counts stay under the bubble; picker hidden until long-press. */
+  .react-pills {
+    margin: 2px 0 0 !important;
+    gap: 3px !important;
+  }
+  .react-pill {
+    min-height: 28px;
+    padding: 3px 8px !important;
+    font-size: 12px !important;
+  }
+  .react-bar {
+    position: static !important;
+    display: none !important;
+    margin-top: 4px;
+    width: max-content;
+    max-width: 100%;
+    padding: 4px 6px !important;
+    gap: 4px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 1px solid #9ec4de !important;
+    box-shadow: 0 2px 8px rgba(22, 50, 74, 0.18);
+  }
+  .chat-row.is-react-open .react-bar {
+    display: flex !important;
+  }
+  .react-btn {
+    min-width: 40px;
+    min-height: 40px;
+    font-size: 18px !important;
+    padding: 4px !important;
+  }
+
+  /* Bottom composer: one clean row + iOS home-indicator padding. */
+  .bar {
+    height: auto !important;
+    min-height: 52px;
+    padding: 8px 8px max(12px, env(safe-area-inset-bottom, 0px)) !important;
+    gap: 6px !important;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .bar input#chat-input {
+    flex: 1 1 auto !important;
+    max-width: none !important;
+    min-height: 44px !important;
+    font-size: 16px !important; /* iOS: avoid focus zoom */
+    padding: 10px 12px !important;
+    border-radius: 8px !important;
+  }
+  .bar button.send {
+    min-height: 44px !important;
+    min-width: 64px !important;
+    padding: 10px 14px !important;
+    border-radius: 8px !important;
+  }
+  .bar .chat-opts,
+  .bar .tb {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Keep Room + music + opts; tuck less-used toolbar icons on very narrow screens. */
+  .bar .tb-go,
+  .bar .tb-friends,
+  .bar .tb-party {
+    display: none !important;
+  }
+  .bar .toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  /* Chat tabs stay usable above composer without crowding the stage. */
+  .chat-tabs {
+    padding: 4px 8px 2px !important;
+    gap: 4px !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chat-tab {
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+    flex: 0 0 auto;
+  }
+
+  /* Room embed dock: don't stack awkwardly over chat on phones when collapsed. */
+  #app > #room-embed-dock.room-embed-dock:not(.is-expanded) {
+    max-height: 52px;
+    overflow: hidden;
+  }
+}
+
+/* Desktop: keep reaction bar hover behavior tidy */
+@media (hover: hover) and (pointer: fine) {
+  .react-bar {
+    position: absolute;
+    right: 4px;
+    top: 2px;
+  }
+}
+
+/* ---- 20260906ar: Avatar upload wizard + creator guide ----
+ * Beginner: Stuff → Avatars → multi-step pale-blue wizard.
+ * ENGINE DEV: saved states schema matches cyan-hair for Pixi.
+ */
+.avatar-wiz-panel { max-width: 720px; }
+.avatar-wiz-presets {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px;
+}
+.avatar-wiz-chip {
+  display: inline-block; padding: 6px 10px; border-radius: 999px;
+  background: #e8f4fb; border: 1px solid #9ec4de; color: #16324a;
+  font: 600 11px var(--ui);
+}
+.avatar-wiz-steps {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+}
+.avatar-wiz-step {
+  padding: 6px 10px; border-radius: 8px; background: #f3f8fc;
+  border: 1px solid #c5deee; font: 700 12px var(--ui); color: #4a6a80;
+}
+.avatar-wiz-step.is-on {
+  background: linear-gradient(#7ec8f0, #3aa3e0); color: #fff; border-color: #1e6fa8;
+}
+.avatar-wiz-step.is-done { background: #d7ebf8; color: #1e6fa8; }
+.avatar-wiz-drop {
+  display: block; margin: 8px 0; padding: 12px; border: 1px dashed #7eb6d4;
+  border-radius: 10px; background: #f8fcff; color: #16324a; font: 600 13px var(--ui);
+}
+.avatar-wiz-drop input { display: block; margin-top: 8px; width: 100%; }
+.avatar-wiz-filelist { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; max-height: 240px; overflow: auto; }
+.avatar-wiz-file {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  background: #fff; border: 1px solid #c5deee; border-radius: 8px;
+}
+.avatar-wiz-file img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; background: #eef7fc; border-radius: 4px; }
+.avatar-wiz-file-name { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar-wiz-file-tag {
+  display: inline-block; padding: 4px 8px; border-radius: 6px; background: #1e6fa8; color: #fff; font: 700 11px var(--ui);
+}
+.avatar-wiz-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.avatar-wiz-thumb {
+  border: 2px solid #c5deee; border-radius: 8px; padding: 4px; background: #fff; cursor: pointer;
+  min-width: 56px; min-height: 56px;
+}
+.avatar-wiz-thumb.is-on { border-color: #1e6fa8; box-shadow: 0 0 0 2px rgba(58,163,224,0.35); }
+.avatar-wiz-thumb img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; display: block; }
+.avatar-wiz-state {
+  margin: 10px 0; padding: 10px; border: 1px solid #c5deee; border-radius: 10px; background: #f8fcff;
+}
+.avatar-wiz-state-head {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px;
+}
+.avatar-wiz-fps input { width: 56px; }
+.avatar-wiz-map-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0;
+  border-top: 1px solid #e2eef6;
+}
+.avatar-wiz-map-row img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
+.avatar-wiz-map-row span { flex: 1; min-width: 80px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.avatar-wiz-map-row select { min-height: 36px; }
+.avatar-wiz-nav {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px;
+}
+.avatar-wiz-preview-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;
+}
+@media (max-width: 600px) {
+  .avatar-wiz-preview-grid { grid-template-columns: 1fr; }
+}
+.avatar-wiz-preview-card {
+  padding: 10px; border-radius: 10px; border: 1px solid #9ec4de; background: #eef7fc;
+  min-height: 120px; text-align: center;
+}
+.avatar-wiz-preview-img {
+  max-height: 120px; width: auto; image-rendering: pixelated; margin: 6px auto; display: block;
+}
+.avatar-guide-page .help-tips { line-height: 1.45; }

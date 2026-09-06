@@ -20,14 +20,14 @@
       .brand .logo, img.logo { width: 96px !important; height: 36px !important; max-width: 96px !important; max-height: 36px !important; }
     }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906ap" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906ap" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906ar" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906ar" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
   <!-- Sign-in: username/password primary. Social OAuth needs a developer app (not wired on Pages). -->
   <script>
-    // Beginner (?v=20260906ap): Pages → live demo tunnel so Create account with Discord works.
+    // Beginner (?v=20260906ar): Pages → live demo tunnel so Create account with Discord works.
     // Only the API origin is public here — never client secrets. Demo server replaces with location.origin.
     window.WHIRLED_API = window.WHIRLED_API || "https://norfolk-approved-discussing-recognised.trycloudflare.com";
     window.__whirledBoot = false;
@@ -35,16 +35,16 @@
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       var msg = (ev && ev.message) ? ev.message : "Script error";
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260906ap">Tap to reload fresh</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome failed to load</h1><p class="meta">' + msg + '</p><p><a href="./?v=20260906ar">Tap to reload fresh</a></p></div></section>';
     });
     setTimeout(function () {
       var el = document.getElementById("app");
       if (!el || window.__whirledBoot) return;
       if (el.textContent.indexOf("Loading chrome") === -1) return;
-      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Old phone cache. Open a fresh link.</p><p><a href="./?v=20260906ap">Reload fresh build</a></p></div></section>';
+      el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Still loading</h1><p class="meta">Old phone cache. Open a fresh link.</p><p><a href="./?v=20260906ar">Reload fresh build</a></p></div></section>';
     }, 2500);
   </script>
-  <script src="./src/api.js?v=20260906ap"></script>
-  <script src="./app.js?v=20260906ap"></script>
+  <script src="./src/api.js?v=20260906ar"></script>
+  <script src="./app.js?v=20260906ar"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "User Aseprite avatar packs",
   "source": "aseprite",
-  "version": "20260906ao",
+  "version": "20260906aq",
   "preferred": "cyan-hair",
   "packs": [
     {
@@ -12,10 +12,19 @@
       "preview": "assets/avatars/user-pack/cyan-hair/preview.png",
       "pack": "assets/avatars/user-pack/cyan-hair/pack.json",
       "frameCount": 9,
-      "states": ["idle", "walk", "stand", "pose"],
+      "states": [
+        "idle",
+        "walk",
+        "stand",
+        "pose",
+        "wave",
+        "sit",
+        "happy"
+      ],
       "source": "aseprite-unified",
       "preferred": true,
-      "ok": true
+      "ok": true,
+      "artFaces": "left"
     },
     {
       "slug": "char-a-dress-idle",

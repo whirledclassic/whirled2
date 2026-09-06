@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ap";
+  var LOGO_V = "20260906ar";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1291,6 +1291,7 @@
   var stuffCat = "avatars";
   var stuffItemId = null;
   var stuffMode = "browse"; // browse | upload | detail | edit
+  var avatarGuideOpen = false; // in-site creator guide (?v=20260906ar)
   var invitePanelOpen = false;
   var occMenuId = null;
   var friendInvitePending = null; // {id,name} for buddy request popup
@@ -1474,6 +1475,58 @@
     if (raw.states && raw.states.idle && !(raw.states.idle.frames && raw.states.idle.frames.length) && raw.preview) {
       raw.states.idle.frames = [raw.preview];
     }
+    // How this works (?v=20260906aq): older Wear rows mapped wave PNGs as idle (constant waving).
+    // Beginner: if idle frames still live under frames/idle/, treat them as wave and calm idle = pose.
+    // ENGINE DEV: same repair keeps getWornAvatar() honest for Pixi until users re-Wear.
+    try { repairWornAvatarStates(raw); } catch (eRep) {}
+    return raw;
+  }
+  function repairWornAvatarStates(raw) {
+    if (!raw || !raw.states) return raw;
+    if (!raw.artFaces && (raw.slug === "cyan-hair" || /cyan-hair/i.test(String(raw.packPath || "")))) {
+      raw.artFaces = "left";
+    }
+    var idle0 = (raw.states.idle && raw.states.idle.frames && raw.states.idle.frames[0]) || "";
+    var looksWaveFolder = /\/frames\/idle\//.test(String(idle0));
+    if (looksWaveFolder && !raw.states.wave) {
+      raw.states.wave = {
+        frames: (raw.states.idle.frames || []).slice(),
+        frameDurationsMs: (raw.states.idle.frameDurationsMs || [220, 220]).slice()
+      };
+      if (raw.states.pose && raw.states.pose.frames && raw.states.pose.frames.length) {
+        raw.states.idle = {
+          frames: raw.states.pose.frames.slice(),
+          frameDurationsMs: (raw.states.pose.frameDurationsMs || [400, 400]).slice()
+        };
+      }
+      raw.frames = (raw.states.idle.frames || raw.frames || []).slice();
+      raw.frameDurationsMs = (raw.states.idle.frameDurationsMs || []).slice();
+      if (raw.state === "wave" || !raw.state) raw.state = "idle";
+      // If stuck on wave from a previous bug, calm down on load.
+      if (raw.state === "wave") raw.state = "idle";
+    }
+    // Sit emote from stand folder art (char-c was a sit).
+    if (!raw.states.sit && raw.states.stand && raw.states.stand.frames && raw.states.stand.frames.length) {
+      var st0 = String(raw.states.stand.frames[0] || "");
+      if (/\/frames\/stand\//.test(st0)) {
+        raw.states.sit = {
+          frames: raw.states.stand.frames.slice(),
+          frameDurationsMs: (raw.states.stand.frameDurationsMs || [833]).slice()
+        };
+        if (raw.states.pose && raw.states.pose.frames && raw.states.pose.frames[0]) {
+          raw.states.stand = {
+            frames: [raw.states.pose.frames[0]],
+            frameDurationsMs: [833]
+          };
+        }
+      }
+    }
+    if (!raw.states.happy && raw.states.pose && raw.states.pose.frames && raw.states.pose.frames.length) {
+      raw.states.happy = {
+        frames: raw.states.pose.frames.slice().reverse(),
+        frameDurationsMs: [280, 280].slice(0, raw.states.pose.frames.length)
+      };
+    }
     return raw;
   }
   function resolveAvatarStates(item) {
@@ -1511,6 +1564,9 @@
     else if (item.pack && item.pack.frames) frames = item.pack.frames.slice();
     else if (preview) frames = [preview];
     var packPath = item.packPath || (item.slug ? ("assets/avatars/user-pack/" + item.slug + "/") : "");
+    // Beginner (?v=20260906aq): copy artFaces so loft flip matches how the PNGs were drawn.
+    // ENGINE DEV: artFaces "left" means native sprites face left — flip when walking right.
+    var artFaces = item.artFaces || (item.pack && item.pack.artFaces) || "";
     var row = {
       stuffId: item.id,
       name: item.name || "Avatar",
@@ -1522,6 +1578,7 @@
         : ((item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || []),
       states: absolutizeStateMap(states, packPath) || states,
       state: "idle",
+      artFaces: artFaces || undefined,
       source: item.source || (item.pack && item.pack.source) || "png",
       packPath: packPath,
       slug: item.slug || (item.pack && item.pack.slug) || "",
@@ -1539,7 +1596,8 @@
   function avatarWearLayerHtml() {
     // How this works: billboard sprite in the room chrome (like item in your space).
     // Beginner: if nothing Worn yet, show classic default tofu so the loft isn’t empty.
-    // ENGINE DEV: layer stays pointer-events none; click-to-walk binds on .stage-host instead.
+    // ENGINE DEV: layer stays pointer-events none; billboard is clickable for emotes (?v=20260906aq).
+    // Click-to-walk still binds on .stage-host (floor). Avatar click stopPropagation.
     // When Pixi mountWhirledEngine owns #stage-slot, chrome walk disables (see bindChromeClickToWalk).
     var worn = loadWornAvatar();
     if (!worn) worn = makeTofuWornRow();
@@ -1550,7 +1608,7 @@
     var posStyle = "--wear-scale:" + scale + ";--wear-x:" + x + "%;--wear-face:" + face + ";";
     if (isTofu) {
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Default tofu avatar">'
-        + '<div class="avatar-wear-billboard" style="' + posStyle + '">'
+        + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
         +   tofuSvgHtml("tofu-avatar tofu-wear")
         +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Tofu") + '</div>'
         + '</div></div>';
@@ -1566,7 +1624,7 @@
     if (!frames.length) {
       // Last resort: show tofu instead of an empty invisible layer.
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Avatar missing frames">'
-        + '<div class="avatar-wear-billboard" style="' + posStyle + '">'
+        + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
         +   tofuSvgHtml("tofu-avatar tofu-wear")
         +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + '</div>'
         + '</div></div>';
@@ -1577,7 +1635,7 @@
       + ' data-wear-durs="' + esc(JSON.stringify(durs)) + '"'
       + ' data-wear-state="' + esc(stateName) + '"';
     return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on" aria-label="Worn avatar">'
-      + '<div class="avatar-wear-billboard"' + meta + ' style="' + posStyle + '">'
+      + '<div class="avatar-wear-billboard" data-avatar-hit="1"' + meta + ' style="' + posStyle + '">'
       +   '<img class="avatar-wear-sprite" src="' + src0 + '" alt="' + esc(worn.name || "Avatar") + '" />'
       +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + '</div>'
       + '</div></div>';
@@ -1702,8 +1760,16 @@
     showWalkTargetMarker(host, xPct, yPct);
     var cur = parseFloat((bill.style.getPropertyValue("--wear-x") || "50").replace("%", ""));
     if (!isFinite(cur)) cur = (typeof worn.xPct === "number" ? worn.xPct : 50);
-    var face = xPct >= cur ? 1 : -1;
+    // How this works (?v=20260906aq): Cyan Hair PNGs face LEFT (artFaces:"left").
+    // Beginner: walking right needs a horizontal flip so they don't moonwalk.
+    // ENGINE DEV: Pixi should read worn.artFaces the same way.
+    var facesLeft = String(worn.artFaces || "").toLowerCase() === "left"
+      || String(worn.slug || "") === "cyan-hair";
+    var movingRight = xPct >= cur;
+    var face = facesLeft ? (movingRight ? -1 : 1) : (movingRight ? 1 : -1);
     applyWearBillboardPose(cur, face);
+    // Cancel any in-flight emote so walk owns the billboard.
+    try { cancelAvatarEmoteTimer(); } catch (eEm0) {}
     setAvatarState((worn.states && worn.states.walk) ? "walk" : "idle");
     if (chromeWalkRaf) { try { cancelAnimationFrame(chromeWalkRaf); } catch (e) {} chromeWalkRaf = 0; }
     var start = cur;
@@ -1739,7 +1805,8 @@
     var host = ev.currentTarget;
     if (!host || !host.classList.contains("stage-host")) return;
     // Ignore UI chrome inside the host (overlay history, buttons, decorate chips).
-    if (ev.target.closest("#chat-overlay, #stage-bubbles, .decorate-chip, button, a, input, textarea, select, .chrome-walk-target")) return;
+    // Beginner (?v=20260906aq): tapping the avatar opens emotes — do not start a walk.
+    if (ev.target.closest("#chat-overlay, #stage-bubbles, .decorate-chip, button, a, input, textarea, select, .chrome-walk-target, [data-avatar-hit], .avatar-emote-menu")) return;
     var rect = host.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     var xPct = ((ev.clientX - rect.left) / rect.width) * 100;
@@ -1769,6 +1836,167 @@
     host.classList.add("chrome-walk-ready");
     chromeWalkBound = true;
   }
+  // ---------------------------------------------------------------------------
+  // Click avatar → emote menu (?v=20260906aq) — whirled.club-like actions
+  // Beginner: tap your worn avatar (not the floor) → Wave / Sit / Pose / Happy.
+  // Playing an emote plays once (short loop) then returns to idle. Floor click = walk.
+  // ENGINE DEV: playAvatarEmote / listAvatarEmotes mirror pack states for Pixi later.
+  // ---------------------------------------------------------------------------
+  var chromeEmoteTimer = 0;
+  var chromeEmoteMenuOpen = false;
+
+  function cancelAvatarEmoteTimer() {
+    if (chromeEmoteTimer) {
+      try { clearTimeout(chromeEmoteTimer); } catch (e) {}
+      chromeEmoteTimer = 0;
+    }
+  }
+  function listAvatarEmotes(worn) {
+    // How this works: map pack states to friendly labels. Skip walk/idle (not emotes).
+    worn = worn || loadWornAvatar();
+    if (!worn || worn.isTofu) return [];
+    var states = worn.states || {};
+    var order = [
+      { key: "wave", label: "Wave" },
+      { key: "dance", label: "Dance" },
+      { key: "sit", label: "Sit" },
+      { key: "happy", label: "Happy" },
+      { key: "pose", label: "Pose" },
+      { key: "stand", label: "Stand" }
+    ];
+    var out = [];
+    order.forEach(function (row) {
+      var st = states[row.key];
+      if (st && st.frames && st.frames.length) out.push(row);
+    });
+    // If pack only has pose (no wave), still offer Pose.
+    if (!out.length && states.pose && states.pose.frames && states.pose.frames.length) {
+      out.push({ key: "pose", label: "Pose" });
+    }
+    return out;
+  }
+  function closeAvatarEmoteMenu() {
+    chromeEmoteMenuOpen = false;
+    var m = document.getElementById("avatar-emote-menu");
+    if (m) m.remove();
+  }
+  function openAvatarEmoteMenu(anchorEl) {
+    // Classic pale-blue action menu near the avatar billboard.
+    closeAvatarEmoteMenu();
+    var worn = loadWornAvatar();
+    var emotes = listAvatarEmotes(worn);
+    if (!emotes.length) {
+      // Soft feedback when pack has no emote states.
+      try { pushSystemChat("This avatar has no emotes yet."); } catch (e) {}
+      return;
+    }
+    var host = document.querySelector(".stage-host");
+    if (!host || !anchorEl) return;
+    var menu = document.createElement("div");
+    menu.id = "avatar-emote-menu";
+    menu.className = "avatar-emote-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", "Avatar emotes");
+    menu.innerHTML = '<div class="avatar-emote-title">Emotes</div>'
+      + emotes.map(function (e) {
+          return '<button type="button" class="avatar-emote-btn" role="menuitem" data-avatar-emote="'
+            + esc(e.key) + '">' + esc(e.label) + '</button>';
+        }).join("")
+      + '<button type="button" class="avatar-emote-btn avatar-emote-cancel" data-avatar-emote-close="1">Cancel</button>';
+    host.appendChild(menu);
+    // Position near billboard (classic popup feel).
+    try {
+      var hr = host.getBoundingClientRect();
+      var ar = anchorEl.getBoundingClientRect();
+      var left = ar.left + ar.width / 2 - hr.left;
+      var top = ar.top - hr.top - 8;
+      menu.style.left = Math.max(8, Math.min(hr.width - 140, left - 60)) + "px";
+      menu.style.top = Math.max(8, top - 8) + "px";
+    } catch (ePos) {
+      menu.style.left = "40%";
+      menu.style.top = "40%";
+    }
+    chromeEmoteMenuOpen = true;
+  }
+  function playAvatarEmote(stateName) {
+    // How this works: play emote frames for a short time, then return to idle.
+    // Beginner: Wave does not loop forever — only while the emote is playing.
+    var worn = loadWornAvatar();
+    if (!worn || worn.isTofu) return false;
+    var name = String(stateName || "");
+    if (!name || name === "idle" || name === "walk") return false;
+    var states = worn.states || {};
+    if (!states[name] || !(states[name].frames && states[name].frames.length)) return false;
+    // Stop walking toward a target so the emote is visible.
+    if (chromeWalkRaf) {
+      try { cancelAnimationFrame(chromeWalkRaf); } catch (eW) {}
+      chromeWalkRaf = 0;
+    }
+    cancelAvatarEmoteTimer();
+    setAvatarState(name);
+    closeAvatarEmoteMenu();
+    // Optional nameplate / bubble feedback.
+    try {
+      var label = name.charAt(0).toUpperCase() + name.slice(1);
+      showAvatarEmoteBubble(label);
+    } catch (eB) {}
+    var st = states[name];
+    var durs = st.frameDurationsMs || [];
+    var total = 0;
+    var frames = st.frames || [];
+    for (var i = 0; i < frames.length; i++) {
+      total += (durs[i] > 0 ? durs[i] : (durs[0] > 0 ? durs[0] : 220));
+    }
+    // Play ~2 loops for multi-frame, or hold ~1.2s for single-frame.
+    var loops = frames.length > 1 ? 2 : 1;
+    var hold = Math.max(900, total * loops);
+    if (frames.length === 1) hold = Math.max(1200, durs[0] || 1200);
+    chromeEmoteTimer = setTimeout(function () {
+      chromeEmoteTimer = 0;
+      // Only return to idle if we are still on this emote (user may have walked).
+      var w2 = loadWornAvatar();
+      if (w2 && w2.state === name) setAvatarState("idle");
+    }, hold);
+    return true;
+  }
+  function showAvatarEmoteBubble(label) {
+    // Tiny classic feedback near the avatar (not a chat history line).
+    var layer = document.getElementById("avatar-wear-layer");
+    var bill = layer && layer.querySelector(".avatar-wear-billboard");
+    if (!bill) return;
+    var old = bill.querySelector(".avatar-emote-bubble");
+    if (old) old.remove();
+    var b = document.createElement("div");
+    b.className = "avatar-emote-bubble";
+    b.textContent = label;
+    bill.appendChild(b);
+    setTimeout(function () { try { b.remove(); } catch (e) {} }, 1400);
+  }
+  function onAvatarHitClick(ev) {
+    // Beginner: tap character → emote menu. Must not trigger floor walk.
+    if (isEngineMountedOnStage()) return;
+    if (decorateMode) return;
+    var hit = ev.target.closest && ev.target.closest("[data-avatar-hit]");
+    if (!hit) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (chromeEmoteMenuOpen) {
+      closeAvatarEmoteMenu();
+      return;
+    }
+    openAvatarEmoteMenu(hit);
+  }
+  function bindAvatarEmoteClicks() {
+    var layer = document.getElementById("avatar-wear-layer");
+    if (!layer) return;
+    var bill = layer.querySelector(".avatar-wear-billboard");
+    if (!bill) return;
+    if (!bill._emoteBound) {
+      bill.addEventListener("click", onAvatarHitClick);
+      bill._emoteBound = true;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Avatar scale + Stuff viewer + tofu default (20260906ak)
   // Beginner: open Stuff → Avatars → pick one → big preview + scale slider + Wear.
@@ -1996,7 +2224,8 @@
       +   '<button type="button" class="action-btn" data-seed-user-packs="1">Add Cyan Hair to Stuff</button>'
       +   '<button type="button" class="text-btn" data-seed-user-packs-parts="1" title="Optional: also add idle/walk/stand/pose as separate part items">Also add part packs…</button>'
       + '</div>'
-      + '<p class="meta" id="avatar-pack-seed-msg">Adds the unified Cyan Hair Wearable. Then <b>Wear</b> → Rooms → click the loft floor to walk.</p>'
+      + '<p class="meta" id="avatar-pack-seed-msg">Adds the unified Cyan Hair Wearable. Then <b>Wear</b> → Rooms → click floor to walk, click avatar for emotes.</p>'
+      + '<p class="meta fla-test-soon"><b>FLA Test Avatar — Coming Soon.</b> Your .fla is saved under <code>assets/avatars/fla-lab/</code> (sketch bitmaps only so far). Publish a <b>.swf</b> from Animate and/or export idle+walk PNGs — see <code>FLA-TEST-AVATAR.md</code>. Cyan Hair stays the working Wearable.</p>'
       + '<div class="stuff-detail-actions">'
       +   '<button type="button" class="action-btn" data-wear-tofu="1">' + happyFaceSvg(false) + ' Wear default tofu</button>'
       + '</div>'
@@ -2081,7 +2310,7 @@
         var srcLabel = (packJson && packJson.source) || p.source || "aseprite";
         var desc;
         if (states && states.walk) {
-          desc = "Unified Aseprite avatar (idle + walk + stand/pose). Wear, then click the loft floor to walk.";
+          desc = "Unified Aseprite avatar (idle + walk + emotes). Wear, click floor to walk, click avatar for Wave/Sit/Pose.";
         } else if (isPart) {
           desc = "Optional part pack (" + (p.role || "frames") + ") for Cyan Hair. Prefer the unified Cyan Hair Wearable.";
         } else {
@@ -2108,6 +2337,7 @@
           frames: frames,
           frameDurationsMs: durs.slice(),
           states: states || undefined,
+          artFaces: (packJson && packJson.artFaces) || (p.artFaces) || undefined,
           pack: packForRow,
           packPath: path,
           slug: p.slug,
@@ -5234,6 +5464,439 @@
     for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
     return null;
   }
+  // ---------------------------------------------------------------------------
+  // Avatar Upload Wizard (?v=20260906ar) — flexible creator path
+  // Beginner: Stuff → Avatars → Upload… → multi-step wizard (not one rigid form).
+  // Accept PNG/WebP sequences, folders, zip packs, .aseprite (store+note), optional .swf (lab).
+  // ENGINE DEV: saved item.states matches cyan-hair pack schema for Pixi later.
+  // ---------------------------------------------------------------------------
+  var AVATAR_WIZARD_STATES = ["idle", "walk", "stand", "wave", "dance", "sit", "happy", "pose", "custom"];
+  var avatarWizard = null; // null | wizard draft object
+  var stuffModeAvatarWizard = false; // when true, stuffMode upload shows wizard
+
+  function newAvatarWizardDraft(editItem) {
+    // How this works: draft lives in memory until Save; remount/edit can reload from Stuff item.
+    var draft = {
+      step: 1,
+      name: "",
+      description: "",
+      artFaces: "left",
+      files: [], // { id, name, dataUrl, kind: image|aseprite|swf|other }
+      mapping: {}, // state -> [fileId,...]
+      fps: {},
+      loopOnce: {}, // emotes default once
+      thumbFileId: "",
+      editItemId: editItem && editItem.id ? editItem.id : null,
+      notes: []
+    };
+    AVATAR_WIZARD_STATES.forEach(function (s) {
+      draft.mapping[s] = [];
+      draft.fps[s] = (s === "walk" || s === "dance") ? 6 : 5;
+      draft.loopOnce[s] = (s === "wave" || s === "sit" || s === "pose" || s === "happy" || s === "custom");
+    });
+    if (editItem) {
+      draft.name = editItem.name || "";
+      draft.description = editItem.description || "";
+      draft.artFaces = editItem.artFaces || (editItem.pack && editItem.pack.artFaces) || "left";
+      var states = editItem.states || (editItem.pack && editItem.pack.states) || {};
+      Object.keys(states).forEach(function (st) {
+        var fr = (states[st] && states[st].frames) || [];
+        var durs = (states[st] && states[st].frameDurationsMs) || [];
+        fr.forEach(function (url, i) {
+          var fid = "ex" + st + i + Math.random().toString(36).slice(2, 6);
+          draft.files.push({ id: fid, name: st + "_frame_" + i + ".png", dataUrl: url, kind: "image" });
+          if (!draft.mapping[st]) draft.mapping[st] = [];
+          draft.mapping[st].push(fid);
+          if (durs[i] > 0) draft.fps[st] = Math.max(1, Math.round(1000 / durs[i]));
+        });
+      });
+      if (draft.files[0]) draft.thumbFileId = draft.files[0].id;
+      draft.step = 3;
+    }
+    return draft;
+  }
+  function guessStateFromName(name) {
+    // Beginner: file/folder names like walk/frame_01.png or idle_00.png auto-suggest a state.
+    var n = String(name || "").toLowerCase().replace(/\\/g, "/");
+    var keys = ["walk", "idle", "stand", "wave", "dance", "sit", "happy", "pose", "custom"];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (n.indexOf("/" + k + "/") >= 0 || n.indexOf("_" + k) >= 0 || n.indexOf(k + "_") === 0 || n.indexOf(k + "/") >= 0) {
+        return k;
+      }
+    }
+    return "idle";
+  }
+  function avatarWizardFileById(id) {
+    if (!avatarWizard) return null;
+    for (var i = 0; i < avatarWizard.files.length; i++) {
+      if (avatarWizard.files[i].id === id) return avatarWizard.files[i];
+    }
+    return null;
+  }
+  function msFromFps(fps) {
+    fps = Number(fps) || 5;
+    if (fps < 1) fps = 1;
+    if (fps > 24) fps = 24;
+    return Math.round(1000 / fps);
+  }
+  function buildStatesFromWizard(draft) {
+    // ENGINE DEV: same shape as cyan-hair pack.json states.
+    var states = {};
+    AVATAR_WIZARD_STATES.forEach(function (st) {
+      var ids = (draft.mapping[st] || []).slice();
+      if (!ids.length) return;
+      var frames = [];
+      ids.forEach(function (id) {
+        var f = null;
+        for (var i = 0; i < draft.files.length; i++) if (draft.files[i].id === id) f = draft.files[i];
+        if (f && f.kind === "image" && f.dataUrl) frames.push(f.dataUrl);
+      });
+      if (!frames.length) return;
+      var ms = msFromFps(draft.fps[st]);
+      states[st] = {
+        frames: frames,
+        frameDurationsMs: frames.map(function () { return ms; })
+      };
+    });
+    return states;
+  }
+  function readBlobAsDataUrl(blob, maxBytes) {
+    return new Promise(function (resolve, reject) {
+      if (maxBytes && blob.size > maxBytes) {
+        reject(new Error("File too large (~" + Math.round(blob.size / 1024) + "KB)."));
+        return;
+      }
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result || "")); };
+      r.onerror = function () { reject(new Error("Could not read file.")); };
+      r.readAsDataURL(blob);
+    });
+  }
+  function inflateRaw(bytes) {
+    // How this works: modern browsers expose DecompressionStream("deflate-raw") for zip DEFLATE.
+    if (typeof DecompressionStream === "undefined") {
+      return Promise.reject(new Error("This browser cannot unpack zip (no DecompressionStream). Unzip locally and upload the PNG folder."));
+    }
+    var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return new Response(stream).arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
+  }
+  function parseZipImages(arrayBuffer) {
+    // Beginner: pulls PNG/WebP/JPEG from a simple .zip pack (folder names become state hints).
+    // ENGINE DEV: store-method + deflate; skips encrypted/unsupported entries.
+    var u8 = new Uint8Array(arrayBuffer);
+    var view = new DataView(arrayBuffer);
+    var out = [];
+    var i = 0;
+    function u16(o) { return view.getUint16(o, true); }
+    function u32(o) { return view.getUint32(o, true); }
+    var chain = Promise.resolve();
+    while (i + 30 < u8.length) {
+      if (u32(i) !== 0x04034b50) break;
+      var method = u16(i + 8);
+      var compSize = u32(i + 18);
+      var uncompSize = u32(i + 22);
+      var nameLen = u16(i + 26);
+      var extraLen = u16(i + 28);
+      var nameBytes = u8.subarray(i + 30, i + 30 + nameLen);
+      var name = "";
+      try { name = new TextDecoder("utf-8").decode(nameBytes); } catch (e) { name = "file"; }
+      var dataStart = i + 30 + nameLen + extraLen;
+      var data = u8.subarray(dataStart, dataStart + compSize);
+      i = dataStart + compSize;
+      if (/\/$/.test(name)) continue;
+      if (!/\.(png|webp|jpe?g|gif)$/i.test(name)) continue;
+      (function (entryName, entryMethod, entryData, entryUncomp) {
+        chain = chain.then(function () {
+          var payload;
+          if (entryMethod === 0) payload = Promise.resolve(entryData);
+          else if (entryMethod === 8) payload = inflateRaw(entryData);
+          else return null;
+          return payload.then(function (raw) {
+            var lower = entryName.toLowerCase();
+            var mime = "image/png";
+            if (/\.webp$/i.test(lower)) mime = "image/webp";
+            else if (/\.jpe?g$/i.test(lower)) mime = "image/jpeg";
+            else if (/\.gif$/i.test(lower)) mime = "image/gif";
+            var b64 = btoa(Array.prototype.map.call(raw, function (c) { return String.fromCharCode(c); }).join(""));
+            // Guard huge frames
+            if (b64.length > 350000) return null;
+            out.push({
+              id: "z" + Math.random().toString(36).slice(2, 9),
+              name: entryName,
+              dataUrl: "data:" + mime + ";base64," + b64,
+              kind: "image",
+              suggested: guessStateFromName(entryName)
+            });
+          });
+        });
+      })(name, method, data, uncompSize);
+    }
+    return chain.then(function () { return out; });
+  }
+  function avatarWizardPresetsHtml() {
+    return '<div class="avatar-wiz-presets" role="list">'
+      + '<span class="avatar-wiz-chip" role="listitem">Aseprite → File → Export Sprite Sheet / PNG sequence</span>'
+      + '<span class="avatar-wiz-chip" role="listitem">Photoshop / Pixelora → PNG frames</span>'
+      + '<span class="avatar-wiz-chip" role="listitem">Flash / Animate → Publish SWF or export PNG</span>'
+      + '<span class="avatar-wiz-chip" role="listitem">Plain folders: idle/ walk/ wave/</span>'
+      + '</div>';
+  }
+  function avatarWizardHtml() {
+    // Multi-step pale-blue wizard UI.
+    if (!avatarWizard) avatarWizard = newAvatarWizardDraft(null);
+    var d = avatarWizard;
+    var step = d.step || 1;
+    var head = '<div class="panel avatar-wiz-panel" id="avatar-wizard">'
+      + '<div class="room-side-head"><h2>Avatar upload wizard</h2>'
+      +   '<button type="button" class="text-btn" data-avatar-wiz-cancel="1">Cancel</button></div>'
+      + '<p class="meta">Flexible creator path — map any frames to idle / walk / emotes. Remount anytime from the item. '
+      + '<button type="button" class="text-btn" data-avatar-guide-open="1">How to make an avatar</button></p>'
+      + avatarWizardPresetsHtml()
+      + '<div class="avatar-wiz-steps" aria-label="Wizard steps">'
+      +   [1,2,3,4].map(function (n) {
+          var labels = { 1: "Files", 2: "Name", 3: "Map states", 4: "Preview" };
+          return '<span class="avatar-wiz-step' + (step === n ? " is-on" : "") + (step > n ? " is-done" : "") + '">' + n + ". " + labels[n] + "</span>";
+        }).join("")
+      + '</div>';
+
+    var body = "";
+    if (step === 1) {
+      body = '<div class="avatar-wiz-body">'
+        + '<p class="meta">Drop in one file or many. Names like <code>walk/frame_00.png</code> auto-suggest states.</p>'
+        + '<label class="avatar-wiz-drop">Images / frames (PNG WebP JPEG GIF)'
+        +   '<input type="file" id="avatar-wiz-images" accept="image/png,image/webp,image/jpeg,image/gif" multiple /></label>'
+        + '<label class="avatar-wiz-drop">Folder of frames'
+        +   '<input type="file" id="avatar-wiz-folder" accept="image/png,image/webp,image/jpeg,image/gif" multiple webkitdirectory directory /></label>'
+        + '<label class="avatar-wiz-drop">Zip pack (.zip of folders)'
+        +   '<input type="file" id="avatar-wiz-zip" accept=".zip,application/zip" /></label>'
+        + '<label class="avatar-wiz-drop">Aseprite source (stored + note — export PNGs for loft)'
+        +   '<input type="file" id="avatar-wiz-ase" accept=".aseprite,.ase,application/octet-stream" multiple /></label>'
+        + '<label class="avatar-wiz-drop">SWF (experimental — needs ?avatarLab=1 to Wear via lab)'
+        +   '<input type="file" id="avatar-wiz-swf" accept=".swf,application/x-shockwave-flash" /></label>'
+        + '<div class="avatar-wiz-filelist">' + (d.files.length
+          ? d.files.map(function (f) {
+              return '<div class="avatar-wiz-file' + (f.kind !== "image" ? " is-attach" : "") + '" data-wiz-file="' + esc(f.id) + '">'
+                + (f.kind === "image" ? ('<img src="' + f.dataUrl + '" alt="" />') : '<span class="avatar-wiz-file-tag">' + esc(f.kind) + '</span>')
+                + '<span class="avatar-wiz-file-name" title="' + esc(f.name) + '">' + esc(f.name) + '</span>'
+                + '<button type="button" class="text-btn" data-wiz-remove-file="' + esc(f.id) + '">Remove</button></div>';
+            }).join("")
+          : '<p class="meta">No files yet.</p>')
+        + '</div>'
+        + '<p class="meta" id="avatar-wiz-msg"></p>'
+        + '<div class="avatar-wiz-nav">'
+        +   '<button type="button" class="action-btn" data-avatar-wiz-next="1"' + (d.files.some(function (f) { return f.kind === "image"; }) ? "" : " disabled") + '>Next — Name</button>'
+        + '</div></div>';
+    } else if (step === 2) {
+      var imgs = d.files.filter(function (f) { return f.kind === "image"; });
+      body = '<div class="avatar-wiz-body">'
+        + '<label>Avatar name <input id="avatar-wiz-name" maxlength="80" required value="' + esc(d.name) + '" placeholder="My avatar" /></label>'
+        + '<label>Description <textarea id="avatar-wiz-desc" rows="2" maxlength="400" placeholder="Optional notes">' + esc(d.description) + '</textarea></label>'
+        + '<div class="section-label">Preview thumb (tap one)</div>'
+        + '<div class="avatar-wiz-thumbs">' + imgs.map(function (f) {
+            return '<button type="button" class="avatar-wiz-thumb' + (d.thumbFileId === f.id ? " is-on" : "") + '" data-wiz-thumb="' + esc(f.id) + '">'
+              + '<img src="' + f.dataUrl + '" alt="" /></button>';
+          }).join("") + '</div>'
+        + '<label>Art faces which way? <select id="avatar-wiz-faces">'
+        +   '<option value="left"' + (d.artFaces === "left" ? " selected" : "") + '>Left (flip when walking right)</option>'
+        +   '<option value="right"' + (d.artFaces === "right" ? " selected" : "") + '>Right (flip when walking left)</option>'
+        + '</select></label>'
+        + '<div class="avatar-wiz-nav">'
+        +   '<button type="button" class="text-btn" data-avatar-wiz-back="1">Back</button>'
+        +   '<button type="button" class="action-btn" data-avatar-wiz-next="1">Next — Map states</button>'
+        + '</div></div>';
+    } else if (step === 3) {
+      var imgs3 = d.files.filter(function (f) { return f.kind === "image"; });
+      // Ensure every image is in some mapping (default suggested)
+      imgs3.forEach(function (f) {
+        var placed = AVATAR_WIZARD_STATES.some(function (st) { return (d.mapping[st] || []).indexOf(f.id) >= 0; });
+        if (!placed) {
+          var g = f.suggested || guessStateFromName(f.name);
+          if (!d.mapping[g]) d.mapping[g] = [];
+          d.mapping[g].push(f.id);
+        }
+      });
+      body = '<div class="avatar-wiz-body">'
+        + '<p class="meta">Assign each frame to a state. Reorder with ↑ ↓. Set FPS. Emotes can play once.</p>'
+        + AVATAR_WIZARD_STATES.map(function (st) {
+            var ids = d.mapping[st] || [];
+            if (!ids.length && st !== "idle" && st !== "walk" && st !== "wave" && st !== "pose" && st !== "sit") {
+              // collapse unused custom-ish empty rows except core
+              if (st === "dance" || st === "happy" || st === "stand" || st === "custom") {
+                /* still show so user can add */
+              }
+            }
+            return '<div class="avatar-wiz-state" data-wiz-state="' + esc(st) + '">'
+              + '<div class="avatar-wiz-state-head"><b>' + esc(st) + '</b>'
+              +   '<label class="avatar-wiz-fps">FPS <input type="number" min="1" max="24" value="' + esc(String(d.fps[st] || 5)) + '" data-wiz-fps="' + esc(st) + '" /></label>'
+              +   (st === "idle" || st === "walk" ? "" : ('<label class="check-row"><input type="checkbox" data-wiz-once="' + esc(st) + '"' + (d.loopOnce[st] ? " checked" : "") + ' /> Play once</label>'))
+              + '</div>'
+              + '<div class="avatar-wiz-state-frames">' + (ids.length ? ids.map(function (id, ix) {
+                  var f = avatarWizardFileById(id);
+                  if (!f) return "";
+                  return '<div class="avatar-wiz-map-row" data-wiz-map="' + esc(st) + '" data-wiz-id="' + esc(id) + '">'
+                    + '<img src="' + f.dataUrl + '" alt="" />'
+                    + '<span>' + esc(f.name) + '</span>'
+                    + '<button type="button" class="text-btn" data-wiz-up="' + esc(st) + '" data-wiz-id="' + esc(id) + '" ' + (ix === 0 ? "disabled" : "") + '>↑</button>'
+                    + '<button type="button" class="text-btn" data-wiz-down="' + esc(st) + '" data-wiz-id="' + esc(id) + '" ' + (ix === ids.length - 1 ? "disabled" : "") + '>↓</button>'
+                    + '<select data-wiz-reassign="' + esc(id) + '" data-wiz-from="' + esc(st) + '">'
+                    +   AVATAR_WIZARD_STATES.map(function (s2) {
+                          return '<option value="' + s2 + '"' + (s2 === st ? " selected" : "") + '>' + s2 + '</option>';
+                        }).join("")
+                    + '</select></div>';
+                }).join("") : '<p class="meta">No frames — reassign from another state.</p>')
+              + '</div></div>';
+          }).join("")
+        + '<div class="avatar-wiz-nav">'
+        +   '<button type="button" class="text-btn" data-avatar-wiz-back="1">Back</button>'
+        +   '<button type="button" class="action-btn" data-avatar-wiz-next="1">Next — Preview</button>'
+        + '</div></div>';
+    } else {
+      var states = buildStatesFromWizard(d);
+      var idle = states.idle || states.stand || states.pose;
+      var walk = states.walk;
+      var thumb = (avatarWizardFileById(d.thumbFileId) || {}).dataUrl || (idle && idle.frames[0]) || "";
+      body = '<div class="avatar-wiz-body">'
+        + '<div class="avatar-wiz-preview-grid">'
+        +   '<div class="avatar-wiz-preview-card"><div class="section-label">Idle</div>'
+        +     (idle ? '<img class="avatar-wiz-preview-img" id="avatar-wiz-prev-idle" src="' + (idle.frames[0] || "") + '" data-frames="' + esc(JSON.stringify(idle.frames)) + '" data-ms="' + esc(String((idle.frameDurationsMs && idle.frameDurationsMs[0]) || 200)) + '" alt="" />'
+          : '<p class="meta">Add idle frames (required for Wear).</p>')
+        +   '</div>'
+        +   '<div class="avatar-wiz-preview-card"><div class="section-label">Walk</div>'
+        +     (walk ? '<img class="avatar-wiz-preview-img" id="avatar-wiz-prev-walk" src="' + (walk.frames[0] || "") + '" data-frames="' + esc(JSON.stringify(walk.frames)) + '" data-ms="' + esc(String((walk.frameDurationsMs && walk.frameDurationsMs[0]) || 200)) + '" alt="" />'
+          : '<p class="meta">Optional — without walk, loft still shows idle.</p>')
+        +   '</div>'
+        +   '<div class="avatar-wiz-preview-card"><div class="section-label">Emote sample</div>'
+        +     (function () {
+              var em = states.wave || states.pose || states.happy || states.sit;
+              if (!em) return '<p class="meta">Optional emotes — click avatar in loft later.</p>';
+              return '<img class="avatar-wiz-preview-img" id="avatar-wiz-prev-emote" src="' + (em.frames[0] || "") + '" data-frames="' + esc(JSON.stringify(em.frames)) + '" data-ms="' + esc(String((em.frameDurationsMs && em.frameDurationsMs[0]) || 220)) + '" alt="" />';
+            })()
+        +   '</div>'
+        +   '<div class="avatar-wiz-preview-card"><div class="section-label">Thumb</div>'
+        +     (thumb ? '<img src="' + thumb + '" alt="" class="avatar-wiz-preview-img" />' : '<p class="meta">—</p>')
+        +   '</div>'
+        + '</div>'
+        + '<label class="check-row"><input type="checkbox" id="avatar-wiz-copyright" required /> I confirm I have the right to upload this (copyright).</label>'
+        + '<p class="meta" id="avatar-wiz-msg"></p>'
+        + '<div class="avatar-wiz-nav">'
+        +   '<button type="button" class="text-btn" data-avatar-wiz-back="1">Back</button>'
+        +   '<button type="button" class="action-btn" data-avatar-wiz-save="1">Save to Stuff</button>'
+        + '</div></div>';
+    }
+    return head + body + '</div>';
+  }
+  function startAvatarWizardPreviewAnims() {
+    // Flip preview cards like tiny GIFs.
+    ["avatar-wiz-prev-idle", "avatar-wiz-prev-walk", "avatar-wiz-prev-emote"].forEach(function (id) {
+      var img = document.getElementById(id);
+      if (!img) return;
+      var frames = [];
+      try { frames = JSON.parse(img.getAttribute("data-frames") || "[]"); } catch (e) { frames = []; }
+      var ms = parseInt(img.getAttribute("data-ms") || "200", 10) || 200;
+      if (frames.length < 2) return;
+      if (img._wizTimer) clearInterval(img._wizTimer);
+      var i = 0;
+      img._wizTimer = setInterval(function () {
+        i = (i + 1) % frames.length;
+        img.src = frames[i];
+      }, ms);
+    });
+  }
+  function saveAvatarWizardToStuff() {
+    // Persist local Stuff item with absolutized data URL frames (Wear-ready).
+    if (!avatarWizard || !session()) return;
+    var d = avatarWizard;
+    var states = buildStatesFromWizard(d);
+    if (!(states.idle && states.idle.frames && states.idle.frames.length)) {
+      var msg = document.getElementById("avatar-wiz-msg");
+      if (msg) msg.textContent = "Map at least one idle frame before saving.";
+      return;
+    }
+    var copy = document.getElementById("avatar-wiz-copyright");
+    if (copy && !copy.checked) {
+      var msg2 = document.getElementById("avatar-wiz-msg");
+      if (msg2) msg2.textContent = "Please confirm the copyright checkbox.";
+      return;
+    }
+    var thumb = (avatarWizardFileById(d.thumbFileId) || {}).dataUrl || states.idle.frames[0];
+    var ases = d.files.filter(function (f) { return f.kind === "aseprite"; });
+    var swfs = d.files.filter(function (f) { return f.kind === "swf"; });
+    var items = loadStuff();
+    var nid = d.editItemId || ("av" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    var row = {
+      id: nid,
+      name: (d.name || "Avatar").slice(0, 80),
+      description: (d.description || "Uploaded via avatar wizard.").slice(0, 400),
+      kind: "avatar",
+      type: "avatar",
+      category: "avatars",
+      creator: session().user.name,
+      ownerId: session().user.id,
+      thumb: thumb,
+      preview: thumb,
+      frames: states.idle.frames.slice(),
+      frameDurationsMs: states.idle.frameDurationsMs.slice(),
+      states: states,
+      artFaces: d.artFaces || "left",
+      source: ases.length ? "aseprite+wizard" : "png-wizard",
+      pack: {
+        name: d.name || "Avatar",
+        states: states,
+        frames: states.idle.frames.slice(),
+        displayFrames: states.idle.frames.slice(),
+        frameDurationsMs: states.idle.frameDurationsMs.slice(),
+        thumb: thumb,
+        artFaces: d.artFaces || "left",
+        source: "wizard",
+        _engineDev: "Wizard pack — same states schema as cyan-hair for Pixi."
+      },
+      owned: true,
+      at: new Date().toISOString()
+    };
+    if (ases[0]) {
+      row.asepriteDataUrl = ases[0].dataUrl;
+      row.asepriteName = ases[0].name;
+      row.pack.sourceFile = ases[0].name;
+    }
+    if (swfs[0]) {
+      row.swfNote = "SWF attached in wizard — use ?avatarLab=1 wardrobe for experimental lab; loft Wear stays sprite pack.";
+      row.swfName = swfs[0].name;
+      // Do not auto-mount SWF; store name only if data huge — keep dataUrl if small enough
+      if (swfs[0].dataUrl && swfs[0].dataUrl.length < 2.5e6) row.swfDataUrl = swfs[0].dataUrl;
+    }
+    var replaced = false;
+    if (d.editItemId) {
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].id === d.editItemId) {
+          items[i] = Object.assign({}, items[i], row, { id: d.editItemId });
+          replaced = true;
+          nid = d.editItemId;
+          break;
+        }
+      }
+    }
+    if (!replaced) items.unshift(row);
+    try {
+      saveStuff(items);
+    } catch (eSave) {
+      var msg3 = document.getElementById("avatar-wiz-msg");
+      if (msg3) msg3.textContent = "Could not save — frames may be too large for browser storage. Use fewer/smaller PNGs.";
+      return;
+    }
+    // If currently worn, refresh wear from new mapping
+    if (isWornStuffId(nid)) {
+      wearStuffAvatar(findStuff(nid));
+    }
+    avatarWizard = null;
+    stuffModeAvatarWizard = false;
+    stuffMode = "detail";
+    stuffItemId = nid;
+    pushNotice("green", "Avatar saved. Wear it, then click the loft floor to walk / click avatar for emotes.", { transient: true });
+    try { awardAction("upload"); } catch (eA) {}
+    paint("stuff");
+  }
+
   function stuffUploadForm(meta) {
     // How this works: Music = audio data URL. Avatars = PNG/WebP preview (+ optional .aseprite attachment).
     // Other categories stay image-thumb stubs. Copyright checkbox is always required.
@@ -5243,10 +5906,9 @@
     if (isMusic) {
       fileLabel = 'Audio file (MP3 / WAV / OGG / WebM) <input type="file" name="media" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/*" required />';
     } else if (isAvatar) {
-      // Beginner (?v=20260906ao): multi-file → one inventory item with idle + walk states.
-      fileLabel = 'Idle / preview PNGs (multi-select OK) <input type="file" name="image" accept="image/png,image/webp,image/jpeg,image/gif" multiple />'
-        + '</label><label>Walk PNGs (optional multi-select) <input type="file" name="walk" accept="image/png,image/webp,image/jpeg,image/gif" multiple />'
-        + '</label><label>Aseprite sources (optional idle/walk .aseprite) <input type="file" name="aseprite" accept=".aseprite,.ase,application/octet-stream" multiple />';
+      // Beginner (?v=20260906ar): full wizard replaces the rigid idle/walk-only form.
+      // Keep a tiny legacy note; primary path is avatarWizardHtml().
+      return avatarWizardHtml();
     } else {
       fileLabel = 'Thumbnail / image (optional) <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" />';
     }
@@ -5342,7 +6004,11 @@
         + '<button type="button" class="action-btn danger" data-stuff-delete="' + esc(item.id) + '">Delete Item</button>'
         + '</div>'
         + (isAvatar
-          ? '<p class="meta">Wear shows this avatar in your loft on <code>#avatar-wear-layer</code> (sprite billboard — not Ruffle/SWF). Scale applies to preview + loft.</p>'
+          ? ('<p class="meta">Wear shows this avatar in your loft on <code>#avatar-wear-layer</code> (sprite billboard — not Ruffle/SWF). Scale applies to preview + loft.</p>'
+            + '<div class="stuff-detail-actions">'
+            +   '<button type="button" class="action-btn" data-avatar-wiz-remap="' + esc(item.id) + '">Remap states…</button>'
+            +   '<button type="button" class="text-btn" data-avatar-guide-open="1">How to make an avatar</button>'
+            + '</div>')
           : "")
         + listBlock
         + '<div class="section-label">Send as Gift</div>'
@@ -5367,7 +6033,8 @@
     var how = '<div class="panel how-stuff-panel">'
       + '<h3>How do I get stuff?</h3>'
       + '<p class="meta">Create furniture and media yourself (wiki Upload), or earn/buy later. Coins & Bars are play currency — no payments. Nothing is invented for you.</p>'
-      + '<button type="button" class="action-btn" data-stuff-mode="upload">Upload…</button>'
+      + '<button type="button" class="action-btn" data-stuff-mode="upload">' + (stuffCat === "avatars" ? "Upload avatar wizard…" : "Upload…") + '</button>'
+      + (stuffCat === "avatars" ? ' <button type="button" class="text-btn" data-avatar-guide-open="1">How to make an avatar</button>' : "")
       + '</div>';
     // How this works: quiet On hold note (default) OR full Avatar lab (flag on) — only on Avatars browse.
     var avatarExtra = "";
@@ -5378,6 +6045,11 @@
     }
     var body;
     if (stuffMode === "upload") {
+      // How this works (?v=20260906ar): Avatars open the multi-step wizard.
+      if (meta.id === "avatars") {
+        stuffModeAvatarWizard = true;
+        if (!avatarWizard) avatarWizard = newAvatarWizardDraft(null);
+      }
       body = stuffUploadForm(meta);
     } else if ((stuffMode === "detail" || stuffMode === "edit") && stuffItemId) {
       body = stuffDetail(findStuff(stuffItemId));
@@ -6227,7 +6899,50 @@
       +   '<p>Features are <b>prototypes</b> and subject to change. <b>Coins &amp; Bars</b> are play currency (earn-only Bars) — no live payments on this mock.</p>'
       + '</div></section>';
   }
-function helpPage() {
+
+  function avatarGuidePage() {
+    // Beginner in-site docs — mirrors AVATAR-CREATOR-GUIDE.md
+    return '<section class="page help-page avatar-guide-page"><div class="page-head"><div><h1>How to make an avatar</h1>'
+      + '<p>Plain-English creator guide for Whirled2 Stuff packs.</p></div>'
+      + '<button type="button" class="text-btn" data-avatar-guide-close="1">Close</button></div>'
+      + '<div class="panel"><h2>What you need</h2>'
+      + '<ul class="help-tips">'
+      + '<li><b>Idle</b> — calm standing loop (arms down). 1–4 frames is fine.</li>'
+      + '<li><b>Walk</b> — 4–8 frames of a walk cycle (optional but recommended).</li>'
+      + '<li><b>Emotes</b> — wave, sit, pose, happy, dance (optional). Click the avatar in the loft to play them.</li>'
+      + '<li><b>Size</b> — classic loft feel ~64–128px wide, transparent PNG/WebP. Keep each frame under ~200KB.</li>'
+      + '<li><b>Facing</b> — draw facing left <i>or</i> right, then set Art faces in the wizard so walk flip looks right.</li>'
+      + '</ul></div>'
+      + '<div class="panel"><h2>Tool paths (pick any)</h2>'
+      + '<ul class="help-tips">'
+      + '<li><b>Aseprite</b> — animate tags per state → Export PNG sequence (or sprite sheet then slice). Attach the .aseprite in the wizard for safekeeping; loft uses PNGs.</li>'
+      + '<li><b>Photoshop / Pixelora / Piskel</b> — export frame PNGs into folders named idle, walk, wave…</li>'
+      + '<li><b>Flash / Animate</b> — Publish SWF for the experimental lab (<code>?avatarLab=1</code>), <b>or</b> export PNG sequences for the modern Wear path (recommended).</li>'
+      + '<li><b>Zip pack</b> — zip folders <code>idle/</code> <code>walk/</code> <code>wave/</code> and upload the zip in the wizard.</li>'
+      + '</ul></div>'
+      + '<div class="panel"><h2>Wizard steps</h2>'
+      + '<ol class="help-tips">'
+      + '<li>Stuff → Avatars → <b>Upload avatar wizard</b>.</li>'
+      + '<li>Add files (multi-select, folder, or zip).</li>'
+      + '<li>Name + pick thumb + art facing.</li>'
+      + '<li>Map frames to states (dropdown per frame). Set FPS.</li>'
+      + '<li>Preview idle/walk/emote → copyright check → Save.</li>'
+      + '<li>Open the card → <b>Wear</b> → Rooms → floor click walks, avatar click emotes.</li>'
+      + '<li><b>Remap states…</b> anytime from the item detail.</li>'
+      + '</ol></div>'
+      + '<div class="panel"><h2>Troubleshooting</h2>'
+      + '<ul class="help-tips">'
+      + '<li><b>Invisible in loft</b> — relative paths 404; wizard stores data URLs. Re-Wear after remap. Cyan Hair uses absolutized <code>./assets/…</code> paths.</li>'
+      + '<li><b>Constant waving</b> — idle mapped to wave art. Remap idle to calm frames; wave is an emote.</li>'
+      + '<li><b>Walking backwards</b> — wrong Art faces setting; flip left/right in Remap / wizard step 2.</li>'
+      + '<li><b>Save failed</b> — too many/large frames for browser storage; shrink PNGs.</li>'
+      + '<li><b>.fla alone</b> — cannot play in browser. Publish SWF and/or export PNGs (see FLA-TEST-AVATAR.md).</li>'
+      + '</ul>'
+      + '<p class="meta">ENGINE DEV: pack <code>states</code> schema matches Cyan Hair for Pixi. Bridge: <code>getWornAvatar</code>, <code>playAvatarEmote</code>, <code>artFaces</code>.</p>'
+      + '</div></section>';
+  }
+
+  function helpPage() {
     return '<section class="page help-page"><div class="page-head"><div><h1>Help</h1>'
       + '<p>Starting Out — Whirled2 chrome tips.</p></div>'
       + '<button type="button" class="text-btn" data-help-close="1">Close Help</button></div>'
@@ -6237,6 +6952,7 @@ function helpPage() {
       + '<li><b>Sign-in</b> — username / password works everywhere. <b>Create account with Discord</b> works on the demo server / phone tunnel (not GitHub Pages — no secrets on a static host). Google Coming Soon. Facebook Connect removed.</li>'
       + '<li><b>Rooms</b> — tap a lobby tile to <b>preview</b> then Enter; <b>Create Room</b> from My Rooms (first free; later 10k coins or 1 bar). Phone landscape = immersive stage + corner chat.</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
+      + '<li><b>Avatars</b> — Stuff → Avatars → <b>Upload avatar wizard</b> (PNG sequences, folders, zip, .aseprite). Wear → click floor to walk → click avatar for emotes. <button type="button" class="text-btn" data-avatar-guide-open="1">How to make an avatar</button></li>'
       + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Owner pastes a YouTube/Spotify link → <b>Set embed</b> → <b>Done</b>. <b>Everyone in this loft hears the same loop (synced)</b> when the demo server is running; Pages alone is local-only. Closing the sheet does <b>not</b> stop playback. On phones use <b>Open player</b> if the embed is hard to tap.</li>'
       + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
       + '<li><b>Profile look</b> — Me → My Profile → presets publish instantly; <b>Upload custom background</b> (image behind everything) or Edit look for font/corners/modules/banner.</li>'
@@ -6251,7 +6967,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906ao</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906ar</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -6348,7 +7064,7 @@ function helpPage() {
       // ENGINE DEV: persistent shell dock + CSS fixed is-expanded; ensureRoomEmbedDock / ensurePlaylistPanel after paint.
       +     chatTabsHtml()
       +     '<div class="chat-log" id="chat-log">' + activeChatMessages().map(chatRow).join('') + '</div>'
-      +     '<div class="room-invite-row">'
+      +     '<div class="room-invite-row room-invite-desktop">'
       +       '<button type="button" class="text-btn" data-room-share="1">Share / embed room…</button>'
       +       '<button type="button" class="text-btn" data-copy-invite="room">Copy link</button>'
       +     '</div>'
@@ -8534,7 +9250,8 @@ function helpPage() {
     // Beginner: Open player stays open when you mute or switch YouTube/Spotify in Room music.
     // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts only when playlistPanelDirty (never while paste field focused; clears dirty instead).
     if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; main.innerHTML = legalPage(); }
-    else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; main.innerHTML = helpPage(); }
+    else if (avatarGuideOpen) { helpOpen = false; legalOpen = false; main.innerHTML = avatarGuidePage(); }
+    else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; avatarGuideOpen = false; main.innerHTML = helpPage(); }
     // How this works (QA 20260906ai): rooms-lobby is a CSS state on #app, not a paint tab.
     // Beginner: if something still calls paint("rooms-lobby"), show the Rooms lobby — never the old Groups stub.
     else if (tab === "rooms" || tab === "rooms-lobby") main.innerHTML = rooms();
@@ -8617,9 +9334,11 @@ function helpPage() {
     } catch (ePop) {}
     // How this works: after room paint, flip multi-frame Worn avatar sprites on #avatar-wear-layer.
     try { startAvatarWearAnim(); } catch (eWearAnim) {}
+    try { if (stuffMode === "upload" && stuffCat === "avatars") startAvatarWizardPreviewAnims(); } catch (eWizPrev) {}
     try { applyWearBillboardScale(); } catch (eWearSc) {}
     // Beginner (?v=20260906ao): click loft floor → chrome walk (yields when Pixi mounts).
     try { bindChromeClickToWalk(); } catch (eWalk) {}
+    try { bindAvatarEmoteClicks(); } catch (eEmBind) {}
     // Stuff Avatar viewer preview play (when detail is open).
     try { startAvatarViewerAnim(); } catch (eViewAnim) {}
   }
@@ -8645,6 +9364,7 @@ function helpPage() {
     try { startAvatarWearAnim(); } catch (eWear) {}
     try { applyWearBillboardScale(); } catch (eSc) {}
     try { bindChromeClickToWalk(); } catch (eWalk2) {}
+    try { bindAvatarEmoteClicks(); } catch (eEmBind2) {}
   }
   // Information: refreshChatLog writes both #chat-log (slide) and #chat-overlay (overlay).
   // How this works: active tab (Room vs PM) picks which message array to render.
@@ -8987,6 +9707,8 @@ function helpPage() {
         return w;
       },
       setAvatarState: function (name) { return setAvatarState(name); },
+      playAvatarEmote: function (name) { return playAvatarEmote(name); },
+      listAvatarEmotes: function () { return listAvatarEmotes(); },
       getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
       isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); }
     };
@@ -9775,6 +10497,21 @@ function helpPage() {
       copyInviteLink(copyInv.getAttribute("data-copy-invite"), copyInv.getAttribute("data-copy-invite-id"));
       return;
     }
+    // Beginner (?v=20260906aq): emote menu buttons on the loft avatar.
+    if (ev.target.closest("[data-avatar-emote-close]")) {
+      closeAvatarEmoteMenu();
+      return;
+    }
+    var emoteBtn = ev.target.closest("[data-avatar-emote]");
+    if (emoteBtn) {
+      var em = emoteBtn.getAttribute("data-avatar-emote");
+      playAvatarEmote(em);
+      return;
+    }
+    if (chromeEmoteMenuOpen && !ev.target.closest(".avatar-emote-menu, [data-avatar-hit]")) {
+      closeAvatarEmoteMenu();
+    }
+
     if (ev.target.closest("[data-room-share]") && session()) {
       // How this works: open Share / embed modal (URL + iframe snippet).
       try {
@@ -10292,10 +11029,116 @@ function helpPage() {
       pushNotice("status", "States / custom actions: Coming Soon for SWF. Sprite packs already preview-play frames in the viewer.", { transient: true });
       return;
     }
+
+    // ---- Avatar wizard (?v=20260906ar) ----
+    if (ev.target.closest("[data-avatar-guide-open]") && session()) {
+      avatarGuideOpen = true; helpOpen = false; legalOpen = false;
+      paint("help");
+      return;
+    }
+    if (ev.target.closest("[data-avatar-guide-close]") && session()) {
+      avatarGuideOpen = false;
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-avatar-wiz-cancel]") && session()) {
+      avatarWizard = null; stuffModeAvatarWizard = false; stuffMode = "browse";
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-avatar-wiz-remap]") && session()) {
+      var rid = ev.target.closest("[data-avatar-wiz-remap]").getAttribute("data-avatar-wiz-remap");
+      var it = findStuff(rid);
+      if (!it) return;
+      avatarWizard = newAvatarWizardDraft(it);
+      stuffMode = "upload"; stuffModeAvatarWizard = true; stuffCat = "avatars";
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-avatar-wiz-back]") && avatarWizard) {
+      // sync name fields if on step 2
+      var nm = document.getElementById("avatar-wiz-name");
+      var ds = document.getElementById("avatar-wiz-desc");
+      var fc = document.getElementById("avatar-wiz-faces");
+      if (nm) avatarWizard.name = nm.value;
+      if (ds) avatarWizard.description = ds.value;
+      if (fc) avatarWizard.artFaces = fc.value;
+      avatarWizard.step = Math.max(1, (avatarWizard.step || 1) - 1);
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-avatar-wiz-next]") && avatarWizard) {
+      var nm2 = document.getElementById("avatar-wiz-name");
+      var ds2 = document.getElementById("avatar-wiz-desc");
+      var fc2 = document.getElementById("avatar-wiz-faces");
+      if (nm2) avatarWizard.name = nm2.value.trim();
+      if (ds2) avatarWizard.description = ds2.value;
+      if (fc2) avatarWizard.artFaces = fc2.value;
+      if (avatarWizard.step === 2 && !avatarWizard.name) {
+        alert("Give your avatar a name.");
+        return;
+      }
+      if (avatarWizard.step === 2 && !avatarWizard.thumbFileId) {
+        var firstImg = avatarWizard.files.filter(function (f) { return f.kind === "image"; })[0];
+        if (firstImg) avatarWizard.thumbFileId = firstImg.id;
+      }
+      avatarWizard.step = Math.min(4, (avatarWizard.step || 1) + 1);
+      paint("stuff");
+      try { startAvatarWizardPreviewAnims(); } catch (eP) {}
+      return;
+    }
+    if (ev.target.closest("[data-avatar-wiz-save]") && avatarWizard) {
+      var nm3 = document.getElementById("avatar-wiz-name");
+      if (nm3) avatarWizard.name = nm3.value.trim();
+      saveAvatarWizardToStuff();
+      return;
+    }
+    if (ev.target.closest("[data-wiz-remove-file]") && avatarWizard) {
+      var rm = ev.target.closest("[data-wiz-remove-file]").getAttribute("data-wiz-remove-file");
+      avatarWizard.files = avatarWizard.files.filter(function (f) { return f.id !== rm; });
+      AVATAR_WIZARD_STATES.forEach(function (st) {
+        avatarWizard.mapping[st] = (avatarWizard.mapping[st] || []).filter(function (id) { return id !== rm; });
+      });
+      if (avatarWizard.thumbFileId === rm) avatarWizard.thumbFileId = "";
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-wiz-thumb]") && avatarWizard) {
+      avatarWizard.thumbFileId = ev.target.closest("[data-wiz-thumb]").getAttribute("data-wiz-thumb");
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-wiz-up]") && avatarWizard) {
+      var upBtn = ev.target.closest("[data-wiz-up]");
+      var stU = upBtn.getAttribute("data-wiz-up");
+      var idU = upBtn.getAttribute("data-wiz-id");
+      var arrU = avatarWizard.mapping[stU] || [];
+      var ixU = arrU.indexOf(idU);
+      if (ixU > 0) {
+        var t = arrU[ixU - 1]; arrU[ixU - 1] = arrU[ixU]; arrU[ixU] = t;
+        avatarWizard.mapping[stU] = arrU;
+        paint("stuff");
+      }
+      return;
+    }
+    if (ev.target.closest("[data-wiz-down]") && avatarWizard) {
+      var dnBtn = ev.target.closest("[data-wiz-down]");
+      var stD = dnBtn.getAttribute("data-wiz-down");
+      var idD = dnBtn.getAttribute("data-wiz-id");
+      var arrD = avatarWizard.mapping[stD] || [];
+      var ixD = arrD.indexOf(idD);
+      if (ixD >= 0 && ixD < arrD.length - 1) {
+        var t2 = arrD[ixD + 1]; arrD[ixD + 1] = arrD[ixD]; arrD[ixD] = t2;
+        avatarWizard.mapping[stD] = arrD;
+        paint("stuff");
+      }
+      return;
+    }
+
     var stuffModeBtn = ev.target.closest("[data-stuff-mode]");
     if (stuffModeBtn && session()) {
       stuffMode = stuffModeBtn.getAttribute("data-stuff-mode") || "browse";
-      if (stuffMode === "browse") { stuffItemId = null; stuffListMode = false; }
+      if (stuffMode === "browse") { stuffItemId = null; stuffListMode = false; avatarWizard = null; stuffModeAvatarWizard = false; }
       if (stuffMode === "upload") { stuffItemId = null; stuffListMode = false; }
       paint("stuff");
       return;
@@ -12559,21 +13402,57 @@ function helpPage() {
       if (cin2) { ev.preventDefault(); cin2.focus(); }
     }
   });
-  // How this works: long-press / hover shows reaction bar on chat rows.
+  // How this works (?v=20260906aq): desktop hover shows reaction bar.
+  // Beginner (mobile): hover-show was leaving floating emoji pills on the room floor.
+  // Phones use long-press on a message instead; picker stays hidden until then.
+  function isCoarsePointer() {
+    try {
+      return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    } catch (e) { return false; }
+  }
   document.addEventListener("mouseover", function (ev) {
+    if (isCoarsePointer()) return;
     var row = ev.target.closest && ev.target.closest(".chat-row[data-msg-id]");
     if (!row) return;
     var bar = row.querySelector(".react-bar");
-    if (bar) bar.hidden = false;
+    if (bar) { bar.hidden = false; row.classList.add("is-react-open"); }
   }, true);
   document.addEventListener("mouseout", function (ev) {
+    if (isCoarsePointer()) return;
     var row = ev.target.closest && ev.target.closest(".chat-row[data-msg-id]");
     if (!row) return;
     var to = ev.relatedTarget;
     if (to && row.contains(to)) return;
     var bar = row.querySelector(".react-bar");
-    if (bar) bar.hidden = true;
+    if (bar) { bar.hidden = true; row.classList.remove("is-react-open"); }
   }, true);
+  // Long-press (~450ms) on mobile chat row → tidy reaction picker under that message.
+  var reactPressTimer = 0;
+  var reactPressRow = null;
+  document.addEventListener("touchstart", function (ev) {
+    if (!isCoarsePointer()) return;
+    var row = ev.target.closest && ev.target.closest(".chat-row[data-msg-id]");
+    if (!row) return;
+    reactPressRow = row;
+    if (reactPressTimer) clearTimeout(reactPressTimer);
+    reactPressTimer = setTimeout(function () {
+      reactPressTimer = 0;
+      document.querySelectorAll(".chat-row.is-react-open").forEach(function (r) {
+        r.classList.remove("is-react-open");
+        var b = r.querySelector(".react-bar");
+        if (b) b.hidden = true;
+      });
+      if (!reactPressRow) return;
+      var bar = reactPressRow.querySelector(".react-bar");
+      if (bar) { bar.hidden = false; reactPressRow.classList.add("is-react-open"); }
+    }, 450);
+  }, { passive: true, capture: true });
+  document.addEventListener("touchend", function () {
+    if (reactPressTimer) { clearTimeout(reactPressTimer); reactPressTimer = 0; }
+  }, { passive: true, capture: true });
+  document.addEventListener("touchmove", function () {
+    if (reactPressTimer) { clearTimeout(reactPressTimer); reactPressTimer = 0; }
+  }, { passive: true, capture: true });
   document.addEventListener("scroll", function (ev) {
     var t = ev.target;
     if (!t || !t.id) return;
@@ -12581,4 +13460,130 @@ function helpPage() {
       chatPinnedScroll = (t.scrollHeight - t.scrollTop - t.clientHeight) > 48;
     }
   }, true);
+
+  // Avatar wizard file inputs + remap selects (?v=20260906ar)
+  document.addEventListener("change", function (ev) {
+    if (!avatarWizard || !session()) return;
+    var t = ev.target;
+    if (!t) return;
+    if (t.id === "avatar-wiz-images" || t.id === "avatar-wiz-folder") {
+      var files = Array.prototype.slice.call(t.files || [], 0);
+      var msg = document.getElementById("avatar-wiz-msg");
+      var chain = Promise.resolve();
+      files.forEach(function (file) {
+        chain = chain.then(function () {
+          var pathName = file.webkitRelativePath || file.name || "frame.png";
+          if (file.size > 220000) throw new Error("Image too large: " + pathName);
+          return readBlobAsDataUrl(file, 220000).then(function (dataUrl) {
+            if (dataUrl.length > 300000) throw new Error("Encoded image too large: " + pathName);
+            var sug = guessStateFromName(pathName);
+            var id = "f" + Math.random().toString(36).slice(2, 9);
+            avatarWizard.files.push({ id: id, name: pathName, dataUrl: dataUrl, kind: "image", suggested: sug });
+            if (!avatarWizard.mapping[sug]) avatarWizard.mapping[sug] = [];
+            avatarWizard.mapping[sug].push(id);
+            if (!avatarWizard.thumbFileId) avatarWizard.thumbFileId = id;
+          });
+        });
+      });
+      chain.then(function () { paint("stuff"); }).catch(function (err) {
+        if (msg) msg.textContent = String(err && err.message || err);
+      });
+      return;
+    }
+    if (t.id === "avatar-wiz-zip") {
+      var zf = t.files && t.files[0];
+      var msgZ = document.getElementById("avatar-wiz-msg");
+      if (!zf) return;
+      if (zf.size > 8 * 1024 * 1024) {
+        if (msgZ) msgZ.textContent = "Zip over ~8MB — unzip locally and upload the folder.";
+        return;
+      }
+      zf.arrayBuffer().then(function (ab) {
+        return parseZipImages(ab);
+      }).then(function (imgs) {
+        imgs.forEach(function (im) {
+          avatarWizard.files.push(im);
+          var sug = im.suggested || "idle";
+          if (!avatarWizard.mapping[sug]) avatarWizard.mapping[sug] = [];
+          avatarWizard.mapping[sug].push(im.id);
+          if (!avatarWizard.thumbFileId) avatarWizard.thumbFileId = im.id;
+        });
+        if (msgZ) msgZ.textContent = imgs.length ? ("Added " + imgs.length + " images from zip.") : "No PNG/WebP/JPEG found in zip.";
+        paint("stuff");
+      }).catch(function (err) {
+        if (msgZ) msgZ.textContent = String(err && err.message || err);
+      });
+      return;
+    }
+    if (t.id === "avatar-wiz-ase") {
+      var ases = Array.prototype.slice.call(t.files || [], 0);
+      var msgA = document.getElementById("avatar-wiz-msg");
+      var cA = Promise.resolve();
+      ases.forEach(function (file) {
+        cA = cA.then(function () {
+          if (file.size > 1000000) throw new Error("Aseprite over ~1MB: " + file.name);
+          return readBlobAsDataUrl(file, 1000000).then(function (dataUrl) {
+            avatarWizard.files.push({
+              id: "a" + Math.random().toString(36).slice(2, 9),
+              name: file.name || "avatar.aseprite",
+              dataUrl: dataUrl,
+              kind: "aseprite"
+            });
+            avatarWizard.notes = avatarWizard.notes || [];
+            avatarWizard.notes.push("Aseprite stored as attachment — export PNG sequence for loft frames.");
+          });
+        });
+      });
+      cA.then(function () {
+        if (msgA) msgA.textContent = "Aseprite attached. Still add PNG frames for Wear/idle/walk.";
+        paint("stuff");
+      }).catch(function (err) {
+        if (msgA) msgA.textContent = String(err && err.message || err);
+      });
+      return;
+    }
+    if (t.id === "avatar-wiz-swf") {
+      var sw = t.files && t.files[0];
+      var msgS = document.getElementById("avatar-wiz-msg");
+      if (!sw) return;
+      if (!isAvatarLabOn()) {
+        if (msgS) msgS.textContent = "SWF noted. Unlock lab with ?avatarLab=1 for experimental wardrobe; loft Wear still needs PNG frames.";
+      }
+      readBlobAsDataUrl(sw, 5 * 1024 * 1024).then(function (dataUrl) {
+        avatarWizard.files.push({
+          id: "s" + Math.random().toString(36).slice(2, 9),
+          name: sw.name || "avatar.swf",
+          dataUrl: dataUrl,
+          kind: "swf"
+        });
+        if (msgS) msgS.textContent = "SWF attached (experimental). Add PNG idle/walk for modern loft Wear.";
+        paint("stuff");
+      }).catch(function (err) {
+        if (msgS) msgS.textContent = String(err && err.message || err);
+      });
+      return;
+    }
+    if (t.getAttribute && t.getAttribute("data-wiz-reassign") && avatarWizard) {
+      var fid = t.getAttribute("data-wiz-reassign");
+      var from = t.getAttribute("data-wiz-from");
+      var to = t.value;
+      if (from === to) return;
+      avatarWizard.mapping[from] = (avatarWizard.mapping[from] || []).filter(function (id) { return id !== fid; });
+      if (!avatarWizard.mapping[to]) avatarWizard.mapping[to] = [];
+      avatarWizard.mapping[to].push(fid);
+      paint("stuff");
+      return;
+    }
+    if (t.getAttribute && t.getAttribute("data-wiz-fps") && avatarWizard) {
+      var stF = t.getAttribute("data-wiz-fps");
+      avatarWizard.fps[stF] = Math.max(1, Math.min(24, parseInt(t.value, 10) || 5));
+      return;
+    }
+    if (t.getAttribute && t.getAttribute("data-wiz-once") && avatarWizard) {
+      avatarWizard.loopOnce[t.getAttribute("data-wiz-once")] = !!t.checked;
+      return;
+    }
+  }, true);
+
+
 })();

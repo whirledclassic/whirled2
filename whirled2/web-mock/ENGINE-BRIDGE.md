@@ -317,3 +317,26 @@ Also see [AVATAR-STUFF-FIDELITY.md](./AVATAR-STUFF-FIDELITY.md) and [STUFF-AVATA
 - Chrome owns gated wardrobe upload/list/export behind `?avatarLab=1`. **Wear (lab only)** stores `activeId` — does **not** change `#stage-slot`.
 - Experimental read helpers today: `WhirledChrome.getWardrobe()`, `getActiveAvatarId()` — ignore for room rendering until Phase 2.
 - Future hooks (not live): `setActiveAvatar(idOrUrl)` → engine mount — **do not implement playback yet**.
+
+
+---
+
+## 13) Chrome avatar emotes + facing (?v=20260906aq)
+
+**Beginner:** Click the worn loft avatar (not the floor) for Wave / Sit / Pose / Happy. Floor click still walks.
+
+**ENGINE DEV:** Extra bridge helpers (chrome-only until you own avatars):
+
+| API | Role |
+|-----|------|
+| `playAvatarEmote(name)` | Plays pack state once/short loop → idle |
+| `listAvatarEmotes()` | Friendly labels for states with frames |
+| `worn.artFaces` | `"left"` ⇒ flip when walking right (Cyan Hair) |
+
+Pack states may include `wave` / `sit` / `happy` in addition to `idle` / `walk` / `stand` / `pose`. When your canvas mounts in `#stage-slot`, chrome walk + emote menu yield — implement equivalent in Pixi.
+
+---
+
+## 14) Avatar upload wizard (?v=20260906ar)
+
+Creators build Stuff packs in chrome (data URLs / absolutized paths) with the same `states` schema as Cyan Hair. Prefer consuming `WhirledChrome.getWornAvatar().states` + `artFaces` in Pixi. Wizard remount does not touch `#stage-slot`.

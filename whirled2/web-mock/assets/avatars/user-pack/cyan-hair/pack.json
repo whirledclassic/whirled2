@@ -1,10 +1,11 @@
 {
   "name": "Cyan Hair",
   "slug": "cyan-hair",
+  "artFaces": "left",
   "states": {
     "idle": {
-      "frames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"],
-      "frameDurationsMs": [200, 200]
+      "frames": ["frames/pose/frame_00.png", "frames/pose/frame_01.png"],
+      "frameDurationsMs": [400, 400]
     },
     "walk": {
       "frames": [
@@ -16,17 +17,29 @@
       "frameDurationsMs": [200, 200, 200, 200]
     },
     "stand": {
+      "frames": ["frames/pose/frame_00.png"],
+      "frameDurationsMs": [833]
+    },
+    "wave": {
+      "frames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"],
+      "frameDurationsMs": [220, 220]
+    },
+    "sit": {
       "frames": ["frames/stand/frame_00.png"],
       "frameDurationsMs": [833]
     },
     "pose": {
       "frames": ["frames/pose/frame_00.png", "frames/pose/frame_01.png"],
       "frameDurationsMs": [833, 833]
+    },
+    "happy": {
+      "frames": ["frames/pose/frame_01.png", "frames/pose/frame_00.png"],
+      "frameDurationsMs": [280, 280]
     }
   },
-  "frames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"],
-  "displayFrames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"],
-  "frameDurationsMs": [200, 200],
+  "frames": ["frames/pose/frame_00.png", "frames/pose/frame_01.png"],
+  "displayFrames": ["frames/pose/frame_00.png", "frames/pose/frame_01.png"],
+  "frameDurationsMs": [400, 400],
   "thumb": "thumb.png",
   "preview": "preview.png",
   "source": "aseprite-unified",
@@ -37,6 +50,7 @@
     "char-d-dress-pose"
   ],
   "frameCount": 9,
-  "_beginner": "One Wearable avatar with idle + walk (+ stand/pose). Add user packs → Wear Cyan Hair → click the loft floor to walk.",
-  "_engineDev": "WhirledChrome.getWornAvatar() exposes states; setAvatarState / getAvatarWalkTarget for chrome walk until mountWhirledEngine owns the stage. Pixi Player can later consume the same JSON."
+  "_beginner": "Idle uses calm pose frames (not the wave PNGs in frames/idle/). Click avatar for Wave/Sit/Pose emotes. Walk faces with artFaces:left.",
+  "_engineDev": "WhirledChrome.getWornAvatar() exposes states incl. wave/sit/happy; setAvatarState / playAvatarEmote / getAvatarWalkTarget for chrome until mountWhirledEngine. artFaces:'left' → flip when walking right.",
+  "_aqNote": "20260906aq: frames/idle/* are actually wave art from Aseprite part char-a; remapped idle→pose, wave→frames/idle."
 }
