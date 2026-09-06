@@ -1,14 +1,13 @@
-name: Apply to Whirled 2
-description: Art, code, or Discord. Paid opportunity if accepted.
+name: Apply
+description: Classic Flash revival or Whirled 2. Art, code, Discord.
 title: "[apply] "
 labels: ["whirled2"]
 body:
   - type: markdown
     attributes:
       value: |
-        Read [ARTISTS.md](https://github.com/whirledclassic/whirled2/blob/main/whirled2/ARTISTS.md).
-        Paid work happens if you are accepted and the first job is a fit.
-        Links to previous work are required.
+        Two projects: Classic Whirled (Flash revival) and Whirled 2 (PixiJS + TypeScript).
+        Paid work if you are accepted and the first job is a fit. Links required.
   - type: input
     id: handle
     attributes:
@@ -27,6 +26,17 @@ body:
       label: Discord handle
     validations:
       required: true
+  - type: dropdown
+    id: projects
+    attributes:
+      label: Which project?
+      multiple: true
+      options:
+        - Classic Whirled (original Flash revival)
+        - Whirled 2 (PixiJS + TypeScript)
+        - Both
+    validations:
+      required: true
   - type: input
     id: portfolio
     attributes:
@@ -38,18 +48,20 @@ body:
     id: more_links
     attributes:
       label: More links
-      description: GitHub, ArtStation, itch, clips, a Discord you already run. One URL per line.
   - type: dropdown
     id: roles
     attributes:
       label: Roles
       multiple: true
       options:
-        - Discord mod / community manager
-        - PixiJS / TypeScript engine
-        - Website chrome
-        - Server / networking / deploy
-        - Classic msoy lab
+        - Discord — build / set up the server
+        - Discord — moderate it
+        - Discord — advertise it and get people in
+        - Discord — keep people engaged and posted during development
+        - Whirled 2 — PixiJS / TypeScript engine
+        - Whirled 2 — website chrome
+        - Whirled 2 — server / networking / deploy
+        - Classic — Flash revival / msoy lab
         - Avatar art
         - Room / environment art
         - Furniture / props
@@ -74,16 +86,6 @@ body:
     id: rate
     attributes:
       label: Rate for the first job
-      placeholder: $
-  - type: dropdown
-    id: pay_shape
-    attributes:
-      label: One job or ongoing?
-      options:
-        - One-time payment for this first job
-        - Ongoing — still one payment per drop for now
-        - Would talk retainer later
-        - Volunteer / not applicable
   - type: textarea
     id: first_drop
     attributes:
@@ -95,7 +97,7 @@ body:
     attributes:
       label: Got it
       options:
-        - label: I sent real links. Paid work happens if I am accepted and the first job is a fit.
+        - label: I sent real links. I picked a project. Paid work happens if I am accepted and the first job is a fit.
           required: true
   - type: textarea
     id: notes

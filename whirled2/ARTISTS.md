@@ -1,29 +1,26 @@
-# Apply to Whirled 2
+# Apply
 
 Public form: [apply.html](https://whirledclassic.github.io/whirled2/whirled2/web-mock/apply.html)
 
-Old artist URL still redirects there.
+Two projects live in this account. Applicants pick one or both.
+
+- **Classic Whirled** — original Flash-era revival. Lab, tooling, testing, community around bringing that client back. Do not leak the lab VM.
+- **Whirled 2** — new browser world in PixiJS + TypeScript. No Flash.
 
 ## Pay
 
-There is a paid opportunity. Apply, send links to previous work, say what you charge. If you are accepted and the first job is a fit, we pay for that job.
+There is a paid opportunity. Apply, send links, say what you charge. If you are accepted and the first job is a fit, we pay for that job.
 
-Ongoing work is still one payment per drop unless we later write a retainer.
+## Discord (need this)
 
-Volunteer / credit-only is also fine. Credit either way.
+Not mute-and-leave. We need someone who will:
 
-## Roles
+- Build and work on the server (channels, roles, rules, welcome)
+- Moderate it
+- Advertise it and get people in
+- Talk to people and keep them engaged while both projects are in development
+- Post updates so the room does not go quiet between drops
 
-One form covers the whole project. Check every role you can actually do.
+## Other roles
 
-**Need now:** Discord mod / community manager.
-
-**Code:** PixiJS + TypeScript room engine, website chrome, server/networking/deploy, classic msoy lab notes.
-
-**Art:** avatar, room, props, UI chrome, shop items, animation.
-
-**Audio / other:** original SFX, QA, writing — name it.
-
-Show links. No portfolio / no GitHub / no clips makes the application hard to take seriously.
-
-No original Whirled shop items. No leaking the classic lab VM.
+Whirled 2 code (engine, chrome, server). Classic lab. Art. Audio. Say it on the form. Links required.
