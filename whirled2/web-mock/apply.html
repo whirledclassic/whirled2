@@ -38,7 +38,7 @@
     .pick strong { display:block; margin-bottom:4px; }
     button,.btn { display:inline-block; margin-top:14px; background:var(--blue); color:#fff; border:0; padding:10px 16px; border-radius:4px; font:inherit; font-weight:bold; cursor:pointer; }
     .muted { color:#4a6a80; font-size:.92rem; }
-    .ok { display:none; background:#e7f8ea; border:1px solid #8dca9a; padding:12px; border-radius:6px; }
+    .ok { display:none; background:#e7f8ea; border:1px solid #8dca9a; padding:12px; border-radius:6px; margin-bottom:12px; }
     .pay-box { display:none; margin-top:12px; padding:12px; background:#fff; border:1px dashed var(--line); border-radius:6px; }
     footer { text-align:center; padding:20px; color:#4a6a80; }
     .rolebox { display:none; margin-top:10px; }
@@ -57,7 +57,7 @@
         <div class="col classic">
           <span class="tag c">PROJECT A — CLASSIC</span>
           <h3>Original Whirled (Flash revival)</h3>
-          <p>Bring the 2007–2017 client back. Lab, tooling, testing, original-era product. Flash stack. Do not leak the lab VM.</p>
+          <p>Bring the 2007–2017 client back. Lab, tooling, testing, original-era product. Flash stack. Private lab details stay private.</p>
           <ul>
             <li>msoy / classic lab notes and tooling</li>
             <li>Test the revival client</li>
@@ -89,12 +89,14 @@
 
     <section id="apply">
       <h2>Application</h2>
-      <p class="muted">First choose Classic, Whirled 2, or both. Role lists change after that.</p>
-      <div class="ok" id="ok">Sent.</div>
-      <form id="app-form" action="https://formsubmit.co/josh.awe99@gmail.com" method="POST">
+      <p class="muted">Goes to Josh. You should get a short receipt on the email you list. First choose Classic, Whirled 2, or both — role lists change after that.</p>
+      <div class="ok" id="ok">Got it. Check the email you listed for a receipt. Josh will reply when he can.</div>
+      <form id="app-form" action="https://formsubmit.co/6416acc4b40eb717bb2e518f59743a4b" method="POST">
         <input type="hidden" name="_subject" value="[APPLY] Classic or Whirled 2" />
         <input type="hidden" name="_template" value="table" />
         <input type="hidden" name="_captcha" value="false" />
+        <input type="hidden" name="_replyto" id="_replyto" value="" />
+        <input type="hidden" name="_autoresponse" value="Got your Whirled application. Josh has it. He will write back if the first job is a fit. Keep this email." />
         <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off" />
         <input type="hidden" name="_next" value="https://whirledclassic.github.io/whirled2/whirled2/web-mock/apply.html?sent=1" />
 
@@ -105,7 +107,7 @@
         <label for="discord">Discord handle</label>
         <input id="discord" name="discord" required />
         <label for="portfolio">Link to previous work</label>
-        <input id="portfolio" name="portfolio" type="url" placeholder="https://" required />
+        <input id="portfolio" name="portfolio" placeholder="https://github.com/… or ArtStation, itch, a clip" required />
         <label for="more_links">More links</label>
         <textarea id="more_links" name="more_links"></textarea>
 
@@ -199,13 +201,16 @@
         document.getElementById("pay-box").style.display = (t && (t.value === "paid" || t.value === "either")) ? "block" : "none";
       });
     });
+    document.getElementById("app-form").addEventListener("submit", function () {
+      document.getElementById("_replyto").value = document.getElementById("email").value;
+    });
     function vals(name) {
       return Array.prototype.slice.call(document.querySelectorAll("input[name='"+name+"']:checked")).map(function (el) { return el.value; }).join(", ");
     }
     document.getElementById("gh-btn").addEventListener("click", function () {
       var name = document.getElementById("name").value || "(name)";
       var p = project() || "(none)";
-      var body = ["### Application","","- Name: "+name,"- Project: "+p,"- Email: "+(document.getElementById("email").value||""),"- Discord: "+(document.getElementById("discord").value||""),"- Work: "+(document.getElementById("portfolio").value||""),"- Classic roles: "+vals("roles_classic[]"),"- Whirled 2 roles: "+vals("roles_w2[]"),"- Discord roles: "+vals("roles_discord[]"),"","### First job",document.getElementById("first_drop").value||""].join("\n");
+      var body = ["### Application","","- Name: "+name,"- Project: "+p,"- Email: "+(document.getElementById("email").value||""),"- Discord: "+(document.getElementById("discord").value||""),"- Work: "+(document.getElementById("portfolio").value||""),"- Classic roles: "+vals("roles_classic[]"),"- Whirled 2 roles: "+vals("roles_w2[]"),"- Discord roles: "+vals("roles_discord[]"),"- Pay: "+(document.querySelector("input[name='track']:checked")||{}).value,"- Rate: "+(document.getElementById("rate").value||""),"","### First job",document.getElementById("first_drop").value||""].join("\n");
       window.open("https://github.com/whirledclassic/whirled2/issues/new?labels=whirled2&title="+encodeURIComponent("[apply] "+name+" — "+p)+"&body="+encodeURIComponent(body),"_blank");
     });
   </script>
