@@ -1,3 +1,9 @@
+## What shipped (?v=20260906ca)
+
+- **Flash blank loft CRITICAL:** companion-first left transparent empty `host.swf` + faded stand → nothing visible (worse than tofu). **DIRECT-first** outer Ruffle avatar always paints; optional companion upgrade after; stand thumb stays opaque until `connected`.
+- Preserve: bz flashQa, by self-host Ruffle, hostLoadBytes, walk-lerp/spoke/sleep
+- Cache: **`?v=20260906ca`**. Push: `/tmp/push-ca.js`.
+
 ## What shipped (?v=20260906bz)
 
 - **Flash QA cleanup:** removed duplicate `flashQa` guest helpers in `app.js` (one path: ephemeral session → Wear demo → loft)

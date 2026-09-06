@@ -7238,3 +7238,19 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   /* bob keyframes own transform (includes face) */
   transform-origin: center bottom;
 }
+
+
+/* (?v=20260906ca) CRITICAL: empty companion host looked like "no avatar".
+   Keep stand thumb/glyph fully visible until companion handshake connects. */
+.avatar-ruffle-host.is-playing:not(.is-companion-connected) .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-pending"] .classic-swf-stand-thumb,
+.avatar-ruffle-host.is-mounting .classic-swf-stand-thumb,
+.avatar-ruffle-host.is-playing:not(.is-companion-connected) .classic-swf-placeholder,
+.avatar-ruffle-host[data-mount-mode="companion-pending"] .classic-swf-placeholder {
+  opacity: 1 !important;
+  z-index: 3 !important;
+}
+.avatar-ruffle-host.is-companion-connected.is-playing .classic-swf-stand-thumb {
+  opacity: 0.45;
+  z-index: 0;
+}
