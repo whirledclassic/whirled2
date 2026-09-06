@@ -1,0 +1,42 @@
+{
+  "name": "Cyan Hair",
+  "slug": "cyan-hair",
+  "states": {
+    "idle": {
+      "frames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"],
+      "frameDurationsMs": [200, 200]
+    },
+    "walk": {
+      "frames": [
+        "frames/walk/frame_00.png",
+        "frames/walk/frame_01.png",
+        "frames/walk/frame_02.png",
+        "frames/walk/frame_03.png"
+      ],
+      "frameDurationsMs": [200, 200, 200, 200]
+    },
+    "stand": {
+      "frames": ["frames/stand/frame_00.png"],
+      "frameDurationsMs": [833]
+    },
+    "pose": {
+      "frames": ["frames/pose/frame_00.png", "frames/pose/frame_01.png"],
+      "frameDurationsMs": [833, 833]
+    }
+  },
+  "frames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"],
+  "displayFrames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"],
+  "frameDurationsMs": [200, 200],
+  "thumb": "thumb.png",
+  "preview": "preview.png",
+  "source": "aseprite-unified",
+  "sourceParts": [
+    "char-a-dress-idle",
+    "char-b-dress-walk",
+    "char-c-dress-stand",
+    "char-d-dress-pose"
+  ],
+  "frameCount": 9,
+  "_beginner": "One Wearable avatar with idle + walk (+ stand/pose). Add user packs → Wear Cyan Hair → click the loft floor to walk.",
+  "_engineDev": "WhirledChrome.getWornAvatar() exposes states; setAvatarState / getAvatarWalkTarget for chrome walk until mountWhirledEngine owns the stage. Pixi Player can later consume the same JSON."
+}
