@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906p";
+  var LOGO_V = "20260906o1";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -949,6 +949,113 @@
     saveKnownProfiles(list);
   }
   // ---------------------------------------------------------------------------
+  // Friendly People + news-read cursor + profile privacy (20260906p)
+  // How this works: local flags only; never invent players. ENGINE DEV: chrome keys.
+  // ---------------------------------------------------------------------------
+  var FRIENDLY_KEY = "whirled2.friendly."; // + userId → "1" | "0"
+  var NEWS_READ_KEY = "whirled2.newsRead."; // + userId → ISO timestamp cursor
+  var PROFILE_PRIVACY_KEY = "whirled2.profilePrivacy."; // + userId → { information, wall }
+  function isFriendly(userId) {
+    if (!userId) return false;
+    try { return localStorage.getItem(FRIENDLY_KEY + userId) === "1"; } catch (e) { return false; }
+  }
+  function setFriendly(userId, on) {
+    if (!userId) return;
+    try { localStorage.setItem(FRIENDLY_KEY + userId, on ? "1" : "0"); } catch (e) {}
+  }
+  function loadNewsReadAt(userId) {
+    if (!userId) return "";
+    try { return localStorage.getItem(NEWS_READ_KEY + userId) || ""; } catch (e) { return ""; }
+  }
+  function markNewsRead(userId) {
+    if (!userId) return;
+    try { localStorage.setItem(NEWS_READ_KEY + userId, new Date().toISOString()); } catch (e) {}
+  }
+  function defaultProfilePrivacy() {
+    return { information: "public", wall: "public" };
+  }
+  function loadProfilePrivacy(userId) {
+    var base = defaultProfilePrivacy();
+    if (!userId) return base;
+    try {
+      var raw = JSON.parse(localStorage.getItem(PROFILE_PRIVACY_KEY + userId) || "null");
+      if (!raw || typeof raw !== "object") return base;
+      ["information", "wall"].forEach(function (k) {
+        var v = String(raw[k] || "").toLowerCase();
+        if (v === "public" || v === "friends" || v === "hidden") base[k] = v;
+      });
+      return base;
+    } catch (e) { return base; }
+  }
+  function saveProfilePrivacy(userId, priv) {
+    if (!userId || !priv) return;
+    try { localStorage.setItem(PROFILE_PRIVACY_KEY + userId, JSON.stringify(priv)); } catch (e) {}
+  }
+  function canViewProfileSection(ownerId, section) {
+    // How this works: enforce Public / Friends / Hidden for visitors on otherProfile.
+    var s = session();
+    var viewer = s && s.user ? String(s.user.id) : "";
+    ownerId = String(ownerId || "");
+    if (!ownerId) return false;
+    if (viewer && viewer === ownerId) return true;
+    var priv = loadProfilePrivacy(ownerId);
+    var mode = priv[section] || "public";
+    if (mode === "public") return true;
+    if (mode === "hidden") return false;
+    if (mode === "friends") {
+      if (!viewer) return false;
+      return loadFriendsFor(ownerId).some(function (f) { return String(f.id) === viewer; })
+        || loadFriends().some(function (f) { return String(f.id) === ownerId; });
+    }
+    return true;
+  }
+  function listLocalUsersKnown() {
+    // How this works: only whirled2.users + knownProfiles + friends + occupants — never invent.
+    var out = [];
+    var seen = {};
+    function add(id, name) {
+      id = String(id || "");
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      out.push({ id: id, name: name || id });
+    }
+    try {
+      var users = JSON.parse(localStorage.getItem("whirled2.users") || "{}");
+      Object.keys(users || {}).forEach(function (id) {
+        var u = users[id] || {};
+        add(id, u.name || id);
+      });
+    } catch (eU) {}
+    loadKnownProfiles().forEach(function (p) { add(p.id, p.name); });
+    loadFriends().forEach(function (f) { add(f.id, f.name); });
+    liveOccupants.forEach(function (p) { add(p.id, p.name); });
+    try {
+      var s = session();
+      if (s && s.user) add(s.user.id, s.user.name);
+    } catch (eS) {}
+    return out;
+  }
+  function listFriendlyPeople() {
+    var sid = session() && session().user ? String(session().user.id) : "";
+    return listLocalUsersKnown().filter(function (p) {
+      return isFriendly(p.id) && String(p.id) !== sid;
+    });
+  }
+  function playersOnlineCount() {
+    // How this works: honest local mock — session (you) + distinct friends online + loft occupants.
+    var ids = {};
+    var s = session();
+    if (s && s.user) ids[String(s.user.id)] = true;
+    var friendIds = {};
+    loadFriends().forEach(function (f) { friendIds[String(f.id)] = true; });
+    liveOccupants.forEach(function (p) {
+      if (p && p.id) ids[String(p.id)] = true;
+    });
+    // Friends marked online via occupant list already counted; no invented extras.
+    var n = Object.keys(ids).length;
+    return Math.max(n, s ? 1 : 0);
+  }
+  // ---------------------------------------------------------------------------
   // Roles (Admin / Mod / Player) — localStorage whirled2.roles
   // Information: name/id "test" or "admin" always counts as admin. First registered
   // account id is stored in whirled2.firstUserId (see api.js) and bootstrapped admin.
@@ -1215,12 +1322,7 @@
         try { grantXp(uid, 20 * newly.length, { kind: "passport" }); } catch (eXpPass) {}
         refreshWalletChrome();
       } catch (eCoin) {}
-      // How this works: stamp awards also feed My News → Stamps filter.
-      try {
-        newly.forEach(function (nm) {
-          pushNotice("stamp", "Passport stamp earned: " + nm, { transient: true });
-        });
-      } catch (eNewsSt) {}
+      // How this works: My News → Stamps reads whirled2.passport.{userId} (not invent).
     }
   }
   function findStamp(id) {
@@ -1375,7 +1477,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + dual currency / streaks (?v=20260906p)
+  // Fidelity + dual currency / streaks (?v=20260906o1)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -2144,7 +2246,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906p";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906o1";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -2989,7 +3091,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Coins + Bars dual currency, daily/weekly streaks, Transactions filters. Cache <code>?v=20260906p</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Coins + Bars dual currency, daily/weekly streaks, Transactions filters. Cache <code>?v=20260906o1</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
