@@ -22,3 +22,11 @@ Whirled = social network + virtual world. Chrome tabs: **Me, Stuff, Games, Rooms
 The original Whirled server/client lived in **[greyhavens/msoy](https://github.com/greyhavens/msoy)** (BSD-licensed Java / GWT / Flash / ActionScript; build with `ant distall`, run `./bin/msoyserver`). Related libraries were extracted under **[threerings/orth](https://github.com/threerings/orth)**. Those repos are **reference only**.
 
 **Whirled Classic** (this web-mock) is a same-game revival: classic chrome + a new engine bridge (`window.WhirledChrome` / `#stage-slot`). It is **intentionally not a port** of msoy, not a Flash SWF rehost, and not a private-engine dump.
+
+## Chat UI (Slide vs Overlay)
+
+Classic Chat Options (wiki Chat): **Slide chat** = own dark panel beside the room stage; **Overlay chat** = semi-transparent log over the left of the room (default here for “chats on the screen of the room”). Preference in `whirled2.chatUi` (`mode`, `hideHistory`, `textSize`). Hide history is overlay-only (F9). Bottom input bar stays in both modes when you are in a room.
+
+## Roles
+
+Staff vibe without purple/gold chrome: **Admin** (deeper blue + optional Agent label) and **Mod** (teal) via `whirled2.roles`. Local-only promote/demote on Account for admins. The `test` profile is always treated as admin.

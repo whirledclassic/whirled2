@@ -22,6 +22,9 @@
   var BLOCKLIST_KEY = "whirled2.blocklist";
   var GALLERIES_KEY = "whirled2.galleries";
   var TRANSACTIONS_KEY = "whirled2.transactions";
+  var ROLES_KEY = "whirled2.roles";
+  var CHAT_UI_KEY = "whirled2.chatUi";
+  var FIRST_USER_KEY = "whirled2.firstUserId";
   var STUFF_CATS = [
     { id: "avatars", label: "Avatars", empty: "You have no avatars yet." },
     { id: "furniture", label: "Furniture", empty: "You have no furniture yet." },
@@ -200,6 +203,8 @@
     invitePanelOpen = false;
     occMenuId = null;
     friendInvitePending = null;
+    chatOptsOpen = false;
+    chatNameMenu = null;
     var gm = document.getElementById("go-menu");
     if (gm) gm.hidden = true;
     var rm = document.getElementById("room-menu");
@@ -208,6 +213,10 @@
     if (orphanParty && !document.querySelector(".workspace #party-panel")) orphanParty.remove();
     var buddy = document.getElementById("buddy-invite-modal");
     if (buddy) buddy.remove();
+    var com = document.getElementById("chat-opts-menu");
+    if (com) com.hidden = true;
+    var cnm = document.getElementById("chat-name-menu");
+    if (cnm) cnm.remove();
     clearTransientNotices();
   }
 
@@ -340,6 +349,122 @@
     if (!found) list.unshift({ id: entry.id, name: entry.name || entry.id, at: new Date().toISOString() });
     saveKnownProfiles(list);
   }
+  function loadRoles() {
+    try { return JSON.parse(localStorage.getItem(ROLES_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function saveRoles(map) {
+    try { localStorage.setItem(ROLES_KEY, JSON.stringify(map || {})); } catch (e) {}
+  }
+  function isPrivilegedName(nameOrId) {
+    var s = String(nameOrId || "").trim().toLowerCase();
+    return s === "test" || s === "admin";
+  }
+  function getRole(userId) {
+    if (!userId) return "player";
+    var id = String(userId);
+    if (isPrivilegedName(id)) return "admin";
+    var map = loadRoles();
+    if (map[id] === "admin" || map[id] === "mod" || map[id] === "player") return map[id];
+    // name lookup via session / known profiles
+    try {
+      var s = session();
+      if (s && s.user && s.user.id === id && isPrivilegedName(s.user.name)) return "admin";
+    } catch (e) {}
+    try {
+      var known = loadKnownProfiles();
+      for (var i = 0; i < known.length; i++) {
+        if (known[i].id === id && isPrivilegedName(known[i].name)) return "admin";
+      }
+    } catch (e2) {}
+    try {
+      var friends = loadFriends();
+      for (var fi = 0; fi < friends.length; fi++) {
+        if (friends[fi].id === id && isPrivilegedName(friends[fi].name)) return "admin";
+      }
+    } catch (e3) {}
+    return "player";
+  }
+  function setRole(userId, role) {
+    if (!userId) return;
+    var id = String(userId);
+    var map = loadRoles();
+    var r = role === "admin" || role === "mod" ? role : "player";
+    if (r === "player") delete map[id];
+    else map[id] = r;
+    // always keep test/admin as admin in map for clarity
+    if (isPrivilegedName(id)) map[id] = "admin";
+    saveRoles(map);
+  }
+  function roleBadgeHtml(role) {
+    if (role === "admin") {
+      return '<span class="role-badge role-admin" title="Admin">Admin</span><span class="role-badge role-agent" title="Classic staff">Agent</span>';
+    }
+    if (role === "mod") {
+      return '<span class="role-badge role-mod" title="Moderator">Mod</span>';
+    }
+    return "";
+  }
+  function bootstrapRoles() {
+    if (!session() || !session().user) return;
+    var map = loadRoles();
+    var empty = !map || !Object.keys(map).length;
+    var me = session().user;
+    var meId = String(me.id || "");
+    var meName = String(me.name || "");
+    function ensureAdmin(uid) {
+      if (!uid) return;
+      map[String(uid)] = "admin";
+    }
+    // Always treat test/admin name or id as admin
+    if (isPrivilegedName(meId) || isPrivilegedName(meName)) ensureAdmin(meId);
+    if (empty) {
+      if (isPrivilegedName(meId) || isPrivilegedName(meName)) ensureAdmin(meId);
+      try {
+        var first = localStorage.getItem(FIRST_USER_KEY) || "";
+        if (first) ensureAdmin(first);
+      } catch (e) {}
+      try {
+        if (localStorage.getItem("whirled2.forceAdmin") === "1") ensureAdmin(meId);
+      } catch (e2) {}
+    } else {
+      // still ensure privileged names even if map not empty
+      if (isPrivilegedName(meId) || isPrivilegedName(meName)) ensureAdmin(meId);
+      try {
+        var first2 = localStorage.getItem(FIRST_USER_KEY) || "";
+        if (first2 && (isPrivilegedName(first2) || first2 === meId)) ensureAdmin(first2);
+      } catch (e3) {}
+    }
+    // Scan known local users for test/admin
+    try {
+      var users = JSON.parse(localStorage.getItem("whirled2.users") || "{}");
+      Object.keys(users).forEach(function (k) {
+        var u = users[k];
+        if (u && (isPrivilegedName(u.id) || isPrivilegedName(u.name))) ensureAdmin(u.id || k);
+      });
+    } catch (e4) {}
+    saveRoles(map);
+  }
+  function loadChatUi() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(CHAT_UI_KEY) || "null");
+      if (raw && (raw.mode === "slide" || raw.mode === "overlay")) {
+        return {
+          mode: raw.mode,
+          hideHistory: !!raw.hideHistory,
+          textSize: raw.textSize === "sm" || raw.textSize === "lg" ? raw.textSize : "md"
+        };
+      }
+    } catch (e) {}
+    return { mode: "overlay", hideHistory: false, textSize: "md" };
+  }
+  function saveChatUi(cfg) {
+    try { localStorage.setItem(CHAT_UI_KEY, JSON.stringify(cfg || loadChatUi())); } catch (e) {}
+  }
+  var chatOptsOpen = false;
+  var chatNameMenu = null; // { id, name, x, y }
+  var chatSendTimes = [];
+  var chatPinnedScroll = false;
+
   function gameGenreOf(g) {
     var raw = String((g && (g.genre || g.category || g.kind)) || "other").toLowerCase();
     if (raw.indexOf("action") >= 0 || raw.indexOf("arcade") >= 0) return "action";
@@ -545,7 +670,7 @@
     return '<div class="person-wrap' + (open ? " is-open" : "") + '">'
       + '<button type="button" class="person" data-occ-menu="' + esc(id) + '">'
       + '<span class="ava' + (p.you ? " you" : "") + '">' + esc(p.initials || "?") + '</span>'
-      + '<span class="person-name">' + esc(p.name) + (p.you ? " <span class=\"sub\">(you)</span>" : "") + '</span>'
+      + '<span class="person-name">' + esc(p.name) + roleBadgeHtml(getRole(id)) + (p.you ? " <span class=\"sub\">(you)</span>" : "") + '</span>'
       + '<span class="dot' + (p.online ? " on" : "") + '"></span>'
       + '<span class="sub">' + esc(p.you ? "you" : (p.room || "")) + '</span></button>'
       + (open ? menu : "")
@@ -562,7 +687,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905u";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905w";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -608,7 +733,29 @@
   function chatRow(msg) {
     var stamp = "";
     try { stamp = new Date(msg.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch (e) {}
-    return '<div class="chat-row"><b>' + esc(msg.who) + "</b> <time>" + esc(stamp) + "</time><div>" + esc(msg.text) + "</div></div>";
+    if (msg.system) {
+      return '<div class="chat-row chat-system"><div class="chat-bubble system">' + esc(msg.text) + '</div></div>';
+    }
+    var uid = msg.userId || "";
+    var role = getRole(uid);
+    if (!role || role === "player") {
+      // try resolve by who name
+      if (isPrivilegedName(msg.who) || isPrivilegedName(uid)) role = "admin";
+    }
+    var accent = role === "admin" ? " is-admin" : (role === "mod" ? " is-mod" : "");
+    var text = String(msg.text || "");
+    var emote = !!msg.emote;
+    if (!emote && (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text))) {
+      emote = true;
+      text = text.replace(/^\/(me|emote)\s+/i, "");
+    }
+    var nameBtn = '<button type="button" class="chat-who" data-chat-who="' + esc(uid || msg.who || "") + '" data-chat-who-name="' + esc(msg.who || "") + '">' + esc(msg.who || "?") + '</button>';
+    var body = emote
+      ? ('<div class="chat-bubble emote"><i>' + esc(msg.who) + " " + esc(text) + "</i></div>")
+      : ('<div class="chat-bubble">' + esc(text) + "</div>");
+    return '<div class="chat-row' + accent + (emote ? " is-emote" : "") + '">'
+      + (emote ? "" : (nameBtn + roleBadgeHtml(role) + ' <time>' + esc(stamp) + "</time>"))
+      + body + "</div>";
   }
   function card(item) {
     var id = item.id || "";
@@ -1275,7 +1422,7 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Me sidebar classics (blocklist / galleries / transactions / contests / share), polish. Cache <code>?v=20260905u</code>.</p>'
+      + '<p class="meta">This pass: Me sidebar classics (blocklist / galleries / transactions / contests / share), polish. Cache <code>?v=20260905w</code>.</p>'
       + '<p class="meta">Live docs live in-repo as CONCEPT.md / STATUS.md — no external secrets.</p>'
       + '</div></section>';
   }
@@ -1335,11 +1482,14 @@
       +       '<span class="room-owner">owner: ' + esc(me.name) + '</span>'
       +       '<span class="room-lock-badge" title="Visual only on Pages" data-lock="' + esc(lock) + '">🔒 ' + esc(lockLabel(lock)) + '</span>'
       +       '<span class="room-rating-badge">' + esc(loftRatingLabel()) + '</span></div>'
+      +     '<div class="stage-body chat-mode-' + esc(loadChatUi().mode) + ' text-size-' + esc(loadChatUi().textSize) + (loadChatUi().hideHistory ? ' hide-history' : '') + '">'
       +     '<div class="stage-host">'
       +       '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
       +       decorateLayerHtml()
+      +       '<div class="chat-overlay" id="chat-overlay" aria-live="polite"></div>'
       +     '</div>'
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
+      +     '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
       +     (decorateMode ? decoratePanel() : '')
       +     (partyPanelOpen ? partyPanel() : '')
@@ -1507,7 +1657,7 @@
       var thumb = ph
         ? '<img src="' + ph + '" alt="" width="48" height="48" />'
         : '<span class="friend-fallback">' + esc(String(f.name || "?").slice(0, 1).toUpperCase()) + '</span>';
-      return '<button type="button" class="friend-thumb" data-profile="' + esc(f.id) + '" title="' + esc(f.name) + '">' + thumb + '<span>' + esc(f.name) + '</span></button>';
+      return '<button type="button" class="friend-thumb" data-profile="' + esc(f.id) + '" title="' + esc(f.name) + '">' + thumb + '<span>' + esc(f.name) + roleBadgeHtml(getRole(f.id)) + '</span></button>';
     }).join("") + '</div>';
   }
   function profileActionRow(opts) {
@@ -1673,7 +1823,7 @@
       +   '<div class="cp-header">'
       +     '<div class="cp-photo">' + photoHtml + '</div>'
       +     '<div class="cp-main">'
-      +       '<div class="cp-name-row"><span class="cp-name">' + esc(me.name) + '</span><span class="level-badge">Level 1</span></div>'
+      +       '<div class="cp-name-row"><span class="cp-name">' + esc(me.name) + '</span>' + roleBadgeHtml(getRole(sid)) + '<span class="level-badge">Level 1</span></div>'
       +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
       +       profileActionRow({ photo: true, poke: 'id="poke-self-demo"' })
       +     '</div>'
@@ -1763,7 +1913,7 @@
       return '<div class="friend-list-row' + (isOn ? " is-online" : "") + '">'
         + thumb
         + '<div class="friend-list-main">'
-        +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(f.id) + '"><b>' + esc(f.name) + '</b></button>'
+        +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(f.id) + '"><b>' + esc(f.name) + '</b></button>' + roleBadgeHtml(getRole(f.id))
         +   '<div class="sub">' + (st ? esc(st) : '<span class="meta">No status</span>') + '</div>'
         +   '<div class="meta">' + (isOn ? "Online · " : "") + esc(loc) + '</div>'
         + '</div>'
@@ -1797,7 +1947,7 @@
         return '<div class="friend-list-row' + (p.online ? " is-online" : "") + '">'
           + '<span class="ava">' + esc(String(p.name || "?").slice(0, 1).toUpperCase()) + '</span>'
           + '<div class="friend-list-main">'
-          +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(p.id) + '"><b>' + esc(p.name) + '</b></button>'
+          +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(p.id) + '"><b>' + esc(p.name) + '</b></button>' + roleBadgeHtml(getRole(p.id))
           +   '<div class="meta">permaname ' + esc(p.id) + (p.online ? " · online" : "") + '</div>'
           + '</div>'
           + '<div class="friend-list-actions">'
@@ -1908,12 +2058,44 @@
     }
     var emailNote = "";
     try { emailNote = localStorage.getItem("whirled2.email." + sid) || ""; } catch (e) {}
+    var myRole = getRole(sid);
+    var roleLabel = myRole === "admin" ? "Admin" : (myRole === "mod" ? "Mod" : "Player");
+    var rolePanel = "";
+    if (myRole === "admin") {
+      var people = [];
+      var seen = {};
+      function addP(id, name) {
+        if (!id || seen[id] || id === sid) return;
+        seen[id] = true;
+        people.push({ id: id, name: name || id });
+      }
+      loadFriends().forEach(function (f) { addP(f.id, f.name); });
+      loadKnownProfiles().forEach(function (p) { addP(p.id, p.name); });
+      liveOccupants.forEach(function (p) { addP(p.id, p.name); });
+      var rows = people.length
+        ? people.map(function (p) {
+            var r = getRole(p.id);
+            return '<div class="role-admin-row">'
+              + '<div><b>' + esc(p.name) + '</b> ' + roleBadgeHtml(r)
+              + '<div class="meta">permaname ' + esc(p.id) + ' · ' + esc(r) + '</div></div>'
+              + '<div class="role-admin-actions">'
+              +   '<button type="button" class="action-btn" data-set-role="' + esc(p.id) + '" data-role="admin">Admin</button>'
+              +   '<button type="button" class="action-btn" data-set-role="' + esc(p.id) + '" data-role="mod">Mod</button>'
+              +   '<button type="button" class="action-btn" data-set-role="' + esc(p.id) + '" data-role="player">Player</button>'
+              + '</div></div>';
+          }).join("")
+        : '<p class="meta">No known profiles yet — friends, occupants, and remembered players appear here.</p>';
+      rolePanel = '<div class="panel"><h2>Roles (local)</h2>'
+        + '<p class="meta">Promote or demote known players on this browser only. Mods can be set by admins.</p>'
+        + rows + '</div>';
+    }
     return '<section class="page me-page account-page">' + meSubnav()
       + '<div class="panel">'
       +   '<h2>Account</h2>'
       +   '<div class="account-grid">'
       +     '<div><span class="k">Permaname</span><span class="v">' + esc(sid) + '</span></div>'
       +     '<div><span class="k">Display name</span><span class="v">' + esc(me.name) + '</span></div>'
+      +     '<div><span class="k">Role</span><span class="v">' + esc(roleLabel) + " " + roleBadgeHtml(myRole) + '</span></div>'
       +     '<div><span class="k">Member since</span><span class="v">' + esc(member) + '</span></div>'
       +     '<div><span class="k">Email</span><span class="v">'
       +       '<input type="email" disabled placeholder="Not set on Pages" value="' + esc(emailNote) + '" title="Local-only placeholder — email is not required on GitHub Pages" />'
@@ -1921,7 +2103,9 @@
       +   '</div>'
       +   '<p class="meta">Password changes are managed by register / login — not required on this chrome.</p>'
       +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
-      + '</div></section>';
+      + '</div>'
+      + rolePanel
+      + '</section>';
   }
 
   function otherProfile(id) {
@@ -1948,7 +2132,7 @@
       +   '<div class="cp-header">'
       +     '<div class="cp-photo">' + photoHtml + '</div>'
       +     '<div class="cp-main">'
-      +       '<div class="cp-name-row"><span class="cp-name">' + esc(name) + '</span><span class="level-badge">Level 1</span></div>'
+      +       '<div class="cp-name-row"><span class="cp-name">' + esc(name) + '</span>' + roleBadgeHtml(getRole(id)) + '<span class="level-badge">Level 1</span></div>'
       +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
       +       profileActionRow({
             poke: isSelf ? '' : ('data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '"'),
@@ -2167,7 +2351,10 @@
       + '</header>'
       + '<div id="main"></div>'
       + '<form class="bar" id="chat-form">'
-      +   '<button type="button" class="chat-opts" title="Chat options" aria-label="Chat options">&#9679;</button>'
+      +   '<div class="chat-opts-wrap">'
+      +   '<button type="button" class="chat-opts" id="chat-opts-btn" title="Chat options" aria-label="Chat options" data-chat-opts="1">&#9679;</button>'
+      +   '<div class="chat-opts-menu" id="chat-opts-menu" hidden></div>'
+      +   '</div>'
       +   '<input id="chat-input" maxlength="240" placeholder="Type here to chat!" autocomplete="off" />'
       +   '<button class="send" type="submit">send</button>'
       +   '<span class="toolbar">'
@@ -2206,6 +2393,7 @@
       try { window.__whirledBoot = true; } catch (e) {}
       return;
     }
+    bootstrapRoles();
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
     var tabAttr = tab || "rooms";
     if (tabAttr === "rooms" && !inRoom) tabAttr = "rooms-lobby";
@@ -2266,10 +2454,58 @@
     }
   }
   function refreshChatLog() {
+    var ui = loadChatUi();
+    var html = chat.map(chatRow).join("");
+    var body = document.querySelector(".stage-body");
+    if (body) {
+      body.classList.toggle("chat-mode-slide", ui.mode === "slide");
+      body.classList.toggle("chat-mode-overlay", ui.mode === "overlay");
+      body.classList.toggle("hide-history", !!ui.hideHistory);
+      body.classList.remove("text-size-sm", "text-size-md", "text-size-lg");
+      body.classList.add("text-size-" + (ui.textSize || "md"));
+    }
     var log = document.getElementById("chat-log");
-    if (!log) return;
-    log.innerHTML = chat.map(chatRow).join("");
-    log.scrollTop = log.scrollHeight;
+    if (log) {
+      var nearBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 48;
+      var stick = !chatPinnedScroll || nearBottom;
+      log.innerHTML = html;
+      if (stick) log.scrollTop = log.scrollHeight;
+    }
+    var ov = document.getElementById("chat-overlay");
+    if (ov) {
+      if (ui.mode === "overlay" && !ui.hideHistory) {
+        ov.hidden = false;
+        var nearB = (ov.scrollHeight - ov.scrollTop - ov.clientHeight) < 48;
+        var stickO = !chatPinnedScroll || nearB;
+        ov.innerHTML = html;
+        if (stickO) ov.scrollTop = ov.scrollHeight;
+      } else {
+        ov.hidden = true;
+        ov.innerHTML = "";
+      }
+    }
+    applyChatBarVisibility();
+  }
+  function applyChatBarVisibility() {
+    var app = document.getElementById("app");
+    var tab = app && app.getAttribute("data-tab");
+    var show = !!(session() && tab === "rooms" && inRoom);
+    var bar = document.getElementById("chat-form");
+    if (bar) bar.style.display = show ? "" : "none";
+    var menu = document.getElementById("chat-opts-menu");
+    if (menu && !show) { menu.hidden = true; chatOptsOpen = false; }
+  }
+  function pushSystemChat(text) {
+    chat.push({ id: "sys" + Date.now(), system: true, text: text, at: new Date().toISOString() });
+    if (chat.length > 120) chat = chat.slice(-100);
+    refreshChatLog();
+  }
+  function clearRoomChatDisplay(clearStorage) {
+    chat = [];
+    refreshChatLog();
+    if (clearStorage) {
+      try { localStorage.removeItem("whirled2.chat.loft"); } catch (e) {}
+    }
   }
   function bindGate() {
     var err = document.getElementById("gate-err");
@@ -2354,11 +2590,66 @@
     return liveOccupants.slice();
   }
   async function pushChat(text) {
-    var result = await window.WhirledApi.postChat("loft", text);
+    text = String(text || "").trim();
+    if (!text) return;
+    if (/^\/clear$/i.test(text)) {
+      clearRoomChatDisplay(false);
+      return;
+    }
+    var now = Date.now();
+    chatSendTimes = chatSendTimes.filter(function (t) { return now - t < 3000; });
+    if (chatSendTimes.length >= 5) {
+      pushSystemChat("You're being too chatty…");
+      return;
+    }
+    chatSendTimes.push(now);
+    var emote = false;
+    var sendText = text;
+    if (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text)) {
+      emote = true;
+      sendText = text; // keep prefix so history shows; chatRow detects
+    }
+    var result = await window.WhirledApi.postChat("loft", sendText);
     var msg = result.message || result;
+    if (emote) msg.emote = true;
     if (!chat.some(function (m) { return m.id === msg.id; })) chat.push(msg);
     refreshChatLog();
     listeners.chat.forEach(function (fn) { try { fn(msg); } catch (e) {} });
+  }
+  function renderChatOptsMenu() {
+    var menu = document.getElementById("chat-opts-menu");
+    if (!menu) return;
+    var ui = loadChatUi();
+    menu.innerHTML = ''
+      + '<div class="chat-opts-title">Chat options</div>'
+      + '<label class="chat-opts-row" data-chat-mode="overlay"><input type="radio" name="chat-mode" value="overlay"' + (ui.mode === "overlay" ? " checked" : "") + ' /> Overlay chat</label>'
+      + '<label class="chat-opts-row" data-chat-mode="slide"><input type="radio" name="chat-mode" value="slide"' + (ui.mode === "slide" ? " checked" : "") + ' /> Slide chat</label>'
+      + '<label class="chat-opts-row' + (ui.mode !== "overlay" ? " is-disabled" : "") + '" data-chat-hide-row="1"><input type="checkbox" data-chat-hide="1"' + (ui.hideHistory ? " checked" : "") + (ui.mode !== "overlay" ? " disabled" : "") + ' /> Hide chat history <span class="meta">(F9)</span></label>'
+      + '<div class="chat-opts-title">Text size</div>'
+      + '<div class="chat-opts-sizes">'
+      +   '<button type="button" class="action-btn' + (ui.textSize === "sm" ? " is-on" : "") + '" data-chat-size="sm">S</button>'
+      +   '<button type="button" class="action-btn' + (ui.textSize === "md" ? " is-on" : "") + '" data-chat-size="md">M</button>'
+      +   '<button type="button" class="action-btn' + (ui.textSize === "lg" ? " is-on" : "") + '" data-chat-size="lg">L</button>'
+      + '</div>'
+      + '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear room chat</button>';
+  }
+  function openChatNameMenu(id, name, x, y) {
+    var existing = document.getElementById("chat-name-menu");
+    if (existing) existing.remove();
+    chatNameMenu = { id: id, name: name };
+    var menu = document.createElement("div");
+    menu.id = "chat-name-menu";
+    menu.className = "chat-name-menu";
+    menu.style.left = Math.max(8, Math.min(window.innerWidth - 180, x)) + "px";
+    menu.style.top = Math.max(8, Math.min(window.innerHeight - 160, y)) + "px";
+    var sid = session() && session().user ? session().user.id : "";
+    var self = sid && id && sid === id;
+    menu.innerHTML = ''
+      + '<button type="button" data-profile="' + esc(id) + '">View profile</button>'
+      + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Add friend</button>')
+      + (self ? '' : '<button type="button" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name) + '">Send mail</button>')
+      + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>');
+    document.body.appendChild(menu);
   }
   async function loadHistory() {
     var result = await window.WhirledApi.history("loft");
@@ -2462,6 +2753,99 @@
       var rm0 = document.getElementById("room-menu");
       if (rm0 && !rm0.hidden) { rm0.hidden = true; roomMenuOpen = false; }
     }
+    // Chat options + name menu
+    var chatOptsBtn = ev.target.closest("[data-chat-opts]");
+    if (chatOptsBtn) {
+      ev.preventDefault();
+      chatOptsOpen = !chatOptsOpen;
+      var com = document.getElementById("chat-opts-menu");
+      if (com) {
+        if (chatOptsOpen) { renderChatOptsMenu(); com.hidden = false; }
+        else com.hidden = true;
+      }
+      return;
+    }
+    if (ev.target.closest("[data-chat-mode]")) {
+      var modeEl = ev.target.closest("[data-chat-mode]");
+      var uiM = loadChatUi();
+      uiM.mode = modeEl.getAttribute("data-chat-mode") === "slide" ? "slide" : "overlay";
+      if (uiM.mode !== "overlay") uiM.hideHistory = false;
+      saveChatUi(uiM);
+      renderChatOptsMenu();
+      refreshChatLog();
+      return;
+    }
+    if (ev.target.closest("[data-chat-hide-row]") || ev.target.closest("[data-chat-hide]")) {
+      var rowH = ev.target.closest("[data-chat-hide-row]") || ev.target.closest("[data-chat-hide]");
+      var box = rowH.querySelector ? rowH.querySelector("[data-chat-hide]") : rowH;
+      if (!box || box.disabled) return;
+      var uiH = loadChatUi();
+      // label click already toggled native checkbox; read after toggle
+      setTimeout(function () {
+        uiH.hideHistory = !!box.checked;
+        saveChatUi(uiH);
+        refreshChatLog();
+        renderChatOptsMenu();
+        var comH = document.getElementById("chat-opts-menu");
+        if (comH) comH.hidden = false;
+        chatOptsOpen = true;
+      }, 0);
+      return;
+    }
+    if (ev.target.closest("[data-chat-size]")) {
+      var uiS = loadChatUi();
+      uiS.textSize = ev.target.closest("[data-chat-size]").getAttribute("data-chat-size") || "md";
+      saveChatUi(uiS);
+      renderChatOptsMenu();
+      refreshChatLog();
+      return;
+    }
+    if (ev.target.closest("[data-chat-clear]")) {
+      if (confirm("Clear room chat display? Also clear saved local history?")) {
+        clearRoomChatDisplay(true);
+      } else if (confirm("Clear display only (keep saved history)?")) {
+        clearRoomChatDisplay(false);
+      }
+      chatOptsOpen = false;
+      var com2 = document.getElementById("chat-opts-menu");
+      if (com2) com2.hidden = true;
+      return;
+    }
+    var chatWho = ev.target.closest("[data-chat-who]");
+    if (chatWho) {
+      ev.preventDefault();
+      openChatNameMenu(
+        chatWho.getAttribute("data-chat-who") || "",
+        chatWho.getAttribute("data-chat-who-name") || "",
+        ev.clientX,
+        ev.clientY
+      );
+      return;
+    }
+    if (ev.target.closest("[data-block-chat]")) {
+      var blk = ev.target.closest("[data-block-chat]");
+      addBlocked({ id: blk.getAttribute("data-block-chat"), name: blk.getAttribute("data-block-name") });
+      var cnm0 = document.getElementById("chat-name-menu");
+      if (cnm0) cnm0.remove();
+      chatNameMenu = null;
+      pushNotice("status", "Blocked " + (blk.getAttribute("data-block-name") || "player") + ".");
+      return;
+    }
+    if (ev.target.closest("[data-set-role]") && session() && getRole(session().user.id) === "admin") {
+      var sr = ev.target.closest("[data-set-role]");
+      setRole(sr.getAttribute("data-set-role"), sr.getAttribute("data-role"));
+      paint("me");
+      return;
+    }
+    if (!ev.target.closest("#chat-opts-menu") && !ev.target.closest("#chat-opts-btn")) {
+      var com3 = document.getElementById("chat-opts-menu");
+      if (com3 && !com3.hidden) { com3.hidden = true; chatOptsOpen = false; }
+    }
+    if (!ev.target.closest("#chat-name-menu") && !ev.target.closest("[data-chat-who]")) {
+      var cnm1 = document.getElementById("chat-name-menu");
+      if (cnm1) { cnm1.remove(); chatNameMenu = null; }
+    }
+
     if (ev.target.id === "logout-btn") {
       window.WhirledApi.logout();
       chat = []; liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
@@ -3700,4 +4084,23 @@
     if (!text) return;
     if (ev.target.id === "chat-form") { pushChat(text); input.value = ""; }
   });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "F9") {
+      var app = document.getElementById("app");
+      if (!app || app.getAttribute("data-tab") !== "rooms" || !inRoom) return;
+      var ui = loadChatUi();
+      if (ui.mode !== "overlay") return;
+      ui.hideHistory = !ui.hideHistory;
+      saveChatUi(ui);
+      refreshChatLog();
+      ev.preventDefault();
+    }
+  });
+  document.addEventListener("scroll", function (ev) {
+    var t = ev.target;
+    if (!t || !t.id) return;
+    if (t.id === "chat-log" || t.id === "chat-overlay") {
+      chatPinnedScroll = (t.scrollHeight - t.scrollTop - t.clientHeight) > 48;
+    }
+  }, true);
 })();

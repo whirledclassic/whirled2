@@ -74,6 +74,11 @@
           coins: 0
         };
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        try {
+          if (!localStorage.getItem("whirled2.firstUserId")) {
+            localStorage.setItem("whirled2.firstUserId", id);
+          }
+        } catch (eFirst) {}
         var session = { token: "local-" + id, user: publicUser(users[id]) };
         saveSession(session);
         return session;
