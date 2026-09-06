@@ -25,7 +25,13 @@ The original Whirled server/client lived in **[greyhavens/msoy](https://github.c
 
 ## Chat UI (Slide vs Overlay)
 
-Classic Chat Options (wiki Chat): **Slide chat** = own dark panel beside the room stage; **Overlay chat** = message bubbles over the room only (classic Whirled never showed an empty chrome slab). Prefer hide-when-empty: `#chat-overlay` stays `hidden` / `.is-empty` until there are messages; soft semi-transparent background only when bubbles exist. Preference in `whirled2.chatUi` (`mode`, `hideHistory`, `textSize`). Hide history is overlay-only (F9). Bottom input bar stays in both modes when you are in a room.
+Classic (wiki.whirled.club/wiki/Chat):
+- **Input**: bottom-left chrome — “Type here to chat!” + send (always when in a room).
+- **Slide chat**: own dark panel beside (desktop) or under (phone) the room stage — black background window with full history scroll.
+- **Overlay chat**: history on the **left side of the room window** (`#chat-overlay` inside `.stage-host`), not a dock above the send bar.
+- **Hide chat history (F9)**: overlay only.
+- Prefs in `whirled2.chatUi` (`mode`, `hideHistory`, `textSize`). Empty overlay stays hidden (no blank slab).
+
 
 ## Pokes
 

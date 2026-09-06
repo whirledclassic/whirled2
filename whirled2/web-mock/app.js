@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906f";
+  var LOGO_V = "20260906g";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1770,6 +1770,10 @@ function helpPage() {
       +     '<div class="stage-host">'
       +       '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
       +       decorateLayerHtml()
+      // How this works (classic Whirled / wiki Chat): Overlay chat sits ON the left of the
+      // room window (inside .stage-host). Slide chat uses sibling #chat-log as its own
+      // dark panel. Bottom #chat-form input stays in the chrome either way.
+      +       '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       +     '</div>'
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
       +     '</div>'
@@ -2847,10 +2851,6 @@ function helpPage() {
       +   '</div>'
       + '</header>'
       + '<div id="main"></div>'
-      // How this works: chat overlay sits on #app (not inside #main). Phones scroll #main;
-      // fixed bubbles inside a scrolling main become a clipped thin strip. Sibling of the
-      // send bar keeps the hood readable above the keyboard/input.
-      + '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       + '<form class="bar" id="chat-form">'
       +   '<div class="chat-opts-wrap">'
       +   '<button type="button" class="chat-opts" id="chat-opts-btn" title="Chat options" aria-label="Chat options" data-chat-opts="1">&#9679;</button>'
@@ -2988,26 +2988,17 @@ function helpPage() {
     }
     var ov = document.getElementById("chat-overlay");
     if (ov) {
-      // How this works (baby steps):
-      // Desktop: overlay mode only shows #chat-overlay bubbles on the stage.
-      // Phones: ALWAYS use the docked bubble hood above the send bar (even if
-      // Chat Options says "Slide"), because the under-stage #chat-log strip
-      // looked like a broken thin black line. Hide history still wins.
-      var isPhone = false;
-      try {
-        isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 700px)").matches);
-      } catch (ePhone) {}
-      var showOv = !ui.hideHistory && chat.length > 0 && (ui.mode === "overlay" || isPhone);
+      // How this works (wiki Chat — Slide vs Overlay):
+      // Overlay = history on the LEFT of the room window (#chat-overlay in .stage-host).
+      // Slide = dark #chat-log panel beside/under the stage. Hide history (F9) is
+      // overlay-only. Bottom input bar is always separate chrome.
+      var showOv = ui.mode === "overlay" && !ui.hideHistory && chat.length > 0;
       if (showOv) {
         ov.hidden = false;
         ov.classList.remove("is-empty");
         var nearB = (ov.scrollHeight - ov.scrollTop - ov.clientHeight) < 48;
         var stickO = !chatPinnedScroll || nearB;
-        var ovHtml = html;
-        if (isPhone) {
-          ovHtml = chat.slice(-7).map(chatRow).join("");
-        }
-        ov.innerHTML = ovHtml;
+        ov.innerHTML = html;
         if (stickO) ov.scrollTop = ov.scrollHeight;
       } else {
         ov.hidden = true;
@@ -3023,14 +3014,6 @@ function helpPage() {
     var show = !!(session() && tab === "rooms" && inRoom);
     var bar = document.getElementById("chat-form");
     if (bar) bar.style.display = show ? "" : "none";
-    // How this works: overlay lives on #app now — hide it whenever the chat bar is off
-    // (lobby / Me / Stuff) so bubbles don't float over other pages.
-    var ov = document.getElementById("chat-overlay");
-    if (ov && !show) {
-      ov.hidden = true;
-      ov.classList.add("is-empty");
-      ov.innerHTML = "";
-    }
     var menu = document.getElementById("chat-opts-menu");
     if (menu && !show) { menu.hidden = true; chatOptsOpen = false; }
   }
@@ -3168,8 +3151,8 @@ function helpPage() {
     var ui = loadChatUi();
     menu.innerHTML = ''
       + '<div class="chat-opts-title">Chat options</div>'
-      + '<label class="chat-opts-row" data-chat-mode="overlay"><input type="radio" name="chat-mode" value="overlay"' + (ui.mode === "overlay" ? " checked" : "") + ' /> Overlay chat <span class="meta">(bubbles on room)</span></label>'
-      + '<label class="chat-opts-row" data-chat-mode="slide"><input type="radio" name="chat-mode" value="slide"' + (ui.mode === "slide" ? " checked" : "") + ' /> Slide chat</label>'
+      + '<label class="chat-opts-row" data-chat-mode="overlay"><input type="radio" name="chat-mode" value="overlay"' + (ui.mode === "overlay" ? " checked" : "") + ' /> Overlay chat <span class="meta">(left of room window)</span></label>'
+      + '<label class="chat-opts-row" data-chat-mode="slide"><input type="radio" name="chat-mode" value="slide"' + (ui.mode === "slide" ? " checked" : "") + ' /> Slide chat <span class="meta">(own dark panel)</span></label>'
       + '<label class="chat-opts-row' + (ui.mode !== "overlay" ? " is-disabled" : "") + '" data-chat-hide-row="1"><input type="checkbox" data-chat-hide="1"' + (ui.hideHistory ? " checked" : "") + (ui.mode !== "overlay" ? " disabled" : "") + ' /> Hide chat history <span class="meta">(F9)</span></label>'
       + '<div class="chat-opts-title">Text size</div>'
       + '<div class="chat-opts-sizes">'

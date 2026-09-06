@@ -120,8 +120,9 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 }
 .room-flag b { display: block; font-size: 13px; color: #fff; }
 .chat-log {
+  /* Slide mode fills this as its own dark window (wiki). Overlay mode hides it. */
   max-height: 92px; overflow: auto; background: #0b1014; color: #dce8f0;
-  padding: 6px 10px; font-size: 12px; border-top: 1px solid #22303a;
+  padding: 8px 10px; font-size: 12px; border-top: 1px solid #22303a;
 }
 .chat-row { padding: 2px 0; }
 .chat-row b { color: #7ec8f0; margin-right: 6px; }
@@ -1234,16 +1235,19 @@ body > .party-panel {
   min-width: 0;
 }
 .stage-body.chat-mode-slide .chat-log {
+  /* Classic Slide: own dark panel beside the room (wiki). */
   display: block;
-  width: 220px;
+  width: 240px;
   max-width: 38vw;
   max-height: none;
+  min-height: 200px;
   height: auto;
   align-self: stretch;
   border-top: 0;
   border-left: 1px solid #22303a;
   background: #0b1014;
-  padding: 8px 10px;
+  padding: 10px 12px;
+  overflow: auto;
 }
 .stage-body.chat-mode-overlay .chat-log {
   display: none;
@@ -1252,22 +1256,22 @@ body > .party-panel {
 .stage-body.hide-history .chat-overlay {
   display: none !important;
 }
-/* How this works: #chat-overlay lives on #app (sibling of #main + .bar), NOT inside
-   the scrolling room. Baby steps: iOS turns fixed-inside-scroll into a clipped strip;
-   keeping it next to the send bar makes bubbles stay readable on phones + desktop. */
+/* How this works (wiki Chat): Overlay = history on the LEFT of the room window.
+   Lives inside .stage-host (position:relative). Not a viewport-fixed dock.
+   Slide uses sibling #chat-log as its own dark panel. Empty overlay stays hidden. */
 .chat-overlay {
-  position: fixed;
-  left: 178px; /* clear the In-this-room rail on desktop */
+  position: absolute;
+  left: 8px;
   right: auto;
-  top: auto;
-  bottom: 56px;
-  max-height: min(42vh, 320px);
-  width: min(320px, 40vw);
-  z-index: 45;
+  top: 8px;
+  bottom: 8px;
+  max-height: none;
+  width: min(280px, 42%);
+  z-index: 5;
   overflow: auto;
-  pointer-events: none; /* stage stays clickable; bubbles re-enable below */
-  padding: 8px;
-  border-radius: 12px;
+  pointer-events: none;
+  padding: 6px 8px;
+  border-radius: 0;
   background: transparent !important;
   backdrop-filter: none;
   border: 0;
@@ -1275,8 +1279,8 @@ body > .party-panel {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 6px;
-  scrollbar-width: none;
+  gap: 5px;
+  scrollbar-width: thin;
 }
 .chat-overlay::-webkit-scrollbar { display: none; }
 .chat-overlay .chat-row {
@@ -1438,12 +1442,10 @@ body > .party-panel {
     border-top: 1px solid #22303a;
   }
   .chat-overlay {
-    /* tablet: keep fixed hood readable; do not shrink to a skinny left strip */
-    left: 12px;
-    width: min(340px, 56vw);
-    max-height: min(42vh, 300px);
-    top: auto;
-    bottom: 56px;
+    width: min(240px, 48%);
+    left: 6px;
+    top: 6px;
+    bottom: 6px;
     background: transparent;
   }
   .chat-overlay[hidden],
@@ -1756,82 +1758,90 @@ body > .party-panel {
   }
 }
 
-/* ---- 20260906f: chat hood on #app (escapes iOS scroll clip) ---- */
+/* ---- 20260906g: classic Slide / Overlay chat (wiki Chat) ---- */
 @media (max-width: 700px) {
-  /* How this works (baby steps):
-     1) Hide under-stage #chat-log (that was the thin black line).
-     2) #chat-overlay is a sibling of #main/.bar on #app — NOT inside scrolling #main
-        — so iOS Safari cannot clip fixed bubbles into a 1-line hood.
-     3) Soft glass panel above the send bar; empty = hidden. */
-  .stage-body .chat-log,
-  .stage-body.chat-mode-slide .chat-log,
-  .stage-body.chat-mode-overlay .chat-log {
-    display: none !important;
-  }
+  /* How this works (baby steps, matches whirled.club wiki):
+     1) Bottom input bar stays the room chat box (Type here to chat! + send).
+     2) Overlay = bubbles on the LEFT of the green room stage (inside .stage-host).
+     3) Slide = its own dark panel under the stage with real height (not a 1px line).
+     4) No viewport-fixed "hood" above the send bar — that was un-Whirled. */
   .stage-body.chat-mode-slide {
     flex-direction: column !important;
   }
-  #app > .chat-overlay,
-  .chat-overlay {
-    position: fixed !important;
-    left: 10px !important;
-    right: 10px !important;
-    top: auto !important;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
-    width: auto !important;
+  .stage-body.chat-mode-slide .chat-log {
+    display: block !important;
+    width: 100% !important;
     max-width: none !important;
-    max-height: 42vh !important;
-    min-height: 72px !important;
-    z-index: 60 !important; /* above sticky .bar (z-index 5) and room chrome */
-    padding: 12px !important;
-    gap: 8px !important;
-    border-radius: 16px !important;
-    background: rgba(8, 16, 24, 0.72) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(180, 210, 230, 0.28) !important;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35) !important;
+    max-height: 36vh !important;
+    min-height: 140px !important;
+    height: auto !important;
+    border-left: 0 !important;
+    border-top: 1px solid #2a3d4c !important;
+    background: #0b1014 !important;
+    padding: 10px 12px !important;
+    overflow: auto !important;
+    font-size: 13px;
+  }
+  .stage-body.chat-mode-overlay .chat-log {
+    display: none !important;
+  }
+  .stage-host {
+    position: relative !important;
+    overflow: visible !important;
+  }
+  .chat-overlay {
+    position: absolute !important;
+    left: 6px !important;
+    right: auto !important;
+    top: 6px !important;
+    bottom: 6px !important;
+    width: min(78%, 300px) !important;
+    max-width: none !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    z-index: 6 !important;
+    padding: 6px !important;
+    gap: 6px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     pointer-events: none !important;
     overflow: auto !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-end !important;
   }
-  #app > .chat-overlay[hidden],
-  #app > .chat-overlay.is-empty,
   .chat-overlay[hidden],
   .chat-overlay.is-empty {
     display: none !important;
-    min-height: 0 !important;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
     padding: 0 !important;
   }
   .chat-overlay .chat-row {
     pointer-events: auto;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 6px;
   }
+  /* Room group chat (wiki): light bubbles / readable on stage art */
   .chat-overlay .chat-bubble:not(.emote):not(.system) {
-    flex: 1 1 100%;
     max-width: 100%;
-    font-size: 15px;
-    line-height: 1.4;
-    padding: 10px 14px;
-    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.35;
+    padding: 8px 11px;
+    border-radius: 10px;
     color: #102030;
-    background: rgba(244, 249, 252, 0.96) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
   }
   .chat-overlay .chat-who {
-    font-size: 13px;
+    font-size: 12px;
     color: #e8f4fb;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.7);
   }
   .chat-overlay .chat-row time { display: none; }
-  .chat-overlay .chat-row:nth-last-child(n+8) { display: none; }
-  .bar { z-index: 55 !important; }
-  .occupants { max-height: 96px; }
+  .chat-log .chat-bubble:not(.emote):not(.system) {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
 }
+

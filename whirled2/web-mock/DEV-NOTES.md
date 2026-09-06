@@ -21,6 +21,14 @@ Plain-English map of the chrome. Read this before changing chat, notices, themes
 4. Mention the token in `STATUS.md` and Help text.
 5. Push to `whirledclassic/whirled2` `main` so GitHub Pages picks it up. Hard-refresh or open the new `?v=` URL on phones.
 
+## Chat modes (classic)
+
+- Wiki: https://wiki.whirled.club/wiki/Chat
+- Overlay → `#chat-overlay` absolute on left inside `.stage-host`.
+- Slide → `#chat-log` dark panel (sibling of `.stage-host`).
+- Do **not** `position:fixed` the overlay to the viewport / above the send bar — that broke phones.
+- Prefs: `localStorage whirled2.chatUi`.
+
 ## How chat submit works (and the radio bug we fixed)
 
 - Bottom bar is `<form id="chat-form">` with `<input id="chat-input">`.
