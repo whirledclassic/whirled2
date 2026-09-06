@@ -2087,3 +2087,148 @@ body > .party-panel {
   background: rgba(244, 249, 252, 0.85);
   border-radius: 16px;
 }
+
+/* === Fidelity + modern upgrade (?v=20260906m) === */
+/* How this works: Room (blue) + Private (orange) tabs; unread glimmer; PM input tint. */
+.chat-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  padding: 4px 6px 0; background: transparent;
+}
+.chat-tab {
+  border: 1px solid #9ec4de; background: #e8f4fb; color: #1e6fa8;
+  border-radius: 6px 6px 0 0; padding: 4px 10px; font: inherit; font-size: 12px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: background .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.chat-tab-room.is-on { background: #1e6fa8; color: #fff; border-color: #1e6fa8; }
+.chat-tab-pm { background: #fff3e8; color: #b35a1e; border-color: #e0a878; }
+.chat-tab-pm.is-on { background: #e07a2a; color: #fff; border-color: #e07a2a; }
+.chat-tab.has-unread {
+  animation: tab-glimmer 1.2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(255, 210, 80, 0.55);
+}
+.chat-tab-x {
+  font-weight: bold; opacity: 0.75; line-height: 1; padding: 0 2px;
+}
+.chat-tab-x:hover { opacity: 1; }
+@keyframes tab-glimmer {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-tab, .chat-tab.has-unread, .dot.pulse { animation: none !important; transition: none !important; }
+  .tab { transition: none !important; }
+}
+.tab { transition: background .18s ease, color .18s ease, opacity .18s ease; }
+#chat-input.is-pm {
+  background: #fff6ee; border-color: #e0a878; box-shadow: inset 0 0 0 1px rgba(224, 122, 42, 0.25);
+}
+.stage-body.pm-tab-active .chat-log { border-color: #e0a878; }
+
+/* Presence pulse */
+.dot.on.pulse {
+  box-shadow: 0 0 0 0 rgba(122, 211, 106, 0.7);
+  animation: presence-pulse 1.6s ease-out infinite;
+}
+@keyframes presence-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(122, 211, 106, 0.55); }
+  70% { box-shadow: 0 0 0 8px rgba(122, 211, 106, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(122, 211, 106, 0); }
+}
+.friend-list-row.is-online .ava::after,
+.friend-list-row.is-online .friend-list-name::before {
+  /* subtle online cue via existing .is-online color */
+}
+
+/* Friend request badge */
+.me-badge {
+  display: inline-block; min-width: 1.1em; padding: 0 5px; margin-left: 2px;
+  border-radius: 999px; background: #1e6fa8; color: #fff; font-size: 11px; line-height: 1.4;
+  vertical-align: middle;
+}
+.friend-request-row { background: #eef7fc; border-radius: 6px; padding: 6px; }
+
+/* Mail upgrades */
+.mail-row.unread {
+  background: #d7ebf8 !important;
+  border-left: 3px solid #1e6fa8;
+}
+.mail-unread-dot { color: #1e6fa8; font-size: 10px; }
+.mail-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.mail-check { float: left; margin-right: 8px; margin-top: 2px; }
+.mail-gift-tag { color: #1e6fa8; font-weight: 600; }
+.mail-row { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; }
+.mail-row .mail-check { grid-row: 1 / span 4; }
+.mail-row .mail-meta, .mail-row .mail-subject, .mail-row .mail-body, .mail-row .mail-row-actions, .mail-row .meta {
+  grid-column: 2;
+}
+
+/* Friends toolbar popup */
+.tb-friends-wrap { position: relative; display: inline-block; }
+.friends-toolbar-pop {
+  position: absolute; bottom: 36px; right: 0; z-index: 80;
+  min-width: 220px; max-width: 280px; max-height: 260px; overflow: auto;
+  background: #fffef8; border: 1px solid #9ec4de; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(22, 50, 74, 0.18); padding: 8px;
+  font-size: 13px;
+}
+.friends-pop-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 6px; }
+.friends-pop-row { padding: 6px 0; border-bottom: 1px dotted #c5deee; }
+.friends-pop-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.friends-pop-actions button {
+  font: inherit; font-size: 11px; padding: 2px 6px; border-radius: 4px;
+  border: 1px solid #9ec4de; background: #e8f4fb; color: #1e6fa8; cursor: pointer;
+}
+
+/* Recent rooms strip */
+.recent-rooms-strip { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.recent-room-chip {
+  border: 1px solid #9ec4de; background: #f4fafd; color: #1e6fa8;
+  border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.recent-room-chip:hover { background: #e8f4fb; }
+.room-invite-row { padding: 2px 8px 6px; }
+
+/* Chat reactions */
+.chat-row { position: relative; }
+.react-bar {
+  position: absolute; right: 4px; top: 2px; display: flex; gap: 2px;
+  background: rgba(255,255,255,0.92); border: 1px solid #c5deee; border-radius: 999px; padding: 2px 4px;
+  z-index: 2;
+}
+.react-btn {
+  border: 0; background: transparent; cursor: pointer; font-size: 14px; line-height: 1; padding: 2px;
+}
+.react-pills { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0 4px; }
+.react-pill {
+  display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px;
+  background: #eef7fc; border: 1px solid #c5deee; cursor: pointer; color: #16324a;
+}
+
+/* Away name tint */
+.chat-who.is-away { color: #c9a000 !important; }
+
+/* Command palette + shortcuts */
+.cmd-palette-backdrop, .shortcuts-backdrop {
+  position: fixed; inset: 0; z-index: 200; background: rgba(22, 50, 74, 0.35);
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh;
+}
+.cmd-palette, .shortcuts-card {
+  width: min(480px, 92vw); background: #fffef8; border: 1px solid #9ec4de;
+  border-radius: 10px; box-shadow: 0 16px 40px rgba(22, 50, 74, 0.25); padding: 12px;
+}
+#cmd-palette-input {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 15px;
+  border: 1px solid #9ec4de; border-radius: 6px; margin-bottom: 8px;
+}
+.cmd-palette-list { max-height: 50vh; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.cmd-item {
+  text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 6px;
+  cursor: pointer; font: inherit; color: inherit;
+}
+.cmd-item:hover, .cmd-item:focus { background: #e8f4fb; outline: none; }
+.notice-row.kind-blue { background: #d7ebf8; }
+.notice-row.kind-friending { background: #e8f4fb; border-left: 3px solid #1e6fa8; }
+
+.friend-list-row { position: relative; }
+.friend-online-dot { position: absolute; left: 36px; top: 36px; width: 10px; height: 10px; border-radius: 50%; }

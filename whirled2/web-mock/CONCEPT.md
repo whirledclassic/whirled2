@@ -4,8 +4,8 @@ Whirled = social network + virtual world. Chrome tabs: **Me, Stuff, Games, Rooms
 
 - **Stuff** left rail (wiki Stuff tab): Avatars, Furniture, Backdrops, Toys, Pets, Games (+ Level Packs / Item Packs), Launchers (shop “Games” aka launchers), Images, Music, Videos. Per category: “How do I get stuff?” + **Upload…** stub (local `whirled2.stuff`, images only for now; SWF later). Detail: gift / edit / delete / **List Item → Shop** / Delist — never invent demo items.
 - **Shop** (wiki Shop): main page = Popular selections per major category; category browse + sort by rating / price / popularity / date; item comments & ratings; listings come from creator **List Item** into `whirled2.shop`. Coins are **labels only** — purchases disabled (“Coins are labels only — no payments”). Never invent catalog listings.
-- **Mail**: header count; Me→Mail inbox/compose; **Reply** (prefill `Re:` + quote) + **Delete**; Send Mail from profiles/friends.
-- **Friends**: search by name/permaname (occupants + friends + known profiles only); online first (alpha), then recent; actions Add Friend / Send Mail / Visit Home / Remove / **Join them!** (online → Studio Loft). **Add Friend** opens Let’s be buddies! message modal (submit via buddy-invite-form). **Invite Them!** share link + mailto (no email-import). Occupant buddy invite = same modal path.
+- **Mail**: header count; Me→Mail inbox/compose; unread blue highlight; **Select All** + **Delete Selected**; **Reply** + **Delete**; Send Mail from profiles/friends; Stuff **Send as Gift** attaches item (removed from sender; claim once on open).
+- **Friends**: search by name/permaname (occupants + friends + known profiles + other local `whirled2.users`); online first (alpha), then recent; actions Invite / Send Mail / Whisper / Visit Home / Remove / **Join them!**. **Invite** opens Let’s be buddies! → creates **pending** `whirled2.friendRequests` (Accept/Decline/Retract; badge on Me→Friends). Multi-local-user: second account on this browser can Accept. **Invite Them!** share link + mailto. Occupant buddy invite = same modal path.
 - **Profile skins** (MySpace vibe): own profile → Customize look (near top) — presets publish instantly; body BG (color/gradient/image, repeat, fixed), module translucency, text/link colors, live preview then Publish. Stored as `whirled2.profileSkin.{userId}`; applied on full `.page.profile-page` via `applyProfileSkinDom`. Visitors see skins on other profiles. **No profile music** — room playlists already cover audio. ENGINE DEV: profile page chrome only; not `#stage-slot`.
 - **Me**: My News (Comments / Friendings / Status + empty Announcements / Trophies / Updated Rooms), People Online Now, My Friends Online; **Passport** (earnable stamps in Mingle/Play/Create/Shop via local actions + Group Medals shell; Go! jumps to tab); **Account** (permaname / display / member since); sidebar classics — **My Blocklist** (`whirled2.blocklist`), **My Galleries** (`whirled2.galleries`), **My Transactions** (label-only ledger `whirled2.transactions`), **Contests** (none running), **Share Whirled** (copy Pages URL). Coins labels only — no payments / no “Get Bars”.
 - **Rooms**: Featured / Active / Hot New / My Rooms tiles; Comment or rate + **room lock enforced locally** (`whirled2.roomLock.loft` `{ mode, ownerId }` — unlocked / friends / locked via `canEnterLoft`); **Decorate Room** shell places Stuff chips on a decorate layer (sibling of `#stage-slot`); layout in `whirled2.roomLayout.loft`. Take the Whirled Tour = local tips, not fake players.
@@ -23,6 +23,13 @@ Whirled = social network + virtual world. Chrome tabs: **Me, Stuff, Games, Rooms
 The original Whirled server/client lived in **[greyhavens/msoy](https://github.com/greyhavens/msoy)** (BSD-licensed Java / GWT / Flash / ActionScript; build with `ant distall`, run `./bin/msoyserver`). Related libraries were extracted under **[threerings/orth](https://github.com/threerings/orth)**. Those repos are **reference only**.
 
 **Whirled2** (this web-mock) is a same-game revival: classic chrome + a new engine bridge (`window.WhirledChrome` / `#stage-slot`). It is **intentionally not a port** of msoy, not a Flash SWF rehost, and not a private-engine dump.
+
+## Chat tabs (Room + Private)
+
+Classic wiki Chat tabs vibe:
+- **Room** tab (blue) = loft room chat.
+- **Private** tabs (orange) = whispers; stored as `whirled2.pm.{sortedPair}`; state in `whirled2.chatTabs`.
+- Friends toolbar popup → Whisper / Profile / Join them. Tab glimmer on unread. `/clear` clears active tab; Clear all clears all. Orange tint on input when PM active.
 
 ## Chat UI (Slide vs Overlay)
 
@@ -62,3 +69,11 @@ Stuff → Music accepts audio (MP3/WAV/OGG/WebM) as data URLs in `whirled2.stuff
 ## Legal
 
 Help / gate / Club point to **Legal / Disclaimer**: no unauthorized copyrighted uploads; Whirled2 is inspired by public research / open-source references — not a redistribution of whirled.club / Three Rings proprietary assets; logos/UI are Whirled2 originals or user-supplied; prototypes subject to change; coins labels only.
+
+
+## Modern chrome (20260906m)
+
+- **Ctrl/Cmd+K** command palette — jump Me/Mail/Friends/Stuff/Rooms/…, Enter loft, Clear chat, Themes.
+- **?** shortcuts overlay — F9, /, Esc, Ctrl+K, `/think` `/me` `/speak` `/away` `/back`.
+- Chat **reactions** (👍😂❤️🎉) on message id in `whirled2.chatReactions`.
+- Copy invite link (room + profile). Recently visited strip on Rooms lobby. Presence pulse on online dots.

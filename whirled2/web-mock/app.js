@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906l";
+  var LOGO_V = "20260906m";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -578,6 +578,7 @@
       return false;
     }
     inRoom = true;
+    try { trackRecentRoom({ id: "loft", name: ROOM }); } catch (eR) {}
     return true;
   }
   function loadRoomRating() {
@@ -949,10 +950,21 @@
   var NOTE_KEY = "whirled2.notices";
   var listeners = { chat: [], occupants: [] };
   function loadFriends() {
+    var s = session();
+    if (s && s.user) {
+      try {
+        var per = JSON.parse(localStorage.getItem("whirled2.friends." + s.user.id) || "null");
+        if (Array.isArray(per)) return per;
+      } catch (e0) {}
+    }
     try { return JSON.parse(localStorage.getItem(FRIENDS_KEY) || "[]"); } catch (e) { return []; }
   }
   function saveFriends(list) {
     localStorage.setItem(FRIENDS_KEY, JSON.stringify(list.slice(0, 100)));
+    var s = session();
+    if (s && s.user) {
+      try { localStorage.setItem("whirled2.friends." + s.user.id, JSON.stringify(list.slice(0, 100))); } catch (e) {}
+    }
   }
   function addFriend(entry) {
     var list = loadFriends();
@@ -991,10 +1003,41 @@
       at: new Date().toISOString(),
       read: !!opts.read
     };
+    // How this works: gift attachments carry a Stuff snapshot; claim once via giftClaimed.
+    if (opts.giftItem) {
+      msg.giftItem = opts.giftItem;
+      msg.giftClaimed = !!opts.giftClaimed;
+    }
     if (!msg.toId) return null;
     list.unshift(msg);
     saveMail(list);
     return msg;
+  }
+  function claimGiftFromMail(mailId) {
+    // How this works: first open of gift mail moves item into recipient Stuff once.
+    var s = session();
+    if (!s || !s.user) return;
+    var list = loadMail();
+    var changed = false;
+    list.forEach(function (m) {
+      if (!m || m.id !== mailId) return;
+      if (!m.giftItem || m.giftClaimed) return;
+      if (String(m.toId) !== String(s.user.id)) return;
+      var stuff = loadStuff();
+      var copy = Object.assign({}, m.giftItem, {
+        id: "st" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        ownerId: s.user.id,
+        owned: true,
+        giftedFrom: m.fromName || m.fromId,
+        at: new Date().toISOString()
+      });
+      stuff.unshift(copy);
+      saveStuff(stuff);
+      m.giftClaimed = true;
+      changed = true;
+      pushNotice("blue", "Gift claimed: " + (copy.name || "item") + " added to Stuff.");
+    });
+    if (changed) saveMail(list);
   }
   function markMailRead(id) {
     var list = loadMail();
@@ -1010,8 +1053,611 @@
     saveMail(loadMail().filter(function (m) { return m.id !== id; }));
   }
   function removeFriend(id) {
-    saveFriends(loadFriends().filter(function (f) { return f.id !== id; }));
+    var list = loadFriends().filter(function (f) { return f.id !== id; });
+    saveFriends(list);
   }
+  // ===========================================================================
+  // Fidelity + modern upgrade (?v=20260906m)
+  // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
+  // command palette, reactions, notices — all localStorage / Pages-safe.
+  // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
+  // ===========================================================================
+  var FRIEND_REQUESTS_KEY = "whirled2.friendRequests";
+  var CHAT_TABS_KEY = "whirled2.chatTabs";
+  var CHAT_REACTIONS_KEY = "whirled2.chatReactions";
+  var RECENT_ROOMS_KEY = "whirled2.recentRooms";
+  var AWAY_KEY = "whirled2.away.";
+  var PRESENCE_SNAP_KEY = "whirled2.presenceSnap";
+  var friendsPopupOpen = false;
+  var cmdPaletteOpen = false;
+  var shortcutsOpen = false;
+  var awayMode = false;
+
+  function loadFriendRequests() {
+    try { return JSON.parse(localStorage.getItem(FRIEND_REQUESTS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveFriendRequests(list) {
+    try { localStorage.setItem(FRIEND_REQUESTS_KEY, JSON.stringify((list || []).slice(0, 200))); } catch (e) {}
+  }
+  function incomingFriendRequestCount() {
+    var s = session();
+    if (!s || !s.user) return 0;
+    var me = s.user.id;
+    return loadFriendRequests().filter(function (r) {
+      return r && r.status === "pending" && String(r.toId) === String(me);
+    }).length;
+  }
+  function friendRelation(otherId) {
+    // How this works: four classic states for profile buttons.
+    otherId = String(otherId || "");
+    if (!otherId) return "not_friends";
+    if (loadFriends().some(function (f) { return String(f.id) === otherId; })) return "friends";
+    var s = session();
+    var me = s && s.user ? String(s.user.id) : "";
+    var reqs = loadFriendRequests();
+    for (var i = 0; i < reqs.length; i++) {
+      var r = reqs[i];
+      if (!r || r.status !== "pending") continue;
+      if (String(r.fromId) === me && String(r.toId) === otherId) return "pending_by_you";
+      if (String(r.toId) === me && String(r.fromId) === otherId) return "pending_to_you";
+    }
+    return "not_friends";
+  }
+  function findPendingRequest(fromId, toId) {
+    fromId = String(fromId || ""); toId = String(toId || "");
+    var reqs = loadFriendRequests();
+    for (var i = 0; i < reqs.length; i++) {
+      var r = reqs[i];
+      if (r && r.status === "pending" && String(r.fromId) === fromId && String(r.toId) === toId) return r;
+    }
+    return null;
+  }
+  function createFriendRequest(toId, toName, message) {
+    // How this works: invite creates PENDING only — friends list updates on Accept.
+    // Multi-local-user: when invitee logs in on this browser, Me→Friends shows Accept.
+    var s = session();
+    if (!s || !s.user || !toId) return null;
+    toId = String(toId);
+    toName = String(toName || toId);
+    if (toId === String(s.user.id)) {
+      pushNotice("orange", "You cannot friend yourself.");
+      return null;
+    }
+    if (loadFriends().some(function (f) { return String(f.id) === toId; })) {
+      pushNotice("gray", toName + " is already on your friends list.");
+      return null;
+    }
+    if (findPendingRequest(s.user.id, toId)) {
+      pushNotice("gray", "Friend request to " + toName + " is already pending.");
+      return null;
+    }
+    // If they already invited you, accept that instead of double-pending.
+    var incoming = findPendingRequest(toId, s.user.id);
+    if (incoming) {
+      acceptFriendRequest(incoming.id);
+      return incoming;
+    }
+    var req = {
+      id: "fr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      fromId: s.user.id,
+      fromName: s.user.name,
+      toId: toId,
+      toName: toName,
+      message: String(message || "Let's be buddies!").slice(0, 400),
+      status: "pending",
+      at: new Date().toISOString()
+    };
+    var list = loadFriendRequests();
+    list.unshift(req);
+    saveFriendRequests(list);
+    sendMail({
+      toId: toId,
+      toName: toName,
+      subject: "Friend request",
+      body: req.message
+    });
+    pushNotice("friending", "Friend request sent to " + toName + ".");
+    rememberProfile({ id: toId, name: toName });
+    return req;
+  }
+  function acceptFriendRequest(reqId) {
+    var s = session();
+    if (!s || !s.user) return;
+    var list = loadFriendRequests();
+    var hit = null;
+    list.forEach(function (r) {
+      if (r && r.id === reqId && r.status === "pending") hit = r;
+    });
+    if (!hit) return;
+    if (String(hit.toId) !== String(s.user.id)) return;
+    hit.status = "accepted";
+    saveFriendRequests(list);
+    addFriend({ id: hit.fromId, name: hit.fromName });
+    // Mutual: also store reverse on this browser so both profiles look friends.
+    var rev = loadFriends();
+    if (!rev.some(function (f) { return String(f.id) === String(hit.toId); })) {
+      // Current user already on own list? skip — addFriend is for the other person.
+    }
+    // Ensure from-side friends list also has us when they next log in:
+    // store under a per-user friends bag if needed — classic mock uses shared whirled2.friends.
+    // For multi-account same browser, keep a per-user friends key overlay.
+    addFriendForUser(hit.fromId, { id: s.user.id, name: s.user.name });
+    addFriendForUser(s.user.id, { id: hit.fromId, name: hit.fromName });
+    pushNotice("blue", hit.fromName + " is now your friend!");
+    sendMail({
+      toId: hit.fromId,
+      toName: hit.fromName,
+      subject: "Friend request accepted",
+      body: s.user.name + " accepted your friend request."
+    });
+  }
+  function declineFriendRequest(reqId) {
+    var s = session();
+    if (!s || !s.user) return;
+    var list = loadFriendRequests();
+    list.forEach(function (r) {
+      if (r && r.id === reqId && r.status === "pending" && String(r.toId) === String(s.user.id)) {
+        r.status = "declined";
+      }
+    });
+    saveFriendRequests(list);
+    pushNotice("gray", "Friend request declined.");
+  }
+  function retractFriendRequest(reqId) {
+    var s = session();
+    if (!s || !s.user) return;
+    var list = loadFriendRequests();
+    list.forEach(function (r) {
+      if (r && r.id === reqId && r.status === "pending" && String(r.fromId) === String(s.user.id)) {
+        r.status = "retracted";
+      }
+    });
+    saveFriendRequests(list);
+    pushNotice("gray", "Friend request retracted.");
+  }
+  function friendsKeyFor(userId) {
+    return "whirled2.friends." + String(userId || "");
+  }
+  function loadFriendsFor(userId) {
+    // How this works: prefer per-user friends bag so multi-local accounts work;
+    // fall back to legacy shared whirled2.friends for the current session user.
+    userId = String(userId || "");
+    try {
+      var per = JSON.parse(localStorage.getItem(friendsKeyFor(userId)) || "null");
+      if (Array.isArray(per)) return per;
+    } catch (e) {}
+    var s = session();
+    if (s && s.user && String(s.user.id) === userId) {
+      try { return JSON.parse(localStorage.getItem(FRIENDS_KEY) || "[]"); } catch (e2) { return []; }
+    }
+    return [];
+  }
+  function saveFriendsFor(userId, list) {
+    userId = String(userId || "");
+    try { localStorage.setItem(friendsKeyFor(userId), JSON.stringify((list || []).slice(0, 100))); } catch (e) {}
+    var s = session();
+    if (s && s.user && String(s.user.id) === userId) {
+      try { localStorage.setItem(FRIENDS_KEY, JSON.stringify((list || []).slice(0, 100))); } catch (e2) {}
+    }
+  }
+  function addFriendForUser(userId, entry) {
+    if (!entry || !entry.id) return;
+    var list = loadFriendsFor(userId);
+    if (list.some(function (f) { return String(f.id) === String(entry.id); })) return;
+    list.unshift({ id: entry.id, name: entry.name, at: new Date().toISOString() });
+    saveFriendsFor(userId, list);
+  }
+  function syncFriendsFromPerUser() {
+    // Call after login so loadFriends() sees this account's list.
+    var s = session();
+    if (!s || !s.user) return;
+    var per = loadFriendsFor(s.user.id);
+    try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(per.slice(0, 100))); } catch (e) {}
+  }
+
+  function loadChatTabs() {
+    try {
+      var t = JSON.parse(localStorage.getItem(CHAT_TABS_KEY) || "null");
+      if (t && typeof t === "object") {
+        return {
+          activeTabId: t.activeTabId || "room",
+          openPMs: Array.isArray(t.openPMs) ? t.openPMs : [],
+          unread: t.unread && typeof t.unread === "object" ? t.unread : {}
+        };
+      }
+    } catch (e) {}
+    return { activeTabId: "room", openPMs: [], unread: {} };
+  }
+  function saveChatTabs(t) {
+    try { localStorage.setItem(CHAT_TABS_KEY, JSON.stringify(t)); } catch (e) {}
+  }
+  function pmKey(a, b) {
+    var ids = [String(a), String(b)].sort();
+    return "whirled2.pm." + ids[0] + ":" + ids[1];
+  }
+  function loadPmChat(otherId) {
+    var s = session();
+    if (!s || !s.user || !otherId) return [];
+    try { return JSON.parse(localStorage.getItem(pmKey(s.user.id, otherId)) || "[]"); } catch (e) { return []; }
+  }
+  function savePmChat(otherId, msgs) {
+    var s = session();
+    if (!s || !s.user || !otherId) return;
+    try { localStorage.setItem(pmKey(s.user.id, otherId), JSON.stringify((msgs || []).slice(-120))); } catch (e) {}
+  }
+  function openPmTab(userId, name) {
+    userId = String(userId || "");
+    if (!userId) return;
+    var t = loadChatTabs();
+    if (!t.openPMs.some(function (p) { return String(p.userId) === userId; })) {
+      t.openPMs.push({ userId: userId, name: name || userId });
+    } else {
+      t.openPMs = t.openPMs.map(function (p) {
+        if (String(p.userId) === userId) return { userId: userId, name: name || p.name || userId };
+        return p;
+      });
+    }
+    t.activeTabId = "pm:" + userId;
+    if (t.unread) t.unread[t.activeTabId] = false;
+    saveChatTabs(t);
+    friendsPopupOpen = false;
+  }
+  function closePmTab(userId) {
+    var t = loadChatTabs();
+    t.openPMs = t.openPMs.filter(function (p) { return String(p.userId) !== String(userId); });
+    if (t.activeTabId === "pm:" + userId) t.activeTabId = "room";
+    if (t.unread) delete t.unread["pm:" + userId];
+    saveChatTabs(t);
+  }
+  function setActiveChatTab(tabId) {
+    var t = loadChatTabs();
+    t.activeTabId = tabId || "room";
+    if (t.unread) t.unread[t.activeTabId] = false;
+    saveChatTabs(t);
+  }
+  function markTabUnread(tabId) {
+    var t = loadChatTabs();
+    if (t.activeTabId === tabId) return;
+    t.unread = t.unread || {};
+    t.unread[tabId] = true;
+    saveChatTabs(t);
+  }
+  function chatTabsHtml() {
+    var t = loadChatTabs();
+    var roomUnread = !!(t.unread && t.unread.room);
+    var html = '<div class="chat-tabs" id="chat-tabs" role="tablist">'
+      + '<button type="button" class="chat-tab chat-tab-room' + (t.activeTabId === "room" ? " is-on" : "") + (roomUnread ? " has-unread" : "") + '" data-chat-tab="room" role="tab">Room</button>';
+    (t.openPMs || []).forEach(function (p) {
+      var tid = "pm:" + p.userId;
+      var un = !!(t.unread && t.unread[tid]);
+      html += '<button type="button" class="chat-tab chat-tab-pm' + (t.activeTabId === tid ? " is-on" : "") + (un ? " has-unread" : "") + '" data-chat-tab="' + esc(tid) + '" role="tab">'
+        + '<span>' + esc(p.name || p.userId) + '</span>'
+        + '<span class="chat-tab-x" data-chat-tab-close="' + esc(p.userId) + '" title="Close">×</span></button>';
+    });
+    html += '</div>';
+    return html;
+  }
+  function friendsToolbarPopupHtml() {
+    if (!friendsPopupOpen) return "";
+    var list = loadFriends();
+    var onlineIds = {};
+    liveOccupants.forEach(function (p) { if (p && p.id) onlineIds[p.id] = p; });
+    var online = list.filter(function (f) { return onlineIds[f.id]; });
+    var rows = online.length
+      ? online.map(function (f) {
+          return '<div class="friends-pop-row">'
+            + '<span class="dot on pulse"></span> <b>' + esc(f.name) + '</b>'
+            + '<div class="friends-pop-actions">'
+            +   '<button type="button" data-whisper="' + esc(f.id) + '" data-whisper-name="' + esc(f.name) + '">Whisper</button>'
+            +   '<button type="button" data-profile="' + esc(f.id) + '">Profile</button>'
+            +   '<button type="button" data-join-them="1" data-join-name="' + esc(f.name) + '">Join them</button>'
+            + '</div></div>';
+        }).join("")
+      : '<p class="meta">No friends online right now.</p>';
+    return '<div class="friends-toolbar-pop" id="friends-toolbar-pop">'
+      + '<div class="friends-pop-head">Friends online <button type="button" class="text-btn" data-friends-pop-close="1">×</button></div>'
+      + rows + '</div>';
+  }
+
+  function loadChatReactions() {
+    try { return JSON.parse(localStorage.getItem(CHAT_REACTIONS_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function saveChatReactions(map) {
+    try { localStorage.setItem(CHAT_REACTIONS_KEY, JSON.stringify(map || {})); } catch (e) {}
+  }
+  function toggleChatReaction(msgId, emoji) {
+    if (!msgId || !emoji) return;
+    var map = loadChatReactions();
+    var row = map[msgId] || {};
+    var s = session();
+    var uid = s && s.user ? s.user.id : "guest";
+    var arr = Array.isArray(row[emoji]) ? row[emoji].slice() : [];
+    var ix = arr.indexOf(uid);
+    if (ix >= 0) arr.splice(ix, 1); else arr.push(uid);
+    if (arr.length) row[emoji] = arr; else delete row[emoji];
+    if (Object.keys(row).length) map[msgId] = row; else delete map[msgId];
+    saveChatReactions(map);
+  }
+  function reactionPillsHtml(msgId) {
+    var map = loadChatReactions();
+    var row = map[msgId] || {};
+    var pills = ["👍", "😂", "❤️", "🎉"].map(function (em) {
+      var n = (row[em] || []).length;
+      if (!n) return "";
+      return '<span class="react-pill" data-react="' + esc(em) + '" data-react-msg="' + esc(msgId) + '">' + em + ' ' + n + '</span>';
+    }).filter(Boolean).join("");
+    return pills ? ('<div class="react-pills">' + pills + '</div>') : "";
+  }
+  function reactionBarHtml(msgId) {
+    if (!msgId) return "";
+    return '<div class="react-bar" hidden>'
+      + ["👍", "😂", "❤️", "🎉"].map(function (em) {
+          return '<button type="button" class="react-btn" data-react="' + esc(em) + '" data-react-msg="' + esc(msgId) + '">' + em + '</button>';
+        }).join("")
+      + '</div>';
+  }
+
+  function loadRecentRooms() {
+    try { return JSON.parse(localStorage.getItem(RECENT_ROOMS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveRecentRooms(list) {
+    try { localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify((list || []).slice(0, 8))); } catch (e) {}
+  }
+  function trackRecentRoom(room) {
+    room = room || { id: "loft", name: ROOM };
+    var list = loadRecentRooms().filter(function (r) { return r && r.id !== room.id; });
+    list.unshift({ id: room.id || "loft", name: room.name || ROOM, at: new Date().toISOString() });
+    saveRecentRooms(list);
+  }
+  function goMenuHtml() {
+    var recent = loadRecentRooms();
+    var recentBtns = recent.length
+      ? recent.map(function (r) {
+          return '<button type="button" data-go-room="' + esc(r.id) + '">Recent — ' + esc(r.name || r.id) + '</button>';
+        }).join("")
+      : '<button type="button" data-go="recent">Recent — Studio Loft</button>';
+    var onlineFriends = loadFriends().filter(function (f) {
+      return liveOccupants.some(function (p) { return p && p.id === f.id; });
+    });
+    var friendBtns = onlineFriends.length
+      ? onlineFriends.map(function (f) {
+          return '<button type="button" data-go-friend="' + esc(f.id) + '" data-go-friend-name="' + esc(f.name) + '">👥 ' + esc(f.name) + '</button>';
+        }).join("")
+      : '<button type="button" data-go="friends">Friends online</button>';
+    return '<div class="go-menu" id="go-menu" hidden>'
+      + '<button type="button" data-go="home">Go home</button>'
+      + recentBtns
+      + '<div class="room-lock-row meta">Friends online</div>'
+      + friendBtns
+      + '<button type="button" data-go="games">View games awaiting players</button>'
+      + '</div>';
+  }
+  function recentRoomsStripHtml() {
+    var recent = loadRecentRooms();
+    if (!recent.length) return "";
+    return '<div class="section-label">Recently visited</div>'
+      + '<div class="recent-rooms-strip">'
+      + recent.map(function (r) {
+          return '<button type="button" class="recent-room-chip" data-enter-room="' + esc(r.id || "loft") + '">' + esc(r.name || "Room") + '</button>';
+        }).join("")
+      + '</div>';
+  }
+
+  function isAway(userId) {
+    try { return localStorage.getItem(AWAY_KEY + userId) === "1"; } catch (e) { return false; }
+  }
+  function setAway(on) {
+    var s = session();
+    if (!s || !s.user) return;
+    awayMode = !!on;
+    try {
+      if (on) localStorage.setItem(AWAY_KEY + s.user.id, "1");
+      else localStorage.removeItem(AWAY_KEY + s.user.id);
+    } catch (e) {}
+  }
+
+  function copyInviteLink(kind, id) {
+    var url = shareInviteUrl();
+    if (kind === "profile" && id) url += (url.indexOf("?") >= 0 ? "&" : "?") + "profile=" + encodeURIComponent(id);
+    if (kind === "room") url += (url.indexOf("#") >= 0 ? "" : "#rooms");
+    function done() {
+      pushNotice("green", "Invite link copied.", { transient: true });
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(function () {
+          window.prompt("Copy invite link:", url);
+          done();
+        });
+      } else {
+        window.prompt("Copy invite link:", url);
+        done();
+      }
+    } catch (e) {
+      try { window.prompt("Copy invite link:", url); done(); } catch (e2) {}
+    }
+  }
+
+  function cmdPaletteHtml() {
+    if (!cmdPaletteOpen) return "";
+    var cmds = [
+      ["me", "Me home", "tab:me:home"],
+      ["profile", "My Profile", "tab:me:profile"],
+      ["mail", "Mail", "tab:me:mail"],
+      ["friends", "Friends", "tab:me:friends"],
+      ["stuff", "Stuff", "tab:stuff"],
+      ["rooms", "Rooms lobby", "tab:rooms-lobby"],
+      ["loft", "Enter loft", "enter:loft"],
+      ["groups", "Groups", "tab:groups"],
+      ["shop", "Shop", "tab:shop"],
+      ["games", "Games", "tab:games"],
+      ["help", "Help", "help"],
+      ["themes", "Themes", "tab:me:themes"],
+      ["clear", "Clear chat (active tab)", "clear-chat"],
+      ["shortcuts", "Shortcuts (?)", "shortcuts"]
+    ];
+    return '<div class="cmd-palette-backdrop" id="cmd-palette" data-cmd-close="1">'
+      + '<div class="cmd-palette" role="dialog" aria-label="Command palette" onclick="event.stopPropagation()">'
+      +   '<input id="cmd-palette-input" placeholder="Jump to… (Me, Mail, Rooms…)" autocomplete="off" />'
+      +   '<div class="cmd-palette-list">'
+      +     cmds.map(function (c) {
+            return '<button type="button" class="cmd-item" data-cmd="' + esc(c[2]) + '" data-cmd-label="' + esc(c[0] + " " + c[1]).toLowerCase() + '">'
+              + '<b>' + esc(c[1]) + '</b> <span class="meta">' + esc(c[0]) + '</span></button>';
+          }).join("")
+      +   '</div>'
+      +   '<p class="meta">Ctrl/Cmd+K · Esc closes</p>'
+      + '</div></div>';
+  }
+  function shortcutsOverlayHtml() {
+    if (!shortcutsOpen) return "";
+    return '<div class="shortcuts-backdrop" id="shortcuts-overlay" data-shortcuts-close="1">'
+      + '<div class="shortcuts-card" role="dialog" onclick="event.stopPropagation()">'
+      +   '<div class="room-side-head"><h2>Keyboard shortcuts</h2>'
+      +     '<button type="button" class="text-btn" data-shortcuts-close="1">×</button></div>'
+      +   '<ul class="help-tips">'
+      +     '<li><b>F9</b> — Hide/show overlay chat history</li>'
+      +     '<li><b>/</b> — Focus chat (in room)</li>'
+      +     '<li><b>Esc</b> — Close menus / palette</li>'
+      +     '<li><b>Ctrl/Cmd+K</b> — Command palette</li>'
+      +     '<li><b>?</b> — This shortcuts overlay</li>'
+      +     '<li><b>/think</b> <b>/me</b> <b>/speak</b> — chat modes</li>'
+      +     '<li><b>/clear</b> — clear active chat tab</li>'
+      +     '<li><b>/away</b> <b>/back</b> — away stub (yellow name + PM auto-reply note)</li>'
+      +   '</ul></div></div>';
+  }
+  function runCommand(cmd) {
+    cmdPaletteOpen = false;
+    shortcutsOpen = false;
+    var el = document.getElementById("cmd-palette");
+    if (el) el.remove();
+    var sh = document.getElementById("shortcuts-overlay");
+    if (sh) sh.remove();
+    if (cmd === "help") { helpOpen = true; paint("help"); return; }
+    if (cmd === "shortcuts") { shortcutsOpen = true; ensureModernOverlays(); return; }
+    if (cmd === "clear-chat") {
+      clearActiveChatTab(true);
+      pushSystemChat("Chat cleared.");
+      return;
+    }
+    if (cmd === "enter:loft") {
+      if (tryEnterLoft()) {
+        trackRecentRoom({ id: "loft", name: ROOM });
+        clearRoomChatDisplay(true);
+        paint("rooms");
+        loadOccupants();
+      } else paint("rooms");
+      return;
+    }
+    if (cmd === "tab:rooms-lobby") {
+      inRoom = false; leaveRoomResetChat(); paint("rooms"); return;
+    }
+    if (cmd.indexOf("tab:me:") === 0) {
+      meSub = cmd.slice(7); viewingId = null; paint("me"); return;
+    }
+    if (cmd.indexOf("tab:") === 0) {
+      var t = cmd.slice(4);
+      paint(t); return;
+    }
+  }
+  function ensureModernOverlays() {
+    var appEl = document.getElementById("app");
+    if (!appEl) return;
+    var oldP = document.getElementById("cmd-palette");
+    if (oldP) oldP.remove();
+    var oldS = document.getElementById("shortcuts-overlay");
+    if (oldS) oldS.remove();
+    if (cmdPaletteOpen) {
+      var w = document.createElement("div");
+      w.innerHTML = cmdPaletteHtml();
+      if (w.firstChild) {
+        document.body.appendChild(w.firstChild);
+        var inp = document.getElementById("cmd-palette-input");
+        if (inp) {
+          setTimeout(function () { inp.focus(); }, 30);
+          inp.addEventListener("input", function () {
+            var q = String(inp.value || "").toLowerCase();
+            document.querySelectorAll(".cmd-item").forEach(function (btn) {
+              var lab = btn.getAttribute("data-cmd-label") || "";
+              btn.hidden = !!(q && lab.indexOf(q) < 0);
+            });
+          });
+        }
+      }
+    }
+    if (shortcutsOpen) {
+      var w2 = document.createElement("div");
+      w2.innerHTML = shortcutsOverlayHtml();
+      if (w2.firstChild) document.body.appendChild(w2.firstChild);
+    }
+  }
+  function clearActiveChatTab(clearStorage) {
+    var t = loadChatTabs();
+    if (t.activeTabId === "room" || !t.activeTabId) {
+      clearRoomChatDisplay(clearStorage);
+      return;
+    }
+    if (t.activeTabId.indexOf("pm:") === 0) {
+      var oid = t.activeTabId.slice(3);
+      if (clearStorage !== false) savePmChat(oid, []);
+      refreshChatLog();
+    }
+  }
+  function activeChatMessages() {
+    var t = loadChatTabs();
+    if (t.activeTabId && t.activeTabId.indexOf("pm:") === 0) {
+      return loadPmChat(t.activeTabId.slice(3));
+    }
+    return chat;
+  }
+  function applyChatInputTint() {
+    var input = document.getElementById("chat-input");
+    if (!input) return;
+    var t = loadChatTabs();
+    var pm = !!(t.activeTabId && t.activeTabId.indexOf("pm:") === 0);
+    input.classList.toggle("is-pm", pm);
+    input.placeholder = pm ? "Private whisper…" : "Type here to chat!";
+  }
+  function presenceCheckNotices() {
+    // How this works: approximate friend login/logout via occupant list diffs.
+    var s = session();
+    if (!s || !s.user) return;
+    var friends = loadFriends();
+    var friendIds = {};
+    friends.forEach(function (f) { friendIds[f.id] = f.name; });
+    var nowOnline = {};
+    liveOccupants.forEach(function (p) {
+      if (p && p.id && friendIds[p.id]) nowOnline[p.id] = friendIds[p.id];
+    });
+    var prev = {};
+    try { prev = JSON.parse(localStorage.getItem(PRESENCE_SNAP_KEY) || "{}"); } catch (e) { prev = {}; }
+    Object.keys(nowOnline).forEach(function (id) {
+      if (!prev[id]) pushNotice("green", nowOnline[id] + " logged on.", { transient: true });
+    });
+    Object.keys(prev).forEach(function (id) {
+      if (!nowOnline[id] && friendIds[id]) pushNotice("gray", (friendIds[id] || prev[id]) + " logged off.", { transient: true });
+    });
+    try { localStorage.setItem(PRESENCE_SNAP_KEY, JSON.stringify(nowOnline)); } catch (e2) {}
+  }
+  function friendActionButtonsHtml(id, name) {
+    // How this works: profile / search show Invite | Pending+Retract | Accept+Decline | Friends+Remove.
+    var rel = friendRelation(id);
+    if (rel === "friends") {
+      return '<button type="button" class="profile-action" disabled><span class="pa-ico">✓</span><span>Friends</span></button>'
+        + '<button type="button" class="profile-action" data-remove-friend="' + esc(id) + '"><span class="pa-ico">−</span><span>Remove</span></button>';
+    }
+    if (rel === "pending_by_you") {
+      var req = findPendingRequest(session().user.id, id);
+      return '<button type="button" class="profile-action" disabled><span class="pa-ico">…</span><span>Pending…</span></button>'
+        + (req ? '<button type="button" class="profile-action" data-friend-retract="' + esc(req.id) + '"><span class="pa-ico">↩</span><span>Retract</span></button>' : "");
+    }
+    if (rel === "pending_to_you") {
+      var req2 = findPendingRequest(id, session().user.id);
+      return (req2 ? '<button type="button" class="profile-action" data-friend-accept="' + esc(req2.id) + '"><span class="pa-ico">✓</span><span>Accept</span></button>'
+        + '<button type="button" class="profile-action" data-friend-decline="' + esc(req2.id) + '"><span class="pa-ico">×</span><span>Decline</span></button>' : "");
+    }
+    return '<button type="button" class="profile-action" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '"><span class="pa-ico">+</span><span>Invite</span></button>';
+  }
+
   function itemCat(item) {
     var k = String((item && (item.kind || item.type || item.category)) || "").toLowerCase().replace(/[\s_]+/g, "");
     if (k.indexOf("avatar") >= 0) return "avatars";
@@ -1075,7 +1721,7 @@
       + '<button type="button" class="person" data-occ-menu="' + esc(id) + '">'
       + '<span class="ava' + (p.you ? " you" : "") + '">' + esc(p.initials || "?") + '</span>'
       + '<span class="person-name">' + esc(p.name) + roleBadgeHtml(getRole(id)) + (p.you ? " <span class=\"sub\">(you)</span>" : "") + '</span>'
-      + '<span class="dot' + (p.online ? " on" : "") + '"></span>'
+      + '<span class="dot' + (p.online ? " on pulse" : "") + '"></span>'
       + '<span class="sub">' + esc(p.you ? "you" : (p.room || "")) + '</span></button>'
       + (open ? menu : "")
       + '</div>';
@@ -1091,7 +1737,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905z";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906m";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -1143,7 +1789,6 @@
     var uid = msg.userId || "";
     var role = getRole(uid);
     if (!role || role === "player") {
-      // try resolve by who name
       if (isPrivilegedName(msg.who) || isPrivilegedName(uid)) role = "admin";
     }
     var accent = role === "admin" ? " is-admin" : (role === "mod" ? " is-mod" : "");
@@ -1158,18 +1803,22 @@
       thought = true;
       text = text.replace(/^\/think\s+/i, "");
     }
-    var nameBtn = '<button type="button" class="chat-who" data-chat-who="' + esc(uid || msg.who || "") + '" data-chat-who-name="' + esc(msg.who || "") + '">' + esc(msg.who || "?") + '</button>';
+    var awayCls = (uid && typeof isAway === "function" && isAway(uid)) ? " is-away" : "";
+    var nameBtn = '<button type="button" class="chat-who' + awayCls + '" data-chat-who="' + esc(uid || msg.who || "") + '" data-chat-who-name="' + esc(msg.who || "") + '">' + esc(msg.who || "?") + '</button>';
     var body;
     if (emote) {
       body = '<div class="chat-bubble emote"><i>' + esc(msg.who) + " " + esc(text) + "</i></div>";
     } else if (thought) {
-      body = '<div class="chat-bubble thought"><i>' + esc(text) + "</i></div>";
+      body = '<div class="chat-bubble thought"><i>' + esc(text) + '</i></div>';
     } else {
-      body = '<div class="chat-bubble">' + esc(text) + "</div>";
+      body = '<div class="chat-bubble">' + esc(text) + '</div>';
     }
-    return '<div class="chat-row' + accent + (emote ? " is-emote" : "") + (thought ? " is-thought" : "") + '">'
+    var mid = msg.id || "";
+    return '<div class="chat-row' + accent + (emote ? " is-emote" : "") + (thought ? " is-thought" : "") + '" data-msg-id="' + esc(mid) + '">'
       + (emote ? "" : (nameBtn + roleBadgeHtml(role) + ' <time>' + esc(stamp) + "</time>"))
-      + body + "</div>";
+      + body
+      + (mid && typeof reactionPillsHtml === "function" ? reactionPillsHtml(mid) + reactionBarHtml(mid) : "")
+      + "</div>";
   }
   function card(item) {
     var id = item.id || "";
@@ -1274,7 +1923,7 @@
           ? ('<form id="stuff-gift-form" data-stuff-gift="' + esc(item.id) + '" class="stuff-gift-form">'
             + '<select name="friendId" required><option value="">— pick a friend —</option>' + friendOpts + '</select>'
             + '<button type="submit">Send as Gift</button>'
-            + '<p class="meta">Sends a mail note (local). Item stays in your Stuff on this mock.</p>'
+            + '<p class="meta">Attaches this item to mail, removes it from your Stuff, and the friend claims it when they open the mail (once).</p>'
             + '</form>')
           : '<p class="meta">Add a friend first to send gifts.</p>')
       ))
@@ -1732,6 +2381,7 @@
     return '<section class="page rooms-lobby">'
       + '<div class="featured">Featured Rooms</div>'
       + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Decorate, chat and play — engine mounts inside the loft.</p>'
+      + recentRoomsStripHtml()
       + '<div class="room-tiles">' + featured + '</div>'
       + '<div class="section-label">Active Rooms</div>'
       + (online > 0 ? '<div class="room-tiles">' + activeBody + '</div>' : activeBody)
@@ -1882,7 +2532,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: profile skins (no profile music), room locks enforced locally, stage bubbles. Cache <code>?v=20260906k</code>.</p>'
+      + '<p class="meta">This pass: friend requests, Room/PM chat tabs, Ctrl+K palette, gift mail, recent rooms. Cache <code>?v=20260906m</code>. Press <b>?</b> for shortcuts.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -1960,7 +2610,9 @@ function helpPage() {
       // dark panel. Bottom #chat-form input stays in the chrome either way.
       +       '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       +     '</div>'
-      +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
+      +     chatTabsHtml()
+      +     '<div class="chat-log" id="chat-log">' + activeChatMessages().map(chatRow).join('') + '</div>'
+      +     '<div class="room-invite-row"><button type="button" class="text-btn" data-copy-invite="room">Copy room invite link</button></div>'
       +     '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
       +     (playlistPanelOpen ? playlistPanel() : '')
@@ -2439,7 +3091,8 @@ function helpPage() {
       + '<button type="button" class="profile-action" data-tab="rooms" data-rooms-lobby="1"><span class="pa-ico">▣</span><span>View Rooms</span></button>'
       + '<button type="button" class="profile-action" data-tab="stuff"><span class="pa-ico">▤</span><span>Browse Items</span></button>'
       + (opts.poke ? '<button type="button" class="profile-action poke" ' + opts.poke + '><span class="pa-ico">☞</span><span>Poke</span></button>' : '')
-      + (opts.friend ? '<button type="button" class="profile-action" ' + opts.friend + '><span class="pa-ico">+</span><span>Add Friend</span></button>' : '')
+      + (opts.friendHtml ? opts.friendHtml : (opts.friend ? '<button type="button" class="profile-action" ' + opts.friend + '><span class="pa-ico">+</span><span>Add Friend</span></button>' : ''))
+      + (opts.copyInvite ? '<button type="button" class="profile-action" ' + opts.copyInvite + '><span class="pa-ico">🔗</span><span>Copy invite</span></button>' : '')
       + (opts.photo ? '<label class="profile-action photo-label"><span class="pa-ico">▣</span><span>Photo</span><input type="file" id="photo-input" accept="image/*" hidden /></label>' : '')
       + '</div>';
   }
@@ -2452,7 +3105,9 @@ function helpPage() {
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link" data-enter-room="loft">My Rooms</button>'
       + '<span class="sep">|</span>'
-      + '<button type="button" class="me-link' + (meSub === "friends" ? " is-on" : "") + '" data-me="friends">Friends</button>'
+      + '<button type="button" class="me-link' + (meSub === "friends" ? " is-on" : "") + '" data-me="friends">Friends'
+      +   (incomingFriendRequestCount() ? (' <span class="me-badge">' + incomingFriendRequestCount() + '</span>') : '')
+      + '</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "mail" ? " is-on" : "") + '" data-me="mail">Mail</button>'
       + '<span class="sep">|</span>'
@@ -2625,7 +3280,9 @@ function helpPage() {
       +         (skin.motto ? ('<div class="cp-motto">' + esc(skin.motto) + '</div>') : '')
       +         editToggle("status", "status")
       +       '</div>'
-      +       profileActionRow({})
+      +       profileActionRow({
+            copyInvite: 'data-copy-invite="profile" data-copy-invite-id="' + esc(sid) + '"'
+          })
       +     '</div>'
       +     '<aside class="cp-meta-box">'
       +       '<div><span class="k">Permaname</span><span class="v">' + esc(sid) + '</span></div>'
@@ -2770,6 +3427,14 @@ function helpPage() {
     });
     loadFriends().forEach(function (f) { add({ id: f.id, name: f.name, online: false }); });
     loadKnownProfiles().forEach(function (p) { add({ id: p.id, name: p.name, online: false }); });
+    // How this works: include other local accounts in whirled2.users so multi-login friend requests work.
+    try {
+      var users = JSON.parse(localStorage.getItem("whirled2.users") || "{}");
+      Object.keys(users).forEach(function (uid) {
+        var u = users[uid];
+        if (u) add({ id: u.id || uid, name: u.name || uid, online: false });
+      });
+    } catch (eU) {}
     return Object.keys(map).map(function (k) { return map[k]; });
   }
   function searchPeople(q) {
@@ -2801,6 +3466,7 @@ function helpPage() {
         : '<span class="ava">' + esc(String(f.name || "?").slice(0, 1).toUpperCase()) + '</span>';
       return '<div class="friend-list-row' + (isOn ? " is-online" : "") + '">'
         + thumb
+        + (isOn ? '<span class="dot on pulse friend-online-dot" title="Online"></span>' : '')
         + '<div class="friend-list-main">'
         +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(f.id) + '"><b>' + esc(f.name) + '</b></button>' + roleBadgeHtml(getRole(f.id))
         +   '<div class="sub">' + (st ? esc(st) : '<span class="meta">No status</span>') + '</div>'
@@ -2808,10 +3474,45 @@ function helpPage() {
         + '</div>'
         + '<div class="friend-list-actions">'
         +   (isOn ? '<button type="button" class="action-btn" data-join-them="1" data-join-name="' + esc(f.name) + '">Join them!</button>' : '')
+        +   '<button type="button" class="action-btn" data-whisper="' + esc(f.id) + '" data-whisper-name="' + esc(f.name) + '">Whisper</button>'
         +   '<button type="button" class="action-btn" data-mail-to="' + esc(f.id) + '" data-mail-name="' + esc(f.name) + '">Send Mail</button>'
         +   '<button type="button" class="action-btn" data-enter-room="loft">Visit Home</button>'
         +   '<button type="button" class="action-btn" data-remove-friend="' + esc(f.id) + '">Remove</button>'
         + '</div></div>';
+    }
+    var incoming = loadFriendRequests().filter(function (r) {
+      return r && r.status === "pending" && session() && String(r.toId) === String(session().user.id);
+    });
+    var outgoing = loadFriendRequests().filter(function (r) {
+      return r && r.status === "pending" && session() && String(r.fromId) === String(session().user.id);
+    });
+    var reqSection = '<div class="section-label">Requests'
+      + (incoming.length ? (' <span class="me-badge">' + incoming.length + '</span>') : '')
+      + '</div>';
+    if (incoming.length) {
+      reqSection += incoming.map(function (r) {
+        return '<div class="friend-list-row friend-request-row">'
+          + '<span class="ava">' + esc(String(r.fromName || "?").slice(0, 1).toUpperCase()) + '</span>'
+          + '<div class="friend-list-main">'
+          +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(r.fromId) + '"><b>' + esc(r.fromName) + '</b></button>'
+          +   '<div class="meta">' + esc(r.message || "Let\'s be buddies!") + '</div>'
+          + '</div>'
+          + '<div class="friend-list-actions">'
+          +   '<button type="button" class="action-btn" data-friend-accept="' + esc(r.id) + '">Accept</button>'
+          +   '<button type="button" class="action-btn" data-friend-decline="' + esc(r.id) + '">Decline</button>'
+          + '</div></div>';
+      }).join("");
+    } else {
+      reqSection += '<p class="meta">No incoming requests. Multi-account tip: register/login as another local user on this browser to Accept an invite you sent.</p>';
+    }
+    if (outgoing.length) {
+      reqSection += '<div class="section-label">Pending you sent</div>' + outgoing.map(function (r) {
+        return '<div class="friend-list-row">'
+          + '<div class="friend-list-main"><b>' + esc(r.toName) + '</b><div class="meta">Waiting…</div></div>'
+          + '<div class="friend-list-actions">'
+          +   '<button type="button" class="action-btn" data-friend-retract="' + esc(r.id) + '">Retract</button>'
+          + '</div></div>';
+      }).join("");
     }
     var rows = "";
     if (online.length) {
@@ -2821,8 +3522,9 @@ function helpPage() {
       rows += '<div class="section-label">Recent</div>' + offline.map(function (f) { return friendListRow(f, false); }).join("");
     }
     if (!list.length) {
-      rows = '<p class="meta">No friends yet. Search below or open someone\'s profile and hit Add Friend.</p>';
+      rows = '<p class="meta">No friends yet. Search below or open someone\'s profile and hit Invite.</p>';
     }
+    rows = reqSection + rows;
     var friendIdSet = {};
     list.forEach(function (f) { friendIdSet[f.id] = true; });
     var results = searchPeople(friendSearchQ);
@@ -2833,7 +3535,18 @@ function helpPage() {
       searchRows = '<p class="meta">No matches among occupants, friends, or known profiles.</p>';
     } else {
       searchRows = results.map(function (p) {
-        var isFriend = !!friendIdSet[p.id];
+        var rel = friendRelation(p.id);
+        var act = "";
+        if (rel === "friends") act = '<span class="meta">Friend</span>';
+        else if (rel === "pending_by_you") {
+          var rq = findPendingRequest(session().user.id, p.id);
+          act = '<span class="meta">Pending…</span>' + (rq ? ' <button type="button" class="action-btn" data-friend-retract="' + esc(rq.id) + '">Retract</button>' : '');
+        } else if (rel === "pending_to_you") {
+          var rq2 = findPendingRequest(p.id, session().user.id);
+          act = (rq2 ? '<button type="button" class="action-btn" data-friend-accept="' + esc(rq2.id) + '">Accept</button><button type="button" class="action-btn" data-friend-decline="' + esc(rq2.id) + '">Decline</button>' : '');
+        } else {
+          act = '<button type="button" class="action-btn" data-add-friend="' + esc(p.id) + '" data-friend-name="' + esc(p.name) + '">Invite</button>';
+        }
         return '<div class="friend-list-row' + (p.online ? " is-online" : "") + '">'
           + '<span class="ava">' + esc(String(p.name || "?").slice(0, 1).toUpperCase()) + '</span>'
           + '<div class="friend-list-main">'
@@ -2841,8 +3554,9 @@ function helpPage() {
           +   '<div class="meta">permaname ' + esc(p.id) + (p.online ? " · online" : "") + '</div>'
           + '</div>'
           + '<div class="friend-list-actions">'
-          +   (isFriend ? '<span class="meta">Friend</span>' : '<button type="button" class="action-btn" data-add-friend="' + esc(p.id) + '" data-friend-name="' + esc(p.name) + '">Add Friend</button>')
+          +   act
           +   '<button type="button" class="action-btn" data-mail-to="' + esc(p.id) + '" data-mail-name="' + esc(p.name) + '">Send Mail</button>'
+          +   '<button type="button" class="action-btn" data-whisper="' + esc(p.id) + '" data-whisper-name="' + esc(p.name) + '">Whisper</button>'
           +   '<button type="button" class="action-btn" data-enter-room="loft" data-profile="' + esc(p.id) + '">Visit</button>'
           + '</div></div>';
       }).join("");
@@ -2877,13 +3591,19 @@ function helpPage() {
     var listHtml = inbox.length ? inbox.map(function (m) {
       var mine = m.fromId === me.id;
       var unread = !m.read && m.toId === me.id;
-      // How this works: Reply/Delete stopPropagation in the click handler so the row
-      // still marks-read on normal clicks, but buttons do not fire that path.
       var replyBtn = mine ? "" : ('<button type="button" class="action-btn" data-mail-reply="' + esc(m.id) + '">Reply</button>');
+      var giftNote = "";
+      if (m.giftItem) {
+        giftNote = m.giftClaimed
+          ? '<div class="meta">Gift: ' + esc(m.giftItem.name || "item") + ' (claimed)</div>'
+          : '<div class="meta mail-gift-tag">🎁 Gift attached: ' + esc(m.giftItem.name || "item") + (mine ? "" : " — open to claim") + '</div>';
+      }
       return '<div class="mail-row' + (unread ? " unread" : "") + '" data-mail-id="' + esc(m.id) + '">'
+        + '<label class="mail-check"><input type="checkbox" class="mail-select" data-mail-select="' + esc(m.id) + '" /></label>'
         + '<div class="mail-meta"><b>' + esc(mine ? ("To " + m.toName) : ("From " + m.fromName)) + '</b>'
         + '<time>' + esc((m.at || "").slice(0, 16).replace("T", " ")) + '</time></div>'
-        + '<div class="mail-subject">' + esc(m.subject) + '</div>'
+        + '<div class="mail-subject">' + esc(m.subject) + (unread ? ' <span class="mail-unread-dot">●</span>' : '') + '</div>'
+        + giftNote
         + '<div class="mail-body">' + esc(m.body) + '</div>'
         + '<div class="mail-row-actions">' + replyBtn
         +   '<button type="button" class="action-btn danger" data-mail-delete="' + esc(m.id) + '">Delete</button>'
@@ -2894,7 +3614,12 @@ function helpPage() {
     }).join("");
     return '<section class="page me-page">' + meSubnav()
       + '<div class="mail-layout">'
-      +   '<div class="panel"><h2>Inbox</h2>' + listHtml + '</div>'
+      +   '<div class="panel"><h2>Inbox</h2>'
+      +     '<div class="mail-toolbar">'
+      +       '<button type="button" class="action-btn" data-mail-select-all="1">Select All</button>'
+      +       '<button type="button" class="action-btn danger" data-mail-delete-selected="1">Delete Selected</button>'
+      +     '</div>'
+      +     listHtml + '</div>'
       +   '<div class="panel"><h2>Compose</h2>'
       +     '<form class="mail-form" id="mail-form">'
       +       '<label>To friend <select name="friendId"><option value="">— pick a friend —</option>' + friendOpts + '</select></label>'
@@ -2907,7 +3632,6 @@ function helpPage() {
       +     '</form></div>'
       + '</div></section>';
   }
-
   function mePassport() {
     var sid = session().user.id;
     var me = you();
@@ -3044,7 +3768,8 @@ function helpPage() {
       +       (skin.motto ? ('<div class="cp-motto">' + esc(skin.motto) + '</div>') : '')
       +       profileActionRow({
             poke: isSelf ? '' : ('data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '"'),
-            friend: isSelf ? '' : ('data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '"'),
+            friendHtml: isSelf ? '' : friendActionButtonsHtml(id, name),
+            copyInvite: 'data-copy-invite="profile" data-copy-invite-id="' + esc(id) + '"',
             mail: isSelf ? '' : ('data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name) + '"')
           })
       +     '</div>'
@@ -3367,21 +4092,23 @@ function helpPage() {
       +     '<button type="button" class="tb tb-vol" title="Mute / unmute room music" aria-label="Volume" data-room-mute="1"></button>'
       +     '<span class="tb-go-wrap">'
       +       '<button type="button" class="tb tb-go" title="Go" aria-label="Go" data-tb="go"></button>'
-      +       '<div class="go-menu" id="go-menu" hidden>'
-      +         '<button type="button" data-go="home">Go home</button>'
-      +         '<button type="button" data-go="recent">Recent — Studio Loft</button>'
-      +         '<button type="button" data-go="friends">Friends online</button>'
-      +         '<button type="button" data-go="games">View games awaiting players</button>'
-      +       '</div>'
+      +       goMenuHtml()
       +     '</span>'
-      +     '<button type="button" class="tb tb-friends" title="Friends" aria-label="Friends" data-tb="friends"></button>'
+      +     '<span class="tb-friends-wrap">'
+      +       '<button type="button" class="tb tb-friends" title="Friends" aria-label="Friends" data-tb="friends"></button>'
+      +       friendsToolbarPopupHtml()
+      +     '</span>'
       +     '<button type="button" class="tb tb-party" title="Parties" aria-label="Parties" data-tb="party"></button>'
       +     '<span class="tb-go-wrap tb-room-wrap">'
       +       '<button type="button" class="tb tb-room" title="Room" aria-label="Room" data-tb="room"></button>'
       +       '<div class="go-menu room-menu" id="room-menu" hidden>'
       +         '<button type="button" data-room-menu="comment">Comment or rate</button>'
       +         '<button type="button" data-room-menu="decorate">Decorate Room</button>'
+      +         '<button type="button" data-room-menu="view-items">View items</button>'
+      +         '<button type="button" data-room-menu="snapshot">Take snapshot (stub)</button>'
+      +         '<button type="button" data-room-menu="zoom">Zoom (stub)</button>'
       +         '<button type="button" data-room-menu="playlist">View room playlist</button>'
+      +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
       +         '<div class="room-lock-row meta">Lock (enforced locally)</div>'
       +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock().mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + '>🔓 Unlocked</button>'
       +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock().mode || "") === "friends" ? ' class="is-on"' : '') + '>👥 Friends</button>'
@@ -3469,6 +4196,17 @@ function helpPage() {
         if (skinUid) applyProfileSkinDom(skinUid);
       }
     } catch (eSkin) {}
+    try { applyChatInputTint(); } catch (eTint) {}
+    try {
+      if (friendsPopupOpen) {
+        var fw2 = document.querySelector(".tb-friends-wrap");
+        if (fw2 && !document.getElementById("friends-toolbar-pop")) {
+          var tmp2 = document.createElement("div");
+          tmp2.innerHTML = friendsToolbarPopupHtml();
+          if (tmp2.firstChild) fw2.appendChild(tmp2.firstChild);
+        }
+      }
+    } catch (ePop) {}
   }
   function ensureStagePlaceholder() {
     var slot = document.getElementById("stage-slot");
@@ -3484,9 +4222,12 @@ function helpPage() {
     try { ensureStageBubblesEl(); } catch (e) {}
   }
   // Information: refreshChatLog writes both #chat-log (slide) and #chat-overlay (overlay).
+  // How this works: active tab (Room vs PM) picks which message array to render.
   function refreshChatLog() {
     var ui = loadChatUi();
-    var html = chat.map(chatRow).join("");
+    var tabs = loadChatTabs();
+    var msgs = activeChatMessages();
+    var html = msgs.map(chatRow).join("");
     var body = document.querySelector(".stage-body");
     if (body) {
       body.classList.toggle("chat-mode-slide", ui.mode === "slide");
@@ -3494,6 +4235,13 @@ function helpPage() {
       body.classList.toggle("hide-history", !!ui.hideHistory);
       body.classList.remove("text-size-sm", "text-size-md", "text-size-lg");
       body.classList.add("text-size-" + (ui.textSize || "md"));
+      body.classList.toggle("pm-tab-active", !!(tabs.activeTabId && tabs.activeTabId.indexOf("pm:") === 0));
+    }
+    var tabsEl = document.getElementById("chat-tabs");
+    if (tabsEl) {
+      var wrap = document.createElement("div");
+      wrap.innerHTML = chatTabsHtml();
+      if (wrap.firstChild) tabsEl.replaceWith(wrap.firstChild);
     }
     var log = document.getElementById("chat-log");
     if (log) {
@@ -3508,7 +4256,9 @@ function helpPage() {
       // Overlay = history on the LEFT of the room window (#chat-overlay in .stage-host).
       // Slide = dark #chat-log panel beside/under the stage. Hide history (F9) is
       // overlay-only. Bottom input bar is always separate chrome.
-      var showOv = ui.mode === "overlay" && !ui.hideHistory && chat.length > 0;
+      // PM tabs always use slide/log path; overlay shows room only when Room tab active.
+      var isPm = !!(tabs.activeTabId && tabs.activeTabId.indexOf("pm:") === 0);
+      var showOv = !isPm && ui.mode === "overlay" && !ui.hideHistory && msgs.length > 0;
       if (showOv) {
         ov.hidden = false;
         ov.classList.remove("is-empty");
@@ -3523,6 +4273,7 @@ function helpPage() {
       }
     }
     applyChatBarVisibility();
+    applyChatInputTint();
   }
   function applyChatBarVisibility() {
     var app = document.getElementById("app");
@@ -3752,11 +4503,28 @@ function helpPage() {
     text = String(text || "").trim();
     if (!text) return;
     if (/^\/clear$/i.test(text)) {
-      // Wiki /clear — wipe this tab's display + saved loft history.
-      clearRoomChatDisplay(true);
+      // Wiki /clear — wipe active tab only (Room or current PM).
+      clearActiveChatTab(true);
       pushSystemChat("Chat cleared.");
       return;
     }
+    if (/^\/away$/i.test(text)) {
+      setAway(true);
+      pushSystemChat("You are now away. (Yellow name tint · PM auto-reply note)");
+      refreshChatLog();
+      return;
+    }
+    if (/^\/back$/i.test(text)) {
+      setAway(false);
+      pushSystemChat("You are back.");
+      refreshChatLog();
+      return;
+    }
+    if (/^\/speak\s+/i.test(text)) {
+      text = text.replace(/^\/speak\s+/i, "");
+    }
+    var tabs = loadChatTabs();
+    var isPm = !!(tabs.activeTabId && tabs.activeTabId.indexOf("pm:") === 0);
     var now = Date.now();
     chatSendTimes = chatSendTimes.filter(function (t) { return now - t < 3000; });
     if (chatSendTimes.length >= 5) {
@@ -3769,19 +4537,49 @@ function helpPage() {
     var sendText = text;
     if (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text)) {
       emote = true;
-      sendText = text; // keep prefix so history shows; chatRow detects
+      sendText = text;
     } else if (/^\/think\s+/i.test(text)) {
       thought = true;
-      sendText = text; // keep /think prefix for history + bubble detection
+      sendText = text;
+    }
+    if (isPm) {
+      var oid = tabs.activeTabId.slice(3);
+      var s = session();
+      var msg = {
+        id: "pm" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        who: s && s.user ? s.user.name : "Guest",
+        userId: s && s.user ? s.user.id : "guest",
+        text: String(sendText).slice(0, 240),
+        at: new Date().toISOString(),
+        pm: true
+      };
+      if (emote) msg.emote = true;
+      if (thought) msg.thought = true;
+      var pmList = loadPmChat(oid);
+      pmList.push(msg);
+      savePmChat(oid, pmList);
+      // Away auto-reply note (stub) when whispering someone who is away.
+      if (isAway(oid)) {
+        pmList.push({
+          id: "sys" + Date.now(),
+          system: true,
+          text: "(auto-reply) They are away right now.",
+          at: new Date().toISOString()
+        });
+        savePmChat(oid, pmList);
+      }
+      refreshChatLog();
+      try { awardAction("chat"); } catch (e) {}
+      return;
     }
     var result = await window.WhirledApi.postChat("loft", sendText);
-    var msg = result.message || result;
-    if (emote) msg.emote = true;
-    if (thought) msg.thought = true;
-    if (!chat.some(function (m) { return m.id === msg.id; })) chat.push(msg);
+    var msg2 = result.message || result;
+    if (emote) msg2.emote = true;
+    if (thought) msg2.thought = true;
+    if (!chat.some(function (m) { return m.id === msg2.id; })) chat.push(msg2);
     refreshChatLog();
-    spawnStageBubble(msg);
-    listeners.chat.forEach(function (fn) { try { fn(msg); } catch (e) {} });
+    spawnStageBubble(msg2);
+    listeners.chat.forEach(function (fn) { try { fn(msg2); } catch (e) {} });
     try { awardAction("chat"); } catch (e) {}
   }
   function renderChatOptsMenu() {
@@ -3821,7 +4619,8 @@ function helpPage() {
     var self = sid && id && sid === id;
     menu.innerHTML = ''
       + '<button type="button" data-profile="' + esc(id) + '">View profile</button>'
-      + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Add friend</button>')
+      + (self ? '' : '<button type="button" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(name) + '">Whisper</button>')
+      + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Invite friend</button>')
       + (self ? '' : '<button type="button" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name) + '">Send mail</button>')
       + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>');
     document.body.appendChild(menu);
@@ -3866,6 +4665,7 @@ function helpPage() {
     });
     liveOccupants.forEach(function (p) { rememberProfile({ id: p.id, name: p.name }); });
     refreshOccupantRail();
+    try { presenceCheckNotices(); } catch (eP) {}
   }
   function startOccPoll() {
     if (occTimer) clearInterval(occTimer);
@@ -3895,7 +4695,12 @@ function helpPage() {
   // ---------------------------------------------------------------------------
   function boot() {
     applyBrowserTheme();
-    if (session()) stripStuckPokeNotices();
+    if (session()) {
+      stripStuckPokeNotices();
+      try { syncFriendsFromPerUser(); } catch (eSF) {}
+      try { awayMode = isAway(session().user.id); } catch (eAw) {}
+      pushNotice("green", you().name + " logged on.", { transient: true });
+    }
     // How this works: a new page load is a new session visit — wipe leftover loft
     // chat from earlier. Do not loadHistory() on boot (that rehydrated old chats).
     clearRoomChatDisplay(true);
@@ -4004,9 +4809,14 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-chat-clear]")) {
-      // Wiki: Clear all chat — one confirm, wipe display + saved loft history.
-      if (confirm("Clear all chat in this room?")) {
+      // Wiki: Clear all chat — wipe Room + open PM tabs.
+      if (confirm("Clear all chat (Room + private tabs)?")) {
         clearRoomChatDisplay(true);
+        var ct = loadChatTabs();
+        (ct.openPMs || []).forEach(function (p) { savePmChat(p.userId, []); });
+        ct.unread = {};
+        saveChatTabs(ct);
+        refreshChatLog();
       }
       chatOptsOpen = false;
       var com2 = document.getElementById("chat-opts-menu");
@@ -4022,6 +4832,141 @@ function helpPage() {
         ev.clientX,
         ev.clientY
       );
+      return;
+    }
+    // --- Fidelity upgrade handlers (friend requests, chat tabs, palette, gifts) ---
+    var chatTabClose = ev.target.closest("[data-chat-tab-close]");
+    if (chatTabClose) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      closePmTab(chatTabClose.getAttribute("data-chat-tab-close"));
+      refreshChatLog();
+      return;
+    }
+    var chatTabBtn = ev.target.closest("[data-chat-tab]");
+    if (chatTabBtn && !ev.target.closest("[data-chat-tab-close]")) {
+      setActiveChatTab(chatTabBtn.getAttribute("data-chat-tab") || "room");
+      refreshChatLog();
+      return;
+    }
+    var whisperBtn = ev.target.closest("[data-whisper]");
+    if (whisperBtn && session()) {
+      var wid = whisperBtn.getAttribute("data-whisper");
+      var wname = whisperBtn.getAttribute("data-whisper-name") || wid;
+      openPmTab(wid, wname);
+      friendsPopupOpen = false;
+      var fpop = document.getElementById("friends-toolbar-pop");
+      if (fpop) fpop.remove();
+      var cnmW = document.getElementById("chat-name-menu");
+      if (cnmW) cnmW.remove();
+      if (!inRoom) {
+        if (tryEnterLoft()) {
+          clearRoomChatDisplay(true);
+          paint("rooms");
+          loadOccupants();
+        }
+      } else {
+        refreshChatLog();
+        applyChatInputTint();
+        var cin = document.getElementById("chat-input");
+        if (cin) cin.focus();
+      }
+      return;
+    }
+    if (ev.target.closest("[data-friends-pop-close]")) {
+      friendsPopupOpen = false;
+      var fp2 = document.getElementById("friends-toolbar-pop");
+      if (fp2) fp2.remove();
+      return;
+    }
+    var frAcc = ev.target.closest("[data-friend-accept]");
+    if (frAcc && session()) {
+      acceptFriendRequest(frAcc.getAttribute("data-friend-accept"));
+      meSub = "friends"; viewingId = null; paint("me");
+      return;
+    }
+    var frDec = ev.target.closest("[data-friend-decline]");
+    if (frDec && session()) {
+      declineFriendRequest(frDec.getAttribute("data-friend-decline"));
+      meSub = "friends"; viewingId = null; paint("me");
+      return;
+    }
+    var frRet = ev.target.closest("[data-friend-retract]");
+    if (frRet && session()) {
+      retractFriendRequest(frRet.getAttribute("data-friend-retract"));
+      meSub = viewingId ? "profile" : "friends";
+      paint("me");
+      return;
+    }
+    var copyInv = ev.target.closest("[data-copy-invite]");
+    if (copyInv && session()) {
+      copyInviteLink(copyInv.getAttribute("data-copy-invite"), copyInv.getAttribute("data-copy-invite-id"));
+      return;
+    }
+    var reactBtn = ev.target.closest("[data-react]");
+    if (reactBtn && session()) {
+      toggleChatReaction(reactBtn.getAttribute("data-react-msg"), reactBtn.getAttribute("data-react"));
+      refreshChatLog();
+      return;
+    }
+    var cmdClose = ev.target.closest("[data-cmd-close]");
+    if (cmdClose && !ev.target.closest(".cmd-palette")) {
+      cmdPaletteOpen = false;
+      var cp = document.getElementById("cmd-palette");
+      if (cp) cp.remove();
+      return;
+    }
+    var cmdItem = ev.target.closest("[data-cmd]");
+    if (cmdItem) {
+      runCommand(cmdItem.getAttribute("data-cmd"));
+      return;
+    }
+    if (ev.target.closest("[data-shortcuts-close]")) {
+      shortcutsOpen = false;
+      var so = document.getElementById("shortcuts-overlay");
+      if (so) so.remove();
+      return;
+    }
+    if (ev.target.closest("[data-mail-select-all]") && session()) {
+      var boxes = document.querySelectorAll(".mail-select");
+      var allOn = Array.prototype.every.call(boxes, function (b) { return b.checked; });
+      boxes.forEach(function (b) { b.checked = !allOn; });
+      return;
+    }
+    if (ev.target.closest("[data-mail-delete-selected]") && session()) {
+      var ids = [];
+      document.querySelectorAll(".mail-select:checked").forEach(function (b) {
+        ids.push(b.getAttribute("data-mail-select"));
+      });
+      if (!ids.length) { pushNotice("gray", "No mail selected."); return; }
+      if (!confirm("Delete " + ids.length + " selected message(s)?")) return;
+      saveMail(loadMail().filter(function (m) { return ids.indexOf(m.id) < 0; }));
+      meSub = "mail"; paint("me");
+      return;
+    }
+    var goRoom = ev.target.closest("[data-go-room]");
+    if (goRoom && session()) {
+      goMenuOpen = false;
+      var gmR = document.getElementById("go-menu");
+      if (gmR) gmR.hidden = true;
+      if (tryEnterLoft()) {
+        clearRoomChatDisplay(true);
+        paint("rooms");
+        loadOccupants();
+      } else paint("rooms");
+      return;
+    }
+    var goFriend = ev.target.closest("[data-go-friend]");
+    if (goFriend && session()) {
+      goMenuOpen = false;
+      var gmF = document.getElementById("go-menu");
+      if (gmF) gmF.hidden = true;
+      openPmTab(goFriend.getAttribute("data-go-friend"), goFriend.getAttribute("data-go-friend-name"));
+      if (!inRoom && tryEnterLoft()) {
+        clearRoomChatDisplay(true);
+        paint("rooms");
+        loadOccupants();
+      } else if (inRoom) refreshChatLog();
       return;
     }
     if (ev.target.closest("[data-block-chat]")) {
@@ -4049,12 +4994,14 @@ function helpPage() {
     }
 
     if (ev.target.id === "logout-btn") {
+      var byeName = you().name;
       window.WhirledApi.logout();
       leaveRoomResetChat();
       liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
       shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
       gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
       decorateMode = false; partyPanelOpen = false; playlistPanelOpen = false; helpOpen = false; legalOpen = false; galleryViewId = null; stuffListMode = false;
+      friendsPopupOpen = false; cmdPaletteOpen = false; shortcutsOpen = false; awayMode = false;
       clearStrayUI();
       paint("");
       return;
@@ -4133,16 +5080,37 @@ function helpPage() {
         var rmenuGo = document.getElementById("room-menu");
         if (rmenuGo) { rmenuGo.hidden = true; roomMenuOpen = false; }
         var menu = document.getElementById("go-menu");
-        if (menu) {
-          menu.hidden = !menu.hidden;
-          goMenuOpen = !menu.hidden;
+        var wrapGo = document.querySelector(".tb-go-wrap");
+        if (menu && !menu.hidden) {
+          menu.hidden = true; goMenuOpen = false;
+        } else if (wrapGo) {
+          // How this works: rebuild Go menu each open so recentRooms stay fresh.
+          if (menu) menu.remove();
+          var tmpG = document.createElement("div");
+          tmpG.innerHTML = goMenuHtml();
+          var goNode = tmpG.firstChild;
+          if (goNode) {
+            wrapGo.appendChild(goNode);
+            goNode.hidden = false;
+            goMenuOpen = true;
+          }
         }
         return;
       }
       if (kind === "friends") {
-        meSub = "friends";
-        viewingId = null;
-        paint("me");
+        // How this works: Friends toolbar opens online-friends popup (Whisper / Profile / Join).
+        friendsPopupOpen = !friendsPopupOpen;
+        var pop = document.getElementById("friends-toolbar-pop");
+        if (friendsPopupOpen) {
+          if (!pop) {
+            var fw = document.querySelector(".tb-friends-wrap");
+            if (fw) {
+              var tmp = document.createElement("div");
+              tmp.innerHTML = friendsToolbarPopupHtml();
+              if (tmp.firstChild) fw.appendChild(tmp.firstChild);
+            }
+          }
+        } else if (pop) pop.remove();
         return;
       }
       if (kind === "room") {
@@ -4693,6 +5661,19 @@ function helpPage() {
         paint("rooms");
         loadOccupants();
         syncRoomAudio();
+      } else if (rm === "view-items") {
+        if (!inRoom) { inRoom = true; }
+        decorateMode = true;
+        roomPanelOpen = false;
+        playlistPanelOpen = false;
+        paint("rooms");
+        loadOccupants();
+        bindDecorateDrag();
+        pushNotice("gray", "View items — decorate layout list.", { transient: true });
+      } else if (rm === "snapshot") {
+        pushNotice("orange", "Snapshot stub — engine will capture the stage later.");
+      } else if (rm === "zoom") {
+        pushNotice("orange", "Zoom stub — engine camera later.");
       }
       return;
     }
@@ -4898,8 +5879,10 @@ function helpPage() {
       return;
     }
     var mailRow = ev.target.closest("[data-mail-id]");
-    if (mailRow && session() && !ev.target.closest("form") && !ev.target.closest("[data-mail-reply]") && !ev.target.closest("[data-mail-delete]")) {
-      markMailRead(mailRow.getAttribute("data-mail-id"));
+    if (mailRow && session() && !ev.target.closest("form") && !ev.target.closest("[data-mail-reply]") && !ev.target.closest("[data-mail-delete]") && !ev.target.closest(".mail-check")) {
+      var midOpen = mailRow.getAttribute("data-mail-id");
+      markMailRead(midOpen);
+      claimGiftFromMail(midOpen);
       // refresh unread badge in header without full navigation reset
       var badge = document.querySelector(".mail-btn u");
       if (badge) badge.textContent = "(" + unreadCount() + ")";
@@ -5225,7 +6208,7 @@ function helpPage() {
         body: String(md.get("body") || "")
       });
       try { awardAction("mail"); } catch (e) {}
-      // Same-browser peer copy already stored as one message to toId.
+      pushNotice("blue", "Mail sent.");
       window.__mailCompose = null;
       meSub = "mail";
       paint("me");
@@ -5244,28 +6227,12 @@ function helpPage() {
     }
 
     if (ev.target.id === "buddy-invite-form" && session()) {
+      // How this works: Send request creates PENDING only — Accept adds mutual friends.
       var bid = ev.target.getAttribute("data-buddy-id");
       var bname = ev.target.getAttribute("data-buddy-name") || bid;
       var bfd = new FormData(ev.target);
       var bmsg = String(bfd.get("message") || "").trim().slice(0, 400) || "Let's be buddies!";
-      addFriend({ id: bid, name: bname });
-      sendMail({
-        toId: bid,
-        toName: bname,
-        subject: "Friend request",
-        body: bmsg
-      });
-      sendMail({
-        toId: session().user.id,
-        toName: session().user.name,
-        fromId: bid,
-        fromName: bname,
-        subject: "Friend request sent",
-        body: "You invited " + bname + ": " + bmsg,
-        read: true
-      });
-      pushNotice("friending", "Friend request sent to " + bname + ".");
-      rememberProfile({ id: bid, name: bname });
+      createFriendRequest(bid, bname, bmsg);
       try { awardAction("friend"); } catch (e) {}
       friendInvitePending = null;
       occMenuId = null;
@@ -5501,20 +6468,26 @@ function helpPage() {
       return;
     }
     if (ev.target.id === "stuff-gift-form" && session()) {
+      // How this works: gift removes item from sender Stuff and attaches snapshot to mail.
       var gidItem = ev.target.getAttribute("data-stuff-gift");
       var itemG = findStuff(gidItem);
       var gd = new FormData(ev.target);
       var fidG = String(gd.get("friendId") || "").trim();
       var frG = loadFriends().filter(function (f) { return f.id === fidG; })[0];
       if (!itemG || !frG) return;
+      var giftSnap = Object.assign({}, itemG);
+      saveStuff(loadStuff().filter(function (it) { return it.id !== gidItem; }));
       sendMail({
         toId: frG.id,
         toName: frG.name,
         subject: "Gift: " + (itemG.name || "item"),
-        body: session().user.name + " sent you “" + (itemG.name || "an item") + "” as a gift (Stuff stub — mail note only on this mock)."
+        body: session().user.name + " sent you “" + (itemG.name || "an item") + "” as a gift. Open this mail to claim it into Stuff.",
+        giftItem: giftSnap,
+        giftClaimed: false
       });
-      pushNotice("blue", "Gift note sent to " + frG.name + ".");
-      stuffMode = "detail";
+      pushNotice("blue", "Gift sent to " + frG.name + " — item left your Stuff.");
+      stuffItemId = null;
+      stuffMode = "browse";
       paint("stuff");
       return;
     }
@@ -5721,16 +6694,61 @@ function helpPage() {
   });
   document.addEventListener("keydown", function (ev) {
     if (ev.key === "F9") {
-      var app = document.getElementById("app");
-      if (!app || app.getAttribute("data-tab") !== "rooms" || !inRoom) return;
+      var appEl = document.getElementById("app");
+      if (!appEl || appEl.getAttribute("data-tab") !== "rooms" || !inRoom) return;
       var ui = loadChatUi();
       if (ui.mode !== "overlay") return;
       ui.hideHistory = !ui.hideHistory;
       saveChatUi(ui);
       refreshChatLog();
       ev.preventDefault();
+      return;
+    }
+    // How this works: Ctrl/Cmd+K opens the command palette (Pages-safe chrome jump).
+    if ((ev.ctrlKey || ev.metaKey) && (ev.key === "k" || ev.key === "K") && session()) {
+      ev.preventDefault();
+      cmdPaletteOpen = true;
+      shortcutsOpen = false;
+      ensureModernOverlays();
+      return;
+    }
+    if (ev.key === "Escape") {
+      if (cmdPaletteOpen) { cmdPaletteOpen = false; var cpE = document.getElementById("cmd-palette"); if (cpE) cpE.remove(); return; }
+      if (shortcutsOpen) { shortcutsOpen = false; var soE = document.getElementById("shortcuts-overlay"); if (soE) soE.remove(); return; }
+      if (friendsPopupOpen) { friendsPopupOpen = false; var fpE = document.getElementById("friends-toolbar-pop"); if (fpE) fpE.remove(); return; }
+      return;
+    }
+    if (ev.key === "?" && session() && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+      var tag = (ev.target && ev.target.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || (ev.target && ev.target.isContentEditable)) return;
+      ev.preventDefault();
+      shortcutsOpen = true;
+      cmdPaletteOpen = false;
+      ensureModernOverlays();
+      return;
+    }
+    if (ev.key === "/" && session() && inRoom && !ev.ctrlKey && !ev.metaKey) {
+      var tag2 = (ev.target && ev.target.tagName) || "";
+      if (tag2 === "INPUT" || tag2 === "TEXTAREA") return;
+      var cin2 = document.getElementById("chat-input");
+      if (cin2) { ev.preventDefault(); cin2.focus(); }
     }
   });
+  // How this works: long-press / hover shows reaction bar on chat rows.
+  document.addEventListener("mouseover", function (ev) {
+    var row = ev.target.closest && ev.target.closest(".chat-row[data-msg-id]");
+    if (!row) return;
+    var bar = row.querySelector(".react-bar");
+    if (bar) bar.hidden = false;
+  }, true);
+  document.addEventListener("mouseout", function (ev) {
+    var row = ev.target.closest && ev.target.closest(".chat-row[data-msg-id]");
+    if (!row) return;
+    var to = ev.relatedTarget;
+    if (to && row.contains(to)) return;
+    var bar = row.querySelector(".react-bar");
+    if (bar) bar.hidden = true;
+  }, true);
   document.addEventListener("scroll", function (ev) {
     var t = ev.target;
     if (!t || !t.id) return;

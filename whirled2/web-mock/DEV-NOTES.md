@@ -28,7 +28,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## How to bump cache-bust `?v=`
 
-1. Pick a new token, e.g. `20260906k`.
+1. Pick a new token, e.g. `20260906m`.
 2. Replace in `index.html` (CSS + JS `href`/`src`, and the “reload fresh” links).
 3. Replace `LOGO_V` in `app.js`.
 4. Replace in repo root `index.html` redirect (Pages) if present.
@@ -102,6 +102,27 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - Key: `whirled2.roomLock.loft` = `{ mode: "unlocked"|"friends"|"locked", ownerId }`.
 - `canEnterLoft(viewerId)` gates enter / Join them / Go home. Owner always enters. Legacy bare-string values migrate on load.
 
+## Friend requests (20260906m)
+
+- Key: `whirled2.friendRequests` — `{id, fromId, fromName, toId, toName, message, status, at}`.
+- Status: `pending|accepted|declined|retracted`. Invite does **not** call `addFriend` until Accept.
+- Per-user friends: `whirled2.friends.{userId}` (+ legacy `whirled2.friends` synced for current session).
+- Test Accept: register a second local account → login → Me→Friends → Requests.
+
+## Chat tabs / PMs
+
+- `whirled2.chatTabs` — `{ activeTabId, openPMs, unread }`.
+- PM history: `whirled2.pm.{a}:{b}` sorted pair key.
+- Friends toolbar (`data-tb=friends`) opens popup, not Me→Friends.
+
 ## LocalStorage keys (common)
 
-`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.profileSkin.*`, `whirled2.roomLock.loft`, `whirled2.notices`, `whirled2.chatUi`, …
+`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.chatTabs`, `whirled2.pm.*`, `whirled2.friendRequests`, `whirled2.friends.*`, `whirled2.recentRooms`, `whirled2.chatReactions`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.profileSkin.*`, `whirled2.roomLock.loft`, `whirled2.notices`, `whirled2.chatUi`, …
+
+
+## Modern shortcuts (20260906m)
+
+- Ctrl/Cmd+K → command palette (`ensureModernOverlays`).
+- `?` (when not in an input) → shortcuts overlay.
+- `/` in room focuses chat input. Esc closes palette/popups.
+- Gift mail: Stuff → Send as Gift removes item; open mail claims once (`giftClaimed`).
