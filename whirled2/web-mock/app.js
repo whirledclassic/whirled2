@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bq";
+  var LOGO_V = "20260906bs";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1693,6 +1693,70 @@
     var nm = target ? sanitizeDisplayName(target.name || target.id, target.id || "friend") : "friends";
     return { ok: true, name: nm };
   }
+  function clearAllChatFromChat() {
+    // How this works (?v=20260906br): wiki Chat Options → Clear all chat — Room + open PM tabs.
+    // Beginner: same as Chat options → Clear all chat; bumps visit-since so poll cannot refill cemetery.
+    clearRoomChatDisplay(true);
+    var ct = loadChatTabs();
+    (ct.openPMs || []).forEach(function (p) { savePmChat(p.userId, []); });
+    (ct.openGroups || []).forEach(function (g) { saveGroupChat(g.groupId, []); });
+    ct.unread = {};
+    saveChatTabs(ct);
+    refreshChatLog();
+    return true;
+  }
+  function openMyRoomsFromChat() {
+    // How this works (?v=20260906br): /myrooms — classic Me → My Rooms (owned rooms + Create).
+    meSub = "rooms";
+    viewingId = null;
+    paint("me");
+    return true;
+  }
+  function openShareFromChat() {
+    // How this works (?v=20260906br): /share — wiki Share or embed room popup when in loft.
+    if (!inRoom) return false;
+    try { openRoomSharePopup(); } catch (eSh) { return false; }
+    return !!document.getElementById("room-share-modal") || !!roomShareOpen;
+  }
+  function openGroupsFromChat() {
+    // How this works (?v=20260906br): /groups — Chat options → Groups (open group chat tabs) when in loft;
+    // else Groups tab. Wiki: reopen closed Group chat from Chat options → Groups.
+    if (!inRoom) {
+      paint("groups");
+      return { ok: true, where: "tab" };
+    }
+    friendsPopupOpen = false;
+    var fpop = document.getElementById("friends-toolbar-pop");
+    if (fpop) fpop.remove();
+    goMenuOpen = false;
+    var gm = document.getElementById("go-menu");
+    if (gm) gm.hidden = true;
+    var rmenu = document.getElementById("room-menu");
+    if (rmenu) { rmenu.hidden = true; roomMenuOpen = false; }
+    chatOptsOpen = true;
+    var btn = document.getElementById("chat-opts-btn");
+    var menu = document.getElementById("chat-opts-menu");
+    if (!menu && btn) {
+      // ensure menu node exists beside opts button
+      try {
+        var wrap = btn.parentNode;
+        if (wrap && !document.getElementById("chat-opts-menu")) {
+          var m = document.createElement("div");
+          m.id = "chat-opts-menu";
+          m.className = "chat-opts-menu";
+          m.hidden = true;
+          wrap.appendChild(m);
+          menu = m;
+        }
+      } catch (eM) {}
+    }
+    menu = document.getElementById("chat-opts-menu");
+    if (!menu) return { ok: false, error: "Chat options not ready — try the chat-options button." };
+    renderChatOptsMenu();
+    menu.hidden = false;
+    try { menu.scrollTop = menu.scrollHeight; } catch (eSc) {}
+    return { ok: true, where: "opts" };
+  }
 
   var loftVisitOccupants = []; // session occupants seen this loft visit
   var helpOpen = false;
@@ -2009,6 +2073,19 @@
         if (!row.swfUrl) row.swfUrl = row.swfDataUrl;
       }
     } catch (eClassicWear) {}
+    // (?v=20260906bs): SWF Wear must never become tofu — force Classic Flash when no walk PNGs.
+    try {
+      var hasWalkWear = !!(row.states && row.states.walk && row.states.walk.frames && row.states.walk.frames.length);
+      var hasSwfWear = !!(row.swfSha1 || row.swfDataUrl || row.swfUrl || row.mediaKind === "swf");
+      if (hasSwfWear && !hasWalkWear) {
+        row.playbackMode = "ruffle";
+        row.forceRuffleInLoft = true;
+        row.classicFlashOptIn = true;
+        row.mediaKind = "swf";
+        row.isTofu = false;
+      }
+      if (hasSwfWear) row.isTofu = false;
+    } catch (eForce) {}
     saveWornAvatar(normalizeWornAvatar(row));
     pushRecentAvatarId(item.id);
     return true;
@@ -2029,20 +2106,15 @@
     return slug === "cyan-hair" || /cyan-hair/i.test(path) || /^whirl$/i.test(name.trim());
   }
   function itemHasRealPngWalk(item) {
+    // (?v=20260906bs): match classic-avatar — walk frames only (thumb/idle ≠ Smooth).
     if (!item) return false;
     try {
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasPngWalk) {
         if (WhirledClassicAvatar.itemHasPngWalk(item)) return true;
       }
     } catch (e) {}
-    if (item.frames && item.frames.length) return true;
-    if (item.states && item.states.idle && item.states.idle.frames && item.states.idle.frames.length) return true;
     if (item.states && item.states.walk && item.states.walk.frames && item.states.walk.frames.length) return true;
-    if (item.pack && item.pack.states) {
-      var ps = item.pack.states;
-      if (ps.idle && ps.idle.frames && ps.idle.frames.length) return true;
-      if (ps.walk && ps.walk.frames && ps.walk.frames.length) return true;
-    }
+    if (item.pack && item.pack.states && item.pack.states.walk && item.pack.states.walk.frames && item.pack.states.walk.frames.length) return true;
     return false;
   }
   function getAvatarPlaybackMode(wornOpt) {
@@ -2053,14 +2125,16 @@
       try { worn = loadWornAvatar(); } catch (e) { worn = null; }
     }
     if (!worn) worn = makeTofuWornRow();
-    if (worn.isTofu || worn.stuffId === TOFU_AVATAR_ID || worn.source === "tofu") return "tofu";
+    // (?v=20260906bs): SWF markers beat tofu flag (Wear persist race / false isTofu).
+    var isSwfEarly = !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf" || worn.kind === "swf");
+    if ((worn.isTofu || worn.stuffId === TOFU_AVATAR_ID || worn.source === "tofu") && !isSwfEarly) return "tofu";
     try {
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.getPlaybackMode) {
         var pm = WhirledClassicAvatar.getPlaybackMode(worn);
         if (pm === "ruffle" || pm === "png-hybrid") return pm;
       }
     } catch (ePm) {}
-    var isSwf = !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf" || worn.kind === "swf");
+    var isSwf = isSwfEarly;
     var wantsClassic = !!(worn.classicFlashOptIn || worn.useClassicFlash
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemWantsClassicFlash && WhirledClassicAvatar.itemWantsClassicFlash(worn)));
     var forceRuffleLoft = !!(worn.forceRuffleInLoft
@@ -2105,6 +2179,24 @@
     return '<span class="stuff-playback-label is-png">Wear mode: PNG sprites</span>';
   }
 
+
+  function classicRuffleWearHtml(worn, posStyle) {
+    // (?v=20260906bs): Always mount Ruffle host + hitbox/nameplate + optional stand thumb.
+    // Beginner: never tofu when a .swf is worn. ENGINE DEV: PE none on Ruffle; hitbox owns emotes.
+    var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
+    var stand = esc(worn.thumb || worn.preview || "");
+    return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle" data-playback="ruffle">'
+      + '<div class="avatar-wear-billboard is-ruffle-billboard" style="' + posStyle + '">'
+      +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" title="Ruffle — transparent; floor click moves you; PE none">'
+      +     (stand ? ('<img class="classic-swf-stand-thumb" src="' + stand + '" alt="" aria-hidden="true" />') : "")
+      +   '</div>'
+      +   '<button type="button" class="avatar-hitbox" data-avatar-hit="1" aria-label="Open avatar emotes" title="Click for emotes"></button>'
+      +   '<div class="avatar-wear-nameplate" data-avatar-hit="1">' + esc(worn.name || "SWF avatar")
+      +   ' <span class="classic-exp-badge">Experimental</span> '
+      +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
+      + '</div></div>';
+  }
+
   function avatarWearLayerHtml() {
     // How this works: billboard sprite in the room chrome (like item in your space).
     // Beginner: if nothing Worn yet, show classic default tofu so the loft isn’t empty.
@@ -2120,14 +2212,13 @@
     var x = (typeof worn.xPct === "number" && isFinite(worn.xPct)) ? worn.xPct : 50;
     var face = worn.face === -1 ? -1 : 1;
     var posStyle = "--wear-scale:" + scale + ";--wear-x:" + x + "%;--wear-face:" + face + ";";
-    var isSwf = !!(worn.swfUrl || worn.mediaKind === "swf" || worn.kind === "swf");
-    // ---- MERGE NOTE (?v=20260906ay): hybrid PNG walk preferred; Ruffle loft only if Force / SWF-only ----
+    var hasSwfMedia = !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf" || worn.kind === "swf");
     var wantsClassic = !!(worn.classicFlashOptIn || worn.useClassicFlash
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemWantsClassicFlash && WhirledClassicAvatar.itemWantsClassicFlash(worn)));
     var forceRuffleLoft = !!(worn.forceRuffleInLoft
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.forceRuffleInLoft && WhirledClassicAvatar.forceRuffleInLoft(worn)));
-    // (?v=20260906bb): Hybrid = real idle/walk PNG frames (not thumb/preview alone).
-    // Preview-only + SWF → Ruffle path + bob walk — never fake Hybrid / never tofu.
+    var playModeEarly = null;
+    try { playModeEarly = getAvatarPlaybackMode(worn); } catch (ePm0) { playModeEarly = null; }
     var hasRealPngWalk = false;
     try {
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasPngWalk) {
@@ -2135,31 +2226,15 @@
       }
     } catch (eHp) { hasRealPngWalk = false; }
     if (!hasRealPngWalk) {
-      hasRealPngWalk = !!(worn.frames && worn.frames.length)
-        || !!(worn.states && ((worn.states.idle && worn.states.idle.frames && worn.states.idle.frames.length)
-          || (worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length)));
-      // Thumb/preview alone do NOT count as Hybrid PNG walk.
-      if (hasRealPngWalk && !(worn.frames && worn.frames.length)
-        && !(worn.states && worn.states.idle && worn.states.idle.frames && worn.states.idle.frames.length)
-        && !(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length)) {
-        hasRealPngWalk = false;
-      }
+      hasRealPngWalk = !!(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length);
     }
     var hasPngFrames = hasRealPngWalk;
-    // SWF-only (no real PNG walk): transparent Ruffle host; pointer-events none; chrome moves + bob.
-    if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && !hasPngFrames) {
-      var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
-      // How this works (?v=20260906bl): Ruffle canvas PE-none; hitbox+nameplate for emotes so floor clicks pass through SWF.
-      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle" data-playback="ruffle">'
-        + '<div class="avatar-wear-billboard is-ruffle-billboard" style="' + posStyle + '">'
-        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" title="Ruffle — transparent; floor click moves you; PE none"></div>'
-        +   '<button type="button" class="avatar-hitbox" data-avatar-hit="1" aria-label="Open avatar emotes" title="Click for emotes"></button>'
-        +   '<div class="avatar-wear-nameplate" data-avatar-hit="1">' + esc(worn.name || "SWF avatar")
-        +   ' <span class="classic-exp-badge">Experimental</span> '
-        +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
-        + '</div></div>';
+    // (?v=20260906bs): Classic Flash / SWF-without-walk ALWAYS mounts Ruffle — never tofu / never false PNG path.
+    if (hasSwfMedia && (playModeEarly === "ruffle" || forceRuffleLoft || ((wantsClassic || hasSwfMedia) && !hasPngFrames))) {
+      if (isTofu) { try { worn.isTofu = false; } catch (eT) {} }
+      return classicRuffleWearHtml(worn, posStyle);
     }
-    if (isTofu) {
+    if (isTofu && !hasSwfMedia) {
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Default tofu avatar" data-loft-mode="tofu" data-playback="tofu">'
         + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
         +   tofuSvgHtml("tofu-avatar tofu-wear")
@@ -2177,16 +2252,8 @@
     if (!frames.length && worn.thumb) frames = [worn.thumb];
     if (!frames.length) {
       // Never show broken tofu when a classic SWF is worn — fall back to transparent Ruffle.
-      if ((worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && (isSwf || wantsClassic || worn.classicFlashOptIn)) {
-        var swfAttr2 = esc(worn.swfUrl || worn.swfDataUrl || "");
-        return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr2 + '" data-loft-mode="ruffle" data-playback="ruffle">'
-          + '<div class="avatar-wear-billboard is-ruffle-billboard" style="' + posStyle + '">'
-          +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr2 + '" title="Ruffle — transparent; floor click moves you; PE none"></div>'
-          +   '<button type="button" class="avatar-hitbox" data-avatar-hit="1" aria-label="Open avatar emotes" title="Click for emotes"></button>'
-          +   '<div class="avatar-wear-nameplate" data-avatar-hit="1">' + esc(worn.name || "SWF avatar")
-          +   ' <span class="classic-exp-badge">Experimental</span> '
-          +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
-          + '</div></div>';
+      if (worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf") {
+        return classicRuffleWearHtml(worn, posStyle);
       }
       // Last resort: show tofu instead of an empty invisible layer (PNG packs only).
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Avatar missing frames">'
@@ -5096,7 +5163,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm/bn/bo/bp + bq) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm/bn/bo/bp/bq/br + bs) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -5145,6 +5212,12 @@
       "• bq: club gaps after bp — /go Go… menu; /party|/parties Parties! board; /rooms Back to Rooms lobby;",
       "  /join [name] Join them in loft; occupant double-click → Whisper (parity with chat name);",
       "  /help go|party|rooms|join — classic-avatar.js Flash loft interact UNTOUCHED",
+      "• br: club gaps after bq — /clearall Clear all chat; /myrooms Me → My Rooms; /share Share/embed;",
+      "  /groups Chat-options Groups (or Groups tab); Friends toolbar double-click → Whisper;",
+      "  My Rooms Make Door blurb fix; /help clearall|myrooms|share|groups — classic-avatar.js UNTOUCHED (Flash bs parallel)",
+      "• bs: Flash/Ruffle playability — never tofu when SWF worn; Hybrid gate = walk PNGs only (not thumb);",
+      "  Classic Flash default for SWF-only; floor walk bob + hitbox emotes; second-SWF Wear→loft one-flow;",
+      "  WhirledAvatarHost EI best-effort + chrome puppet; research sharedEvents Phase-2 documented",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -5160,8 +5233,9 @@
       "   chrome walks the billboard on #avatar-wear-layer; emotes swap frames.",
       "2) Dual Wear modes (bg): pick Whirled2 Smooth (png-hybrid) OR Classic Flash (Ruffle)",
       "   before Wear — Ruffle is optional WASM, never an Adobe Flash plugin.",
-      "3) Classic Flash (Ruffle): chrome moves billboard + bob; emote hitbox; EI host shim tries walk/actions.",
-      "4) Stock SDK SWFs need Phase-2 sharedEvents host for true in-SWF walk — Smooth PNG is best feel today.",
+      "3) Classic Flash (Ruffle, ?v=20260906bs): chrome moves billboard + bob/flip; nameplate/hitbox emotes",
+      "   (bubble + EI try). Never tofu when .swf worn — stand thumb under Ruffle if CDN fails.",
+      "4) Stock SDK SWFs speak controlConnect on sharedEvents (not EI) — Phase-2 host SWF later; chrome puppet now.",
       "",
       "Doc: HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md (web-mock root).",
       "QA: QA-FLASH.md · scripts/qa-flash-check.cjs",
@@ -5277,10 +5351,10 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Club polish after bp: /go Go… menu; /party|/parties Parties! board; /rooms lobby\n"
-        + "• /join [name] Join them in loft; occupant double-click → Whisper (parity with chat name)\n"
-        + "• /help go|party|rooms|join — classic-avatar.js Flash loft interact UNTOUCHED\n"
-        + "Preserve: bl/bm Flash loft interact, bp /friends /who /home + Complain, bo Block, bn action/whisper, bg dual Wear, Whirl, visit-since.",
+        + "• Club polish after bq: /clearall Clear all chat; /myrooms Me → My Rooms; /share Share/embed\n"
+        + "• /groups Chat-options Groups (loft) or Groups tab; Friends toolbar double-click → Whisper\n"
+        + "• My Rooms Make Door blurb fix; /help clearall|myrooms|share|groups — classic-avatar.js UNTOUCHED (Flash bs parallel)\n"
+        + "Preserve: bl/bm Flash loft interact, bq /go /party /rooms /join, bp friends/who/home/Complain, bo Block, bn action/whisper, bg dual Wear, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -6250,9 +6324,10 @@
     var online = list.filter(function (f) { return onlineIds[f.id]; });
     var offline = list.filter(function (f) { return !onlineIds[f.id]; });
     function friendPopRow(f, isOn) {
-      return '<div class="friends-pop-row' + (isOn ? " is-online" : " is-offline") + '">'
+      // How this works (?v=20260906br): double-click name → Whisper (parity with chat/occupant; respects Block).
+      return '<div class="friends-pop-row' + (isOn ? " is-online" : " is-offline") + '" data-friend-pop-who="' + esc(f.id) + '" data-friend-pop-name="' + esc(f.name) + '" title="Double-click name to Whisper">'
         + (isOn ? '<span class="dot on pulse"></span> ' : '<span class="dot"></span> ')
-        + '<b>' + esc(f.name) + '</b>'
+        + '<b data-friend-pop-who="' + esc(f.id) + '" data-friend-pop-name="' + esc(f.name) + '">' + esc(f.name) + '</b>'
         + (isOn ? ' <span class="meta">here</span>' : ' <span class="meta">offline</span>')
         + '<div class="friends-pop-actions">'
         +   '<button type="button" data-whisper="' + esc(f.id) + '" data-whisper-name="' + esc(f.name) + '">Whisper</button>'
@@ -6486,7 +6561,8 @@
       +     '<li><b>/msg</b>|/tell|/w <i>name</i> [text] — open whisper / send PM</li>'
       +     '<li><b>/friends</b> — Friends Online · <b>/who</b> — occupants · <b>/home</b> — Go home</li>'
       +     '<li><b>/go</b> — Go… menu · <b>/party</b> — Parties! · <b>/rooms</b> — lobby · <b>/join</b> [name]</li>'
-      +     '<li><b>Double-click</b> chat name or occupant — Whisper · <b>Complain…</b> Coming Soon modal</li>'
+      +     '<li><b>/clearall</b> — Clear all chat · <b>/myrooms</b> — Me → My Rooms · <b>/share</b> — Share/embed · <b>/groups</b> — Groups chat</li>'
+      +     '<li><b>Double-click</b> chat name, occupant, or Friends toolbar name — Whisper · <b>Complain…</b> Coming Soon modal</li>'
       +     '<li><b>Block</b> — name or occupant menu; hides their chat for you · Unblock restores</li>'
       +   '</ul></div></div>';
   }
@@ -9071,7 +9147,7 @@
           "dev-cache",
           "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
           "STATUS.md",
-          "Current build: ?v=20260906bq (club /go /party /rooms /join + occ dbl-Whisper after bp). Hard-refresh after pulls."
+          "Current build: ?v=20260906bs (Flash loft playability + br club). Hard-refresh after pulls."
         )
       + devHubCard(
           "FLA / SWF lab notes",
@@ -11236,7 +11312,7 @@
       + myRoomsTilesHtml(sid, { includeLoftFallback: false })
       + (owned.length ? '' : '<p class="meta">Studio Loft stays in the Rooms lobby Featured seed — create below for your own My Rooms list.</p>')
       + createBlock
-      + '<p class="meta">Doors / Make Door from decorate — Coming Soon. Snapshot lobby thumbs — Coming Soon.</p>'
+      + '<p class="meta">Make Door / Drop Door ship from Decorate (chip → door). Snapshot lobby thumbs — Coming Soon.</p>'
       + '</section>';
   }
 
@@ -12204,7 +12280,8 @@
         "/msg|/tell|/w <name> [text] — whisper (not if blocked)",
         "/friends · /who · /home — Friends Online / occupants / Go home",
         "/go · /party|/parties · /rooms · /join [name] — Go menu / Parties / lobby / Join them",
-        "/clear — clear active chat tab",
+        "/clear · /clearall — clear active tab / all tabs",
+        "/myrooms · /share · /groups — My Rooms / Share-embed / Groups chat",
         "Block — name menu (hides their chat for you) · Complain Coming Soon"
       ];
       if (helpTopic === "away" || helpTopic === "afk") {
@@ -12226,7 +12303,7 @@
       } else if (helpTopic === "msg" || helpTopic === "tell" || helpTopic === "w" || helpTopic === "whisper") {
         helpLines = ["/msg|/tell|/w <name> [message] — open private tab; with text, send whisper. Blocked players are refused."];
       } else if (helpTopic === "clear") {
-        helpLines = ["/clear — clear the active chat tab (Room also bumps visit-since). Chat options → Clear all chat for every tab."];
+        helpLines = ["/clear — clear the active chat tab (Room also bumps visit-since). /clearall or Chat options → Clear all chat for every tab."];
       } else if (helpTopic === "back") {
         helpLines = ["/back — clear /away or /dnd; name returns to blue (wiki Chat)."];
       } else if (helpTopic === "block") {
@@ -12245,6 +12322,14 @@
         helpLines = ["/rooms — leave loft to Rooms lobby (same as Back to Rooms)."];
       } else if (helpTopic === "join") {
         helpLines = ["/join [name] — Join them in Studio Loft (friend/occupant name). Bare /join enters loft."];
+      } else if (helpTopic === "clearall" || helpTopic === "clear-all") {
+        helpLines = ["/clearall — Clear all chat (Room + private + group tabs). Same as Chat options → Clear all chat."];
+      } else if (helpTopic === "myrooms" || helpTopic === "my-rooms") {
+        helpLines = ["/myrooms — open Me → My Rooms (owned rooms + Create Room)."];
+      } else if (helpTopic === "share" || helpTopic === "embed") {
+        helpLines = ["/share — open Share or embed room popup (enter loft first)."];
+      } else if (helpTopic === "groups" || helpTopic === "group") {
+        helpLines = ["/groups — in loft opens Chat options → Groups (reopen group chat); else Groups tab."];
       } else if (helpTopic === "complain" || helpTopic === "report") {
         helpLines = ["Complain… — name menu opens Coming Soon report modal (no fake mod queue). Block hides chat now."];
       }
@@ -12309,6 +12394,43 @@
         pushNotice("orange", jres.error || "Join failed.", { transient: true });
       } else {
         pushNotice("blue", "Joined " + (jres.name || "friends") + " in Studio Loft.", { transient: true });
+      }
+      return;
+    }
+    if (/^\/clearall$/i.test(text)) {
+      // How this works (?v=20260906br): wiki Chat Options → Clear all chat from slash.
+      if (!confirm("Clear all chat (Room + private + group tabs)?")) return;
+      clearAllChatFromChat();
+      pushNotice("blue", "All chat cleared.", { transient: true });
+      pushSystemChat("Cleared all chat tabs.", { ephemeral: true });
+      return;
+    }
+    if (/^\/myrooms$/i.test(text)) {
+      // How this works (?v=20260906br): /myrooms — Me → My Rooms.
+      openMyRoomsFromChat();
+      pushNotice("blue", "My Rooms", { transient: true });
+      return;
+    }
+    if (/^\/share$/i.test(text)) {
+      // How this works (?v=20260906br): /share — Share or embed room.
+      if (!inRoom) {
+        pushSystemChat("Enter a loft first, then /share opens Share / embed.", { ephemeral: true });
+        return;
+      }
+      if (openShareFromChat()) pushNotice("blue", "Share / embed room", { transient: true });
+      else pushSystemChat("Share popup not ready — try Share / embed on the room bar.", { ephemeral: true });
+      return;
+    }
+    if (/^\/groups?$/i.test(text)) {
+      // How this works (?v=20260906br): /groups — Chat options Groups or Groups tab.
+      var gres = openGroupsFromChat();
+      if (!gres.ok) {
+        pushSystemChat(gres.error || "Groups not ready.", { ephemeral: true });
+        pushNotice("orange", gres.error || "Groups not ready.", { transient: true });
+      } else if (gres.where === "opts") {
+        pushNotice("blue", "Chat options → Groups", { transient: true });
+      } else {
+        pushNotice("blue", "Groups", { transient: true });
       }
       return;
     }
@@ -13370,18 +13492,39 @@
       return;
     }
     if (ev.target.closest("[data-chat-clear]")) {
-      // Wiki: Clear all chat — wipe Room + open PM tabs.
-      if (confirm("Clear all chat (Room + private tabs)?")) {
-        clearRoomChatDisplay(true);
-        var ct = loadChatTabs();
-        (ct.openPMs || []).forEach(function (p) { savePmChat(p.userId, []); });
-        ct.unread = {};
-        saveChatTabs(ct);
-        refreshChatLog();
+      // Wiki: Clear all chat — wipe Room + open PM/group tabs (?v=20260906br also /clearall).
+      if (confirm("Clear all chat (Room + private + group tabs)?")) {
+        clearAllChatFromChat();
+        pushNotice("blue", "All chat cleared.", { transient: true });
       }
       chatOptsOpen = false;
       var com2 = document.getElementById("chat-opts-menu");
       if (com2) com2.hidden = true;
+      return;
+    }
+    // How this works (?v=20260906br): Friends toolbar double-click name → Whisper (parity with chat/occupant).
+    var friendPopWho = ev.target.closest("[data-friend-pop-who]");
+    if (friendPopWho && !ev.target.closest("button") && session()) {
+      var fpId = friendPopWho.getAttribute("data-friend-pop-who") || "";
+      var fpName = friendPopWho.getAttribute("data-friend-pop-name") || fpId;
+      var nowFp = Date.now();
+      var lastFp = window.__whirledFriendPopClick || { id: "", t: 0 };
+      window.__whirledFriendPopClick = { id: fpId, t: nowFp };
+      var sidFp = session().user ? session().user.id : "";
+      if (fpId && lastFp.id === fpId && (nowFp - lastFp.t) < 450 && sidFp !== fpId) {
+        if (isBlocked(fpId)) {
+          pushNotice("orange", "Unblock " + (fpName || "player") + " before whispering.", { transient: true });
+          return;
+        }
+        openPmTab(fpId, fpName || fpId);
+        refreshChatLog();
+        applyChatInputTint();
+        var cinFp = document.getElementById("chat-input");
+        if (cinFp) cinFp.focus();
+        pushNotice("blue", "Whisper " + (fpName || "player"), { transient: true });
+        return;
+      }
+      // single click on name row — ignore (use action buttons)
       return;
     }
     var chatWho = ev.target.closest("[data-chat-who]");

@@ -2,9 +2,12 @@
 
 Dual modes: `playbackMode` png-hybrid|ruffle. **bl** = Ruffle loft interactivity (walk/emote/hitbox/EI shim) + bk club in same ship.
 
-# QA-FLASH — overnight Flash / loft interact checklist (?v=20260906bl)
+# QA-FLASH — overnight Flash / loft interact checklist (?v=20260906bs)
 
-## Success criteria
+## Success criteria (?v=20260906bs)
+
+0. Worn Classic Flash SWF never shows tofu bean — Ruffle or last thumb.
+
 
 1. Wear **Classic Flash (Ruffle)** → enter loft → **click floor** moves character (bob/flip).
 2. **Click nameplate / hitbox** → emote menu → Wave/Sit/… → **bubble + bob** (EI try if SWF exposes callbacks).

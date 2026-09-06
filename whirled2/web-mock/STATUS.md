@@ -1,3 +1,18 @@
+## What shipped (?v=20260906bs)
+
+- **Flash/Ruffle playability (CRITICAL):** Wear Classic Flash SWF → loft shows SWF (or last thumb), **never tofu**; floor click moves billboard (bob/flip); nameplate/hitbox emotes (bubble + EI try); second SWF one-flow (Analyze → Classic Flash → Save → Wear & enter loft)
+- **Root causes:** false Hybrid from thumb-as-idle; Wear persist dataURL blowup; playbackMode PNG path with empty walk; Ruffle PE/hitbox; setAvatarState blank frames (already guarded)
+- **Research:** Ruffle EI/allowScriptAccess; Grey Havens AvatarControl sharedEvents (Phase-2 host SWF — no AGPL copy); chrome puppet best-effort now
+- **Preserve:** br club (/clearall /myrooms /share /groups …), bl loft interact APIs, bg dual Wear cards, Whirl, visit-since
+- Cache: **`?v=20260906bs`**. Push: `/tmp/push-bs.js` (dry-run default).
+
+## What shipped (?v=20260906br)
+
+- **Club gaps + polish (after bq):** wiki **/clearall** Clear all chat (Room+PM+group); **/myrooms** Me → My Rooms; **/share** Share/embed popup; **/groups** Chat options → Groups (loft) or Groups tab; **Friends toolbar double-click** → Whisper (parity); My Rooms Make Door blurb fix (doors already shipped); `/help clearall|myrooms|share|groups`
+- **Preserve:** bl/bm Flash loft interact (`classic-avatar.js` UNTOUCHED — Flash playability **bs** parallel); bq /go /party /rooms /join + occ dbl-Whisper; bp /friends /who /home + Complain; bo Block; bn action/whisper; bg dual Wear; Whirl; visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906br`**. Push: `/tmp/push-br.js` (dry-run default).
+
 ## What shipped (?v=20260906bq)
 
 - **Club gaps + polish (after bp):** wiki **/go** opens Go… toolbar; **/party|/parties** opens Parties! board; **/rooms** Back to Rooms lobby; **/join [name]** Join them in Studio Loft; **occupant double-click** → Whisper (parity with chat name; respects blocklist); `/help go|party|rooms|join`

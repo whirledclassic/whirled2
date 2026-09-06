@@ -7091,3 +7091,42 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   cursor: not-allowed;
 }
 .complain-modal .complain-reason .soon-tag { margin-left: 6px; }
+
+
+/* ==========================================================================
+   ?v=20260906bs — Never-tofu Classic Flash loft (stand thumb + hitbox)
+   Beginner: if Ruffle is slow/fails, last thumb still shows — not grey tofu bean.
+   ENGINE DEV: stand thumb PE none; hitbox/nameplate keep emote clicks.
+   ========================================================================== */
+.classic-swf-stand-thumb,
+.avatar-ruffle-host .classic-swf-stand-thumb {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) scaleX(var(--wear-face, 1));
+  max-height: min(160px, 42vh);
+  max-width: 120px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  image-rendering: auto;
+  pointer-events: none !important;
+  z-index: 0;
+  opacity: 0.92;
+}
+.avatar-ruffle-host.is-on .classic-swf-stand-thumb,
+.avatar-ruffle-host:has(ruffle-player) .classic-swf-stand-thumb {
+  opacity: 0.18; /* soft under live SWF */
+}
+.avatar-ruffle-host.is-failed .classic-swf-stand-thumb {
+  opacity: 1;
+  z-index: 1;
+}
+.avatar-wear-layer.is-swf .avatar-hitbox {
+  width: 96px;
+  height: 120px;
+  z-index: 5;
+}
+.avatar-wear-layer.is-swf .avatar-wear-nameplate[data-avatar-hit] {
+  z-index: 6;
+}

@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906bl
+ * Cache: ?v=20260906bs
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906bl";
+  var VERSION = "20260906bs";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -27,7 +27,7 @@
   var THUMB_MAX_BYTES = 1 * 1024 * 1024;
   var RUFFLE_CDN = "https://unpkg.com/@ruffle-rs/ruffle";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906bl): dual Wear modes + loft EI shim — png-hybrid | ruffle (playbackMode).
+  // How this works (?v=20260906bs): dual Wear modes + loft EI shim — png-hybrid | ruffle (playbackMode).
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
   // SWF-only: transparent Ruffle + synthesized bob/flip walk — never broken tofu.
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
@@ -375,7 +375,7 @@
   }
 
   function mountRuffle(container, swfUrl, opts) {
-    // How this works (?v=20260906bl): Ruffle TRANSPARENT stage + loft PE-none canvas.
+    // How this works (?v=20260906bs): Ruffle TRANSPARENT stage + loft PE-none canvas.
     // Beginner: black box was opaque stage — fixed via wmode + backgroundColor null + CSS.
     // ENGINE DEV: chrome-owned host only (never #stage-slot). Loft enables allowScriptAccess so
     // user-owned SWFs can talk to our minimal AvatarHost shim (EI only — not full sharedEvents).
@@ -498,20 +498,13 @@
   }
 
   function itemHasPngWalk(item) {
-    // Beginner (?v=20260906bb): Hybrid needs REAL idle/walk PNG frames — not thumb/preview alone.
-    // Root cause of "tofu / wrong sprite" walk: treating preview-only as Hybrid, then loft
-    // tried PNG chrome walk without walk frames (or blanked frames → tofu fallback).
-    // ENGINE DEV: same gate Whirl uses — states.idle / states.walk / frames[].
+    // Beginner (?v=20260906bs): Whirled2 Smooth needs REAL walk PNGs — not thumb/preview alone.
+    // ROOT CAUSE FIX: thumb copied into states.idle used to return true here → false Smooth
+    // (playbackMode png-hybrid) → loft PNG path with no walk frames → frozen/tofu look.
+    // ENGINE DEV: Hybrid gate = states.walk (or pack.walk) with frames. Idle-only / thumb ≠ Smooth.
     if (!item || item.isTofu) return false;
-    if (item.frames && item.frames.length) return true;
-    if (item.states) {
-      if (stateHasFrames(item.states.idle) || stateHasFrames(item.states.stand)) return true;
-      if (stateHasFrames(item.states.walk)) return true;
-    }
-    if (item.pack && item.pack.states) {
-      var ps = item.pack.states;
-      if (stateHasFrames(ps.idle) || stateHasFrames(ps.stand) || stateHasFrames(ps.walk)) return true;
-    }
+    if (item.states && stateHasFrames(item.states.walk)) return true;
+    if (item.pack && item.pack.states && stateHasFrames(item.pack.states.walk)) return true;
     return false;
   }
 
@@ -688,15 +681,23 @@
         });
       }
     }
-    // Idle from frames / preview if still missing — never invent tofu.
+    // Idle from frames if still missing. (?v=20260906bs): for Classic Flash / SWF-only,
+    // do NOT invent states.idle from thumb/preview — that falsely tripped Hybrid + empty walk.
+    // Keep thumb/preview on the row for Stuff cards + Ruffle last-stand art in loft HTML.
     if (!row.states) row.states = {};
+    var pmEnsure = normalizePlaybackMode(row.playbackMode) || normalizePlaybackMode(row.pack && row.pack.playbackMode);
+    var swfOnlyEnsure = !!(row.swfSha1 || row.swfDataUrl || row.swfUrl || row.mediaKind === "swf")
+      && !stateHasFrames(row.states && row.states.walk)
+      && !(row.pack && row.pack.states && stateHasFrames(row.pack.states.walk));
     if (!stateHasFrames(row.states.idle)) {
       if (row.frames && row.frames.length) {
         row.states.idle = { frames: row.frames.slice(), frameDurationsMs: (row.frameDurationsMs || []).slice() };
-      } else if (row.preview) {
-        row.states.idle = { frames: [row.preview], frameDurationsMs: [400] };
-      } else if (row.thumb) {
-        row.states.idle = { frames: [row.thumb], frameDurationsMs: [400] };
+      } else if (!(pmEnsure === "ruffle" || swfOnlyEnsure)) {
+        if (row.preview) {
+          row.states.idle = { frames: [row.preview], frameDurationsMs: [400] };
+        } else if (row.thumb) {
+          row.states.idle = { frames: [row.thumb], frameDurationsMs: [400] };
+        }
       }
     }
     if (!(row.frames && row.frames.length) && stateHasFrames(row.states.idle)) {
@@ -710,7 +711,7 @@
   }
 
   /*
-   * AvatarControl host shim (?v=20260906bl) — architecture study only; do NOT copy AGPL.
+   * AvatarControl host shim (?v=20260906bs) — architecture study only; do NOT copy AGPL.
    * -----------------------------------------------------------------------
    * Research: Grey Havens whirled-sdk AvatarControl / ActorControl:
    *   - Stock Whirled SWFs dispatch "controlConnect" on loaderInfo.sharedEvents
@@ -1086,16 +1087,16 @@
       +   '<div class="section-label">Wear mode (pick one)</div>'
       +   '<div class="classic-mode-cards" role="radiogroup" aria-label="Wear playback mode">'
       +     '<label class="classic-mode-card is-recommended">'
-      +       '<input type="radio" name="playbackMode" value="png-hybrid" checked data-auto-hybrid="1" />'
+      +       '<input type="radio" name="playbackMode" value="png-hybrid" data-auto-hybrid="1" />'
       +       '<span class="classic-mode-card-title">Whirled2 Smooth</span>'
-      +       '<span class="classic-mode-card-badge">Recommended when PNGs exist</span>'
+      +       '<span class="classic-mode-card-badge">Recommended when walk PNGs exist</span>'
       +       '<span class="classic-mode-card-detail">PNG/WebP idle+walk like Whirl — click floor to walk, emotes when frames exist. '
       +         '<b>No Ruffle</b> in loft. Badge: Walking: PNG hybrid (no Ruffle).</span>'
       +     '</label>'
       +     '<label class="classic-mode-card">'
-      +       '<input type="radio" name="playbackMode" value="ruffle" />'
+      +       '<input type="radio" name="playbackMode" value="ruffle" checked data-auto-ruffle="1" />'
       +       '<span class="classic-mode-card-title">Classic Flash (Ruffle)</span>'
-      +       '<span class="classic-mode-card-badge">When SWF exists</span>'
+      +       '<span class="classic-mode-card-badge">Default for SWF-only</span>'
       +       '<span class="classic-mode-card-detail">Plays real <code>.swf</code> via Ruffle (transparent, pointer-events none). '
       +         'Billboard moves + bob/flip; EI host shim tries walk/idle. Badge: Appearance: Ruffle (SWF).</span>'
       +     '</label>'
@@ -1204,8 +1205,10 @@
       return "";
     }
     var swfU = esc(worn.swfUrl || worn.swfDataUrl || "");
+    var standU = esc(worn.thumb || worn.preview || "");
     return '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host classic-wear-swf-slot is-loft" data-swf-url="'
       + swfU + '" aria-label="Classic Flash avatar overlay" title="Ruffle experimental — PE none; click nameplate/hitbox for emotes">'
+      + (standU ? ('<img class="classic-swf-stand-thumb" src="' + standU + '" alt="" aria-hidden="true" />') : "")
       + '<span class="classic-exp-badge classic-exp-badge-overlay">Flash</span>'
       + '</div>';
   }
@@ -1388,10 +1391,8 @@
                 frameDurationsMs: walkUrls.map(function () { return 160; })
               };
             }
-            // If SWF-only and no PNG, use thumb as idle so Wear has something visible when Ruffle fails
-            if (!states.idle && thumbDataUrl) {
-              states.idle = { frames: [thumbDataUrl], frameDurationsMs: [400] };
-            }
+            // (?v=20260906bs): Do NOT put thumb into states.idle — that falsely tripped Hybrid.
+            // Keep thumb/preview on the row for Stuff cards + last-resort stand art under Ruffle.
 
             var swfDataUrl = null;
             if (swfBuf && (!sha1 || (swfBuf.byteLength || swfBuf.length) < 1.5e6)) {
@@ -1450,9 +1451,11 @@
               else if (preferHybridLegacy && (idleUrl || walkUrls.length)) chosenMode = "png-hybrid";
               else chosenMode = defaultPlaybackMode(row) || (swfBuf ? "ruffle" : null);
             }
-            if (chosenMode === "png-hybrid" && !(idleUrl || walkUrls.length || itemHasPngWalk(row))) {
+            // (?v=20260906bs): Smooth requires walk PNGs. SWF-only / thumb-only → force Classic Flash.
+            if (chosenMode === "png-hybrid" && !walkUrls.length && !itemHasPngWalk(row)) {
               chosenMode = swfBuf ? "ruffle" : chosenMode;
             }
+            if (!chosenMode && swfBuf) chosenMode = "ruffle";
             if (chosenMode) setPlaybackModeOnItem(row, chosenMode);
             if (chosenMode === "ruffle" && swfBuf) {
               row.classicFlashOptIn = true;
@@ -1545,7 +1548,18 @@
         }
       });
     }).catch(function () {
+      // (?v=20260906bs): never leave blank/tofu — show last thumb/preview under host if Ruffle fails.
       slot.classList.add("is-failed");
+      try {
+        var stand = (worn && (worn.thumb || worn.preview)) || "";
+        if (stand && !slot.querySelector("img.classic-swf-stand-thumb")) {
+          var img = document.createElement("img");
+          img.className = "classic-swf-stand-thumb";
+          img.alt = (worn && worn.name) || "Avatar";
+          img.src = stand;
+          slot.appendChild(img);
+        }
+      } catch (eThumb) {}
     });
   }
 
@@ -1598,7 +1612,8 @@
             if (form.classicOptIn) form.classicOptIn.checked = true;
             var hasIdle = !!(form.idle && form.idle.files && form.idle.files[0]);
             var hasWalk = !!(form.walk && form.walk.files && form.walk.files.length);
-            var defMode = (hasIdle || hasWalk) ? "png-hybrid" : "ruffle";
+            // (?v=20260906bs): Smooth only when walk PNGs attached — thumb/idle alone stays Classic Flash.
+            var defMode = hasWalk ? "png-hybrid" : "ruffle";
             var radios = form.querySelectorAll('input[name="playbackMode"]');
             for (var ri = 0; ri < radios.length; ri++) {
               radios[ri].checked = (radios[ri].value === defMode);
@@ -1871,9 +1886,16 @@
       || (item.pack && item.pack.classicFlashOptIn));
     // Dual-mode: copy playbackMode; sync legacy forceRuffle from it.
     var pm = getPlaybackMode(item) || getPlaybackMode(row) || defaultPlaybackMode(item) || defaultPlaybackMode(row);
+    // (?v=20260906bs): SWF without walk PNGs always Classic Flash — never false Smooth → tofu loft.
+    if ((!pm || pm === "png-hybrid") && itemHasClassicSwf(item) && !itemHasPngWalk(item) && !itemHasPngWalk(row)) {
+      pm = "ruffle";
+    }
     if (pm) {
       row.playbackMode = pm;
       row.forceRuffleInLoft = (pm === "ruffle");
+      if (!row.pack) row.pack = {};
+      row.pack.playbackMode = pm;
+      row.pack.forceRuffleInLoft = row.forceRuffleInLoft;
     } else {
       row.forceRuffleInLoft = !!(item.forceRuffleInLoft || item.useRuffleInLoft
         || (item.pack && (item.pack.forceRuffleInLoft || item.pack.useRuffleInLoft)));

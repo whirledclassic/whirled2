@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-flash-check.cjs — headless smoke for ?v=20260906bl
+ * qa-flash-check.cjs — headless smoke for ?v=20260906bs
  * Combined: bk club polish + Classic Flash loft interactivity (walk/emote/EI shim).
  * Beginner: run `node scripts/qa-flash-check.cjs` — no browser needed.
  * ENGINE DEV: dual Wear cards, Hybrid gate, hitbox PE, WhirledAvatarHost, Smooth intact.
@@ -18,10 +18,16 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
-console.log("QA-FLASH check (?v=20260906bl — Ruffle interactivity + bk club)");
+console.log("QA-FLASH check (?v=20260906bs — Flash playability CRITICAL + br club)");
 
 const classic = read("src/classic-avatar.js");
-ok(classic.includes('VERSION = "20260906bl"'), "classic-avatar VERSION bl");
+ok(classic.includes('VERSION = "20260906bs"'), "classic-avatar VERSION bs");
+ok(classic.includes("ROOT CAUSE FIX") || classic.includes("Do NOT put thumb"), "thumb-idle Hybrid fix");
+ok(classic.includes("classic-swf-stand-thumb"), "stand thumb fallback");
+ok(classic.includes('data-auto-ruffle="1"'), "Classic Flash default radio");
+var pngWalkFn = classic.split("function itemHasPngWalk")[1].split("function itemHasStandThumb")[0];
+ok(pngWalkFn.includes("states.walk"), "itemHasPngWalk checks walk");
+ok(!/item\.frames && item\.frames\.length/.test(pngWalkFn), "itemHasPngWalk ignores bare frames");
 ok(classic.includes('wmode: opts.wmode || "transparent"'), "mountRuffle wmode transparent");
 ok(classic.includes("shouldMountRuffleInLoft"), "hybrid gate shouldMountRuffleInLoft");
 ok(classic.includes("setLoftWalkMotion"), "SWF bob walk helper");
@@ -49,7 +55,9 @@ ok(classic.includes('name="playbackMode"') || classic.includes("data-playback-mo
 ok(!/playbackMode\s*=\s*null/.test(classic) || classic.includes("getPlaybackMode"), "dual-mode API intact");
 
 const app = read("app.js");
-ok(app.includes('LOGO_V = "20260906bl"'), "app LOGO_V bl");
+ok(app.includes('LOGO_V = "20260906bs"'), "app LOGO_V bs");
+ok(app.includes("classicRuffleWearHtml"), "app classicRuffleWearHtml never-tofu");
+ok(app.includes("playModeEarly"), "app playbackMode-first loft");
 ok(app.includes("avatar-hitbox"), "avatar-hitbox in loft HTML");
 ok(app.includes("data-avatar-emote-chrome"), "chrome emote buttons");
 ok(app.includes("playClassicChromeEmote"), "playClassicChromeEmote");
@@ -71,16 +79,17 @@ ok(app.includes("I'm away from the keyboard.") || app.includes("away from the ke
 
 const css = read("src/styles.css");
 ok(css.includes("avatar-hitbox"), "CSS avatar-hitbox");
-ok(css.includes("20260906bl") || css.includes("is-ruffle-billboard") || css.includes("avatar-hitbox"), "styles bl / hitbox");
+ok(css.includes("20260906bs") || css.includes("is-ruffle-billboard") || css.includes("avatar-hitbox"), "styles bs / hitbox");
 ok(css.includes("whirled-swf-walk-bob") || css.includes("is-swf-walking"), "SWF bob keyframes/class");
 ok(css.includes("pointer-events: none !important"), "CSS PE none on loft ruffle");
+ok(css.includes("classic-swf-stand-thumb"), "CSS stand thumb under Ruffle");
 ok(css.includes("classic-ruffle-callout") || css.includes("classic-hybrid-badge") || css.includes("classic-mode-card"), "hybrid/callout/mode styles");
 const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
 const brownActive = (cssNoComments.match(/#5c4030/g) || []).length + (cssNoComments.match(/#8b6914/g) || []).length;
 ok(brownActive === 0, "no active brown band hexes outside comments (count=" + brownActive + ")");
 
 const index = read("index.html");
-ok(index.includes("20260906bl"), "index.html cache bl");
+ok(index.includes("20260906bs"), "index.html cache bs");
 ok(index.includes("classic-avatar.js"), "index loads classic-avatar.js");
 
 const docs = [
@@ -96,11 +105,11 @@ ok(how.includes("PNG hybrid") || how.includes("png-hybrid"), "how-doc PNG hybrid
 ok(how.includes("Ruffle never loads"), "how-doc Whirl-only never loads Ruffle");
 ok(how.includes("dual modes") || how.includes("Dual modes") || how.includes("Why dual modes"), "how-doc dual modes why");
 ok(how.includes("playbackMode"), "how-doc playbackMode");
-ok(how.includes("20260906bl") || how.includes("hitbox"), "how-doc bl / hitbox");
+ok(how.includes("20260906bs") || how.includes("hitbox"), "how-doc bs / hitbox");
 ok(how.includes("What works in Classic Flash") || how.includes("WhirledAvatarHost"), "how-doc honest Ruffle table");
 
 const status = read("STATUS.md");
-ok(status.includes("20260906bl"), "STATUS bl");
+ok(status.includes("20260906bs"), "STATUS bs");
 ok(status.includes("hitbox") || status.includes("WhirledAvatarHost") || status.includes("interactivity"), "STATUS Flash interactivity");
 
 if (failed) {

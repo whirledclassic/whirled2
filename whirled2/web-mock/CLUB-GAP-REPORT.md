@@ -1,7 +1,9 @@
+> **Note:** ?v=20260906bs ships Flash/Ruffle loft playability beside br club commands.
+
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bq` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bs` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +19,22 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bq`)
+## Closed this pass (`?v=20260906bs`)
+
+| Item | Notes |
+|------|--------|
+| /clearall | Clear all chat (Room + PM + group tabs) — wiki Chat Options |
+| /myrooms | Me → My Rooms (owned + Create) |
+| /share | Share / embed room popup (in loft) |
+| /groups | Chat options → Groups reopen (loft) or Groups tab |
+| Friends toolbar dbl-click | → Whisper (parity with chat/occupant; respects Block) |
+| My Rooms blurb | Make Door already shipped — remove stale Coming Soon |
+| /help topics | clearall / myrooms / share / groups |
+| Preserve | classic-avatar.js untouched (Flash **bs** parallel); bq go/party/rooms/join; bp friends/who/home/Complain; bo Block; bn; bg dual Wear; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bq`)
 
 | Item | Notes |
 |------|--------|

@@ -1,6 +1,6 @@
 # Classic Whirled avatars — without Adobe Flash
 
-**Cache:** `?v=20260906bl`  
+**Cache:** `?v=20260906bs`  
 **Audience:** beginners + ENGINE DEV. In-site: Help → **Developers** → *Classic Whirled avatars — without Adobe Flash*. Groups → **Dev Updates** thread.
 
 ---
@@ -36,6 +36,19 @@ Persist choice on the Stuff item as `playbackMode: 'png-hybrid' | 'ruffle'`.
 
 ---
 
+
+## Root causes fixed (?v=20260906bs)
+
+| Bug | Fix |
+|-----|-----|
+| Thumb/preview treated as Hybrid PNG walk | `itemHasPngWalk` requires **walk** frames only |
+| Default Smooth radio on SWF-only Save | Default **Classic Flash**; Analyze picks Smooth only if walk PNGs attached |
+| Wear → tofu / empty loft | Never invent idle-from-thumb for SWF; strip huge dataURLs; loft always mounts Ruffle (or last thumb) when SWF worn |
+| Dead floor / emotes | Billboard bob/flip walk; hitbox+nameplate PE auto; chrome bubble + EI try |
+| Stock SWF no AvatarControl | Honest: sharedEvents `controlConnect` needs Phase-2 host SWF — chrome puppet now |
+
+Research (architecture only, no AGPL copy): Ruffle `allowScriptAccess` + EI callbacks on player element; Grey Havens `AvatarControl` / `ActorControl` use `appearanceChanged` + `setLogicalLocation` / states+actions via **sharedEvents**, not raw JS clicks.
+
 ## Do we use Ruffle?
 
 **Yes — optionally.**
@@ -59,7 +72,7 @@ Persist choice on the Stuff item as `playbackMode: 'png-hybrid' | 'ruffle'`.
 
 ---
 
-## What works in Classic Flash (Ruffle) after `?v=20260906bl`
+## What works in Classic Flash (Ruffle) after `?v=20260906bs`
 
 | Action | Works? | How |
 |--------|--------|-----|
