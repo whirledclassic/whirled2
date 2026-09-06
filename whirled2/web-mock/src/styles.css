@@ -874,3 +874,33 @@ button.card.shop-card {
 .room-side-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .room-side-head h2 { margin: 0; font-size: 15px; color: #1e6fa8; }
 .comment-list { margin: 0 0 8px; max-height: 180px; overflow: auto; }
+
+
+/* Games */
+.genre-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.games-page .page-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.game-table-list { display: grid; gap: 8px; margin: 0 0 12px; }
+.game-table-row {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center;
+  border: 1px solid #c5deee; border-radius: 8px; padding: 10px 12px; background: #fff;
+}
+.game-table-row h3 { margin: 0 0 4px; color: #1e6fa8; font-size: 15px; }
+.game-table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.friend-search-form { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.friend-search-form input {
+  flex: 1; min-width: 180px; border: 1px solid #b7d3e8; border-radius: 4px; padding: 8px;
+  font: 13px var(--ui); color: #16324a; background: #fff;
+}
+.friend-search-results { margin: 0 0 14px; }
+.news-section { margin: 12px 0 0; }
+.news-section h3 { margin: 0 0 6px; font-size: 14px; color: #1e6fa8; }
+#create-table-form input[type="number"] { width: 64px; margin-left: 6px; }
+#create-table-form label { display: inline-flex; align-items: center; gap: 6px; margin: 6px 10px 6px 0; }
+#game-comment-form textarea, #create-table-form input[name="name"] {
+  width: 100%; box-sizing: border-box; margin: 6px 0;
+  border: 1px solid #b7d3e8; border-radius: 4px; padding: 8px;
+  font: 13px var(--ui); color: #16324a; background: #fff;
+}
+@media (max-width: 900px) {
+  .games-genre-rail { display: none; }
+}

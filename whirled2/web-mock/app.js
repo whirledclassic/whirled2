@@ -45,6 +45,26 @@
   var ROOM_LOCK_KEY = "whirled2.roomLock.loft";
   var ROOM_RATING_KEY = "whirled2.roomRating.loft";
   var ROOM_COMMENTS_KEY = "whirled2.roomComments.loft";
+  var GAMES_KEY = "whirled2.games";
+  var GAME_TABLES_KEY = "whirled2.gameTables";
+  var GAME_FAV_KEY = "whirled2.gameFavorites";
+  var KNOWN_PROFILES_KEY = "whirled2.knownProfiles";
+  var GAME_GENRES = [
+    { id: "action", label: "Action/Arcade" },
+    { id: "adventure", label: "Adventure/RPG" },
+    { id: "card", label: "Card/Board" },
+    { id: "mmo", label: "MMO/Whirled" },
+    { id: "other", label: "Other" },
+    { id: "puzzle", label: "Puzzle" },
+    { id: "sports", label: "Sports/Racing" },
+    { id: "strategy", label: "Strategy" },
+    { id: "word", label: "Word" }
+  ];
+  var gameGenre = "all";
+  var gamesMode = "browse"; // browse | detail | lobby
+  var gameViewId = null;
+  var gameDetailTab = "play"; // play | trophies | comments
+  var friendSearchQ = "";
   var SHOP_POPULAR = [
     { id: "avatars", label: "Avatars", empty: "No popular avatars yet." },
     { id: "furniture", label: "Furniture", empty: "No popular furniture yet." },
@@ -127,6 +147,77 @@
   }
   function saveRoomComments(rows) {
     try { localStorage.setItem(ROOM_COMMENTS_KEY, JSON.stringify((rows || []).slice(0, 100))); } catch (e) {}
+  }
+  function loadGames() {
+    try { return JSON.parse(localStorage.getItem(GAMES_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveGames(list) {
+    try { localStorage.setItem(GAMES_KEY, JSON.stringify((list || []).slice(0, 200))); } catch (e) {}
+  }
+  function loadGameTables() {
+    try { return JSON.parse(localStorage.getItem(GAME_TABLES_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveGameTables(list) {
+    try { localStorage.setItem(GAME_TABLES_KEY, JSON.stringify((list || []).slice(0, 100))); } catch (e) {}
+  }
+  function loadGameFavorites() {
+    try { return JSON.parse(localStorage.getItem(GAME_FAV_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveGameFavorites(ids) {
+    try { localStorage.setItem(GAME_FAV_KEY, JSON.stringify((ids || []).slice(0, 200))); } catch (e) {}
+  }
+  function toggleGameFavorite(gameId) {
+    var ids = loadGameFavorites();
+    var i = ids.indexOf(gameId);
+    if (i >= 0) ids.splice(i, 1); else ids.unshift(gameId);
+    saveGameFavorites(ids);
+    return ids.indexOf(gameId) >= 0;
+  }
+  function gameCommentsKey(gid) { return "whirled2.gameComments." + gid; }
+  function loadGameComments(gid) {
+    try { return JSON.parse(localStorage.getItem(gameCommentsKey(gid)) || "[]"); } catch (e) { return []; }
+  }
+  function saveGameComments(gid, rows) {
+    try { localStorage.setItem(gameCommentsKey(gid), JSON.stringify((rows || []).slice(0, 100))); } catch (e) {}
+  }
+  function loadKnownProfiles() {
+    try { return JSON.parse(localStorage.getItem(KNOWN_PROFILES_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveKnownProfiles(list) {
+    try { localStorage.setItem(KNOWN_PROFILES_KEY, JSON.stringify((list || []).slice(0, 200))); } catch (e) {}
+  }
+  function rememberProfile(entry) {
+    if (!entry || !entry.id) return;
+    var list = loadKnownProfiles();
+    var found = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === entry.id) {
+        list[i].name = entry.name || list[i].name;
+        list[i].at = new Date().toISOString();
+        found = true;
+        break;
+      }
+    }
+    if (!found) list.unshift({ id: entry.id, name: entry.name || entry.id, at: new Date().toISOString() });
+    saveKnownProfiles(list);
+  }
+  function gameGenreOf(g) {
+    var raw = String((g && (g.genre || g.category || g.kind)) || "other").toLowerCase();
+    if (raw.indexOf("action") >= 0 || raw.indexOf("arcade") >= 0) return "action";
+    if (raw.indexOf("adventure") >= 0 || raw.indexOf("rpg") >= 0) return "adventure";
+    if (raw.indexOf("card") >= 0 || raw.indexOf("board") >= 0) return "card";
+    if (raw.indexOf("mmo") >= 0 || raw.indexOf("whirled") >= 0) return "mmo";
+    if (raw.indexOf("puzzle") >= 0) return "puzzle";
+    if (raw.indexOf("sport") >= 0 || raw.indexOf("racing") >= 0 || raw.indexOf("race") >= 0) return "sports";
+    if (raw.indexOf("strategy") >= 0) return "strategy";
+    if (raw.indexOf("word") >= 0) return "word";
+    for (var i = 0; i < GAME_GENRES.length; i++) if (GAME_GENRES[i].id === raw) return raw;
+    return "other";
+  }
+  function findGame(gid) {
+    var list = loadGames();
+    for (var i = 0; i < list.length; i++) if ((list[i].id || list[i].name) === gid) return list[i];
+    return null;
   }
   function loftRatingLabel() {
     var n = loadRoomRating();
@@ -422,15 +513,161 @@
   function catalog(title, blurb, items) {
     return '<section class="page"><div class="page-head"><div><h1>' + esc(title) + '</h1><p>' + esc(blurb) + '</p></div></div><div class="grid">' + items.map(card).join('') + '</div></section>';
   }
+  function genreRail(active) {
+    return '<aside class="stuff-rail games-genre-rail" aria-label="Genres"><ul class="stuff-cats">'
+      + '<li><button type="button" class="stuff-cat' + (active === "all" ? " is-on" : "") + '" data-game-genre="all">All</button></li>'
+      + GAME_GENRES.map(function (c) {
+          return '<li><button type="button" class="stuff-cat' + (c.id === active ? " is-on" : "") + '" data-game-genre="' + c.id + '">' + esc(c.label) + '</button></li>';
+        }).join("")
+      + '</ul></aside>';
+  }
+  function genreChips(active) {
+    return '<div class="genre-chips" role="group" aria-label="Genres">'
+      + '<button type="button" class="sort-btn' + (active === "all" ? " is-on" : "") + '" data-game-genre="all">All</button>'
+      + GAME_GENRES.map(function (c) {
+          return '<button type="button" class="sort-btn' + (c.id === active ? " is-on" : "") + '" data-game-genre="' + c.id + '">' + esc(c.label) + '</button>';
+        }).join("")
+      + '</div>';
+  }
+  function gameCard(g) {
+    var id = g.id || g.name || "";
+    var coins = (g.coins != null ? g.coins : g.price);
+    var price = coins != null ? (coins + " coins") : "free";
+    return '<button type="button" class="card shop-card game-card" data-game-open="' + esc(id) + '">'
+      + '<div class="swatch"></div><div class="body"><h3>' + esc(g.name || "Game") + '</h3>'
+      + '<p class="meta">' + esc(gameGenreLabel(gameGenreOf(g))) + " · " + esc(g.creator || "member") + '</p>'
+      + '<div class="price">' + esc(String(price)) + '</div></div></button>';
+  }
+  function gameGenreLabel(id) {
+    for (var i = 0; i < GAME_GENRES.length; i++) if (GAME_GENRES[i].id === id) return GAME_GENRES[i].label;
+    return "Other";
+  }
+  function gamesLobbyPage() {
+    var tables = loadGameTables();
+    var s = session();
+    var meId = s && s.user ? s.user.id : "";
+    var rows;
+    if (!tables.length) {
+      rows = '<div class="panel"><p class="meta">No tables awaiting players. Create a game below — local only for now.</p></div>';
+    } else {
+      rows = '<div class="game-table-list">' + tables.map(function (t) {
+        var seats = t.players || [];
+        var n = seats.length;
+        var max = Number(t.maxPlayers) || 4;
+        var joined = seats.some(function (p) { return p.id === meId; });
+        var alone = joined && n === 1;
+        var meta = alone
+          ? "Waiting for other players"
+          : (n + "/" + max + " players" + (t.rated ? " · rated" : " · unrated"));
+        return '<div class="game-table-row">'
+          + '<div><h3>' + esc(t.name || "Table") + '</h3>'
+          + '<p class="meta">' + esc(meta) + (t.gameName ? (" · " + esc(t.gameName)) : "") + '</p>'
+          + '<p class="meta">Host: ' + esc(t.hostName || "member") + '</p></div>'
+          + '<div class="game-table-actions">'
+          + (joined
+            ? '<button type="button" class="action-btn" data-table-leave="' + esc(t.id) + '">Leave</button>'
+              + '<button type="button" class="action-btn" data-table-start="' + esc(t.id) + '"' + (n < 1 ? " disabled" : "") + '>Start now</button>'
+            : '<button type="button" class="action-btn" data-table-join="' + esc(t.id) + '"' + (n >= max ? " disabled" : "") + '>Join</button>')
+          + '</div></div>';
+      }).join("") + '</div>';
+    }
+    return '<section class="page games-page">'
+      + '<button type="button" class="text-btn" data-games-back="1">← All games</button>'
+      + '<div class="featured">Games awaiting players</div>'
+      + '<p class="shop-banner">Multiplayer lobby shell — not a real Pixi game. Tables are local-only.</p>'
+      + '<div class="section-label">Tables</div>'
+      + rows
+      + '<div class="section-label">Create Game</div>'
+      + '<div class="panel"><form id="create-table-form">'
+      +   '<input name="name" maxlength="60" placeholder="Table name" required />'
+      +   '<label class="meta">Max players <input name="max" type="number" min="2" max="8" value="4" /></label>'
+      +   '<label class="meta"><input name="rated" type="checkbox" /> Rated</label>'
+      +   '<button type="submit">Create Game</button>'
+      + '</form></div></section>';
+  }
+  function gameDetailPage(g) {
+    if (!g) {
+      gameViewId = null;
+      gamesMode = "browse";
+      return gamesBrowsePage();
+    }
+    var id = g.id || g.name;
+    var favs = loadGameFavorites();
+    var isFav = favs.indexOf(id) >= 0;
+    var comments = loadGameComments(id);
+    var commentRows = comments.length
+      ? comments.map(function (c) {
+          return '<div class="wall-row"><b>' + esc(c.who || "member") + '</b> ' + esc(c.text || "")
+            + '<time>' + esc((c.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+        }).join("")
+      : '<p class="meta">No comments yet.</p>';
+    var coins = (g.coins != null ? g.coins : g.price);
+    var price = coins != null ? (coins + " coins") : "free";
+    var tabs = [["play", "Play"], ["trophies", "Trophies"], ["comments", "Comments"]].map(function (t) {
+      return '<button type="button" class="sort-btn' + (gameDetailTab === t[0] ? " is-on" : "") + '" data-game-tab="' + t[0] + '">' + t[1] + '</button>';
+    }).join("");
+    var body;
+    if (gameDetailTab === "trophies") {
+      body = '<div class="panel"><p class="meta">No trophies yet. Achievements arrive with the engine track.</p></div>';
+    } else if (gameDetailTab === "comments") {
+      body = '<div class="panel"><div class="comment-list">' + commentRows + '</div>'
+        + '<form id="game-comment-form" data-game-comment="' + esc(id) + '">'
+        + '<textarea name="text" maxlength="400" rows="3" placeholder="Post a comment…" required></textarea>'
+        + '<button type="submit">Post Comment</button></form></div>';
+    } else {
+      body = '<div class="panel">'
+        + '<p class="meta">Open the multiplayer lobby to create or join a table. This is a shell — not a Pixi game.</p>'
+        + '<button type="button" class="action-btn" data-game-play="' + esc(id) + '">Play</button>'
+        + '</div>';
+    }
+    return '<section class="page games-page">'
+      + '<button type="button" class="text-btn" data-games-back="1">← All games</button>'
+      + '<div class="shop-detail">'
+      +   '<div class="panel shop-detail-panel">'
+      +     '<h1>' + esc(g.name || "Game") + '</h1>'
+      +     '<p class="meta">' + esc(gameGenreLabel(gameGenreOf(g))) + " · " + esc(g.creator || "member") + " · " + esc(String(price)) + '</p>'
+      +     '<p class="lobby-blurb">' + esc(g.blurb || g.description || "Saved local game shell.") + '</p>'
+      +     '<div class="shop-detail-actions">'
+      +       '<button type="button" class="action-btn" data-game-play="' + esc(id) + '">Play</button>'
+      +       '<button type="button" class="action-btn fav-btn' + (isFav ? " is-on" : "") + '" data-game-fav="' + esc(id) + '">' + (isFav ? "♥ Favorited" : "♡ Favorite") + '</button>'
+      +     '</div>'
+      +     '<div class="shop-sort" role="tablist">' + tabs + '</div>'
+      +     body
+      +   '</div></div></section>';
+  }
+  function gamesBrowsePage() {
+    var all = loadGames();
+    var filtered = gameGenre === "all" ? all.slice() : all.filter(function (g) { return gameGenreOf(g) === gameGenre; });
+    var favIds = loadGameFavorites();
+    var favGames = all.filter(function (g) { return favIds.indexOf(g.id || g.name) >= 0; });
+    var listBody = filtered.length
+      ? '<div class="grid">' + filtered.map(gameCard).join("") + '</div>'
+      : '<div class="panel"><p class="meta">No games in this genre yet. Games come from localStorage <code>whirled2.games</code> only — nothing is invented.</p></div>';
+    var favBody = favGames.length
+      ? '<div class="grid tight">' + favGames.map(gameCard).join("") + '</div>'
+      : '<p class="meta">No favorites yet.</p>';
+    return '<section class="page games-page">'
+      + '<div class="page-head"><div><h1>Games</h1>'
+      + '<p class="shop-banner">Parlor games mount later with the engine track. Coins from games are labels only.</p></div>'
+      + '<button type="button" class="action-btn" data-games-lobby="1">Games awaiting players</button></div>'
+      + '<div class="stuff-layout">' + genreRail(gameGenre)
+      + '<div class="stuff-main">'
+      +   genreChips(gameGenre)
+      +   '<div class="section-label">Featured</div>'
+      +   '<div class="panel"><p class="meta">No featured games yet.</p></div>'
+      +   '<div class="section-label">My favorites</div>'
+      +   '<div class="panel">' + favBody + '</div>'
+      +   '<div class="section-label">Games</div>'
+      +   listBody
+      + '</div></div></section>';
+  }
   function gamesPage() {
-    return '<section class="page">'
-      + '<div class="featured">Featured Games</div>'
-      + '<p class="lobby-blurb">Parlor games and room launchers live here. Play with friends when games are published — no fake player lists.</p>'
-      + '<div class="section-label">Your games</div>'
-      + '<div class="panel"><p class="meta">No games listed yet. Room toys and launchers arrive with the engine track.</p></div>'
-      + '<div class="section-label">Recently played</div>'
-      + '<div class="panel"><p class="meta">Nothing played yet.</p></div>'
-      + '</section>';
+    if (gamesMode === "lobby") return gamesLobbyPage();
+    if (gamesMode === "detail" && gameViewId) {
+      var g = findGame(gameViewId);
+      return gameDetailPage(g);
+    }
+    return gamesBrowsePage();
   }
   function findGroup(gid) {
     var list = loadGroups();
@@ -669,7 +906,7 @@
       +       '<span class="room-owner">owner: ' + esc(me.name) + '</span>'
       +       '<span class="room-lock-badge" title="Visual only on Pages" data-lock="' + esc(lock) + '">🔒 ' + esc(lockLabel(lock)) + '</span>'
       +       '<span class="room-rating-badge">' + esc(loftRatingLabel()) + '</span></div>'
-      +     '<div id="stage-slot"><div class="stage-copy"><strong>Engine mounts here</strong>Click-to-walk belongs to the room engine.<code>#stage-slot</code></div></div>'
+      +     '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate later — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
       +   '</section>'
@@ -818,13 +1055,66 @@
       + '<button type="button" class="me-link' + (meSub === "account" ? " is-on" : "") + '" data-me="account">Account</button>'
       + '</nav></div>';
   }
+  function newsKindOf(n) {
+    var k = String((n && n.kind) || "").toLowerCase();
+    if (k === "friending" || k === "friend" || k.indexOf("friend") >= 0) return "friending";
+    if (k === "status") return "status";
+    if (k === "comment" || k === "blue") return "comment";
+    if (k === "trophy" || k === "trophies") return "trophy";
+    if (k === "announce" || k === "announcement") return "announce";
+    if (k === "room" || k === "rooms") return "room";
+    if (k === "orange") return "status";
+    return "other";
+  }
+  function myNewsSections() {
+    var sid = session().user.id;
+    var items = [];
+    loadNotices().forEach(function (n) {
+      items.push({ kind: newsKindOf(n), text: n.text, who: "", at: n.at || "" });
+    });
+    loadWall(sid).forEach(function (w) {
+      var k = w.kind === "status" ? "status" : "comment";
+      items.push({ kind: k, text: w.text, who: w.who || "", at: w.at || "" });
+    });
+    loadFriends().forEach(function (f) {
+      if (!f || !f.at) return;
+      items.push({ kind: "friending", text: "You friended " + (f.name || f.id) + ".", who: f.name || "", at: f.at });
+    });
+    function rowsFor(kind) {
+      var rows = items.filter(function (it) { return it.kind === kind; })
+        .sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); })
+        .slice(0, 12);
+      if (!rows.length) return "";
+      return rows.map(function (w) {
+        var label = w.who ? ("<b>" + esc(w.who) + "</b> ") : "";
+        return '<div class="news-row">' + label + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+      }).join("");
+    }
+    function section(title, kind, emptyAlways) {
+      var body = rowsFor(kind);
+      if (!body && !emptyAlways) return "";
+      if (!body) body = '<p class="meta">Nothing here yet.</p>';
+      return '<div class="news-section"><h3>' + esc(title) + '</h3>' + body + '</div>';
+    }
+    var hasAny = items.some(function (it) {
+      return it.kind === "comment" || it.kind === "friending" || it.kind === "status";
+    });
+    if (!hasAny) {
+      return '<p class="meta">No news yet. Post a status on My Profile, leave a comment, or add a friend.</p>'
+        + section("Announcements", "announce", true)
+        + section("Trophies", "trophy", true)
+        + section("Updated Rooms", "room", true);
+    }
+    return section("Comments", "comment", true)
+      + section("Friendings", "friending", true)
+      + section("Status", "status", true)
+      + section("Announcements", "announce", true)
+      + section("Trophies", "trophy", true)
+      + section("Updated Rooms", "room", true);
+  }
   function meHome() {
     var me = you();
     var st = loadStatus(session().user.id);
-    var wall = loadWall(session().user.id).slice(0, 12);
-    var news = wall.map(function (w) {
-      return '<div class="news-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
-    }).join("") || '<p class="meta">No news yet. Post a status on My Profile.</p>';
     var friendIds = {};
     loadFriends().forEach(function (f) { friendIds[f.id] = true; });
     var friendsOnline = liveOccupants.filter(function (p) {
@@ -843,7 +1133,7 @@
       +     '<div class="panel invite-banner">Invite friends to Whirled Classic — coins stay labels only (no payments).</div>'
       +     '<div class="panel"><h2>My News</h2>'
       +       (st ? '<p class="status-line"><b>Your status:</b> ' + esc(st) + '</p>' : '')
-      +       news + '</div>'
+      +       myNewsSections() + '</div>'
       +   '</div>'
       +   '<aside class="me-side">'
       +     '<div class="panel links-panel">'
@@ -927,6 +1217,36 @@
       + '</div></section>';
   }
 
+  function collectSearchablePeople() {
+    var map = {};
+    function add(p) {
+      if (!p || !p.id) return;
+      if (session() && p.id === session().user.id) return;
+      var prev = map[p.id];
+      map[p.id] = {
+        id: p.id,
+        name: p.name || (prev && prev.name) || p.id,
+        online: !!(p.online || (prev && prev.online)),
+        room: p.room || (prev && prev.room) || ""
+      };
+    }
+    liveOccupants.forEach(function (p) {
+      add({ id: p.id, name: p.name, online: true, room: p.room });
+      rememberProfile({ id: p.id, name: p.name });
+    });
+    loadFriends().forEach(function (f) { add({ id: f.id, name: f.name, online: false }); });
+    loadKnownProfiles().forEach(function (p) { add({ id: p.id, name: p.name, online: false }); });
+    return Object.keys(map).map(function (k) { return map[k]; });
+  }
+  function searchPeople(q) {
+    q = String(q || "").trim().toLowerCase();
+    if (!q) return [];
+    return collectSearchablePeople().filter(function (p) {
+      var name = String(p.name || "").toLowerCase();
+      var id = String(p.id || "").toLowerCase();
+      return name.indexOf(q) >= 0 || id.indexOf(q) >= 0;
+    }).slice(0, 40);
+  }
   function meFriends() {
     var list = loadFriends().slice();
     var onlineIds = {};
@@ -965,13 +1285,44 @@
       rows += '<div class="section-label">Recent</div>' + offline.map(function (f) { return friendListRow(f, false); }).join("");
     }
     if (!list.length) {
-      rows = '<p class="meta">No friends yet. Open someone\'s profile and hit Add Friend.</p>';
+      rows = '<p class="meta">No friends yet. Search below or open someone\'s profile and hit Add Friend.</p>';
+    }
+    var friendIdSet = {};
+    list.forEach(function (f) { friendIdSet[f.id] = true; });
+    var results = searchPeople(friendSearchQ);
+    var searchRows;
+    if (!String(friendSearchQ || "").trim()) {
+      searchRows = '<p class="meta">Type a Whirled name or permaname (id). Results only include people in this session, your friends, or saved profiles — no invented players.</p>';
+    } else if (!results.length) {
+      searchRows = '<p class="meta">No matches among occupants, friends, or known profiles.</p>';
+    } else {
+      searchRows = results.map(function (p) {
+        var isFriend = !!friendIdSet[p.id];
+        return '<div class="friend-list-row' + (p.online ? " is-online" : "") + '">'
+          + '<span class="ava">' + esc(String(p.name || "?").slice(0, 1).toUpperCase()) + '</span>'
+          + '<div class="friend-list-main">'
+          +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(p.id) + '"><b>' + esc(p.name) + '</b></button>'
+          +   '<div class="meta">permaname ' + esc(p.id) + (p.online ? " · online" : "") + '</div>'
+          + '</div>'
+          + '<div class="friend-list-actions">'
+          +   (isFriend ? '<span class="meta">Friend</span>' : '<button type="button" class="action-btn" data-add-friend="' + esc(p.id) + '" data-friend-name="' + esc(p.name) + '">Add Friend</button>')
+          +   '<button type="button" class="action-btn" data-mail-to="' + esc(p.id) + '" data-mail-name="' + esc(p.name) + '">Send Mail</button>'
+          +   '<button type="button" class="action-btn" data-enter-room="loft" data-profile="' + esc(p.id) + '">Visit</button>'
+          + '</div></div>';
+      }).join("");
     }
     return '<section class="page me-page">' + meSubnav()
       + '<div class="panel"><h2>Friends</h2>'
-      + '<p class="meta">Invite Them! Search comes with the shared server. For now, add people you meet in the loft.</p>'
+      + '<div class="section-label">Search</div>'
+      + '<form id="friend-search-form" class="friend-search-form">'
+      +   '<input name="q" maxlength="60" placeholder="Search by Whirled name or permaname" value="' + esc(friendSearchQ) + '" />'
+      +   '<button type="submit">Search</button>'
+      + '</form>'
+      + '<div class="friend-search-results">' + searchRows + '</div>'
+      + '<div class="section-label">Your friends</div>'
       + rows + '</div></section>';
   }
+
   function meMail(composeTo) {
     var s = session();
     var me = s.user;
@@ -1247,6 +1598,15 @@
         btn.classList.toggle("is-on", btn.getAttribute("data-room-lock") === lk);
       });
     } catch (e) {}
+    try { ensureStagePlaceholder(); } catch (e) {}
+  }
+  function ensureStagePlaceholder() {
+    var slot = document.getElementById("stage-slot");
+    if (!slot) return;
+    var hasEngine = !!(slot.querySelector("canvas") || slot.querySelector("[data-whirled-engine]"));
+    if (hasEngine) return;
+    if (slot.querySelector(".stage-copy")) return;
+    slot.innerHTML = '<div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate later — click-to-walk arrives with the engine track.<code>#stage-slot</code></div>';
   }
   function refreshChatLog() {
     var log = document.getElementById("chat-log");
@@ -1325,6 +1685,7 @@
         you: session() && p.id === session().user.id
       };
     });
+    liveOccupants.forEach(function (p) { rememberProfile({ id: p.id, name: p.name }); });
     refreshOccupantRail();
   }
   function startOccPoll() {
@@ -1392,6 +1753,7 @@
       window.WhirledApi.logout();
       chat = []; liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
       shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
+      gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
       paint("");
       return;
     }
@@ -1436,6 +1798,8 @@
         viewingId = null;
         paint("me");
       } else if (g === "games") {
+        gamesMode = "lobby";
+        gameViewId = null;
         paint("games");
       }
       return;
@@ -1473,6 +1837,10 @@
     var prof = ev.target.closest("[data-profile]");
     if (prof && session()) {
       viewingId = prof.getAttribute("data-profile") || null;
+      if (viewingId) {
+        var pname0 = (prof.textContent || "").trim() || viewingId;
+        rememberProfile({ id: viewingId, name: pname0.slice(0, 40) });
+      }
       meSub = "profile";
       paint("me");
       return;
@@ -1499,7 +1867,7 @@
         body: session().user.name + " added you as a friend.",
         read: false
       });
-      pushNotice("gray", "You friended " + fname + ".");
+      pushNotice("friending", "You friended " + fname + "."); rememberProfile({ id: fid, name: fname });
       meSub = "friends";
       viewingId = null;
       paint("me");
@@ -1562,6 +1930,95 @@
       paint("shop");
       return;
     }
+
+    var gameGenreBtn = ev.target.closest("[data-game-genre]");
+    if (gameGenreBtn && session()) {
+      gameGenre = gameGenreBtn.getAttribute("data-game-genre") || "all";
+      gamesMode = "browse";
+      paint("games");
+      return;
+    }
+    var gameOpen = ev.target.closest("[data-game-open]");
+    if (gameOpen && session()) {
+      gameViewId = gameOpen.getAttribute("data-game-open");
+      gamesMode = "detail";
+      gameDetailTab = "play";
+      paint("games");
+      return;
+    }
+    if (ev.target.closest("[data-games-back]") && session()) {
+      gamesMode = "browse";
+      gameViewId = null;
+      paint("games");
+      return;
+    }
+    if (ev.target.closest("[data-games-lobby]") && session()) {
+      gamesMode = "lobby";
+      gameViewId = null;
+      paint("games");
+      return;
+    }
+    var gamePlay = ev.target.closest("[data-game-play]");
+    if (gamePlay && session()) {
+      gamesMode = "lobby";
+      paint("games");
+      return;
+    }
+    var gameFav = ev.target.closest("[data-game-fav]");
+    if (gameFav && session()) {
+      toggleGameFavorite(gameFav.getAttribute("data-game-fav"));
+      gamesMode = "detail";
+      paint("games");
+      return;
+    }
+    var gameTab = ev.target.closest("[data-game-tab]");
+    if (gameTab && session()) {
+      gameDetailTab = gameTab.getAttribute("data-game-tab") || "play";
+      gamesMode = "detail";
+      paint("games");
+      return;
+    }
+    var tableJoin = ev.target.closest("[data-table-join]");
+    if (tableJoin && session()) {
+      var tjid = tableJoin.getAttribute("data-table-join");
+      var tablesJ = loadGameTables();
+      for (var tji = 0; tji < tablesJ.length; tji++) {
+        if (tablesJ[tji].id === tjid) {
+          tablesJ[tji].players = tablesJ[tji].players || [];
+          var maxJ = Number(tablesJ[tji].maxPlayers) || 4;
+          if (tablesJ[tji].players.length >= maxJ) break;
+          if (!tablesJ[tji].players.some(function (p) { return p.id === session().user.id; })) {
+            tablesJ[tji].players.push({ id: session().user.id, name: session().user.name });
+          }
+          break;
+        }
+      }
+      saveGameTables(tablesJ);
+      gamesMode = "lobby";
+      paint("games");
+      return;
+    }
+    var tableLeave = ev.target.closest("[data-table-leave]");
+    if (tableLeave && session()) {
+      var tlid = tableLeave.getAttribute("data-table-leave");
+      saveGameTables(loadGameTables().map(function (t) {
+        if (t.id !== tlid) return t;
+        return Object.assign({}, t, {
+          players: (t.players || []).filter(function (p) { return p.id !== session().user.id; })
+        });
+      }));
+      gamesMode = "lobby";
+      paint("games");
+      return;
+    }
+    var tableStart = ev.target.closest("[data-table-start]");
+    if (tableStart && session()) {
+      pushNotice("gray", "Start now — parlor engine mounts later. Lobby stays a shell.");
+      gamesMode = "lobby";
+      paint("games");
+      return;
+    }
+
     var gOpen = ev.target.closest("[data-group-open]");
     if (gOpen && session() && !ev.target.closest("[data-group-thread]")) {
       groupViewId = gOpen.getAttribute("data-group-open");
@@ -1708,6 +2165,7 @@
       if (t === "rooms") { /* keep inRoom */ }
       if (t === "shop") { shopItemId = null; }
       if (t === "groups") { groupViewId = null; groupThreadId = null; }
+      if (t === "games") { gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; }
       paint(t);
     }
   });
@@ -1774,7 +2232,7 @@
       if (st) {
         wall.unshift({ who: you().name, text: "updated status: " + st, at: new Date().toISOString(), kind: "status" });
         saveWall(session().user.id, wall);
-        pushNotice("gray", you().name + " " + st);
+        pushNotice("status", you().name + " " + st);
       }
       meSub = "profile";
       paint("me");
@@ -1788,7 +2246,7 @@
       var wall2 = loadWall(targetWall);
       wall2.unshift({ who: you().name, text: text3, at: new Date().toISOString(), kind: "comment" });
       saveWall(targetWall, wall2);
-      pushNotice("blue", you().name + " commented on a profile.");
+      pushNotice("comment", you().name + " commented on a profile.");
       if (targetWall === session().user.id) { viewingId = null; meSub = "profile"; }
       else viewingId = targetWall;
       paint("me");
@@ -1831,6 +2289,55 @@
       paint("shop");
       return;
     }
+
+    if (ev.target.id === "friend-search-form" && session()) {
+      var fsd = new FormData(ev.target);
+      friendSearchQ = String(fsd.get("q") || "").trim().slice(0, 60);
+      meSub = "friends";
+      viewingId = null;
+      paint("me");
+      return;
+    }
+    if (ev.target.id === "game-comment-form" && session()) {
+      var gc = new FormData(ev.target);
+      var gct = String(gc.get("text") || "").trim().slice(0, 400);
+      var gcid = ev.target.getAttribute("data-game-comment") || gameViewId;
+      if (!gct || !gcid) return;
+      var gcl = loadGameComments(gcid);
+      gcl.unshift({ who: you().name, text: gct, at: new Date().toISOString() });
+      saveGameComments(gcid, gcl);
+      pushNotice("comment", you().name + " commented on a game.");
+      gamesMode = "detail";
+      gameDetailTab = "comments";
+      paint("games");
+      return;
+    }
+    if (ev.target.id === "create-table-form" && session()) {
+      var ctd = new FormData(ev.target);
+      var tname = String(ctd.get("name") || "").trim().slice(0, 60);
+      if (!tname) return;
+      var tmax = Math.max(2, Math.min(8, Number(ctd.get("max")) || 4));
+      var trated = !!ctd.get("rated");
+      var tables = loadGameTables();
+      var tid = "tbl" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      tables.unshift({
+        id: tid,
+        name: tname,
+        maxPlayers: tmax,
+        rated: trated,
+        hostId: session().user.id,
+        hostName: session().user.name,
+        gameId: gameViewId || "",
+        gameName: (findGame(gameViewId) || {}).name || "",
+        players: [{ id: session().user.id, name: session().user.name }],
+        at: new Date().toISOString()
+      });
+      saveGameTables(tables);
+      gamesMode = "lobby";
+      paint("games");
+      return;
+    }
+
     if (ev.target.id === "create-group-form" && session()) {
       var cg = new FormData(ev.target);
       var gname = String(cg.get("name") || "").trim().slice(0, 60);
