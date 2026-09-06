@@ -1,6 +1,6 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906bh` (`LOGO_V`)  
+**Cache:** `?v=20260906bi` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
@@ -67,7 +67,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bh` — club furniture glow stubs + name colors + `/help`/`/away` + presence polish on bg dual Wear + bf Go/Friends (see `STATUS.md`). **Do not regress** `classic-avatar.js` dual Wear modes.
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bi` — Go Group halls + presence status/mail + View items Bleep on bh/bg dual Wear (see `STATUS.md`). **Do not regress** `classic-avatar.js` dual Wear modes.
 
 ---
 

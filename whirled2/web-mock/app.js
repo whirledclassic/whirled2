@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bh";
+  var LOGO_V = "20260906bi";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -4793,7 +4793,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg + bh) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh + bi) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4816,6 +4816,9 @@
       "  /help + /away message, presence feed orange party invites + Clear,",
       "  Friends Visit home offline, View items categories, chat name-menu Send Mail,",
       "  hangout batch invite copy polish — classic-avatar.js dual-mode UNTOUCHED",
+      "• bi: Go menu Group halls, presence status/mail/friend notices, View items Bleep stubs,",
+      "  peach logout-clone name legend, room-avatar friend invite wiki toast, room menu sections,",
+      "  chat-opts Groups reopen blurb — classic-avatar.js dual Wear UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -4947,13 +4950,12 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Clickable furniture: orange link + white game stub clicks (Coming Soon toasts) + on-stage glow legend\n"
-        + "• Occupant name colors: blue here / yellow away / gray idle Zzz (wiki Room)\n"
-        + "• Chat: /help command list; /away <msg>; presence feed orange party invites + Clear log\n"
-        + "• Friends toolbar Visit home (offline); View items categories; name-menu Send Mail\n"
-        + "• Hangout batch invite copy polish (wiki Friend after leave)\n"
-        + "Preserve: bg Flash dual Wear modes (classic-avatar.js UNTOUCHED), bf club Go/Friends/glow,\n"
-        + "  be Music/Parties, bd badges, bc Groups/Admin/broadcast, Whirl, visit-since, pale-blue, earn-only.",
+        + "• Go menu Group halls (joined groups → Groups home)\n"
+        + "• Presence feed: status changes + new mail + friend-request notices (wiki Chat corner)\n"
+        + "• View items: per-item Bleep stub + View in shop Coming Soon\n"
+        + "• Name colors: peach logout-clone legend (Coming Soon); room-avatar invite → mailed toast\n"
+        + "• Room menu section labels + chat-opts Groups reopen beginner blurb\n"
+        + "Preserve: bg Flash dual Wear (classic-avatar.js UNTOUCHED), bh/bf/be/bd/bc, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -5465,7 +5467,7 @@
     savePresenceFeed(rows);
   }
   function presenceFeedHtml() {
-    // How this works (?v=20260906bh): wiki Chat grey corner log — login/logout + orange party invites.
+    // How this works (?v=20260906bi): wiki Chat grey corner — login/logout, status, mail/friend, orange party.
     // Beginner: lower-right Presence list; expand for more; Clear empties this browser log only.
     var rows = loadPresenceFeed().slice(0, presenceFeedOpen ? 14 : 4);
     if (!rows.length) return "";
@@ -5482,7 +5484,7 @@
         : '')
       + '</div>'
       + '<div class="presence-feed-body"' + (presenceFeedOpen ? "" : ' data-collapsed="1"') + '>' + body + '</div>'
-      + '<p class="meta presence-feed-hint">Grey = login/logout · Orange = party invite (local)</p>'
+      + '<p class="meta presence-feed-hint">Grey = login/logout/status · Blue = mail/friend · Orange = party (local)</p>'
       + '</div>';
   }
   var friendsPopupOpen = false;
@@ -5567,6 +5569,7 @@
         refreshWalletChrome();
       } catch (eFrAuto) {}
       pushNotice("friending", toName + " (Friendly) auto-accepted — you are friends!");
+      try { appendPresenceFeed("blue", toName + " (Friendly) is now your friend!"); } catch (eFa) {}
       sendMail({
         toId: toId,
         toName: toName,
@@ -5594,7 +5597,9 @@
       subject: "Friend request",
       body: req.message
     });
-    pushNotice("friending", "Friend request sent to " + toName + ".");
+    // How this works (?v=20260906bi): wiki Friend — “Your friend request was successfully mailed.”
+    pushNotice("friending", "Your friend request was successfully mailed.");
+    try { appendPresenceFeed("blue", "Friend request mailed → " + toName + "."); } catch (ePf) {}
     rememberProfile({ id: toId, name: toName });
     return req;
   }
@@ -5622,6 +5627,7 @@
     addFriendForUser(hit.fromId, { id: s.user.id, name: s.user.name });
     addFriendForUser(s.user.id, { id: hit.fromId, name: hit.fromName });
     pushNotice("friending", hit.fromName + " is now your friend!");
+    try { appendPresenceFeed("blue", hit.fromName + " is now your friend!"); } catch (eAf) {}
     // How this works: friend accept grants +15 coins each side (local wallets).
     try {
       grantCurrency(s.user.id, 15, 0, { kind: "friend", label: "Friend accepted", note: "+15 coins — friended " + (hit.fromName || "") });
@@ -5956,6 +5962,15 @@
           return '<button type="button" data-go-friend="' + esc(f.id) + '" data-go-friend-name="' + esc(f.name) + '">👥 ' + esc(f.name) + '</button>';
         }).join("")
       : '<button type="button" data-go="friends">No friends here — open Friends list</button>';
+    // How this works (?v=20260906bi): wiki Go… also lists Group halls (joined groups).
+    // Beginner: Group halls open the Groups tab on that group's home — not a fake shop catalog.
+    var halls = [];
+    try { halls = myJoinedGroups(); } catch (eH) { halls = []; }
+    var hallBtns = halls.length
+      ? halls.slice(0, 8).map(function (g) {
+          return '<button type="button" data-go-group="' + esc(g.id) + '">🏛 ' + esc(g.name || g.id) + '</button>';
+        }).join("")
+      : '<button type="button" data-go="groups">No halls yet — browse Groups</button>';
     return '<div class="go-menu" id="go-menu" hidden>'
       + '<div class="go-menu-section meta">Go…</div>'
       + '<button type="button" data-go="home">🏠 Go home</button>'
@@ -5963,9 +5978,11 @@
       + recentBtns
       + '<div class="go-menu-section meta">Friends online</div>'
       + friendBtns
+      + '<div class="go-menu-section meta">Group halls</div>'
+      + hallBtns
       + '<div class="go-menu-section meta">Games</div>'
       + '<button type="button" data-go="games">View games awaiting players</button>'
-      + '<p class="meta go-menu-hint">Classic Go menu — visit friends, recents, home, or parlor lobby.</p>'
+      + '<p class="meta go-menu-hint">Classic Go — home, recents, friends, group halls, or parlor lobby.</p>'
       + '</div>';
   }
   function recentRoomsStripHtml() {
@@ -6415,12 +6432,14 @@
       + '</div>';
   }
   function occLegend() {
-    // How this works (?v=20260906bh): wiki Room name colors — blue here, yellow /away, gray Zzz idle.
+    // How this works (?v=20260906bi): wiki Room name colors — blue here, yellow /away, gray Zzz, peach clone stub.
+    // Beginner: peach = logged-out greeting clone (classic under development) — Coming Soon here.
     return '<div class="occ-legend" title="Presence + classic name colors">'
       + '<span><i class="lg green"></i> Here</span>'
       + '<span><i class="lg yellow"></i> Away</span>'
       + '<span><i class="lg gray"></i> Idle</span>'
       + '<span><i class="lg orange"></i> In game</span>'
+      + '<span title="Logged-out greeting clone — Coming Soon"><i class="lg peach"></i> Clone <span class="soon-tag">Soon</span></span>'
       + '</div>';
   }
   function occupantRailHtml(here) {
@@ -6452,7 +6471,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ax";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=" + LOGO_V;
   }
   function roomShareUrl() {
     // How this works (20260906af): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
@@ -6600,7 +6619,7 @@
     return '<div class="modal-backdrop" id="buddy-invite-modal" data-buddy-cancel="1">'
       + '<div class="modal-card" role="dialog" aria-label="Let\'s be buddies!" onclick="event.stopPropagation()">'
       +   '<h2>Let\'s be buddies!</h2>'
-      +   '<p class="meta">Invite <b>' + esc(t.name) + '</b> — optional message (sent as a mail note). Default classic text below.</p>'
+      +   '<p class="meta">Invite <b>' + esc(t.name) + '</b> — optional message (mail note). Wiki room-avatar path uses default “Let\'s be buddies!” without this form; profile Invite still customizes.</p>'
       +   '<form id="buddy-invite-form" data-buddy-id="' + esc(t.id) + '" data-buddy-name="' + esc(t.name) + '">'
       +     '<textarea name="message" rows="3" maxlength="400">Let\'s be buddies!</textarea>'
       +     '<div class="invite-them-actions">'
@@ -8138,7 +8157,13 @@
       else if (kGlow.indexOf("toy") >= 0 || kGlow.indexOf("pet") >= 0 || catGlow === "toys" || catGlow === "pets" || it.linkTo) glowKind = "link";
     }
     var showGlow = !!doorGlowPreview && !!glowKind;
+    var itemBleeped = false;
+    try {
+      var blMap = JSON.parse(sessionStorage.getItem("whirled2.roomItemBleep") || "{}") || {};
+      itemBleeped = !!(it.id && blMap[it.id]);
+    } catch (eBleChip) {}
     var cls = "decorate-chip"
+      + (itemBleeped ? " is-item-bleeped" : "")
       + (isDoor ? " is-door" : "")
       + (selected ? " is-selected" : "")
       + (showGlow && glowKind === "door" ? " is-glowing" : "")
@@ -8214,12 +8239,22 @@
         else byCat.other.push(it);
       }
     });
+    // How this works (?v=20260906bi): wiki View items — Bleep/Unbleep + View in shop stubs (local chrome).
+    // Beginner: Bleep hides the chip for you only this session; shop link is Coming Soon (no fake catalog).
+    var bleeped = {};
+    try { bleeped = JSON.parse(sessionStorage.getItem("whirled2.roomItemBleep") || "{}") || {}; } catch (eBl) { bleeped = {}; }
     function listBlock(label, arr) {
       if (!arr.length) return "";
       return '<div class="section-label">' + esc(label) + ' (' + arr.length + ')</div>'
         + '<ul class="room-items-list">' + arr.map(function (it) {
-          return '<li><span class="room-item-chip">' + esc(it.name || "Item") + '</span> <span class="meta">'
-            + esc(itemUsage(it)) + ' · (' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span></li>';
+          var ble = !!(it.id && bleeped[it.id]);
+          return '<li class="room-item-row' + (ble ? " is-bleeped" : "") + '">'
+            + '<span class="room-item-chip">' + esc(it.name || "Item") + '</span> <span class="meta">'
+            + esc(itemUsage(it)) + ' · (' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span>'
+            + ' <button type="button" class="text-btn room-item-bleep" data-room-item-bleep="' + esc(it.id || "") + '" title="Bleep (hide for you)">'
+            + (ble ? "Unbleep" : "Bleep") + '</button>'
+            + ' <button type="button" class="text-btn" data-room-item-shop="' + esc(it.id || "") + '" title="Shop page — Coming Soon">View in shop <span class="soon-tag">Soon</span></button>'
+            + '</li>';
         }).join("") + '</ul>';
     }
     var placedBody = placed.length
@@ -8239,7 +8274,7 @@
       + '<div class="panel">'
       +   '<div class="room-side-head"><h2>Room View items</h2>'
       +     '<button type="button" class="text-btn" data-room-items-close="1">Close</button></div>'
-      +   '<p class="meta">Wiki View items — furniture, toys, doors, images, playlist. Avatars &amp; pets are not listed (classic).</p>'
+      +   '<p class="meta">Wiki View items — furniture, toys, doors, images, playlist. Avatars &amp; pets are not listed. Bleep hides a chip for you (session). Shop pages stay Coming Soon — no fake catalog.</p>'
       +   placedBody
       +   '<div class="section-label">Playlist</div>' + trackRows
       + '</div></div>';
@@ -10970,13 +11005,16 @@
       +     '<span class="tb-go-wrap tb-room-wrap">'
       +       '<button type="button" class="tb tb-room" title="Room" aria-label="Room" data-tb="room">' + tbIconSvg("room") + '</button>'
       +       '<div class="go-menu room-menu" id="room-menu" hidden>'
-      +         '<button type="button" data-room-menu="comment">💬 Comment or rate</button>'
-      +         '<button type="button" data-room-menu="decorate">✏️ Decorate Room</button>'
+      +         '<div class="go-menu-section meta">Room</div>'
+      +         '<p class="meta go-menu-hint room-menu-hint">Wiki Room control — edit, view items, comments, playlist, share.</p>'
+      +         '<button type="button" data-room-menu="decorate">✏️ Edit / Decorate Room</button>'
       +         '<button type="button" data-room-menu="view-items">View items</button>'
+      +         '<button type="button" data-room-menu="comment">💬 View / add room comments</button>'
+      +         '<button type="button" data-room-menu="playlist">♪ View room playlist</button>'
       +         '<button type="button" data-room-menu="clickable">View clickable furniture</button>'
+      +         '<div class="go-menu-section meta">Capture &amp; share</div>'
       +         '<button type="button" data-room-menu="snapshot">📸 Take snapshot <span class="soon-tag">Coming Soon</span></button>'
       +         '<button type="button" data-room-menu="zoom">🔍 Zoom room view <span class="soon-tag">Coming Soon</span></button>'
-      +         '<button type="button" data-room-menu="playlist">♪ View room music</button>'
       +         '<button type="button" data-room-share="1">Share / embed room…</button>'
       +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
       // How this works (20260906af): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
@@ -11870,7 +11908,8 @@
       +   '<button type="button" class="action-btn' + (ui.bubbleDuration === "long" ? " is-on" : "") + '" data-chat-bubble-dur="long">Long</button>'
       + '</div>'
       + '<p class="meta" style="margin:4px 8px 8px;font-size:11px">Stage bubble duration (above avatars)</p>'
-      + '<div class="chat-opts-title">Groups</div>';
+      + '<div class="chat-opts-title">Groups</div>'
+      + '<p class="meta chat-opts-hint">Wiki: closing a Group tab hides it until you reopen here (Chat options → Groups).</p>';
     var joined = myJoinedGroups();
     if (joined.length) {
       menu.innerHTML += joined.map(function (g) {
@@ -13044,7 +13083,23 @@
         gamesMode = "lobby";
         gameViewId = null;
         paint("games");
+      } else if (g === "groups") {
+        // How this works (?v=20260906bi): Go → Groups browse when no halls joined yet.
+        groupViewId = null;
+        groupThreadId = null;
+        paint("groups");
       }
+      return;
+    }
+    var goGroup = ev.target.closest("[data-go-group]");
+    if (goGroup && session()) {
+      // How this works (?v=20260906bi): wiki Go → group halls — open that group's home.
+      goMenuOpen = false;
+      var gmG = document.getElementById("go-menu");
+      if (gmG) gmG.hidden = true;
+      groupViewId = goGroup.getAttribute("data-go-group");
+      groupThreadId = null;
+      paint("groups");
       return;
     }
     var tb = ev.target.closest("[data-tb]");
@@ -13139,19 +13194,15 @@
     }
     var invBuddy = ev.target.closest("[data-invite-buddy]");
     if (invBuddy && session()) {
-      friendInvitePending = {
-        id: invBuddy.getAttribute("data-invite-buddy"),
-        name: invBuddy.getAttribute("data-friend-name") || invBuddy.getAttribute("data-invite-buddy")
-      };
+      // How this works (?v=20260906bi): wiki Friend — room avatar invite skips customize; default “Let's be buddies!”
+      // Beginner: Profile “Invite” still opens the optional-message form; loft occupant menu mails instantly.
+      var ibId = invBuddy.getAttribute("data-invite-buddy");
+      var ibName = invBuddy.getAttribute("data-friend-name") || ibId;
       occMenuId = null;
-      if (document.querySelector(".workspace")) {
-        refreshOccupantRail();
-        if (!document.getElementById("buddy-invite-modal")) {
-          var wrap = document.createElement("div");
-          wrap.innerHTML = friendInvitePopup();
-          document.getElementById("app").appendChild(wrap.firstChild);
-        }
-      } else paint("me");
+      createFriendRequest(ibId, ibName, "Let's be buddies!");
+      try { awardAction("friend"); } catch (eIb) {}
+      if (document.querySelector(".workspace")) refreshOccupantRail();
+      else { meSub = "friends"; viewingId = null; paint("me"); }
       return;
     }
     if (ev.target.closest("[data-invite-open]") && session()) {
@@ -14264,6 +14315,24 @@
       paint("rooms");
       return;
     }
+    var rib = ev.target.closest("[data-room-item-bleep]");
+    if (rib && session()) {
+      // How this works (?v=20260906bi): wiki View items Bleep — hide decorate chip for you (sessionStorage).
+      var ridB = rib.getAttribute("data-room-item-bleep") || "";
+      if (!ridB) return;
+      var mapB = {};
+      try { mapB = JSON.parse(sessionStorage.getItem("whirled2.roomItemBleep") || "{}") || {}; } catch (eRB) { mapB = {}; }
+      if (mapB[ridB]) delete mapB[ridB];
+      else mapB[ridB] = 1;
+      try { sessionStorage.setItem("whirled2.roomItemBleep", JSON.stringify(mapB)); } catch (eRB2) {}
+      pushNotice("gray", mapB[ridB] ? "Bleeped item (hidden for you)." : "Unbleeped item.", { transient: true });
+      if (inRoom) paint("rooms");
+      return;
+    }
+    if (ev.target.closest("[data-room-item-shop]")) {
+      pushNotice("orange", "View in shop — Coming Soon (no fake catalog SKUs).", { transient: true });
+      return;
+    }
     if (ev.target.closest("[data-playlist-close]") && session()) {
       // How this works: explicit Close only (also backdrop via capture binder).
       closePlaylistPanel();
@@ -15160,6 +15229,8 @@
         wall.unshift({ who: you().name, text: "updated status: " + st, at: new Date().toISOString(), kind: "status" });
         saveWall(session().user.id, wall);
         pushNotice("status", you().name + " " + st);
+        // How this works (?v=20260906bi): wiki Chat — friend status changes appear in the grey corner feed.
+        try { appendPresenceFeed("gray", you().name + " status: “" + st.slice(0, 80) + "”"); } catch (eStPf) {}
         try { awardAction("status"); } catch (e) {}
         try { tryStatusCoinGrant(session().user.id); refreshWalletChrome(); } catch (eSt) {}
       }
@@ -15209,6 +15280,7 @@
       });
       try { awardAction("mail"); } catch (e) {}
       pushNotice("blue", "Mail sent.");
+      try { appendPresenceFeed("blue", "Mail sent → " + (toName || toId) + "."); } catch (eMailPf) {}
       window.__mailCompose = null;
       meSub = "mail";
       paint("me");

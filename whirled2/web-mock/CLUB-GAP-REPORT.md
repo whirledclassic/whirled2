@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bh` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bi` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,22 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bh`)
+## Closed this pass (`?v=20260906bi`)
+
+| Item | Notes |
+|------|--------|
+| Go Group halls | Joined groups in Go… → Groups home; browse Groups if none |
+| Presence feed | Status changes (grey); mail + friend-request (blue); hint updated |
+| View items Bleep | Per-item Bleep/Unbleep (session) + View in shop Coming Soon |
+| Peach name legend | Logout-clone peach swatch Coming Soon (wiki Room name colors) |
+| Room-avatar invite | Instant “Let's be buddies!” + “successfully mailed” toast (wiki Friend) |
+| Room menu / chat-opts | Section labels; Groups reopen beginner blurb |
+| Preserve | bg dual Wear (`classic-avatar.js` untouched); bh/bf/be/bd/bc; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bh`)
+
 
 | Item | Notes |
 |------|--------|
@@ -176,8 +191,8 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Lock / share / embed | Working chrome + pale-blue dock (ax) | Lock triad + preview blurbs `bd`; share/embed `be`; clickable glow legend `bf` |
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
 | Parties | **Improved** (`be`) board create/join/invite; follow-host Coming Soon | Follow-host presence **P1** |
-| Go / Friends toolbar | **Improved** (`bf`) Go sections + Friends online/offline popup | Server presence **P1** |
-| Clickable furniture glow | **Improved** (`bh`) legend + stub clicks (Coming Soon toasts) | Full link/game travel later **P2** |
+| Go / Friends toolbar | **Improved** (`bi`) Go sections + Group halls + Friends online/offline | Server presence **P1** |
+| Clickable furniture glow | **Improved** (`bh`) legend + stub clicks; View items Bleep (`bi`) | Full link/game travel later **P2** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |
 
 ### Door (wiki)
@@ -220,8 +235,8 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Friends toolbar popup / online approx | **Working** (occupant-diff heuristic) | Server presence **P1** |
 | Rich search (email/permaname) | **Improved** (`ba`) name/id/email/realName/interests (local) | Server directory **P1** |
 | Friends toolbar popup | **Improved** (`bf`) online + offline rows; Join/Whisper/Profile | Server presence **P1** |
-| Login/logout notices | **Improved** (`bh`) presence feed + orange party invites + Clear | Server presence **P1** |
-| Room avatar “Invite to be your friend” | Partial vs wiki | **P2** |
+| Login/logout notices | **Improved** (`bi`) presence + status/mail/friend + orange party + Clear | Server presence **P1** |
+| Room avatar “Invite to be your friend” | **Improved** (`bi`) instant default mail + wiki toast | Profile customize still available **—** |
 
 ### Music (wiki)
 **Classic:** MP3 upload/shop; room playlist; owner controls; max 99 tracks.

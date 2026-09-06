@@ -1,8 +1,8 @@
 # QA Flash
 
-Dual modes bg: playbackMode png-hybrid|ruffle.
+Dual modes bg: playbackMode png-hybrid|ruffle. (bi club polish — classic-avatar.js UNTOUCHED)
 
-# QA-FLASH — overnight Flash / loft interact checklist (?v=20260906bb)
+# QA-FLASH — overnight Flash / loft interact checklist (?v=20260906bi)
 
 **Audience:** beginners verifying Wear + loft; ENGINE DEV confirming chrome vs Ruffle boundaries.
 
@@ -16,7 +16,7 @@ Dual modes bg: playbackMode png-hybrid|ruffle.
 1. **Black background** — Ruffle opaque stage. Fixed: `wmode:"transparent"`, `backgroundColor:null`, transparent CSS.
 2. **Cannot click / walk** — Ruffle ate pointer events; stock SWFs need AvatarControl. Fixed: Hybrid PNG walk default; loft Ruffle `pointer-events:none`.
 3. **Brown/black room bars** — swept to pale-blue (ay/az).
-4. **Tofu / wrong sprite on Hybrid walk (?v=20260906bb)** — preview/thumb alone was treated as Hybrid; empty walk frames blanked the billboard → tofu fallback. Fixed: strict PNG idle/walk gate; never wipe frames mid-walk; never tofu when SWF worn; SWF-only gets Ruffle + bob/flip motion.
+4. **Tofu / wrong sprite on Hybrid walk (?v=20260906bi)** — preview/thumb alone was treated as Hybrid; empty walk frames blanked the billboard → tofu fallback. Fixed: strict PNG idle/walk gate; never wipe frames mid-walk; never tofu when SWF worn; SWF-only gets Ruffle + bob/flip motion.
 5. **Huge SWF data URL on worn row** — could blow localStorage Wear. Fixed: prefer `swfSha1` + IDB; strip large data URLs from worn snapshot.
 
 ## What to do on Wear
@@ -30,7 +30,7 @@ Dual modes bg: playbackMode png-hybrid|ruffle.
 
 ### Steps (Test profile)
 
-1. Hard-reload `?v=20260906bb`.
+1. Hard-reload `?v=20260906bi`.
 2. Stuff → Avatars → Whirl seeded + Worn.
 3. Classic upload: Drop SWF → Analyze (auto Experimental/Hybrid) → Save → **Wear & enter loft**.
 4. Hybrid with PNG idle+walk → nameplate Hybrid (smooth) → floor walk uses PNG (not tofu).

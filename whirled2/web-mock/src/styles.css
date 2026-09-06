@@ -6929,3 +6929,13 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 @media (max-width: 700px) {
   .furniture-glow-legend { left: 6px; bottom: 64px; width: min(200px, 58vw); font-size: 11px; }
 }
+
+/* ---- ?v=20260906bi: club polish — peach clone legend, View items bleep, presence blue ---- */
+.occ-legend .lg.peach { background: #f0c4a8; box-shadow: 0 0 0 1px #e0a888; }
+.presence-feed-row.kind-blue { color: #1e6fa8; }
+.room-item-row.is-bleeped .room-item-chip { opacity: 0.45; text-decoration: line-through; }
+.room-item-row .room-item-bleep { font-size: 11px; }
+.decorate-chip.is-item-bleeped { opacity: 0.28; filter: grayscale(0.6); pointer-events: none; }
+.room-menu-hint { margin: 2px 8px 6px; font-size: 10px; }
+.chat-opts-hint { margin: 2px 8px 6px !important; font-size: 10px !important; }
+.go-menu .go-menu-section { margin-top: 4px; }

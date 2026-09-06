@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-flash-check.cjs — headless smoke for ?v=20260906bh (preserve bg dual Wear modes) + Flash loft.
+ * qa-flash-check.cjs — headless smoke for ?v=20260906bi (preserve bg dual Wear modes) + Flash loft.
  * Beginner: run `node scripts/qa-flash-check.cjs` — no browser needed.
  * ENGINE DEV: asserts playbackMode dual cards, Hybrid gate, SWF bob, optional Ruffle docs, no tofu-on-SWF.
  */
@@ -17,10 +17,10 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
-console.log("QA-FLASH check (?v=20260906bh — dual modes preserved)");
+console.log("QA-FLASH check (?v=20260906bi — dual modes preserved)");
 
 const classic = read("src/classic-avatar.js");
-ok(classic.includes('VERSION = "20260906bg"') || classic.includes('VERSION = "20260906bh"'), "classic-avatar VERSION bg|bh (dual-mode file preserved)");
+ok(classic.includes('VERSION = "20260906bg"') || classic.includes('VERSION = "20260906bh"') || classic.includes('VERSION = "20260906bi"'), "classic-avatar VERSION bg|bh|bi (dual-mode preserved)");
 ok(classic.includes('wmode: opts.wmode || "transparent"'), "mountRuffle wmode transparent");
 ok(classic.includes("shouldMountRuffleInLoft"), "hybrid gate shouldMountRuffleInLoft");
 ok(classic.includes("setLoftWalkMotion"), "SWF bob walk helper");
@@ -40,7 +40,11 @@ ok(classic.includes("pointerEvents") || classic.includes("pointer-events"), "lof
 ok(classic.includes('name="playbackMode"') || classic.includes("data-playback-mode-item"), "Wear mode radios");
 
 const app = read("app.js");
-ok(app.includes('LOGO_V = "20260906bh"'), "app LOGO_V bh");
+ok(app.includes('LOGO_V = "20260906bi"'), "app LOGO_V bi");
+ok(app.includes("data-go-group") || app.includes("Group halls"), "Go Group halls bi");
+ok(app.includes("roomItemBleep") || app.includes("data-room-item-bleep"), "View items Bleep bi");
+ok(app.includes("successfully mailed"), "wiki friend mailed toast bi");
+ok(app.includes("lg peach") || app.includes("lg.peach") || app.includes('class="lg peach"'), "peach clone legend bi");
 ok(app.includes("setLoftWalkMotion"), "app wires SWF walk motion");
 ok(app.includes("never wipe frames") || app.includes("never wipe frames to"), "setAvatarState never blanks frames");
 ok(app.includes("HOW-CLASSIC-AVATARS-WITHOUT-FLASH"), "Dev Hub links how-without-Flash");
@@ -53,7 +57,7 @@ ok(app.includes("getPlaybackMode"), "app honors getPlaybackMode");
 ok(app.includes("storage full") || app.includes("120000"), "Wear persist harden vs blown localStorage");
 
 const css = read("src/styles.css");
-ok(css.includes("classic-mode-cards") || css.includes("20260906bg") || css.includes("20260906bh"), "styles.css dual-mode cards / bh");
+ok(css.includes("classic-mode-cards") || css.includes("20260906bg") || css.includes("20260906bh") || css.includes("20260906bi"), "styles.css dual-mode cards / bi");
 ok(css.includes("whirled-swf-walk-bob") || css.includes("is-swf-walking"), "SWF bob keyframes/class");
 ok(css.includes("pointer-events: none !important"), "CSS PE none on loft ruffle");
 ok(css.includes("classic-ruffle-callout") || css.includes("classic-hybrid-badge") || css.includes("classic-mode-card"), "hybrid/callout/mode styles");
@@ -62,7 +66,7 @@ const brownActive = (cssNoComments.match(/#5c4030/g) || []).length + (cssNoComme
 ok(brownActive === 0, "no active brown band hexes outside comments (count=" + brownActive + ")");
 
 const index = read("index.html");
-ok(index.includes("20260906bh"), "index.html cache bh");
+ok(index.includes("20260906bi"), "index.html cache bh");
 ok(index.includes("classic-avatar.js"), "index loads classic-avatar.js");
 ok(classic.includes("playbackMode") && classic.includes("classicWearModePickerHtml"), "dual Wear modes still in classic-avatar.js");
 

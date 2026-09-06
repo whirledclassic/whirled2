@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bi)
+
+- **Club gaps + polish (after bh):** Go menu **Group halls** (joined groups); presence feed status/mail/friend (blue) notices; View items **Bleep**/Unbleep + View in shop Coming Soon; peach logout-clone name legend; room-avatar Invite → wiki “successfully mailed” toast; Room menu section labels; chat-opts Groups reopen beginner blurb
+- **Preserve:** bg Flash dual Wear modes (`classic-avatar.js` playbackMode UNTOUCHED — still VERSION bg), bh furniture glow/name colors/help, bf Go/Friends/glow, be Music/Parties, bd badges, bc Groups/Admin, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bi`**. Push: `/tmp/push-bi.js` (dry-run default).
+
 ## What shipped (?v=20260906bh)
 
 - **Club gaps + polish (after bg):** furniture orange/white stub clicks + on-stage glow legend; occupant name colors (blue/yellow/gray Zzz); `/help` + `/away <msg>` + `/action` stub; presence feed orange party invites + Clear; Friends toolbar Visit home (offline); Room View items categories; chat name-menu Send Mail; hangout batch invite copy
