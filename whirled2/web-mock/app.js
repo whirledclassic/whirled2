@@ -19,6 +19,9 @@
   var PARTIES_KEY = "whirled2.parties";
   var ROOM_LAYOUT_KEY = "whirled2.roomLayout.loft";
   var MY_PARTY_KEY = "whirled2.myParty";
+  var BLOCKLIST_KEY = "whirled2.blocklist";
+  var GALLERIES_KEY = "whirled2.galleries";
+  var TRANSACTIONS_KEY = "whirled2.transactions";
   var STUFF_CATS = [
     { id: "avatars", label: "Avatars", empty: "You have no avatars yet." },
     { id: "furniture", label: "Furniture", empty: "You have no furniture yet." },
@@ -131,6 +134,82 @@
     var id = loadMyPartyId();
     return id ? findParty(id) : null;
   }
+  function loadBlocklist() {
+    try { return JSON.parse(localStorage.getItem(BLOCKLIST_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveBlocklist(list) {
+    try { localStorage.setItem(BLOCKLIST_KEY, JSON.stringify((list || []).slice(0, 200))); } catch (e) {}
+  }
+  function isBlocked(id) {
+    if (!id) return false;
+    var sid = String(id).toLowerCase();
+    return loadBlocklist().some(function (b) {
+      return String(b.id || "").toLowerCase() === sid || String(b.permaname || "").toLowerCase() === sid;
+    });
+  }
+  function addBlocked(entry) {
+    var id = String((entry && entry.id) || "").trim();
+    if (!id) return false;
+    var list = loadBlocklist().filter(function (b) { return String(b.id).toLowerCase() !== id.toLowerCase(); });
+    list.unshift({
+      id: id,
+      permaname: id,
+      name: String((entry && entry.name) || id).trim().slice(0, 40),
+      at: new Date().toISOString()
+    });
+    saveBlocklist(list);
+    return true;
+  }
+  function removeBlocked(id) {
+    saveBlocklist(loadBlocklist().filter(function (b) { return String(b.id) !== String(id); }));
+  }
+  function loadGalleries() {
+    try { return JSON.parse(localStorage.getItem(GALLERIES_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveGalleries(list) {
+    try { localStorage.setItem(GALLERIES_KEY, JSON.stringify((list || []).slice(0, 50))); } catch (e) {}
+  }
+  function findGallery(id) {
+    var all = loadGalleries();
+    for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+    return null;
+  }
+  function loadTransactions() {
+    try { return JSON.parse(localStorage.getItem(TRANSACTIONS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveTransactions(list) {
+    try { localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify((list || []).slice(0, 300))); } catch (e) {}
+  }
+  function appendTransaction(row) {
+    var list = loadTransactions();
+    list.unshift({
+      id: "tx" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      kind: (row && row.kind) || "note",
+      label: String((row && row.label) || "").slice(0, 160),
+      coins: Number((row && row.coins) || 0) || 0,
+      note: "Coins are labels only — no real currency.",
+      at: new Date().toISOString()
+    });
+    saveTransactions(list);
+  }
+  function clearStrayUI() {
+    goMenuOpen = false;
+    roomMenuOpen = false;
+    partyPanelOpen = false;
+    helpOpen = false;
+    invitePanelOpen = false;
+    occMenuId = null;
+    friendInvitePending = null;
+    var gm = document.getElementById("go-menu");
+    if (gm) gm.hidden = true;
+    var rm = document.getElementById("room-menu");
+    if (rm) rm.hidden = true;
+    var orphanParty = document.getElementById("party-panel");
+    if (orphanParty && !document.querySelector(".workspace #party-panel")) orphanParty.remove();
+    var buddy = document.getElementById("buddy-invite-modal");
+    if (buddy) buddy.remove();
+  }
+
   function loadRoomLayout() {
     try {
       var raw = JSON.parse(localStorage.getItem(ROOM_LAYOUT_KEY) || '{"items":[]}');
@@ -332,7 +411,7 @@
     var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
-  var meSub = "home"; // home | profile | friends | mail | passport | account
+  var meSub = "home"; // home | profile | friends | mail | passport | account | blocklist | galleries | transactions | contests | share
   var tourTip = 0;
   var goMenuOpen = false;
   var inRoom = false;
@@ -482,7 +561,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905t";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905u";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -1195,7 +1274,7 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: List→Shop creator loop, Decorate Room shell, Help, Parties stub. Cache <code>?v=20260905t</code>.</p>'
+      + '<p class="meta">This pass: Me sidebar classics (blocklist / galleries / transactions / contests / share), polish. Cache <code>?v=20260905u</code>.</p>'
       + '<p class="meta">Live docs live in-repo as CONCEPT.md / STATUS.md — no external secrets.</p>'
       + '</div></section>';
   }
@@ -1502,6 +1581,12 @@
       +       '<button type="button" class="text-btn" data-me="passport">My Passport</button>'
       +       '<button type="button" class="text-btn" data-me="mail">Mail' + (unread ? ' (' + unread + ')' : '') + '</button>'
       +       '<button type="button" class="text-btn" data-me="account">Account</button>'
+      +       '<hr class="me-side-rule" />'
+      +       '<button type="button" class="text-btn" data-me="blocklist">My Blocklist</button>'
+      +       '<button type="button" class="text-btn" data-me="galleries">My Galleries</button>'
+      +       '<button type="button" class="text-btn" data-me="transactions">My Transactions</button>'
+      +       '<button type="button" class="text-btn" data-me="contests">Contests</button>'
+      +       '<button type="button" class="text-btn" data-me="share">Share Whirled</button>'
       +     '</div>'
       +     '<div class="panel"><h2>My Friends Online</h2>' + friendBox + '</div>'
       +   '</aside>'
@@ -1520,6 +1605,7 @@
     var photoHtml = photo
       ? '<img class="profile-photo" src="' + photo + '" alt="Profile photo" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(me.initials) + '</span></div>';
+    wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
     var wallHtml = wall.length ? wall.map(function (w) {
       return '<div class="wall-row"><span class="ava">' + esc((w.who || "?").slice(0, 1)) + '</span><div><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div></div>';
     }).join("") : '<p class="meta">No comments yet.</p>';
@@ -1601,6 +1687,7 @@
     q = String(q || "").trim().toLowerCase();
     if (!q) return [];
     return collectSearchablePeople().filter(function (p) {
+      if (isBlocked(p.id)) return false;
       var name = String(p.name || "").toLowerCase();
       var id = String(p.id || "").toLowerCase();
       return name.indexOf(q) >= 0 || id.indexOf(q) >= 0;
@@ -1799,6 +1886,7 @@
     var photoHtml = photo
       ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(initials) + '</span></div>';
+    wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
     var wallHtml = wall.length ? wall.map(function (w) {
       return '<div class="wall-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
     }).join("") : '<p class="meta">No comments yet.</p>';
@@ -1832,16 +1920,155 @@
       + '</div></section>';
   }
 
+
+  var galleryViewId = null;
+
+  function meBlocklist() {
+    var list = loadBlocklist();
+    var rows = list.length
+      ? list.map(function (b) {
+          return '<div class="block-row">'
+            + '<div><b>' + esc(b.name || b.id) + '</b><div class="meta">permaname ' + esc(b.id) + '</div></div>'
+            + '<button type="button" class="action-btn" data-unblock="' + esc(b.id) + '">Remove</button>'
+            + '</div>';
+        }).join("")
+      : '<p class="meta">Your blocklist is empty. Blocked players stay out of friends search results and cannot leave wall comments here.</p>';
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="panel"><h2>My Blocklist</h2>'
+      + '<p class="meta">Stored locally as <code>whirled2.blocklist</code>. Add by permaname / id — no invented players.</p>'
+      + '<form id="blocklist-add-form" class="blocklist-add-form">'
+      +   '<input name="id" maxlength="40" placeholder="Permaname or id" required />'
+      +   '<input name="name" maxlength="40" placeholder="Display name (optional)" />'
+      +   '<button type="submit">Add to blocklist</button>'
+      + '</form>'
+      + '<div class="block-list">' + rows + '</div>'
+      + '</div></section>';
+  }
+
+  function meGalleries() {
+    var galleries = loadGalleries();
+    if (galleryViewId) {
+      var g = findGallery(galleryViewId);
+      if (!g) {
+        galleryViewId = null;
+      } else {
+        var imgs = (g.images || []);
+        var grid = imgs.length
+          ? '<div class="gallery-grid">' + imgs.map(function (im) {
+              var thumb = im.thumb
+                ? '<img src="' + im.thumb + '" alt="' + esc(im.name || "") + '" />'
+                : '<div class="swatch"></div>';
+              return '<div class="gallery-cell">' + thumb
+                + '<div class="meta">' + esc(im.name || "image") + '</div>'
+                + '<button type="button" class="text-btn" data-gallery-remove-img="' + esc(im.id) + '" data-gallery-id="' + esc(g.id) + '">Remove</button>'
+                + '</div>';
+            }).join("") + '</div>'
+          : '<p class="meta">This gallery is empty. Add images from your Stuff → Images below.</p>';
+        var stuffImgs = loadStuff().filter(function (it) {
+          return itemCat(it) === "images" && (it.ownerId === session().user.id || it.owned);
+        });
+        var already = {};
+        imgs.forEach(function (im) { already[im.stuffId || im.id] = true; });
+        var addOpts = stuffImgs.filter(function (it) { return !already[it.id]; }).map(function (it) {
+          return '<option value="' + esc(it.id) + '">' + esc(it.name || it.id) + '</option>';
+        }).join("");
+        return '<section class="page me-page">' + meSubnav()
+          + '<div class="panel"><div class="friends-head"><h2>' + esc(g.name) + '</h2>'
+          +   '<button type="button" class="text-btn" data-gallery-back="1">← All galleries</button></div>'
+          + grid
+          + '<form id="gallery-add-img-form" data-gallery-id="' + esc(g.id) + '" class="gallery-add-form">'
+          +   '<label>Add from Stuff Images <select name="stuffId" required><option value="">— pick an image —</option>' + (addOpts || '<option value="" disabled>No images in Stuff yet</option>') + '</select></label>'
+          +   '<button type="submit"' + (addOpts ? "" : " disabled") + '>Add image</button>'
+          + '</form>'
+          + '<p class="meta">Galleries are local (<code>whirled2.galleries</code>). Upload images under Stuff → Images first.</p>'
+          + '</div></section>';
+      }
+    }
+    var listHtml = galleries.length
+      ? '<div class="gallery-list">' + galleries.map(function (g) {
+          var n = (g.images || []).length;
+          return '<div class="gallery-row">'
+            + '<button type="button" class="text-btn" data-gallery-open="' + esc(g.id) + '"><b>' + esc(g.name) + '</b></button>'
+            + '<span class="meta">' + n + ' image' + (n === 1 ? "" : "s") + '</span>'
+            + '<button type="button" class="action-btn" data-gallery-delete="' + esc(g.id) + '">Delete</button>'
+            + '</div>';
+        }).join("") + '</div>'
+      : '<p class="meta">No galleries yet. Create one below — empty authentic list from <code>whirled2.galleries</code>.</p>';
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="panel"><h2>My Galleries</h2>'
+      + listHtml
+      + '<form id="gallery-create-form" class="gallery-create-form">'
+      +   '<input name="name" maxlength="60" placeholder="Gallery name" required />'
+      +   '<button type="submit">Create gallery</button>'
+      + '</form>'
+      + '</div></section>';
+  }
+
+  function meTransactions() {
+    var rows = loadTransactions();
+    var list = rows.length
+      ? rows.map(function (tx) {
+          return '<div class="tx-row">'
+            + '<div><b>' + esc(tx.kind || "event") + '</b> — ' + esc(tx.label || "")
+            + (tx.coins ? (' <span class="meta">(' + esc(String(tx.coins)) + ' coins label)</span>') : '')
+            + '<div class="meta">' + esc(tx.note || "Coins are labels only — no real currency.") + '</div></div>'
+            + '<time class="meta">' + esc((tx.at || "").slice(0, 16).replace("T", " ")) + '</time>'
+            + '</div>';
+        }).join("")
+      : '<p class="meta">No transactions yet. Listing a shop item or uploading Stuff appends a label-only ledger row.</p>';
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="panel"><h2>My Transactions</h2>'
+      + '<p class="meta">Stub ledger in <code>whirled2.transactions</code>. <b>Coins are labels only — no real currency / no payments.</b></p>'
+      + '<div class="tx-list">' + list + '</div>'
+      + '</div></section>';
+  }
+
+  function meContests() {
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="panel"><h2>Contests</h2>'
+      + '<p class="meta">None running.</p>'
+      + '<p class="meta">Classic contest boards return when community events are wired — this page stays empty rather than inventing winners.</p>'
+      + '</div></section>';
+  }
+
+  function meShare() {
+    var url = shareInviteUrl();
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="panel"><h2>Share Whirled</h2>'
+      + '<p class="meta">Copy the Pages URL and invite a friend. Coins stay labels only.</p>'
+      + '<label class="invite-link-label">Pages URL'
+      +   '<input id="share-whirled-url" readonly value="' + esc(url) + '" />'
+      + '</label>'
+      + '<div class="invite-them-actions">'
+      +   '<button type="button" class="action-btn" data-share-copy="1">Copy URL</button>'
+      + '</div>'
+      + '<p class="meta" id="share-copy-msg"></p>'
+      + '</div></section>';
+  }
+
   function mePage() {
-    if (viewingId && session() && viewingId !== session().user.id) return otherProfile(viewingId);
+    if (viewingId && session() && viewingId !== session().user.id) {
+      if (isBlocked(viewingId)) {
+        return '<section class="page me-page">' + meSubnav()
+          + '<div class="panel"><h2>Blocked</h2><p class="meta">This player is on your blocklist. Remove them from My Blocklist to view their profile.</p>'
+          + '<button type="button" class="text-btn" data-me="blocklist">My Blocklist</button></div></section>';
+      }
+      return otherProfile(viewingId);
+    }
     if (viewingId && session() && viewingId === session().user.id) { meSub = "profile"; viewingId = null; }
     if (meSub === "friends") return meFriends();
     if (meSub === "mail") return meMail(window.__mailCompose || null);
     if (meSub === "passport") return mePassport();
     if (meSub === "account") return meAccount();
     if (meSub === "profile") return meProfile();
+    if (meSub === "blocklist") return meBlocklist();
+    if (meSub === "galleries") return meGalleries();
+    if (meSub === "transactions") return meTransactions();
+    if (meSub === "contests") return meContests();
+    if (meSub === "share") return meShare();
     return meHome();
   }
+
 
 
   function gate() {
@@ -2190,6 +2417,8 @@
       chat = []; liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
       shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
       gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
+      decorateMode = false; partyPanelOpen = false; helpOpen = false; galleryViewId = null; stuffListMode = false;
+      clearStrayUI();
       paint("");
       return;
     }
@@ -2821,12 +3050,82 @@
       paint("shop");
       return;
     }
+    if (ev.target.closest("[data-share-copy]") && session()) {
+      var sinp = document.getElementById("share-whirled-url");
+      var smsg = document.getElementById("share-copy-msg");
+      var sval = sinp ? sinp.value : shareInviteUrl();
+      function scCopied() { if (smsg) smsg.textContent = "URL copied."; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(sval).then(scCopied).catch(function () {
+          if (sinp) { sinp.select(); try { document.execCommand("copy"); scCopied(); } catch (e) { if (smsg) smsg.textContent = sval; } }
+        });
+      } else if (sinp) {
+        sinp.select();
+        try { document.execCommand("copy"); scCopied(); } catch (e) { if (smsg) smsg.textContent = sval; }
+      }
+      return;
+    }
+    var unblockBtn = ev.target.closest("[data-unblock]");
+    if (unblockBtn && session()) {
+      removeBlocked(unblockBtn.getAttribute("data-unblock"));
+      meSub = "blocklist";
+      paint("me");
+      return;
+    }
+    var galOpen = ev.target.closest("[data-gallery-open]");
+    if (galOpen && session()) {
+      galleryViewId = galOpen.getAttribute("data-gallery-open");
+      meSub = "galleries";
+      paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-gallery-back]") && session()) {
+      galleryViewId = null;
+      meSub = "galleries";
+      paint("me");
+      return;
+    }
+    var galDel = ev.target.closest("[data-gallery-delete]");
+    if (galDel && session()) {
+      var gdel = galDel.getAttribute("data-gallery-delete");
+      if (gdel && confirm("Delete this gallery?")) {
+        saveGalleries(loadGalleries().filter(function (g) { return g.id !== gdel; }));
+        if (galleryViewId === gdel) galleryViewId = null;
+        meSub = "galleries";
+        paint("me");
+      }
+      return;
+    }
+    var galRemImg = ev.target.closest("[data-gallery-remove-img]");
+    if (galRemImg && session()) {
+      var gidR = galRemImg.getAttribute("data-gallery-id");
+      var iidR = galRemImg.getAttribute("data-gallery-remove-img");
+      var galls = loadGalleries();
+      for (var gi = 0; gi < galls.length; gi++) {
+        if (galls[gi].id === gidR) {
+          galls[gi].images = (galls[gi].images || []).filter(function (im) { return im.id !== iidR; });
+          break;
+        }
+      }
+      saveGalleries(galls);
+      galleryViewId = gidR;
+      meSub = "galleries";
+      paint("me");
+      return;
+    }
     var mailRow = ev.target.closest("[data-mail-id]");
     if (mailRow && session() && !ev.target.closest("form")) {
       markMailRead(mailRow.getAttribute("data-mail-id"));
       // refresh unread badge in header without full navigation reset
       var badge = document.querySelector(".mail-btn u");
       if (badge) badge.textContent = "(" + unreadCount() + ")";
+      // also refresh Me sidebar mail count if present
+      try {
+        document.querySelectorAll('.links-panel [data-me="mail"]').forEach(function (btn) {
+          var u = unreadCount();
+          btn.textContent = u ? ("Mail (" + u + ")") : "Mail";
+        });
+      } catch (e) {}
       mailRow.classList.remove("unread");
     }
     var meBtn = ev.target.closest("[data-me]");
@@ -2834,6 +3133,7 @@
       meSub = meBtn.getAttribute("data-me") || "home";
       viewingId = null;
       occMenuId = null;
+      galleryViewId = null; // sidebar Me links always show list/root, not a nested gallery
       if (meSub !== "mail") window.__mailCompose = null;
       paint("me");
       return;
@@ -2850,15 +3150,14 @@
     var tab = ev.target.closest("[data-tab]");
     if (tab && tab.getAttribute("data-tab") && session()) {
       var t = tab.getAttribute("data-tab");
-      if (t === "me") { meSub = "home"; viewingId = null; invitePanelOpen = false; }
-      if (t === "rooms") { /* keep inRoom */ }
+      clearStrayUI();
+      if (t === "me") { meSub = "home"; viewingId = null; galleryViewId = null; }
+      if (t === "rooms") { /* keep inRoom; decorate stays until leave */ }
+      else { decorateMode = false; roomPanelOpen = false; }
       if (t === "shop") { shopItemId = null; }
       if (t === "groups") { groupViewId = null; groupThreadId = null; }
       if (t === "games") { gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; }
       if (t === "stuff") { stuffMode = "browse"; stuffItemId = null; stuffListMode = false; }
-      helpOpen = false;
-      occMenuId = null;
-      friendInvitePending = null;
       paint(t);
     }
   });
@@ -2936,8 +3235,12 @@
       var text3 = String(data3.get("text") || "").trim().slice(0, 240);
       if (!text3) return;
       var targetWall = ev.target.getAttribute("data-wall-user") || session().user.id;
+      if (targetWall !== session().user.id && isBlocked(targetWall)) {
+        pushNotice("gray", "That player is on your blocklist.");
+        return;
+      }
       var wall2 = loadWall(targetWall);
-      wall2.unshift({ who: you().name, text: text3, at: new Date().toISOString(), kind: "comment" });
+      wall2.unshift({ who: you().name, text: text3, at: new Date().toISOString(), kind: "comment", fromId: session().user.id });
       saveWall(targetWall, wall2);
       pushNotice("comment", you().name + " commented on a profile.");
       if (targetWall === session().user.id) { viewingId = null; meSub = "profile"; }
@@ -3041,6 +3344,7 @@
         saveStuff(items);
         stuffItemId = nid;
         stuffMode = "detail";
+        appendTransaction({ kind: "upload", label: "Uploaded Stuff “" + sname + "” (" + stype + ")", coins: 0 });
         pushNotice("green", "Saved “" + sname + "” to Stuff.");
         paint("stuff");
       }
@@ -3116,8 +3420,61 @@
       });
       saveShop(shop);
       stuffListMode = false;
+      appendTransaction({ kind: "list", label: "Listed “" + (src.name || "item") + "” in Shop", coins: coins });
       pushNotice("green", "Listed “" + (src.name || "item") + "” in Shop at " + coins + " coins (label).");
       paint("stuff");
+      return;
+    }
+    if (ev.target.id === "blocklist-add-form" && session()) {
+      var bd = new FormData(ev.target);
+      var bid = String(bd.get("id") || "").trim().slice(0, 40);
+      var bname = String(bd.get("name") || "").trim().slice(0, 40) || bid;
+      if (!bid) return;
+      if (session().user.id && bid.toLowerCase() === String(session().user.id).toLowerCase()) {
+        pushNotice("gray", "You cannot block yourself.");
+        return;
+      }
+      addBlocked({ id: bid, name: bname });
+      meSub = "blocklist";
+      paint("me");
+      return;
+    }
+    if (ev.target.id === "gallery-create-form" && session()) {
+      var gcd = new FormData(ev.target);
+      var gname = String(gcd.get("name") || "").trim().slice(0, 60);
+      if (!gname) return;
+      var gs = loadGalleries();
+      var gid = "gal" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      gs.unshift({ id: gid, name: gname, images: [], at: new Date().toISOString() });
+      saveGalleries(gs);
+      galleryViewId = gid;
+      meSub = "galleries";
+      paint("me");
+      return;
+    }
+    if (ev.target.id === "gallery-add-img-form" && session()) {
+      var gaid = ev.target.getAttribute("data-gallery-id");
+      var gad = new FormData(ev.target);
+      var sidImg = String(gad.get("stuffId") || "").trim();
+      var stuffImg = findStuff(sidImg);
+      if (!gaid || !stuffImg) return;
+      var gals = loadGalleries();
+      for (var gx = 0; gx < gals.length; gx++) {
+        if (gals[gx].id === gaid) {
+          gals[gx].images = gals[gx].images || [];
+          gals[gx].images.push({
+            id: "gi" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
+            stuffId: stuffImg.id,
+            name: stuffImg.name,
+            thumb: stuffImg.thumb || ""
+          });
+          break;
+        }
+      }
+      saveGalleries(gals);
+      galleryViewId = gaid;
+      meSub = "galleries";
+      paint("me");
       return;
     }
     if (ev.target.id === "party-create-form" && session()) {

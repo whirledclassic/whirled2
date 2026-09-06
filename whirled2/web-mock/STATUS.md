@@ -4,15 +4,14 @@ Date: 2026-09-05
 
 ## What shipped (this pass)
 
-- **List Item → Shop** (creator loop): Stuff detail “List Item” form (coins label price, tags, copyright) copies listing into `whirled2.shop` with seller id/name, type, thumb. **Delist** when already listed. Shop category + popular panels show real user listings only — no invented demos. Buy disabled: “Coins are labels only — no payments”.
-- **Decorate Room** shell (wiki Room/Furniture): Room menu enables decorate mode (not Pixi). Side panel lists owned furniture/backdrops/toys/images; Add to room places absolute chips on `#decorate-layer` (sibling of `#stage-slot` inside `.stage-host`). Drag to move; Save → `whirled2.roomLayout.loft`; Take from room removes. `getStageEl()` still returns `#stage-slot`. View items lists layout.
-- **Help** (header): Starting Out tips (Me, Rooms, Stuff upload, Mail, Groups, Games lobby, coins labels) + in-page CONCEPT/STATUS spirit. No external secrets.
-- **Parties** stub (wiki Party): `tb-party` opens party board from `whirled2.parties`; Create (name, open/friends); Join/Leave local; party name in notice bar; follow-leader meta only.
-- Cache bust `?v=20260905t`. Coins labels only. No gold/purple. No private engine. Keep `WhirledChrome` + `#stage-slot`.
+- **Me sidebar classics** (wiki Me tab): **My Blocklist** (`whirled2.blocklist` — add/remove by permaname/id; blocked hidden from friends search + wall interact), **My Galleries** (`whirled2.galleries` — create, add Stuff Images, grid; empty authentic), **My Transactions** (stub ledger `whirled2.transactions` — append on Stuff upload / Shop list; coins labels only), **Contests** (“None running”), **Share Whirled** (copy Pages URL).
+- **Polish**: tab switches clear stray menus/overlays (`clearStrayUI`); decorate save / list item / parties handlers verified; mail unread badge refreshed after mark-read (header + Me sidebar); mobile decorate panel / menus capped to viewport.
+- **CONCEPT**: note that original platform source is BSD greyhavens/msoy (+ threerings/orth libs) — Whirled Classic is chrome revival + new engine bridge, not an msoy/Flash port.
+- Cache bust `?v=20260905u`. Coins labels only. No gold/purple. No fake NPCs/catalog. Keep `WhirledChrome` + `#stage-slot` + `#decorate-layer`. No private engine.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905t
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905u
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
