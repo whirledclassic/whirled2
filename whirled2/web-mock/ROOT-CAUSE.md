@@ -1,16 +1,21 @@
-# ROOT-CAUSE — Classic Flash click-to-walk (?v=20260906ch)
+# ROOT-CAUSE — Classic Flash loft tofu + grey "T" (?v=20260906ci)
 
-## Short note (ch)
+## Short note (ci)
 
-**Broken hop (cg):** `hostLoadBytes` / bridge `"ready"` did not reliably run on the **host** Ruffle (`tryCallIntoSwf` treated Ruffle EI `undefined` as `{ok:true}`; dual-layer ready-flush could hit DIRECT). Nest never `"connected"` → `loftUsesCompanionHost` stayed false → floor click = chrome bob only.
+**Broken UX (ch screenshot):** loft showed classic **tofu** (beige face) **plus** a grey rounded square with big **"T"**. Classic Flash Wear was not visible.
 
-**Fix (ch):** COMPANION-ONLY mount of `avatar-host.swf` into `#avatar-ruffle-host` with **stand cover** until bridge `"connected"`. Gate `hostLoadBytes` on `"ready"`. Prefer `loftCompanionPlayer` for host EI. Fail/watchdog → remount DIRECT. See `WALK-E2E-ANALYSIS.md`.
+**Causes:**
+1. Stand fallback used `classic-swf-placeholder` = first letter of avatar name (`Tofu` → **T**). Companion-cover called `ensureStandFallback` with reasons that were **not** soft → `is-failed` kept the glyph full-opacity on TOP of empty host.
+2. `assets/ruffle/demo-avatar.swf` returned **HTTP 404** on Pages (only `flash-qa/demo-avatar.swf` + `ruffle/demo-qa.swf` were live). Any path/docs pointing at ruffle/demo-avatar failed; nest/DIRECT miss → tofu path or stand junk.
 
-## Historical — cg Option A / ce wipe / cf OFF
+**Fix (ci):** mirror Body demo under `assets/ruffle/demo-avatar.swf`; stand = PNG/thumb or tofu-SVG (**never letter**); soft companion-cover; fail → DIRECT with demo URL fallbacks. See `STATUS.md`.
 
+## Historical — ch companion-only / cg Option A / ce wipe / cf OFF
+
+- **ch:** COMPANION-ONLY mount + stand cover; hostLoadBytes gated on ready; EI silent-miss fixed.
+- **cg:** sibling layer — paint preserved, connect hop still failed.
 - **ce:** remount companion into same host → wiped paint (blank loft).
 - **cf:** `WEAR_AUTO_COMPANION_UPGRADE=false` — DIRECT stable, no walk frames.
-- **cg:** Option A sibling layer — paint preserved, but connect hop still failed (EI silent-miss + race).
 
 ### Non-goals
 

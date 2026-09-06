@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906ch
+ * Cache: ?v=20260906ci
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906ch";
+  var VERSION = "20260906ci";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -66,8 +66,9 @@
   // demo-qa.swf = Ruffle paint smoke ONLY (no AvatarControl). Walk QA uses BODY_DEMO below.
   var RUFFLE_DEMO_SWF = "./assets/ruffle/demo-qa.swf";
   var BODY_DEMO_SWF = "./assets/avatars/flash-qa/demo-avatar.swf"; // controlConnect + appearanceChanged_v2
+  var BODY_DEMO_SWF_ALT = "./assets/ruffle/demo-avatar.swf"; // (?v=20260906ci) mirror — Pages must 200
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906ch): COMPANION-ONLY nest for Classic Flash walk.
+  // How this works (?v=20260906ci): COMPANION-ONLY nest; stand = PNG/tofu SVG NEVER letter glyph.
   // Beginner: we load OUR tiny host.swf first; your avatar is rebuilt inside it from bytes.
   // Stand thumb covers the host (opacity 1) until bridge "connected" — never a blank loft.
   // ENGINE DEV: cg dual-layer raced loftActivePlayer + EI silent-miss → never connected.
@@ -526,9 +527,26 @@
     catch (e) { return RUFFLE_DEMO_SWF; }
   }
   function getBodyDemoSwfUrl() {
-    // (?v=20260906ch) AvatarControl mimic — floor click → hostWalk → green walk pose.
+    // (?v=20260906ci) AvatarControl mimic — floor click → hostWalk → green walk pose.
     try { return new URL(BODY_DEMO_SWF + "?v=" + VERSION, global.location.href).href; }
     catch (e) { return BODY_DEMO_SWF; }
+  }
+  function getBodyDemoSwfUrlAlt() {
+    try { return new URL(BODY_DEMO_SWF_ALT + "?v=" + VERSION, global.location.href).href; }
+    catch (e) { return BODY_DEMO_SWF_ALT; }
+  }
+  function standTofuHtml() {
+    // (?v=20260906ci) CRITICAL: never paint a lonely letter "T" as the loft avatar.
+    // Beginner: no stand PNG yet → tiny tofu face cover (NOT grey initial glyph).
+    return '<div class="classic-swf-stand-tofu" aria-hidden="true" title="Stand cover — waiting for Flash">'
+      + '<svg viewBox="0 0 64 80" width="64" height="80" focusable="false">'
+      + '<rect x="10" y="4" width="44" height="52" rx="8" fill="#f0e6d2" stroke="#c4a882" stroke-width="2"/>'
+      + '<rect x="18" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+      + '<rect x="34" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+      + '<circle cx="24" cy="26" r="3" fill="#8a7048"/>'
+      + '<circle cx="40" cy="26" r="3" fill="#8a7048"/>'
+      + '<path d="M26 38c2.5 3 9.5 3 12 0" fill="none" stroke="#8a7048" stroke-width="2" stroke-linecap="round"/>'
+      + '</svg></div>';
   }
 
   function preloadRuffle() {
@@ -575,18 +593,21 @@
       player.setAttribute("data-classic-ruffle", "1");
       player.setAttribute("data-wmode", "transparent");
       if (loftMount) player.setAttribute("data-loft-ruffle", "1");
-      // (?v=20260906bt) CRITICAL: do NOT wipe stand thumb / placeholder — empty loft looks like tofu.
+      // (?v=20260906ci) CRITICAL: keep stand PNG or tofu-SVG — NEVER restore letter glyph.
       // Beginner: keep last thumb under Ruffle until SWF paints; restore on fail.
       // ENGINE DEV: innerHTML="" was the overnight tofu bug after ?v=bs.
       var savedStand = null;
-      var savedGlyph = null;
+      var savedTofu = null;
       try {
         var standEl = container.querySelector("img.classic-swf-stand-thumb");
         if (standEl) {
           savedStand = { src: standEl.getAttribute("src") || standEl.src || "", alt: standEl.alt || "" };
         }
-        var glyphEl = container.querySelector(".classic-swf-placeholder");
-        if (glyphEl) savedGlyph = glyphEl.outerHTML;
+        var tofuEl = container.querySelector(".classic-swf-stand-tofu");
+        if (tofuEl) savedTofu = tofuEl.outerHTML;
+        // Drop legacy letter placeholders — they looked like junk "T" boxes.
+        var junk = container.querySelector(".classic-swf-placeholder");
+        if (junk && junk.parentNode) junk.parentNode.removeChild(junk);
       } catch (eSave) {}
       destroyPlayersIn(container);
       // Clear only ruffle nodes; rebuild host contents with stand first, then player.
@@ -595,8 +616,10 @@
         if (savedStand && savedStand.src) {
           keepBits.push('<img class="classic-swf-stand-thumb" src="' + esc(savedStand.src)
             + '" alt="' + esc(savedStand.alt || "") + '" aria-hidden="true" />');
-        } else if (savedGlyph) {
-          keepBits.push(savedGlyph);
+        } else if (savedTofu) {
+          keepBits.push(savedTofu);
+        } else {
+          keepBits.push(standTofuHtml());
         }
         container.innerHTML = keepBits.join("");
       } catch (eHtml) { try { container.innerHTML = ""; } catch (e2) {} }
@@ -687,6 +710,10 @@
     if (!item) return Promise.resolve(null);
     if (item.swfUrl && (/^(blob:|data:|https?:|\.\/|\/)/i.test(item.swfUrl))) {
       return Promise.resolve(item.swfUrl);
+    }
+    // (?v=20260906ci) flashQa / durable mirror path when primary missing
+    if (item.swfUrlAlt && (/^(blob:|data:|https?:|\.\/|\/)/i.test(item.swfUrlAlt))) {
+      return Promise.resolve(item.swfUrlAlt);
     }
     if (item.swfDataUrl) return Promise.resolve(item.swfDataUrl);
     var sha = item.swfSha1 || (item.pack && item.pack.swfSha1) || null;
@@ -1302,7 +1329,7 @@
       var el = kids[i];
       if (!el) continue;
       if (el.id === "avatar-companion-layer" || (el.getAttribute && el.getAttribute("data-companion-layer") === "1")) continue;
-      if (el.classList && (el.classList.contains("classic-swf-stand-thumb") || el.classList.contains("classic-swf-placeholder"))) continue;
+      if (el.classList && (el.classList.contains("classic-swf-stand-thumb") || el.classList.contains("classic-swf-stand-tofu") || el.classList.contains("classic-swf-placeholder"))) continue;
       var tag = String(el.tagName || "").toUpperCase();
       var isRuffle = tag === "RUFFLE-PLAYER" || tag === "RUFFLE-EMBED"
         || (el.getAttribute && el.getAttribute("data-classic-ruffle") === "1");
@@ -1475,15 +1502,34 @@
       logAvatarDebug("remountDirect FAILED", err && err.message);
       return null;
     }
+    function tryMountUrl(u) {
+      return resolveSwfBytes(worn).then(function (got) {
+        var o = Object.assign({}, loftOpts);
+        if (got && got.buffer) {
+          o.swfData = got.buffer;
+          o.swfFileName = "avatar.swf";
+        }
+        return mountRuffle(slot, u, o).then(finishRemount);
+      });
+    }
     // Prefer DataLoadOptions ArrayBuffer (official) over blob: URL for remount too.
-    return resolveSwfBytes(worn).then(function (got) {
-      var o = Object.assign({}, loftOpts);
-      if (got && got.buffer) {
-        o.swfData = got.buffer;
-        o.swfFileName = "avatar.swf";
+    // (?v=20260906ci) If primary URL 404s, fall through to demo-avatar / demo-qa so loft never tofu+T.
+    return tryMountUrl(url).catch(function (err1) {
+      logAvatarDebug("remountDirect primary fail — try body demo", err1 && err1.message);
+      var alt = null;
+      try { alt = getBodyDemoSwfUrlAlt() || getBodyDemoSwfUrl(); } catch (eA) { alt = getBodyDemoSwfUrl(); }
+      if (alt && alt !== url) {
+        return tryMountUrl(alt).catch(function (err2) {
+          logAvatarDebug("remountDirect alt fail — try demo-qa paint", err2 && err2.message);
+          var qa = getDemoQaSwfUrl();
+          if (qa && qa !== url && qa !== alt) return tryMountUrl(qa).catch(failRemount);
+          return failRemount(err2 || err1);
+        });
       }
-      return mountRuffle(slot, url, o).then(finishRemount);
-    }).catch(failRemount);
+      var qa2 = getDemoQaSwfUrl();
+      if (qa2 && qa2 !== url) return tryMountUrl(qa2).catch(failRemount);
+      return failRemount(err1);
+    });
   }
 
   function armCompanionWatchdog(gen, reasonTag) {
@@ -1508,7 +1554,7 @@
         // Companion-ONLY or no DIRECT left → remount avatar DIRECT (chrome bob fallback)
         remountDirectAvatarImmediate("watchdog-no-connected:" + String(reasonTag || ""));
       }
-    }, 5500); // (?v=20260906ch) loadBytes + controlConnect; Option A keeps DIRECT meanwhile
+    }, 3200); // (?v=20260906ci) faster DIRECT remount — empty host must not linger as junk UI
   }
 
   /**
@@ -2381,12 +2427,11 @@
     var swfU = esc(worn.swfUrl || worn.swfDataUrl || "");
     var shaU = esc(worn.swfSha1 || (worn.pack && worn.pack.swfSha1) || "");
     var standU = esc(worn.thumb || worn.preview || "");
-    var initial = esc(((worn.name || "SWF").trim().charAt(0) || "S").toUpperCase());
     return '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host classic-wear-swf-slot is-loft" data-swf-url="'
       + swfU + '" data-swf-sha1="' + shaU + '" aria-label="Classic Flash avatar overlay" title="Ruffle experimental — PE none; click nameplate/hitbox for emotes">'
       + (standU
         ? ('<img class="classic-swf-stand-thumb" src="' + standU + '" alt="" aria-hidden="true" />')
-        : ('<div class="classic-swf-placeholder" aria-hidden="true"><span>' + initial + '</span></div>'))
+        : standTofuHtml())
       + ruffleStatusBadgeHtml({ overlay: true, compact: true })
       + '</div>';
   }
@@ -2698,20 +2743,26 @@
   }
 
   function ensureStandFallback(slot, worn, reason) {
-    // (?v=20260906cd): always leave SOMETHING visible — thumb, or initial glyph. Never blank loft.
-    // Beginner: while mounting / DIRECT-first, show stand WITHOUT marking is-failed (that dims Ruffle).
-    // ENGINE DEV: only real failures get is-failed + data-mount-fail.
+    // (?v=20260906ci): always leave SOMETHING visible — stand PNG/thumb, else tofu SVG. Never blank loft.
+    // Beginner: NEVER a lonely letter "T" grey box overlapping the loft.
+    // ENGINE DEV: companion-cover / mounting are SOFT (not is-failed). Hard-fail only on real mount death.
     if (!slot) return;
     try {
       var r = String(reason || "");
-      var soft = /^(mounting|direct-first|fallback:)/i.test(r);
-      if (soft) {
+      var soft = /mounting|direct-first|fallback:|companion|strategy|cover|pending|post-host|safe|no-payload|prep|watchdog/i.test(r);
+      var hard = /no-swf-url|direct-remount-failed|ruffle-mount-failed|direct-primary-fail/i.test(r)
+        && !/cover|pending|mounting|fallback:/i.test(r);
+      if (soft && !hard) {
         slot.classList.add("is-mounting");
-        // keep is-playing if already painting; do not force-failed
+        slot.classList.remove("is-failed");
       } else {
         slot.classList.add("is-failed");
         slot.classList.remove("is-playing", "is-mounting");
         if (reason) slot.setAttribute("data-mount-fail", r.slice(0, 120));
+      }
+      var junkGlyph = slot.querySelector(".classic-swf-placeholder");
+      if (junkGlyph && junkGlyph.parentNode) {
+        try { junkGlyph.parentNode.removeChild(junkGlyph); } catch (eRm) {}
       }
       var stand = (worn && (worn.thumb || worn.preview)) || "";
       if (stand) {
@@ -2726,12 +2777,15 @@
         } else {
           existing.style.opacity = "1";
         }
-      } else if (!slot.querySelector(".classic-swf-placeholder")) {
-        var g = document.createElement("div");
-        g.className = "classic-swf-placeholder";
-        g.setAttribute("aria-hidden", "true");
-        g.innerHTML = "<span>" + esc(((worn && worn.name) || "SWF").trim().charAt(0).toUpperCase() || "S") + "</span>";
-        slot.insertBefore(g, slot.firstChild);
+        var tofuStand = slot.querySelector(".classic-swf-stand-tofu");
+        if (tofuStand && tofuStand.parentNode) {
+          try { tofuStand.parentNode.removeChild(tofuStand); } catch (eRt) {}
+        }
+      } else if (!slot.querySelector("img.classic-swf-stand-thumb") && !slot.querySelector(".classic-swf-stand-tofu")) {
+        var wrap = document.createElement("div");
+        wrap.innerHTML = standTofuHtml();
+        var node = wrap.firstChild;
+        if (node) slot.insertBefore(node, slot.firstChild);
       }
     } catch (eThumb) {}
   }
@@ -3477,6 +3531,9 @@
   api.flashQaEnabled = flashQaEnabled;
   api.getDemoQaSwfUrl = getDemoQaSwfUrl;
   api.getBodyDemoSwfUrl = getBodyDemoSwfUrl;
+  api.getBodyDemoSwfUrlAlt = getBodyDemoSwfUrlAlt;
+  api.standTofuHtml = standTofuHtml;
+  api.BODY_DEMO_SWF_ALT = BODY_DEMO_SWF_ALT;
   api.BODY_DEMO_SWF = BODY_DEMO_SWF;
   api.WEAR_COMPANION_ONLY = WEAR_COMPANION_ONLY;
   api.resolveHostEiPlayer = resolveHostEiPlayer;

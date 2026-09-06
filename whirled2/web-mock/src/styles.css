@@ -7329,6 +7329,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
    ENGINE DEV: z-index above ruffle-player while data-mount-mode=companion-cover.
    ========================================================================== */
 .avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-stand-tofu,
 .avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-placeholder {
   opacity: 1 !important;
   z-index: 6 !important;
@@ -7338,4 +7339,55 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 .avatar-ruffle-host[data-mount-mode="companion-cover"] canvas {
   /* Host may be transparent empty until nest paints — stand covers it */
   z-index: 1;
+}
+
+
+/* ==========================================================================
+   ?v=20260906ci — Stand cover = PNG/thumb OR tofu SVG — NEVER letter glyph
+   Beginner: grey rounded "T" box was junk overlapping tofu. Retired.
+   ENGINE DEV: classic-swf-stand-tofu mirrors stand-thumb z-index rules.
+   ========================================================================== */
+.classic-swf-stand-tofu {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%) scaleX(var(--wear-face, 1));
+  width: 64px;
+  height: 80px;
+  pointer-events: none !important;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.classic-swf-stand-tofu svg { display: block; width: 64px; height: 80px; }
+/* Legacy letter glyph — hide if any stale HTML still injects it */
+.classic-swf-placeholder {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+.avatar-ruffle-host.is-playing .classic-swf-stand-tofu {
+  opacity: 0.35;
+  z-index: 0;
+}
+.avatar-ruffle-host.is-failed .classic-swf-stand-tofu,
+.avatar-ruffle-host.is-mounting .classic-swf-stand-tofu {
+  opacity: 1 !important;
+  z-index: 3 !important;
+}
+.avatar-ruffle-host[data-mount-mode="companion-pending"]:not(.is-playing) .classic-swf-stand-tofu,
+.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-stand-tofu {
+  opacity: 1 !important;
+  z-index: 6 !important;
+}
+.avatar-ruffle-host[data-mount-mode="companion-pending"].is-playing .classic-swf-stand-tofu,
+.avatar-ruffle-host[data-mount-mode="direct"].is-playing .classic-swf-stand-tofu,
+.avatar-ruffle-host[data-mount-mode="companion"].is-playing .classic-swf-stand-tofu,
+.avatar-ruffle-host.is-companion-connected.is-playing .classic-swf-stand-tofu {
+  opacity: 0.35 !important;
+  z-index: 0 !important;
 }

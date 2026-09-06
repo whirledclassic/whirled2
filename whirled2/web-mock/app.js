@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ch";
+  var LOGO_V = "20260906ci";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2189,16 +2189,17 @@
 
 
   function classicRuffleWearHtml(worn, posStyle) {
-    // (?v=20260906cd): Always mount Ruffle companion host + hitbox/nameplate + stand thumb OR glyph.
-    // Beginner: never tofu / never blank when a .swf is worn (sha1-only OK — IDB resolves at mount).
+    // (?v=20260906ci): Always mount Ruffle companion host + hitbox/nameplate + stand PNG OR tofu SVG.
+    // Beginner: never blank when a .swf is worn; NEVER a grey letter "T" glyph as the loft avatar.
     // ENGINE DEV: data-swf-sha1 on host; PE none on Ruffle; hitbox owns emotes; stand survives mountRuffle.
     var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
     var shaAttr = esc(worn.swfSha1 || (worn.pack && worn.pack.swfSha1) || "");
     var stand = esc(worn.thumb || worn.preview || "");
-    var initial = esc(((worn.name || "SWF").trim().charAt(0) || "S").toUpperCase());
     var standHtml = stand
       ? ('<img class="classic-swf-stand-thumb" src="' + stand + '" alt="" aria-hidden="true" />')
-      : ('<div class="classic-swf-placeholder" aria-hidden="true"><span>' + initial + '</span></div>');
+      : (window.WhirledClassicAvatar && WhirledClassicAvatar.standTofuHtml
+        ? WhirledClassicAvatar.standTofuHtml()
+        : tofuSvgHtml("classic-swf-stand-tofu tofu-wear"));
     return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-swf-sha1="' + shaAttr + '" data-loft-mode="ruffle" data-playback="ruffle">'
       + '<div class="avatar-wear-billboard is-ruffle-billboard" style="' + posStyle + '">'
       +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" data-swf-sha1="' + shaAttr + '" title="Ruffle — transparent; floor click moves you; PE none">'
@@ -13164,28 +13165,43 @@
         wearStuffAvatar(seeded);
         return { mode: "seeded", id: seeded.id };
       }
-      // (?v=20260906ch) Use AvatarControl mimic (demo-avatar.swf) — demo-qa.swf is paint-only.
+      // (?v=20260906ci) Prefer Body demo (AvatarControl mimic). Mirror under assets/ruffle/ too.
+      // demo-qa.swf = paint-only last resort. Stand thumb = tiny SVG so cover is NEVER letter "T".
       var demoUrl = "./assets/avatars/flash-qa/demo-avatar.swf?v=" + LOGO_V;
       try {
         if (window.WhirledClassicAvatar && WhirledClassicAvatar.getBodyDemoSwfUrl) {
           demoUrl = WhirledClassicAvatar.getBodyDemoSwfUrl();
-        } else if (window.WhirledClassicAvatar && WhirledClassicAvatar.getDemoQaSwfUrl) {
-          // fallback paint-only if body demo helper missing
-          demoUrl = WhirledClassicAvatar.getDemoQaSwfUrl();
         }
       } catch (eD) {}
+      // Durable alt if flash-qa path 404s on a stale Pages deploy
+      var demoAlt = "./assets/ruffle/demo-avatar.swf?v=" + LOGO_V;
+      try {
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.getBodyDemoSwfUrlAlt) {
+          demoAlt = WhirledClassicAvatar.getBodyDemoSwfUrlAlt();
+        }
+      } catch (eA) {}
+      var standThumb = "data:image/svg+xml," + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80">'
+        + '<rect x="10" y="4" width="44" height="52" rx="8" fill="#f0e6d2" stroke="#c4a882" stroke-width="2"/>'
+        + '<rect x="18" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+        + '<rect x="34" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+        + '<circle cx="24" cy="26" r="3" fill="#8a7048"/><circle cx="40" cy="26" r="3" fill="#8a7048"/>'
+        + '<path d="M26 38c2.5 3 9.5 3 12 0" fill="none" stroke="#8a7048" stroke-width="2" stroke-linecap="round"/>'
+        + '</svg>'
+      );
       var row = {
         stuffId: "flashqa-demo",
         id: "flashqa-demo",
         name: "Flash QA Body demo",
         swfUrl: demoUrl,
+        swfUrlAlt: demoAlt,
         mediaKind: "swf",
         playbackMode: "ruffle",
         classicFlashOptIn: true,
         forceRuffleInLoft: true,
         source: "flashQa",
-        thumb: "",
-        preview: "",
+        thumb: standThumb,
+        preview: standThumb,
         isTofu: false
       };
       if (typeof wearStuffAvatar === "function") wearStuffAvatar(row);

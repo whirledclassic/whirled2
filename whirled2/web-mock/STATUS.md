@@ -1,3 +1,14 @@
+## What shipped (?v=20260906ci — tofu+T junk UI; demo-avatar on Pages; stand ≠ letter)
+
+- **Root cause (screenshot):** loft showed classic tofu face + grey rounded **"T"** glyph. Letter came from `classic-swf-placeholder` / `ensureStandFallback` initial (name "Tofu" → T). Companion-cover called ensureStand with non-soft reasons → `is-failed` kept glyph on TOP. `assets/ruffle/demo-avatar.swf` was **404** on Pages (flashQa/docs sometimes pointed there); paint-only path + failed nest → no Classic Flash Wear visible.
+- **Fix:**
+  1. Ship **`assets/ruffle/demo-avatar.swf`** (mirror of flash-qa Body demo) + keep `assets/avatars/flash-qa/demo-avatar.swf`.
+  2. `ensureStandFallback` / `classicRuffleWearHtml` / `classicWearSlotHtml`: **NEVER letter glyph** — stand PNG/thumb or `classic-swf-stand-tofu` SVG. CSS hides legacy `.classic-swf-placeholder`.
+  3. Companion-cover / mounting = **soft** (not `is-failed`). Watchdog → DIRECT remount sooner (~3.2s); DIRECT falls through body-demo alt → `demo-qa.swf`.
+  4. flashQa wears Body demo with SVG stand thumb + `swfUrlAlt` mirror path.
+- Preserve: companion-only nest, hostLoadBytes ready-gate, dual Wear, no `#stage-slot` Ruffle, no AGPL.
+- Cache: **`?v=20260906ci`**. Push: `/tmp/push-ci.js` (`WHIRLED_DO_PUSH=1`).
+
 ## What shipped (?v=20260906ch — COMPANION-ONLY walk nest; EI ready-gate)
 
 - **Root cause:** cg companion never `"connected"` — EI silent-miss + ready flush could hit DIRECT; `hostLoadBytes` not gated on ready. See `WALK-E2E-ANALYSIS.md` / `ROOT-CAUSE.md`.
