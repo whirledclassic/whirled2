@@ -19,6 +19,15 @@ Same/different vs the 2007 client: [`whirled2/SAME-AND-DIFFERENT.md`](whirled2/S
 - Do not vendor `greyhavens/msoy` into this tree.
 - Be an adult. Harassment or "gotcha" crash content gets you removed.
 
+## Apply
+
+One form for art, code, and Discord:
+https://whirledclassic.github.io/whirled2/whirled2/web-mock/apply.html
+
+There is a paid opportunity if you are accepted and the first job is a fit. Links to previous work required. Discord mod / community manager is needed now.
+
+Notes: [`whirled2/ARTISTS.md`](whirled2/ARTISTS.md).
+
 ## What to work on
 
 Look at open issues. Prefer anything tagged `good first issue` or `help wanted`.
@@ -31,15 +40,6 @@ Whirled 2 priority:
 4. Deploy notes for a $5 VPS + HTTPS
 
 Classic priority: keep lab notes accurate. Do not publish the VM.
-
-## Artist work
-
-Read the terms and pick a role: [whirled2/ARTISTS.md](whirled2/ARTISTS.md).
-
-Apply here (email + optional GitHub issue):
-https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html
-
-Paid and volunteer tracks both exist. Quote a rate if you want paid. Long-term still means one-time payments per asset drop unless agreed otherwise in writing.
 
 ## Code style (Whirled 2)
 
