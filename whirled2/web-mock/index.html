@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Whirled2 dh</title>
+  <title>Whirled2 di</title>
   <style>
     .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
     body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; background: #89C6E3; color: #16324a; }
@@ -13,13 +13,14 @@
     #room-enter-curtain, .room-enter-curtain, .loft-hint-engine-waiting, .avatar-engine-waiting-note { display: none !important; }
     .stage-host, #stage-slot {
       min-height: 48vh !important;
+      height: 48vh !important;
       background: linear-gradient(180deg,#5fa8cc 0 56%, #c9a36a 56% 100%) !important;
       position: relative !important;
     }
     #stage-slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906dh" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906dh" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906di" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906di" />
   <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
 </head>
 <body>
@@ -33,7 +34,7 @@
       if (/127\.0\.0\.1|localhost/.test(ls)) localStorage.removeItem("whirled2.engineSrc");
     } catch (e) {}
   </script>
-  <script src="./src/api.js?v=20260906dh"></script>
+  <script src="./src/api.js?v=20260906di"></script>
   <script>
     (function () {
       if (!window.WhirledApi || !window.WhirledApi.login) return;
@@ -53,20 +54,46 @@
       };
     })();
   </script>
-  <script src="./src/classic-avatar.js?v=20260906dh"></script>
-  <script src="./src/pixi-bridge.js?v=20260906dh"></script>
-  <script src="./app.js?v=20260906dh"></script>
+  <script src="./src/classic-avatar.js?v=20260906di"></script>
+  <script src="./src/pixi-bridge.js?v=20260906di"></script>
+  <script src="./app.js?v=20260906di"></script>
   <script>
     (function () {
-      function mount() {
-        var host = document.getElementById("stage-slot");
+      function drawLoft(host) {
         if (!host || host.querySelector("canvas")) return;
         if (typeof window.mountWhirledEngine === "function") {
           try { window.mountWhirledEngine(host); } catch (e) {}
         }
+        if (host.querySelector("canvas")) return;
+        var c = document.createElement("canvas");
+        c.setAttribute("data-whirled-stage", "1");
+        c.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;";
+        host.appendChild(c);
+        host.setAttribute("data-whirled-engine", "1");
+        var ctx = c.getContext("2d");
+        function paint() {
+          var r = host.getBoundingClientRect();
+          var w = Math.max(160, r.width || 320), h = Math.max(180, r.height || 240);
+          var dpr = Math.min(window.devicePixelRatio || 1, 2);
+          c.width = w * dpr; c.height = h * dpr;
+          c.style.width = w + "px"; c.style.height = h + "px";
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.fillStyle = "#6eb7d8"; ctx.fillRect(0, 0, w, h * 0.58);
+          ctx.fillStyle = "#c9a36a"; ctx.fillRect(0, h * 0.58, w, h * 0.42);
+          ctx.fillStyle = "#fff"; ctx.font = "700 14px Trebuchet MS,sans-serif";
+          ctx.fillText("Studio Loft", 10, 22);
+          ctx.fillStyle = "#16324a"; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.72, 10, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#1e6fa8"; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.78, 14, 0, Math.PI * 2); ctx.fill();
+        }
+        paint();
+        setInterval(paint, 1000);
       }
-      document.addEventListener("whirled:ready", mount);
-      setInterval(mount, 400);
+      function tick() {
+        var host = document.getElementById("stage-slot");
+        if (host) drawLoft(host);
+      }
+      document.addEventListener("whirled:ready", tick);
+      setInterval(tick, 400);
     })();
   </script>
 </body>
