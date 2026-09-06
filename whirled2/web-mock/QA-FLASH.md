@@ -1,28 +1,28 @@
-# QA-FLASH — Flash / loft interact checklist (?v=20260906cf)
+# QA-FLASH — Flash / loft interact checklist (?v=20260906cg)
 
-Dual modes: `playbackMode` png-hybrid|ruffle. **cf** = DIRECT-stable Wear (companion auto-upgrade OFF); **ce** attempted upgrade (regressed); **cd** Ruffle config; **cb** DIRECT-stable; **by** hostLoadBytes; **bu** nest; **bt** never-tofu; **bs** Hybrid gate.
+Dual modes: `playbackMode` png-hybrid|ruffle. **cg** = DIRECT-first + SAFE Option A companion sibling layer; **cf** DIRECT-stable (upgrade OFF); **ce** dangerous remount (regressed); **cd** Ruffle config; **by** hostLoadBytes.
 
-## Success criteria (?v=20260906cf)
+## Success criteria (?v=20260906cg)
 
-0. Worn Classic Flash SWF never shows tofu bean **or blank loft** — DIRECT outer Ruffle + stand thumb / glyph immediately and **kept**.
-1. Wear **Classic Flash (Ruffle)** → loft → **floor click** moves billboard (chrome bob/flip). Emotes via nameplate/hitbox. In-SWF walk frames deferred until companion research is safe.
-2. Mount: **DIRECT only** for Wear default (`WEAR_AUTO_COMPANION_UPGRADE = false`). Companion helpers remain gated; watchdog → remount **DIRECT** if ever used.
-3. Stand thumb visible (on TOP while mounting; behind once `data-mount-mode=direct` + `is-playing`).
+0. Worn Classic Flash SWF never shows tofu bean **or blank loft** — DIRECT outer Ruffle paints immediately and **stays** during companion attempt.
+1. Wear **Classic Flash (Ruffle)** → loft → **floor click** moves billboard (chrome bob/flip). When companion connects, in-SWF walk frames via `hostWalk` → `appearanceChanged_v2`.
+2. Mount: DIRECT first; `WEAR_SAFE_COMPANION_UPGRADE` mounts host in `#avatar-companion-layer` (opacity 0). Promote only on bridge `"connected"`. Watchdog ~4s → tear companion, keep DIRECT.
+3. Stand thumb visible (opacity 1) until DIRECT or companion has `.is-playing`.
 4. Wear **Whirled2 Smooth** → PNG walk; Ruffle **not** mounted.
 5. Dual Wear radio cards still present.
-6. Debug: `?avatarDebug=1` → `WhirledClassicAvatar.getLoftHostDebug()` shows `companionConnected: false` / DIRECT mount (auto-upgrade OFF).
+6. Debug: `?avatarDebug=1` → `WhirledClassicAvatar.getLoftHostDebug()` — `safeUpgradeActive` / `companionConnected` / `hasDirectPlayer`.
 
 ## Architecture
 
-- Loft Wear: outer Ruffle loads **avatar SWF DIRECT** and keeps it (companion auto-upgrade OFF)
-- Bridge / nest / watchdog kept in code for future opt-in after Ruffle research
+- Loft Wear: outer Ruffle loads **avatar SWF DIRECT**; companion nest is progressive enhancement in a sibling layer
+- Bridge `"connected"` gates `loftUsesCompanionHost`; reject nested blob/data URLs
 - Source: `tools/avatar-host/AvatarHost.hx` (ORIGINAL MIT; study protocol only — no AGPL copy)
-- Docs: `ROOT-CAUSE.md`, `RUFFLE-INTEGRATION.md`, `GREY-HAVENS-PROTOCOL.md`
+- Docs: `ROOT-CAUSE.md`, `RUFFLE-SOURCE-DEEP.md`, `GREY-HAVENS-PROTOCOL.md`
 
 ## Commands
 
 ```bash
 node --check src/classic-avatar.js && node --check app.js
 node scripts/qa-flash-check.cjs
-WHIRLED_DO_PUSH=1 node /tmp/push-cf.js
+WHIRLED_DO_PUSH=1 node /tmp/push-cg.js
 ```

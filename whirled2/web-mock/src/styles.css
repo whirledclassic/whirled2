@@ -7247,12 +7247,22 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
    Never classic-png-under-swf hide without a visible SWF — see afterMountUi in classic-avatar.js. */
 .avatar-ruffle-host.is-mounting .classic-swf-stand-thumb,
 .avatar-ruffle-host.is-failed .classic-swf-stand-thumb,
-.avatar-ruffle-host[data-mount-mode="companion-pending"] .classic-swf-stand-thumb,
 .avatar-ruffle-host.is-mounting .classic-swf-placeholder,
-.avatar-ruffle-host.is-failed .classic-swf-placeholder,
-.avatar-ruffle-host[data-mount-mode="companion-pending"] .classic-swf-placeholder {
+.avatar-ruffle-host.is-failed .classic-swf-placeholder {
   opacity: 1 !important;
   z-index: 3 !important;
+}
+/* (?v=20260906cg) companion-pending WITHOUT paint yet → stand on TOP (never blank).
+   When DIRECT is already .is-playing, stand is backup UNDER — do not cover the SWF. */
+.avatar-ruffle-host[data-mount-mode="companion-pending"]:not(.is-playing) .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-pending"]:not(.is-playing) .classic-swf-placeholder {
+  opacity: 1 !important;
+  z-index: 3 !important;
+}
+.avatar-ruffle-host[data-mount-mode="companion-pending"].is-playing .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-pending"].is-playing .classic-swf-placeholder {
+  opacity: 0.35 !important;
+  z-index: 0 !important;
 }
 /* DIRECT playing: SWF is the paint — stand is backup under the player, not a cover sheet. */
 .avatar-ruffle-host[data-mount-mode="direct"].is-playing .classic-swf-stand-thumb,
@@ -7271,4 +7281,43 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 .avatar-ruffle-host.is-playing:not([data-mount-mode]):not(.is-companion-connected) .classic-swf-placeholder {
   opacity: 1 !important;
   z-index: 2 !important;
+}
+
+
+/* ==========================================================================
+   ?v=20260906cg — SAFE companion Option A (sibling layer; never wipe DIRECT)
+   Beginner: DIRECT avatar stays visible while companion host tries invisibly.
+   ENGINE DEV: #avatar-companion-layer opacity 0 until bridge connected + promote.
+   ========================================================================== */
+.avatar-companion-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none !important;
+  background: transparent !important;
+  opacity: 0;
+  z-index: 2; /* over DIRECT while pending (invisible) — promote fades this in */
+  overflow: hidden;
+}
+.avatar-companion-layer.is-companion-pending {
+  opacity: 0 !important;
+}
+.avatar-companion-layer.is-companion-visible,
+.avatar-ruffle-host.is-companion-connected .avatar-companion-layer {
+  opacity: 1 !important;
+  z-index: 2;
+}
+.avatar-companion-layer ruffle-player,
+.avatar-companion-layer ruffle-embed,
+.avatar-companion-layer canvas {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 140px;
+  max-height: 180px;
+  pointer-events: none !important;
+  background: transparent !important;
 }

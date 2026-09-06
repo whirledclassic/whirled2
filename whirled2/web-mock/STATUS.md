@@ -1,3 +1,11 @@
+## What shipped (?v=20260906cg — SAFE companion Option A; DIRECT preserved)
+
+- **Fix:** Wear stays DIRECT-first. Companion upgrade uses sibling `#avatar-companion-layer` (opacity 0) — never `mountRuffle(host)` into the visible host until bridge `"connected"`. Fail/watchdog ~4s tears companion only; DIRECT stays.
+- Flag: `WEAR_SAFE_COMPANION_UPGRADE = true` (legacy `WEAR_AUTO_COMPANION_UPGRADE` stays false). `loftUsesCompanionHost` only on `"connected"`.
+- Docs: `ROOT-CAUSE.md`, `RUFFLE-SOURCE-DEEP.md` implementation note, `QA-FLASH.md`.
+- Preserve: cf DIRECT paint, by hostLoadBytes, walk-lerp/spoke/sleep, dual Wear, Whirl
+- Cache: **`?v=20260906cg`**. Push: `/tmp/push-cg.js` (`WHIRLED_DO_PUSH=1`).
+
 ## What shipped (?v=20260906cf — DIRECT-stable Wear; companion auto-upgrade OFF)
 
 - **Regression:** `?v=20260906ce` auto-upgrade (DIRECT → delayed companion nest) wiped visible Wear again — blank loft / companion wipe (worse than before). See `ROOT-CAUSE.md`.

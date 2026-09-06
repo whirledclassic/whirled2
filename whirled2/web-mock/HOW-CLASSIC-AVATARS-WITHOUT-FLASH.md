@@ -1,6 +1,6 @@
 # Classic Whirled avatars — without Adobe Flash
 
-**Cache:** `?v=20260906cf`  
+**Cache:** `?v=20260906cg`  
 **Audience:** beginners + ENGINE DEV. In-site: Help → **Developers** → *Classic Whirled avatars — without Adobe Flash*. Groups → **Dev Updates** thread.
 
 ---
@@ -82,7 +82,7 @@ From `greyhavens/whirled-api` `AbstractControl.as` / `ActorControl.as` / `Avatar
 1. Stuff → Avatars → **Classic Flash / Whirled avatars** panel.  
 2. Drop your **own** `.swf` (plus optional PNG idle + walk).  
 3. **Analyze** → pick **Wear mode** → **Save** → **Wear & enter loft**.  
-4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906cf`.
+4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906cg`.
 
 ---
 
@@ -121,7 +121,7 @@ Whirl starter, chat visit-since, pale-blue chrome, transparent Ruffle, PE-none l
 Stock Wear from IDB uses companion `hostLoadBytes(base64)` → `Loader.loadBytes` (not nested blob URLs). See `FLASH-SYNC-RESEARCH.md`.
 
 
-## How Ruffle is integrated (?v=20260906cf)
+## How Ruffle is integrated (?v=20260906cg)
 
 See **[RUFFLE-INTEGRATION.md](./RUFFLE-INTEGRATION.md)** for the full research summary (Using-Ruffle wiki + js-docs).
 

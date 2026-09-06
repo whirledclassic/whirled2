@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906cf
+ * Cache: ?v=20260906cg
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906cf";
+  var VERSION = "20260906cg";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -65,16 +65,17 @@
 
   var RUFFLE_DEMO_SWF = "./assets/ruffle/demo-qa.swf";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906cf): DIRECT-stable Wear — paint outer avatar SWF and KEEP it.
-  // ROOT BREAK (companion-first / ce auto-upgrade): empty host.swf or companion wipe → blank loft.
-  // Companion nest helpers (startCompanionWithPayload, companion-pending CSS, watchdog) stay in tree
-  // but Wear auto-upgrade is GATED OFF until Ruffle source research says nested sharedEvents /
-  // hostLoadBytes is safe. Chrome bob/emotes keep working. Stand thumb always visible.
-  // Never set loftUsesCompanionHost until bridge "connected". Watchdog → remount DIRECT.
+  // How this works (?v=20260906cg): SAFE companion upgrade (Option A) — DIRECT stays visible.
+  // Beginner: your avatar SWF paints first on outer Ruffle. A second invisible companion layer
+  // tries host.swf + hostLoadBytes. Only after bridge "connected" do we fade to companion.
+  // If companion fails / watchdog ~4s: tear companion layer down — DIRECT stays. Never blank loft.
+  // ENGINE DEV: mountRuffle() clears its container — must NOT remount host into #avatar-ruffle-host
+  // until success (ce wipe). Sibling #avatar-companion-layer under/over with opacity 0 until connected.
+  // loftUsesCompanionHost ONLY on bridge "connected". Reject nested blob:/data: — hostLoadBytes only.
   // LIVE whirled.club: ActorSprite → appearanceChanged_v2 → Body state_*_walking (+ gotControl_v1).
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
-  // SWF-only: transparent Ruffle + bob/flip backup — never broken tofu / never blank loft.
-  var WEAR_AUTO_COMPANION_UPGRADE = false; // (?v=20260906cf) OFF — do not re-enable yet
+  var WEAR_SAFE_COMPANION_UPGRADE = true; // (?v=20260906cg) Option A dual-layer — never wipe DIRECT first
+  var WEAR_AUTO_COMPANION_UPGRADE = false; // legacy ce flag kept false (dangerous remount-into-host)
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
   var api = {};
 
@@ -987,8 +988,14 @@
   var HOST_B64_MAX = 14 * 1024 * 1024; // ~10MB SWF as base64
 
   var loftActivePlayer = null;
+  // (?v=20260906cg) Option A: DIRECT player stays in #avatar-ruffle-host; companion mounts in sibling layer.
+  var loftDirectPlayer = null;
+  var loftCompanionLayer = null;
+  var loftCompanionPlayer = null;
+  var loftSafeUpgradeActive = false;
   var loftHostState = {
     connected: false,
+    gotControl: false,
     moving: false,
     orient: 180,
     state: "Default",
@@ -1233,12 +1240,148 @@
     }
   }
 
+  /**
+   * (?v=20260906cg) Option A — sibling companion layer inside #avatar-ruffle-host.
+   * Beginner: DIRECT avatar stays visible; companion host loads invisibly on top until connected.
+   * ENGINE DEV: mountRuffle clears its container — never pass the main host slot until promote.
+   */
+  function ensureCompanionLayer(slot) {
+    if (!slot) return null;
+    var layer = null;
+    try { layer = slot.querySelector("#avatar-companion-layer"); } catch (eQ) {}
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "avatar-companion-layer";
+      layer.className = "avatar-companion-layer";
+      layer.setAttribute("aria-hidden", "true");
+      layer.setAttribute("data-companion-layer", "1");
+      try { slot.appendChild(layer); } catch (eA) { return null; }
+    }
+    try {
+      layer.style.opacity = "0";
+      layer.style.pointerEvents = "none";
+      layer.classList.add("is-companion-pending");
+      layer.classList.remove("is-companion-visible", "is-failed", "is-playing");
+    } catch (eSt) {}
+    loftCompanionLayer = layer;
+    return layer;
+  }
+
+  function removeDirectPlayersOnly(slot) {
+    if (!slot) return;
+    var kids = [];
+    try { kids = Array.prototype.slice.call(slot.children || []); } catch (eK) { kids = []; }
+    for (var i = 0; i < kids.length; i++) {
+      var el = kids[i];
+      if (!el) continue;
+      if (el.id === "avatar-companion-layer" || (el.getAttribute && el.getAttribute("data-companion-layer") === "1")) continue;
+      if (el.classList && (el.classList.contains("classic-swf-stand-thumb") || el.classList.contains("classic-swf-placeholder"))) continue;
+      var tag = String(el.tagName || "").toUpperCase();
+      var isRuffle = tag === "RUFFLE-PLAYER" || tag === "RUFFLE-EMBED"
+        || (el.getAttribute && el.getAttribute("data-classic-ruffle") === "1");
+      if (!isRuffle) continue;
+      try {
+        activePlayers = activePlayers.filter(function (p) { return p !== el; });
+      } catch (eF) {}
+      try {
+        if (el.remove) el.remove();
+        else if (el.parentNode) el.parentNode.removeChild(el);
+      } catch (eR) {}
+    }
+  }
+
+  function tearDownCompanionLayer(reason) {
+    // Keep DIRECT paint — only remove the sibling companion attempt.
+    clearCompanionWatch();
+    logAvatarDebug("tearDownCompanionLayer (keep DIRECT)", reason, {
+      hadLayer: !!loftCompanionLayer,
+      hadDirect: !!loftDirectPlayer,
+      gen: loftMountGeneration
+    });
+    loftSafeUpgradeActive = false;
+    loftUsesCompanionHost = false;
+    loftHostState.hostMode = false;
+    loftHostState.connected = false;
+    loftHostState.gotControl = false;
+    loftFallbackInFlight = false;
+    var layer = loftCompanionLayer;
+    var slot = null;
+    try {
+      slot = (layer && layer.parentNode)
+        || document.getElementById("avatar-ruffle-host")
+        || document.getElementById("classic-wear-swf-slot");
+    } catch (eS) {}
+    if (layer) {
+      try { destroyPlayersIn(layer); } catch (eD) {}
+      try {
+        if (layer.remove) layer.remove();
+        else if (layer.parentNode) layer.parentNode.removeChild(layer);
+      } catch (eRm) {}
+    }
+    loftCompanionLayer = null;
+    loftCompanionPlayer = null;
+    if (loftDirectPlayer) {
+      loftActivePlayer = loftDirectPlayer;
+    }
+    if (slot) {
+      try {
+        slot.classList.remove("is-companion-connected", "is-failed", "is-mounting");
+        slot.classList.add("is-on");
+        if (loftDirectPlayer || slot.querySelector("ruffle-player, ruffle-embed, [data-classic-ruffle]")) {
+          slot.classList.add("is-playing");
+        }
+        slot.setAttribute("data-mount-mode", "direct");
+      } catch (eCl) {}
+      try { ensureStandFallback(slot, null, "companion-teardown:" + String(reason || "").slice(0, 60)); } catch (eSt) {}
+    }
+    return loftDirectPlayer || loftActivePlayer;
+  }
+
+  function promoteCompanionOverDirect(slot) {
+    // Bridge "connected" (+ nest success) — NOW it is safe to drop DIRECT paint.
+    slot = slot || document.getElementById("avatar-ruffle-host")
+      || document.getElementById("classic-wear-swf-slot");
+    loftUsesCompanionHost = true;
+    loftHostState.hostMode = true;
+    loftHostState.connected = true;
+    loftSafeUpgradeActive = false;
+    loftFallbackInFlight = false;
+    if (loftCompanionPlayer) loftActivePlayer = loftCompanionPlayer;
+    if (loftCompanionLayer) {
+      try {
+        loftCompanionLayer.style.opacity = "1";
+        loftCompanionLayer.classList.add("is-companion-visible", "is-playing");
+        loftCompanionLayer.classList.remove("is-companion-pending", "is-mounting", "is-failed");
+        loftCompanionLayer.setAttribute("aria-hidden", "false");
+      } catch (eL) {}
+    }
+    if (slot) {
+      try { removeDirectPlayersOnly(slot); } catch (eRp) {}
+      loftDirectPlayer = null;
+      try {
+        slot.classList.add("is-companion-connected", "is-playing", "is-on");
+        slot.classList.remove("is-mounting", "is-failed");
+        slot.setAttribute("data-mount-mode", "companion");
+      } catch (eSc) {}
+    }
+    logAvatarDebug("promoteCompanionOverDirect — DIRECT removed; nest owns paint", {
+      gotControl: !!loftHostState.gotControl,
+      hasCompanion: !!loftCompanionPlayer
+    });
+  }
+
   function remountDirectAvatar(slot, avatarUrl, worn, loftOpts, reason) {
     return remountDirectAvatarImmediate(reason || "remountDirect", slot, avatarUrl, worn, loftOpts);
   }
 
   function remountDirectAvatarImmediate(reason, slotOpt, urlOpt, wornOpt, loftOptsOpt) {
-    // (?v=20260906cd) CRITICAL: empty companion host → remount the real avatar SWF (blob: OK for outer Ruffle).
+    // (?v=20260906cg) If Option A sibling upgrade is active and DIRECT still paints, only tear companion.
+    // Beginner: never blank the loft just because companion failed — keep the avatar you already see.
+    // ENGINE DEV: remount into #avatar-ruffle-host only when DIRECT is gone (legacy / wipe recovery).
+    if (loftDirectPlayer && (loftSafeUpgradeActive || loftCompanionLayer)) {
+      tearDownCompanionLayer(reason || "keep-direct");
+      return Promise.resolve(loftDirectPlayer);
+    }
     if (loftFallbackInFlight) {
       logAvatarDebug("remountDirect skipped (in flight)", reason);
       return Promise.resolve(null);
@@ -1281,9 +1424,16 @@
       }
       loftUsesCompanionHost = false;
       loftHostState.hostMode = false;
+      loftHostState.connected = false;
+      loftHostState.gotControl = false;
+      loftSafeUpgradeActive = false;
+      loftCompanionLayer = null;
+      loftCompanionPlayer = null;
+      loftDirectPlayer = player || null;
+      loftActivePlayer = player || loftActivePlayer;
       loftFallbackInFlight = false;
       try {
-        slot.classList.remove("is-failed");
+        slot.classList.remove("is-failed", "is-companion-connected");
         slot.classList.add("is-playing", "is-on");
         slot.setAttribute("data-mount-mode", "direct");
       } catch (eCl) {}
@@ -1316,13 +1466,19 @@
         logAvatarDebug("watchdog OK — connected", reasonTag);
         return;
       }
-      // No loaded/connected in ~2s → blank host risk — remount DIRECT (outer blob works)
-      logAvatarDebug("watchdog FIRE — no connected → direct", reasonTag, {
+      // (?v=20260906cg) ~4s no connect → tear companion layer, KEEP DIRECT (Option A).
+      logAvatarDebug("watchdog FIRE — no connected → keep DIRECT", reasonTag, {
         lastBridge: loftHostState.lastBridge,
-        companionAttempted: loftCompanionAttempted
+        companionAttempted: loftCompanionAttempted,
+        safeUpgrade: loftSafeUpgradeActive,
+        hadDirect: !!loftDirectPlayer
       });
-      remountDirectAvatarImmediate("watchdog-no-connected");
-    }, 3500); // (?v=20260906cf) loadBytes + controlConnect needs >2s on large IDB SWFs
+      if (loftDirectPlayer && (loftSafeUpgradeActive || loftCompanionLayer)) {
+        tearDownCompanionLayer("watchdog-no-connected:" + String(reasonTag || ""));
+      } else {
+        remountDirectAvatarImmediate("watchdog-no-connected");
+      }
+    }, 4000); // (?v=20260906cg) loadBytes + controlConnect; Option A keeps DIRECT meanwhile
   }
 
   /**
@@ -1346,25 +1502,34 @@
         tryFlushPendingAvatarLoad();
         logAvatarDebug("host loaded avatar bytes (await controlConnect)");
       }
+      if (kind === "gotControl") {
+        loftHostState.gotControl = (payload === true || payload === "true" || payload === 1);
+        logAvatarDebug("gotControl", loftHostState.gotControl, payload);
+      }
       if (kind === "connected") {
-        // (?v=20260906cf) ONLY flip companion flags here — never at host mount (blank loft).
+        // (?v=20260906cg) ONLY flip companion flags here — never at host mount (blank loft).
         // Beginner: walk frames work now because host can call appearanceChanged_v2.
+        // ENGINE DEV: Option A promotes sibling layer + drops DIRECT only after connected.
         loftHostState.connected = true;
         loftHostState.hostMode = true;
         loftUsesCompanionHost = true;
+        clearCompanionWatch();
+        loftFallbackInFlight = false;
         try {
-          var slotC = document.getElementById("avatar-ruffle-host");
-          if (slotC) {
+          var slotC = document.getElementById("avatar-ruffle-host")
+            || document.getElementById("classic-wear-swf-slot");
+          if (loftCompanionLayer || loftSafeUpgradeActive) {
+            promoteCompanionOverDirect(slotC);
+          } else if (slotC) {
             slotC.classList.add("is-companion-connected", "is-playing", "is-on");
             slotC.classList.remove("is-mounting", "is-failed");
             slotC.setAttribute("data-mount-mode", "companion");
           }
         } catch (eCc) {}
-        clearCompanionWatch();
-        loftFallbackInFlight = false;
-        logAvatarDebug("companion connected — keep nest; re-sync appearance", {
+        logAvatarDebug("companion connected — nest owns walk; re-sync appearance", {
           moving: loftHostState.moving,
-          orient: loftHostState.orient
+          orient: loftHostState.orient,
+          gotControl: !!loftHostState.gotControl
         });
         setTimeout(function () {
           try {
@@ -1389,7 +1554,7 @@
         }
       }
       if (kind === "error" || kind === "ei_error" || kind === "appearance_error") {
-        logAvatarDebug("companion host error → direct remount", kind, payload);
+        logAvatarDebug("companion host error → keep DIRECT / remount if needed", kind, payload);
         remountDirectAvatarImmediate("bridge:" + kind + ":" + String(payload || "").slice(0, 60));
       }
       return true;
@@ -1924,15 +2089,21 @@
     return {
       version: VERSION,
       hasPlayer: !!loftActivePlayer,
+      hasDirectPlayer: !!loftDirectPlayer,
+      hasCompanionPlayer: !!loftCompanionPlayer,
+      safeUpgradeActive: !!loftSafeUpgradeActive,
       companionHost: loftUsesCompanionHost || loftHostState.hostMode,
       companionAttempted: loftCompanionAttempted,
       companionConnected: !!loftHostState.connected,
+      gotControl: !!loftHostState.gotControl,
+      wearSafeCompanionUpgrade: !!WEAR_SAFE_COMPANION_UPGRADE,
       hostSwf: getCompanionHostSwfUrl(),
       avatarUrl: !!(loftPendingAvatarUrl || loftHostState.avatarUrl),
       hostLoadUrlKind: loftHostState._hostLoadUrl ? String(loftHostState._hostLoadUrl).slice(0, 48) : null,
       hostLoadBytesLen: loftPendingAvatarB64 ? loftPendingAvatarB64.length : 0,
       state: {
         connected: loftHostState.connected,
+        gotControl: !!loftHostState.gotControl,
         moving: loftHostState.moving,
         orient: loftHostState.orient,
         state: loftHostState.state,
@@ -1955,7 +2126,7 @@
       whyIdle: "Stock Whirled SWFs dispatch ConnectEvent type controlConnect on loaderInfo.sharedEvents (NOT ExternalInterface).",
       protocol: "Nested host: Ruffle loads avatar-host.swf (http) → hostLoadBytes(base64) → Loader.loadBytes → sharedEvents controlConnect → hostProps → gotControl_v1 → appearanceChanged_v2. http(s) avatars may use hostLoadUrl.",
       liveClub: "whirled.club world-client: ActorSprite floor move → appearanceChanged_v2(loc,orient,moving,sleeping) → Body state_*_walking / towalking / fromwalking. Embed allowScriptAccess sameDomain; nested avatar inside host SWF (same nest as ours).",
-      whatWorksNow: "by: companion nest + hostLoadBytes; walk duration parity (hostWalk true→locX tick~100ms→false on arrive); setLocation→chromeWalkTo; loft chat→hostSpoke; ~60s idle→hostSleep; self-host Ruffle + ?flashQa=1.",
+      whatWorksNow: "cg: DIRECT-first + SAFE Option A sibling companion layer; promote only on bridge connected; fail/watchdog keeps DIRECT; hostLoadBytes; hostWalk→appearanceChanged_v2; spoke/sleep.",
       hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
       hostShim: "assets/avatar-host/avatar-host.swf compiled from tools/avatar-host/AvatarHost.hx (Haxe --swf). No AGPL copy.",
       debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
@@ -2511,9 +2682,16 @@
     if (!shouldMountRuffleInLoft(worn)) {
       // Hybrid smooth: destroy any stale loft player so PNG walk stays clickable / visible.
       if (slot) {
+        try { tearDownCompanionLayer("hybrid-smooth"); } catch (eTd) {}
         destroyPlayersIn(slot);
-        slot.classList.remove("is-on", "is-playing", "is-mounting");
+        slot.classList.remove("is-on", "is-playing", "is-mounting", "is-companion-connected");
+        try { slot.removeAttribute("data-mount-mode"); } catch (eMm) {}
       }
+      loftDirectPlayer = null;
+      loftActivePlayer = null;
+      loftCompanionPlayer = null;
+      loftSafeUpgradeActive = false;
+      loftUsesCompanionHost = false;
       return;
     }
     if (!slot) return;
@@ -2553,11 +2731,9 @@
           }
         }
       }
-      // (?v=20260906cf) DIRECT-stable Wear — companion auto-upgrade OFF.
-      // Beginner: always show your avatar (DIRECT Ruffle + blob) and KEEP it. Stand thumb visible.
-      // Companion helpers remain below but WEAR_AUTO_COMPANION_UPGRADE is false (ce wiped paint).
-      // ENGINE DEV: outer Ruffle blob: OK; nested Loader research still pending before re-enable.
-      // Never set loftUsesCompanionHost until bridge "connected". Watchdog ~3.5s → DIRECT.
+      // (?v=20260906cg) DIRECT-first + SAFE companion (Option A sibling layer).
+      // Beginner: always show your avatar first. Companion upgrades invisibly; fail keeps DIRECT.
+      // ENGINE DEV: loftUsesCompanionHost only on bridge "connected". Watchdog ~4s → tear companion.
       installWhirledAvatarHostBridge();
       loftMountGeneration += 1;
       var mountGen = loftMountGeneration;
@@ -2567,8 +2743,13 @@
       loftHostState._hostLoadUrl = null;
       loftUsesCompanionHost = false;
       loftCompanionAttempted = false;
+      loftSafeUpgradeActive = false;
+      loftDirectPlayer = null;
+      loftCompanionPlayer = null;
+      loftCompanionLayer = null;
       loftHostState.hostMode = false;
       loftHostState.connected = false;
+      loftHostState.gotControl = false;
       loftFallbackInFlight = false;
       clearCompanionWatch();
       ensureStandFallback(slot, worn, "mounting");
@@ -2590,6 +2771,8 @@
         loftUsesCompanionHost = false;
         loftHostState.hostMode = false;
         loftHostState.connected = false;
+        loftHostState.gotControl = false;
+        loftSafeUpgradeActive = false;
         // Official DataLoadOptions when we have bytes (IDB/blob) — more reliable than blob: URL.
         // Beginner: your uploaded SWF lives in IndexedDB; we hand Ruffle the bytes directly.
         // ENGINE DEV: resolveSwfBytes → {data}; blob: fetch fallback; else URLLoadOptions.
@@ -2597,8 +2780,13 @@
           var o = Object.assign({}, loftOpts);
           if (buf) { o.swfData = buf; o.swfFileName = "avatar.swf"; }
           return mountRuffle(slot, url || "avatar.swf", o).then(function (player) {
+            loftDirectPlayer = player || null;
+            loftActivePlayer = player || loftActivePlayer;
             afterMountUi();
-            try { slot.setAttribute("data-mount-mode", "direct"); } catch (eM) {}
+            try {
+              slot.classList.add("is-playing", "is-on");
+              slot.setAttribute("data-mount-mode", "direct");
+            } catch (eM) {}
             return player;
           });
         }
@@ -2617,20 +2805,53 @@
       }
 
       function startCompanionWithPayload(prep) {
+        // (?v=20260906cg) Option A: mount companion host in sibling layer — NEVER clear DIRECT slot.
+        // Beginner: you keep seeing your avatar; companion tries walk-sync invisibly.
+        // ENGINE DEV: mountRuffle(slot) would wipe DIRECT (ce blank loft) — mount into layer only.
         loftCompanionAttempted = true;
+        loftSafeUpgradeActive = true;
         loftPendingAvatarB64 = (prep.mode === "bytes") ? prep.b64 : null;
         loftHostState._hostLoadUrl = (prep.mode === "url") ? prep.url : null;
-        logAvatarDebug("companion attempt", {
+        // Reject nested blob:/data: — prepareCompanionPayload already prefers bytes; double-gate URL mode.
+        if (prep.mode === "url" && prep.url && (/^(blob:|data:)/i.test(String(prep.url)))) {
+          logAvatarDebug("companion reject nested blob/data URL — keep DIRECT", String(prep.url).slice(0, 24));
+          loftSafeUpgradeActive = false;
+          return Promise.resolve(loftDirectPlayer);
+        }
+        var layer = ensureCompanionLayer(slot);
+        if (!layer) {
+          logAvatarDebug("companion layer missing — keep DIRECT");
+          loftSafeUpgradeActive = false;
+          return Promise.resolve(loftDirectPlayer);
+        }
+        logAvatarDebug("companion SAFE attempt (Option A sibling layer)", {
           reason: prep.reason, mode: prep.mode, hostUrl: hostUrl,
-          b64Len: prep.b64 ? prep.b64.length : 0
+          b64Len: prep.b64 ? prep.b64.length : 0,
+          hasDirect: !!loftDirectPlayer
         });
-        return mountRuffle(slot, hostUrl, loftOpts).then(function (player) {
+        try {
+          slot.classList.remove("is-companion-connected");
+          slot.setAttribute("data-mount-mode", "companion-pending");
+          // Keep DIRECT is-playing so loft stays painted; stand stays opacity 1 via CSS pending rule.
+          if (loftDirectPlayer) slot.classList.add("is-playing", "is-on");
+        } catch (ePend) {}
+        ensureStandFallback(slot, worn, "companion-pending-safe");
+        var companionOpts = Object.assign({}, loftOpts, {
+          loftMount: true,
+          pointerEvents: "none",
+          wmode: "transparent",
+          backgroundColor: null,
+          allowScriptAccess: true
+        });
+        return mountRuffle(layer, hostUrl, companionOpts).then(function (player) {
           if (mountGen !== loftMountGeneration) return player;
+          loftCompanionPlayer = player || null;
+          loftActivePlayer = player || loftActivePlayer; // EI → companion; DIRECT still paints
           loftHostState.hostMode = false;
           loftUsesCompanionHost = false;
+          loftHostState.connected = false;
           afterMountUi();
-          try { slot.setAttribute("data-mount-mode", "companion-pending"); } catch (eM2) {}
-          // Feed avatar into host: bytes preferred, else http(s) URL
+          try { layer.classList.add("is-companion-pending"); layer.style.opacity = "0"; } catch (eOp) {}
           var fed = { ok: false };
           if (prep.mode === "bytes" && prep.b64) {
             fed = callHostLoadBytes(prep.b64);
@@ -2643,8 +2864,8 @@
           } else if (prep.mode === "url" && prep.url) {
             fed = callHostLoadUrl(prep.url);
           } else {
-            remountDirectAvatarImmediate("companion-no-payload");
-            return player;
+            tearDownCompanionLayer("companion-no-payload");
+            return loftDirectPlayer || player;
           }
           setTimeout(function () {
             if (mountGen !== loftMountGeneration || loftHostState.connected) return;
@@ -2655,31 +2876,30 @@
             var r = tryFlushPendingAvatarLoad();
             logAvatarDebug("companion late flush", r);
             if (!r || !r.ok) {
-              remountDirectAvatarImmediate("hostLoad-never-ok");
+              tearDownCompanionLayer("hostLoad-never-ok");
             }
           }, 700);
           armCompanionWatchdog(mountGen, prep.reason || prep.mode);
           return player;
         }).catch(function (hostErr) {
-          logAvatarDebug("companion host mount failed — direct", hostErr && hostErr.message);
-          return mountDirectPrimary((hostErr && hostErr.message) || "host-mount-fail");
+          logAvatarDebug("companion host mount failed — keep DIRECT", hostErr && hostErr.message);
+          tearDownCompanionLayer((hostErr && hostErr.message) || "host-mount-fail");
+          return loftDirectPlayer;
         });
       }
 
-      // Strategy (?v=20260906cf) DIRECT-stable (companion auto-upgrade OFF):
-      // Beginner: paint YOUR avatar SWF on outer Ruffle and keep it. Stand thumb stays visible.
-      // Chrome bob / emotes keep working. startCompanionWithPayload + companion-pending + watchdog
-      // remain coded but Wear does NOT schedule upgrade — ce auto-upgrade regressed visibility
-      // (blank loft / companion wipe). Do NOT re-enable until Ruffle nested sharedEvents /
-      // hostLoadBytes research says safe.
-      ensureStandFallback(slot, worn, "direct-stable");
-      return mountDirectPrimary("direct-stable-visible").then(function (player) {
+      // Strategy (?v=20260906cg) DIRECT-first + SAFE companion upgrade (Option A):
+      // Beginner: paint YOUR avatar SWF first and keep it visible. Companion tries in a hidden
+      // sibling layer; only after bridge "connected" do we switch. Fail → tear companion, keep DIRECT.
+      // ENGINE DEV: never mountRuffle(host.swf) into #avatar-ruffle-host while DIRECT paints (ce wipe).
+      // WEAR_SAFE_COMPANION_UPGRADE gates the sibling attempt; WEAR_AUTO_COMPANION_UPGRADE stays false.
+      ensureStandFallback(slot, worn, "direct-first-safe");
+      return mountDirectPrimary("direct-first-visible").then(function (player) {
         if (mountGen !== loftMountGeneration) return player;
-        // Precompute companion payload for debug / future opt-in — gate blocks auto-upgrade.
         prepareCompanionStrategy(url, worn).then(function (prep) {
           if (mountGen !== loftMountGeneration) return;
-          if (!WEAR_AUTO_COMPANION_UPGRADE) {
-            logAvatarDebug("companion auto-upgrade OFF (cf DIRECT-stable)", prep && {
+          if (!WEAR_SAFE_COMPANION_UPGRADE) {
+            logAvatarDebug("safe companion upgrade OFF — keep DIRECT", prep && {
               ok: prep && prep.ok, mode: prep && prep.mode, reason: prep && prep.reason,
               skipped: prep && prep.skipped
             });
@@ -2691,25 +2911,25 @@
             });
             return;
           }
-          logAvatarDebug("companion upgrade scheduled after DIRECT", {
+          logAvatarDebug("SAFE companion upgrade scheduled after DIRECT", {
             reason: prep.reason, mode: prep.mode,
             b64Len: prep.b64 ? prep.b64.length : 0
           });
           setTimeout(function () {
             if (mountGen !== loftMountGeneration) return;
             if (loftHostState.connected || loftCompanionAttempted) return;
-            ensureStandFallback(slot, worn, "pre-companion-upgrade");
-            try {
-              slot.classList.remove("is-companion-connected");
-              slot.setAttribute("data-mount-mode", "companion-pending");
-            } catch (eRm) {}
+            if (!loftDirectPlayer) {
+              logAvatarDebug("skip companion — DIRECT missing");
+              return;
+            }
+            ensureStandFallback(slot, worn, "pre-safe-companion-upgrade");
             startCompanionWithPayload(prep).catch(function (err) {
-              logAvatarDebug("companion upgrade failed — DIRECT fallback", err && err.message);
-              remountDirectAvatarImmediate("companion-upgrade-fail");
+              logAvatarDebug("safe companion upgrade failed — keep DIRECT", err && err.message);
+              tearDownCompanionLayer("companion-upgrade-fail");
             });
           }, 450);
         }).catch(function (prepErr) {
-          logAvatarDebug("companion prep (debug only / keep DIRECT)", prepErr && prepErr.message);
+          logAvatarDebug("companion prep failed — keep DIRECT", prepErr && prepErr.message);
         });
         return player;
       }).catch(function (err) {
