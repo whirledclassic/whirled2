@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bb";
+  var LOGO_V = "20260906bc";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -4633,8 +4633,9 @@
       "• Flash hybrid: PNG walk/emotes default; transparent Ruffle optional (no Adobe Flash plugin)",
       "• Room visuals: pale-blue chrome (az) — no brown/black slabs",
       "• Dev Hub (?page=dev), Make Door / Drop Door, passport seals",
-      "• ba: real Groups forum + Admin panel + /broadcast (escalating coins)",
-      "• ba QA: fixed occupant NaN names (QA AxNaNNaN → QA Ax) via sanitize/heal",
+      "• ba/bc: real Groups forum + Admin panel + /broadcast (escalating coins)",
+      "• bc QA: fixed occupant NaN names (QA AxNaNNaN → QA Ax) via sanitize/heal",
+      "• bc on top of bb Flash walk/tofu (classic-avatar.js preserved)",
       "",
       "See STATUS.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md for details.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."

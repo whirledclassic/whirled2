@@ -534,10 +534,15 @@
   }
 
   function sanitizeApiName(name, fallback) {
-    var s = String(name == null ? "" : name).trim();
-    if (!s || /NaN/i.test(s)) s = String(fallback || "Player").trim();
-    s = s.replace(/NaN/gi, "").replace(/\s{2,}/g, " ").trim();
-    if (!s) s = "Player";
+    // How this works (?v=20260906ba): strip NaN first so offline occupants never paint AxNaNNaN.
+    function scrub(v) {
+      var t = String(v == null ? "" : v).replace(/NaN/gi, "").replace(/[\u0000-\u001f]/g, "");
+      t = t.replace(/([A-Za-z])(?:0{1,4})+$/g, "$1").replace(/\s{2,}/g, " ").trim();
+      return t;
+    }
+    var s = scrub(name);
+    if (!s) s = scrub(fallback) || "Player";
+    if (/NaN/i.test(s) || !s) s = "Player";
     return s.slice(0, 40);
   }
   function initials(name) {

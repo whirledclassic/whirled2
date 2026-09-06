@@ -110,3 +110,8 @@ Classic wiki used **Bars** (start ~5, inflate; Club Whirled fixed 10k coins). Wh
 ## Classic avatars without Flash
 
 See `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md` and Groups → Whirled2 Developers → **Flash / avatars**.
+
+
+## Cache letter `bc` (2026-09-06)
+
+Groups forum + Admin + `/broadcast` + NaN heal shipped on top of `bb` Flash walk. See STATUS.md.

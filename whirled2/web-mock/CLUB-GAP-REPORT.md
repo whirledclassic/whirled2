@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906ax` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bc` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,21 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906ax`)
+## Closed this pass (`?v=20260906bc`)
+
+| Item | Notes |
+|------|--------|
+| Groups forum | Real list/create/join, home logo/banner ph, threads/replies/search, sticky flags, Group chat |
+| Seeded Whirled2 Developers | Updates & notes + Flash/avatars + General; overnight changelog + NaN + Flash-without-plugin posts |
+| Admin panel | Me/header Admin; Make/Remove; whirled2.admins + forceAdmin bootstrap |
+| /broadcast | Escalating coins (wiki Bars → documented coin model); highlighted bubble |
+| Occupant NaN | sanitize/heal; QA AxNaNNaN fixed |
+| Friends search | email / real name / interests (local only) |
+
+---
+
+## Closed earlier (`?v=20260906ax`)
+
 
 | Item | Notes |
 |------|--------|
@@ -110,7 +124,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
 | Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors | Group tabs still limited |
 | Name click menu | **Working** (`at`) Profile / friend / whisper / block / complain stub | Complain moderation **P2** |
-| Speak/thought/shout modes | Limited / chrome bubbles (/think /me /speak) | Mode picker polish still **P2** |
+| Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`) escalating coins | Mode picker polish **P2** |
 | “Too chatty” throttle | Not verified as classic-faithful | **P2** |
 
 ### Me / Profile (wiki)
@@ -133,7 +147,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Friend requests / accept / decline | **Working** (local multi-account) | — |
 | Friendly People auto-accept | **Working** | — |
 | Friends toolbar popup / online approx | **Working** (occupant-diff heuristic) | Server presence **P1** |
-| Rich search (email/permaname) | Limited local user list | **P1** |
+| Rich search (email/permaname) | **Improved** (`ba`) name/id/email/realName/interests (local) | Server directory **P1** |
 | Room avatar “Invite to be your friend” | Partial vs wiki | **P2** |
 
 ### Music (wiki)
@@ -155,7 +169,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Register / login gate | **Working** (hybrid `al`) | — |
 | Discord create on Pages+tunnel | **Working** when `WHIRLED_API` set; else Coming Soon | Secrets never in client |
 | Home loft + earn coins/Bars | **Working** (earn-only) | Shop economy **out of scope** |
-| Groups / discussions | Coming Soon | **P1** |
+| Groups / discussions | **Working** (`ba`) forum + seeded Dev group; themed Whirled still Coming Soon | Themed Whirled **P2** |
 | Creator upload to global Shop | Not shipped | **P2** |
 
 ---
@@ -170,7 +184,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 
 ### P1
 1. ~~Richer chat tabs + name menus~~ — **improved `at`**; server-backed presence for friends still open.
-2. Full passport / medals; Groups.
+2. Full passport / medals; ~~Groups forum~~ **shipped `ba`** (themed Whirled still open).
 3. Broader Stuff types (furniture/backdrops/pets) without inventing shop SKUs.
 4. MP3 / classic music item model vs embed-only.
 
