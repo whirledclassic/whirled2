@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Whirled 2 — Apply</title>
-  <meta name="description" content="Apply for paid or volunteer work on Whirled 2: art, code, Discord." />
+  <title>Whirled — Apply</title>
+  <meta name="description" content="Apply to Classic Whirled revival or Whirled 2. Art, code, Discord. Paid spots open." />
   <style>
     :root { --sky:#d7eaf6; --card:#f4fbff; --ink:#16324a; --blue:#2b7bb9; --blue-dark:#1a5a8a; --line:#9ec4dc; --ok:#1e6b3a; --ok-bg:#e8f7ee; }
     * { box-sizing: border-box; }
@@ -26,6 +26,8 @@
     .role { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px; }
     .role ul { margin:6px 0 0; padding-left:18px; }
     .tag { display:inline-block; font-size:.75rem; background:#e3f1fa; color:var(--blue-dark); padding:1px 6px; border-radius:3px; margin-bottom:6px; }
+    .proj { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media (max-width:700px) { .proj { grid-template-columns:1fr; } }
     label { display:block; font-weight:bold; margin:12px 0 4px; }
     input, select, textarea { width:100%; padding:8px; border:1px solid var(--line); border-radius:4px; font:inherit; background:#fff; }
     textarea { min-height:88px; resize:vertical; }
@@ -49,49 +51,66 @@
 <body>
   <header>
     <div class="row">
-      <img src="./assets/whirled2-logo.svg" alt="Whirled 2" />
+      <img src="./assets/whirled2-logo.svg" alt="Whirled" />
       <div>
         <h1>Join the team</h1>
-        <p>Art, code, Discord — one application. Paid spots are open.</p>
+        <p>Classic Flash revival or Whirled 2. Paid spots are open.</p>
       </div>
     </div>
     <nav>
       <a href="./">Demo</a>
+      <a href="#projects">Projects</a>
       <a href="#pay">Pay</a>
       <a href="#roles">Roles</a>
       <a href="#apply">Apply</a>
-      <a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/ARTISTS.md">Notes</a>
     </nav>
   </header>
   <main>
-    <section>
-      <h2>What this is</h2>
-      <p>Whirled 2 is a <strong>new</strong> browser world in the spirit of Whirled (2007–2017): your room, walk-around avatars, user-made stuff. No Flash. No ripped old shop items.</p>
-      <p>We need people across the whole project — not only illustrators. Pick every role you can actually do. Send links to work you already shipped.</p>
+    <section id="projects">
+      <h2>Two projects. Say which one.</h2>
+      <div class="proj">
+        <article class="role">
+          <span class="tag">Classic</span>
+          <h3>Original Whirled (Flash revival)</h3>
+          <p>The 2007–2017 world. Help bring that client back up: lab notes, tooling, testing, community around the revival. Flash-era product. Do not leak the lab VM.</p>
+        </article>
+        <article class="role">
+          <span class="tag">New</span>
+          <h3>Whirled 2 (PixiJS + TypeScript)</h3>
+          <p>A new browser world in the same spirit. No Flash. Room engine in PixiJS/TypeScript, website chrome that still feels like classic whirled.com.</p>
+        </article>
+      </div>
+      <p class="muted" style="margin-top:10px">You can work on one or both. The form makes you pick.</p>
     </section>
     <section class="opp" id="pay">
       <h2>There is a paid opportunity</h2>
       <p><strong>Yes, you can get paid.</strong> Apply, show the work, tell us what you want to charge. If we accept you and we like what you bring, we pay for that work.</p>
-      <p>Acceptance is not automatic. It depends on the application, the links you send, and whether the first job is a fit. If we say yes, we pay for that job.</p>
-      <p>Want to stay on after the first job? Say so. Right now that still looks like <em>one payment per drop</em> (a walk cycle, a room, a feature, a month of Discord). We stay in touch and do the next payment when the next drop is agreed.</p>
-      <p>You can also apply as volunteer / credit-only if money is not the point. Credit either way.</p>
     </section>
     <section id="roles">
       <h2>Open roles</h2>
-      <p class="muted">Discord mod / community manager is a real need right now.</p>
       <div class="roles">
-        <article class="role"><span class="tag">Need this</span><h3>Discord mod / community manager</h3><p>Run the server so Josh is not the only adult in the room.</p><ul><li>Roles, rules, welcome flow</li><li>Keep spam and drama down</li><li>Relay useful reports back to the project</li></ul></article>
-        <article class="role"><span class="tag">Code</span><h3>Room engine (PixiJS + TypeScript)</h3><p>Click-to-walk, camera, avatars, furniture.</p></article>
-        <article class="role"><span class="tag">Code</span><h3>Website chrome</h3><p>Tabs, login, profile, chat. Classic whirled.com feel.</p></article>
-        <article class="role"><span class="tag">Code</span><h3>Server / networking</h3><p>Tiny HTTPS API, sockets, cheap VPS deploy.</p></article>
-        <article class="role"><span class="tag">Code</span><h3>Classic lab</h3><p>msoy notes and tooling. No leaking the VM.</p></article>
-        <article class="role"><span class="tag">Art</span><h3>Avatar / room / props / UI / shop / animation</h3><p>Readable at game scale. Classic blue chrome for UI. Original work only.</p></article>
-        <article class="role"><span class="tag">Audio / other</span><h3>Music, SFX, QA, writing</h3><p>Name it on the form.</p></article>
+        <article class="role" style="grid-column:1/-1">
+          <span class="tag">Need this</span>
+          <h3>Discord — build it, run it, talk about it</h3>
+          <p>This is not mute-and-leave. We need someone who will actually <strong>create and work on the server</strong>, then <strong>get people in it and keep them there</strong> while both projects are in development.</p>
+          <ul>
+            <li>Stand up the server: channels, roles, rules, welcome, bots</li>
+            <li>Moderate it for real</li>
+            <li>Advertise it. Get the invite in front of humans</li>
+            <li>Talk in the server. Keep people engaged during the slow build months</li>
+            <li>Post updates so the room is not a ghost town between code drops</li>
+          </ul>
+        </article>
+        <article class="role"><span class="tag">Whirled 2</span><h3>PixiJS / TypeScript engine</h3><p>Click-to-walk, camera, avatars, furniture.</p></article>
+        <article class="role"><span class="tag">Whirled 2</span><h3>Website chrome</h3><p>Tabs, login, profile, chat.</p></article>
+        <article class="role"><span class="tag">Whirled 2</span><h3>Server / networking</h3><p>API, sockets, cheap VPS.</p></article>
+        <article class="role"><span class="tag">Classic</span><h3>Flash revival / msoy lab</h3><p>Original-client notes and tooling. No leaking the VM.</p></article>
+        <article class="role"><span class="tag">Art</span><h3>Avatar / room / props / UI / shop / animation</h3><p>Original work only.</p></article>
       </div>
     </section>
     <section id="apply">
       <h2>Application</h2>
-      <p class="muted">Goes to Josh. Links to previous work are required.</p>
+      <p class="muted">Goes to Josh. Pick a project. Links required.</p>
       <div class="ok" id="ok">Sent.</div>
       <form id="app-form" action="https://formsubmit.co/josh.awe99@gmail.com" method="POST">
         <input type="hidden" name="_subject" value="[W2 APPLY] New application" />
@@ -104,18 +123,27 @@
         <label for="email">Email</label>
         <input id="email" name="email" type="email" required />
         <label for="discord">Discord handle</label>
-        <input id="discord" name="discord" required placeholder="username" />
+        <input id="discord" name="discord" required />
         <label for="portfolio">Main link to previous work</label>
         <input id="portfolio" name="portfolio" type="url" placeholder="https://" required />
-        <label for="more_links">More links (GitHub, ArtStation, itch, clips, a Discord you already run)</label>
-        <textarea id="more_links" name="more_links" placeholder="One URL per line"></textarea>
+        <label for="more_links">More links</label>
+        <textarea id="more_links" name="more_links"></textarea>
+        <label>Which project?</label>
+        <div class="pay-grid">
+          <label class="pay-opt"><input type="checkbox" name="projects[]" value="classic" /><strong>Classic Whirled</strong>Original Flash revival. Help develop that project.</label>
+          <label class="pay-opt"><input type="checkbox" name="projects[]" value="whirled2" /><strong>Whirled 2</strong>New world in PixiJS + TypeScript.</label>
+          <label class="pay-opt"><input type="checkbox" name="projects[]" value="both" /><strong>Both</strong>Revival and the new client.</label>
+        </div>
         <label>What do you want to do?</label>
         <div class="checks">
-          <label><input type="checkbox" name="roles[]" value="discord-mod" /> Discord mod / community manager</label>
-          <label><input type="checkbox" name="roles[]" value="engine" /> PixiJS / TypeScript engine</label>
-          <label><input type="checkbox" name="roles[]" value="chrome" /> Website chrome</label>
-          <label><input type="checkbox" name="roles[]" value="server" /> Server / networking / deploy</label>
-          <label><input type="checkbox" name="roles[]" value="classic-lab" /> Classic msoy lab</label>
+          <label><input type="checkbox" name="roles[]" value="discord-build" /> Discord — build / set up the server</label>
+          <label><input type="checkbox" name="roles[]" value="discord-mod" /> Discord — moderate it</label>
+          <label><input type="checkbox" name="roles[]" value="discord-promo" /> Discord — advertise it and get people in</label>
+          <label><input type="checkbox" name="roles[]" value="discord-engage" /> Discord — keep people engaged and posted during development</label>
+          <label><input type="checkbox" name="roles[]" value="engine" /> Whirled 2 — PixiJS / TypeScript engine</label>
+          <label><input type="checkbox" name="roles[]" value="chrome" /> Whirled 2 — website chrome</label>
+          <label><input type="checkbox" name="roles[]" value="server" /> Whirled 2 — server / networking / deploy</label>
+          <label><input type="checkbox" name="roles[]" value="classic-lab" /> Classic — Flash revival / msoy lab</label>
           <label><input type="checkbox" name="roles[]" value="avatar" /> Avatar art</label>
           <label><input type="checkbox" name="roles[]" value="room" /> Room / environment art</label>
           <label><input type="checkbox" name="roles[]" value="props" /> Furniture / props</label>
@@ -130,18 +158,18 @@
         <label>Pay</label>
         <div class="pay-grid">
           <label class="pay-opt"><input type="radio" name="track" value="paid" required /><strong>I want to be paid</strong>If we accept you and like the work, we pay for that job.</label>
-          <label class="pay-opt"><input type="radio" name="track" value="either" /><strong>Paid preferred</strong>Take paid if accepted; otherwise still want in.</label>
-          <label class="pay-opt"><input type="radio" name="track" value="volunteer" /><strong>Volunteer / credit</strong>Money is not the point for me.</label>
+          <label class="pay-opt"><input type="radio" name="track" value="either" /><strong>Paid preferred</strong></label>
+          <label class="pay-opt"><input type="radio" name="track" value="volunteer" /><strong>Volunteer / credit</strong></label>
         </div>
         <div class="pay-box" id="pay-box">
           <label for="rate">What do you charge for the first job?</label>
-          <input id="rate" name="rate" placeholder="$80 walk cycle, $150 Discord setup week…" />
+          <input id="rate" name="rate" />
           <label for="pay_shape">One job or ongoing?</label>
           <select id="pay_shape" name="pay_shape">
             <option value="">Choose…</option>
             <option>One-time payment for this first job</option>
             <option>Ongoing — still one payment per drop for now</option>
-            <option>Would talk retainer later if the project can carry it</option>
+            <option>Would talk retainer later</option>
           </select>
         </div>
         <label for="first_drop">What would you actually do first?</label>
@@ -151,13 +179,11 @@
           <option value="">Choose…</option>
           <option>Repo license is fine</option>
           <option>CC-BY</option>
-          <option>CC-BY-SA</option>
           <option>Written grant, ask me first</option>
           <option>Code under the repo license / not applicable</option>
         </select>
-        <label for="terms_ok">Got it</label>
         <div class="checks" style="column-count:1">
-          <label><input type="checkbox" name="terms_ok" value="yes" required /> I sent real links to previous work. Paid work happens if I am accepted and the first job is a fit.</label>
+          <label><input type="checkbox" name="terms_ok" value="yes" required /> I sent real links. I picked Classic, Whirled 2, or both. Paid work happens if I am accepted and the first job is a fit.</label>
         </div>
         <label for="notes">Anything else</label>
         <textarea id="notes" name="notes"></textarea>
@@ -166,24 +192,31 @@
       </form>
     </section>
   </main>
-  <footer>Whirled 2 · <a href="https://github.com/whirledclassic/whirled2">github.com/whirledclassic/whirled2</a></footer>
+  <footer>Whirled · <a href="https://github.com/whirledclassic/whirled2">github.com/whirledclassic/whirled2</a></footer>
   <script>
     if (/sent=1/.test(location.search)) document.getElementById("ok").style.display = "block";
     function selectedTrack() {
       var el = document.querySelector("input[name='track']:checked");
       return el ? el.value : "";
     }
+    function checkedVals(name) {
+      return Array.prototype.slice.call(document.querySelectorAll("input[name='"+name+"']:checked")).map(function (el) { return el.value; }).join(", ");
+    }
     function togglePayBox() {
       var t = selectedTrack();
       document.getElementById("pay-box").style.display = (t === "paid" || t === "either") ? "block" : "none";
     }
     document.querySelectorAll("input[name='track']").forEach(function (el) { el.addEventListener("change", togglePayBox); });
+    document.getElementById("app-form").addEventListener("submit", function (e) {
+      if (!checkedVals("projects[]")) { e.preventDefault(); alert("Pick Classic Whirled, Whirled 2, or both."); }
+    });
     document.getElementById("gh-btn").addEventListener("click", function () {
       var name = document.getElementById("name").value || "(name)";
-      var roles = Array.prototype.slice.call(document.querySelectorAll("input[name='roles[]']:checked")).map(function (el) { return el.value; }).join(", ") || "(none)";
+      var roles = checkedVals("roles[]") || "(none)";
+      var projects = checkedVals("projects[]") || "(none)";
       var nl = "\n";
-      var body = ["### Application","","- Name: "+name,"- Email: "+(document.getElementById("email").value||""),"- Discord: "+(document.getElementById("discord").value||""),"- Main work link: "+(document.getElementById("portfolio").value||""),"- More links:",document.getElementById("more_links").value||"","- Roles: "+roles,"- Track: "+(selectedTrack()||""),"- Rate: "+(document.getElementById("rate").value||""),"","### First job",document.getElementById("first_drop").value||"","","### Notes",document.getElementById("notes").value||""].join(nl);
-      window.open("https://github.com/whirledclassic/whirled2/issues/new?labels=whirled2&title="+encodeURIComponent("[apply] "+name+" — "+roles)+"&body="+encodeURIComponent(body),"_blank");
+      var body = ["### Application","","- Name: "+name,"- Email: "+(document.getElementById("email").value||""),"- Discord: "+(document.getElementById("discord").value||""),"- Projects: "+projects,"- Main work link: "+(document.getElementById("portfolio").value||""),"- Roles: "+roles,"- Track: "+(selectedTrack()||""),"- Rate: "+(document.getElementById("rate").value||""),"","### First job",document.getElementById("first_drop").value||"","","### Notes",document.getElementById("notes").value||""].join(nl);
+      window.open("https://github.com/whirledclassic/whirled2/issues/new?labels=whirled2&title="+encodeURIComponent("[apply] "+name+" — "+projects)+"&body="+encodeURIComponent(body),"_blank");
     });
   </script>
 </body>
