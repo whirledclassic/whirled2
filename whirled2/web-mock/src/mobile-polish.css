@@ -1,4 +1,4 @@
-/* 20260906dm — phone chrome + flush Now Playing strip. Desktop unchanged. */
+/* 20260906dn — phone chrome, flush Now Playing, no black overlay slab. */
 html.w2-phone, html.w2-phone body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -7,15 +7,6 @@ html.w2-phone #app[data-tab="rooms"] .stage-host,
 html.w2-phone #app[data-tab="rooms"] #stage-slot {
   min-height: 44vh !important;
   height: 44vh !important;
-}
-html.w2-phone .chat-tabs {
-  background: #e8f3fa !important;
-  border-top: 1px solid #b7d3e8 !important;
-  padding: 4px 8px 0 !important;
-}
-html.w2-phone .chat-tab {
-  min-height: 36px;
-  padding: 8px 14px !important;
 }
 html.w2-phone .chat-log:empty,
 html.w2-phone .chat-log.is-empty {
@@ -30,8 +21,6 @@ html.w2-phone .stage-body.chat-mode-slide .chat-log {
   color: #16324a !important;
   max-height: 88px !important;
 }
-
-/* YouTube / Now Playing — one club strip, not a floating card */
 html.w2-phone #app > #room-embed-dock.room-embed-dock,
 html.w2-phone #room-embed-dock.room-embed-dock {
   margin: 0 !important;
@@ -61,7 +50,6 @@ html.w2-phone .room-embed-now-glyph {
   height: 28px !important;
   background: linear-gradient(180deg, #7ec8f0, #3aa3e0) !important;
   color: #fff !important;
-  box-shadow: none !important;
 }
 html.w2-phone .room-embed-now-title {
   color: #1e6fa8 !important;
@@ -69,13 +57,8 @@ html.w2-phone .room-embed-now-title {
   text-transform: uppercase !important;
   letter-spacing: 0.04em !important;
 }
-html.w2-phone .room-embed-now-sub {
-  color: #16324a !important;
-  font-size: 12px !important;
-}
-html.w2-phone .room-embed-now-kind {
-  display: none !important;
-}
+html.w2-phone .room-embed-now-sub { color: #16324a !important; font-size: 12px !important; }
+html.w2-phone .room-embed-now-kind { display: none !important; }
 html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-frame,
 html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-frame-wrap,
 html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-mobile-controls,
@@ -84,10 +67,7 @@ html.w2-phone .room-embed-dock:not(.is-expanded) .room-embed-note {
   height: 0 !important;
   min-height: 0 !important;
 }
-html.w2-phone .room-embed-now-actions {
-  gap: 4px !important;
-  flex-shrink: 0;
-}
+html.w2-phone .room-embed-now-actions { gap: 4px !important; flex-shrink: 0; }
 html.w2-phone .room-embed-now-actions .action-btn,
 html.w2-phone .room-embed-now-actions .room-embed-play-btn {
   min-height: 32px !important;
@@ -106,36 +86,6 @@ html.w2-phone .room-embed-now-actions .text-btn {
   background: #fff !important;
   color: #1e6fa8 !important;
 }
-html.w2-phone .room-embed-dock.is-expanded {
-  border-radius: 0 !important;
-  margin: 0 !important;
-}
-html.w2-phone .room-embed-dock.is-expanded .room-embed-frame {
-  border-radius: 8px;
-  margin-top: 6px;
-}
-
-html.w2-phone .room-embed-now-actions .action-btn,
-html.w2-phone .room-embed-now-actions button,
-html.w2-phone .room-embed-mobile-controls .action-btn,
-html.w2-phone .room-embed-mobile-controls button {
-  min-height: 32px;
-  min-width: 48px;
-}
-html.w2-phone .occ-strip,
-html.w2-phone .occupants,
-html.w2-phone .in-this-room {
-  max-height: 44px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-}
-html.w2-phone .room-title-row,
-html.w2-phone .room-strip {
-  gap: 6px !important;
-  padding: 4px 8px !important;
-  font-size: 12px !important;
-}
 html.w2-phone .tabs {
   overflow-x: auto;
   flex-wrap: nowrap !important;
@@ -143,24 +93,45 @@ html.w2-phone .tabs {
   scrollbar-width: none;
 }
 html.w2-phone .tabs::-webkit-scrollbar { display: none; }
-html.w2-phone .tab {
-  flex: 0 0 auto;
-  min-height: 40px;
-  padding: 8px 14px !important;
+html.w2-phone .tab { flex: 0 0 auto; min-height: 40px; padding: 8px 14px !important; }
+html.w2-phone .bar { padding-bottom: max(10px, env(safe-area-inset-bottom)) !important; }
+html.w2-phone .bar input#chat-input { font-size: 16px !important; min-height: 44px !important; }
+html.w2-phone .bar button.send { min-height: 44px !important; }
+html.w2-phone .chat-overlay {
+  background: transparent !important;
+  box-shadow: none !important;
+  max-height: 42% !important;
+  bottom: 10px !important;
+  top: auto !important;
 }
-html.w2-phone .bar {
-  padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+html.w2-phone .chat-overlay .chat-bubble,
+html.w2-phone .chat-overlay .chat-bubble.system,
+html.w2-phone .chat-overlay .chat-bubble:not(.emote) {
+  background: #f4f9fc !important;
+  color: #16324a !important;
+  border: 1px solid #c5deee !important;
+  box-shadow: 0 1px 4px rgba(20,50,80,0.16) !important;
 }
-html.w2-phone .bar input#chat-input {
-  font-size: 16px !important;
-  min-height: 44px !important;
+html.w2-phone .chat-overlay .chat-who {
+  color: #1e6fa8 !important;
+  text-shadow: none !important;
 }
-html.w2-phone .bar button.send {
-  min-height: 44px !important;
+html.w2-phone .chat-tabs,
+html.w2-phone #app[data-tab="rooms"] .chat-tabs {
+  min-height: 38px !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  padding: 6px 8px 0 !important;
+  background: #e8f3fa !important;
+  z-index: 8 !important;
 }
-@media (min-width: 901px) {
-  html.w2-desktop #app[data-tab="rooms"] .stage-host,
-  html.w2-desktop #app[data-tab="rooms"] #stage-slot {
-    min-height: 48vh;
-  }
+html.w2-phone .chat-tab,
+html.w2-phone .chat-tab-room {
+  min-height: 32px !important;
+  height: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
