@@ -6651,3 +6651,92 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 @media (max-width: 720px) {
   .avatar-wear-nameplate .avatar-playback-badge { font-size: 10px; max-width: 160px; }
 }
+
+
+/* ==========================================================================
+   ?v=20260906be — club Music / Chat / Parties / Stuff polish
+   Beginner: playlist bold+bleep, Speak mode tints, Parties board, themed note.
+   ENGINE DEV: chrome-only; never remount #stage-slot.
+   ========================================================================== */
+
+.playlist-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 8px 6px;
+}
+.playlist-row.is-playing {
+  background: #e8f4fb;
+  border-left: 3px solid #1e6fa8;
+  padding-left: 8px;
+}
+.playlist-row.is-bleeped { opacity: 0.55; }
+.playlist-row-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+.playlist-now-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #1e6fa8; flex: 0 0 auto;
+}
+.playlist-now-dot.is-off { background: #c5deee; }
+.playlist-bleep-tag {
+  font-size: 10px; font-weight: 700; color: #8a3a10;
+  background: #fff4e8; border: 1px solid #e07a28; border-radius: 4px; padding: 1px 5px;
+}
+.playlist-row-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.playlist-btn {
+  border: 1px solid #b7d3e8;
+  background: #fff;
+  color: #1e6fa8;
+  font: 700 11px var(--ui);
+  padding: 4px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 28px;
+}
+.playlist-btn-play {
+  background: #1e6fa8; color: #fff; border-color: #165a8a;
+}
+.playlist-btn-remove {
+  background: #e8f0f6; color: #a33; border-color: #d4a0a0;
+}
+.playlist-btn-bleep { color: #8a3a10; border-color: #e0b080; background: #fff8f0; }
+.playlist-btn-report { color: #666; }
+.playlist-wiki-hint { font-size: 12px; }
+.playlist-added-by { font-size: 11px; }
+
+.chat-speak-mode.is-speak {
+  background: linear-gradient(180deg, #fff, #e8f4fb);
+  color: #1e6fa8; border-color: #b7d3e8;
+}
+.chat-speak-mode.is-think {
+  background: linear-gradient(180deg, #f4f7fa, #dce8f2);
+  color: #3a5568; border-color: #9bb8cc;
+}
+.chat-speak-mode.is-shout {
+  background: linear-gradient(180deg, #fff8f0, #ffe0c0);
+  color: #8a3a10; border-color: #e07a28;
+}
+
+.party-row.is-yours {
+  border-color: #1e6fa8;
+  box-shadow: 0 0 0 1px rgba(30, 111, 168, 0.2);
+}
+.party-row-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.party-row-head h3 { margin: 0; }
+.party-vis-pill {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  color: #1e6fa8; background: #e8f4fb; border: 1px solid #b7d3e8;
+  border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+}
+.party-row-actions { margin-top: 6px; }
+.party-empty { background: #f7fbfd; }
+
+.stuff-themed-note {
+  margin: 0 0 10px;
+  border-left: 3px solid #9bb8cc;
+  background: #f7fbfd;
+}
+.stuff-cat-how { margin: 0 0 10px; font-size: 12px; }

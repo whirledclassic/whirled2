@@ -1,3 +1,13 @@
+## What shipped (?v=20260906be)
+
+- **Club Music playlist fidelity (wiki Music):** bold Now playing, hover “Added by…”, owner ▶ (blue) / ✕ (red), **Bleep** (session mute/skip for you), info toast + Report stub
+- **Chat modes polish:** Speak / Think / Shout button tints + input accents; classic throttle copy: “You're being too chatty. Wait a moment and try again.”
+- **Parties! board:** clearer Open/Friends pills, member count, follow-host Coming Soon, beginner create/invite copy
+- **Stuff:** themed Whirled inventory filter Coming Soon banner + per-category how blurb (no fake catalog)
+- **Share/embed:** wiki Room blurb + `LOGO_V` on share links
+- Built on **bd** PNG/Ruffle badges + decorate/friends/lock/groups/passport — **did not regress** bc Groups/Admin/broadcast, bb Flash hybrid, Whirl, chat visit-since
+- Cache: **`?v=20260906be`**. Push: `/tmp/push-be.js` (dry-run default).
+
 ## What shipped (?v=20260906bd)
 
 - **Playback clarity (user confusion fix):** loft nameplate + Stuff Wear cards show crystal-clear badges:

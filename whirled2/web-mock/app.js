@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bd";
+  var LOGO_V = "20260906be";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1238,10 +1238,20 @@
     // How this works: advance local queue once (no double pl.current++).
     // Beginner: Next / track-ended both call this; click handler must not increment again.
     // ENGINE DEV: set playlistPanelDirty so ensurePlaylistPanel can refresh "Now playing" once.
+    // How this works (?v=20260906be): skip session-bleeped tracks (wiki Music Bleep) — wrap at most once.
     var pl = loadPlaylist();
     if (normalizePlaylistSource(pl.source) !== "local") return;
     if (!pl.tracks.length) return;
-    pl.current = (pl.current + 1) % pl.tracks.length; // once only — do not increment again in the click handler
+    var start = pl.current;
+    var n = pl.tracks.length;
+    var next = (pl.current + 1) % n; // once only — do not increment again in the click handler
+    var guard = 0;
+    while (guard < n && isPlaylistBleeped(pl.tracks[next], next)) {
+      next = (next + 1) % n;
+      guard++;
+      if (next === start) break;
+    }
+    pl.current = next;
     savePlaylist(pl);
     playlistPanelDirty = true;
     if (playlistPanelOpen && inRoom) paint("rooms");
@@ -1258,12 +1268,26 @@
     var music = myMusicStuff();
     var rows = pl.tracks.length
       ? pl.tracks.map(function (t, i) {
+          // How this works (?v=20260906be): wiki Music playlist — bold current, hover “who added”,
+          // blue play box + red X (owner), Bleep (you only), Report stub.
           var now = i === pl.current;
-          return '<div class="playlist-row' + (now ? " is-playing" : "") + '">'
-            + (now ? "<b>" : "") + esc(t.name || "Track") + (now ? "</b>" : "")
-            + ' <span class="meta">by ' + esc(t.by || "?") + '</span>'
-            + (canCtrl ? (' <button type="button" class="text-btn" data-playlist-play="' + i + '">Play</button>'
-              + ' <button type="button" class="text-btn" data-playlist-remove="' + i + '">Remove</button>') : "")
+          var ble = isPlaylistBleeped(t, i);
+          var who = t.by || "?";
+          var tip = "Added by " + who + (t.at ? (" · " + String(t.at).slice(0, 16).replace("T", " ")) : "");
+          return '<div class="playlist-row' + (now ? " is-playing" : "") + (ble ? " is-bleeped" : "") + '" title="' + esc(tip) + '">'
+            + '<div class="playlist-row-main">'
+            +   (now ? '<span class="playlist-now-dot" aria-hidden="true"></span>' : '<span class="playlist-now-dot is-off" aria-hidden="true"></span>')
+            +   (now ? "<b>" : "<span>") + esc(t.name || "Track") + (now ? "</b>" : "</span>")
+            +   ' <span class="meta playlist-added-by">by ' + esc(who) + '</span>'
+            +   (ble ? ' <span class="playlist-bleep-tag">bleeped</span>' : "")
+            + '</div>'
+            + '<div class="playlist-row-tools" role="group" aria-label="Track actions">'
+            +   (canCtrl ? ('<button type="button" class="playlist-btn playlist-btn-play" data-playlist-play="' + i + '" title="Play this song (owner)">▶</button>'
+              + '<button type="button" class="playlist-btn playlist-btn-remove" data-playlist-remove="' + i + '" title="Remove from room playlist (owner)">✕</button>') : "")
+            +   '<button type="button" class="playlist-btn playlist-btn-info" data-playlist-info="' + i + '" title="View music item info">ℹ</button>'
+            +   '<button type="button" class="playlist-btn playlist-btn-bleep" data-playlist-bleep="' + i + '" title="Bleep (mute for you only)">' + (ble ? "Unbleep" : "Bleep") + '</button>'
+            +   '<button type="button" class="playlist-btn playlist-btn-report" data-playlist-report="' + i + '" title="Report music item (stub)">⚑</button>'
+            + '</div>'
             + '</div>';
         }).join("")
       : '<p class="meta">Playlist empty. Add a track from My Music (Stuff → Music).</p>';
@@ -1344,6 +1368,7 @@
       +   '<div class="room-side-head"><h2>Room music</h2>'
       +     '<button type="button" class="text-btn" data-playlist-close="1">Close</button></div>'
       +   '<p class="meta">Everyone in this loft hears the same loop (synced). Music keeps playing after Close — the dock under the room holds the player.</p>'
+      +   '<p class="meta playlist-wiki-hint">Wiki Music (?v=20260906be): current song is <b>bold</b>; hover a row for who added it; owner ▶ / ✕; <b>Bleep</b> mutes a track for you only; Report is a stub.</p>'
       +   musicSyncMetaHtml()
       +   sourceTabs
       +   (src === "local" ? localBody : embedBody)
@@ -1392,6 +1417,18 @@
   // Beginner: while you are typing/pasting a link, the panel HTML is never replaced (keyboard stays up).
   // ENGINE DEV: set dirty before paint(); clear after successful remount; Close/leave/clearStrayUI remove the node.
   var playlistPanelDirty = false;
+  // How this works (?v=20260906be): wiki Music "Bleep" — session-local mute of a playlist track (you only).
+  // Beginner: Bleep skips that song for you; owner Remove (red X) deletes it for everyone.
+  // ENGINE DEV: chrome-only preference; does not change shared playlist sync payload.
+  var playlistBleeped = {}; // key = track id or name|by|i → true
+  function playlistTrackKey(t, i) {
+    if (!t) return "i:" + i;
+    if (t.id) return String(t.id);
+    return String(t.name || "Track") + "|" + String(t.by || "") + "|" + i;
+  }
+  function isPlaylistBleeped(t, i) {
+    return !!playlistBleeped[playlistTrackKey(t, i)];
+  }
   // How this works: #room-embed-dock lives in shell() outside #main — paint never destroys the iframe.
   // Beginner: Open player sticks open across mute / YouTube↔Spotify taps until you Close player or leave.
   // ENGINE DEV: roomEmbedExpanded + CSS is-expanded (fixed sheet inside #app). Never reparent to body.
@@ -4722,7 +4759,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc + bd) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd + be) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4733,10 +4770,13 @@
       "• bc QA: fixed occupant NaN names (QA AxNaNNaN → QA Ax) via sanitize/heal",
       "• bd: decorate tool handlers (filter/snap/scale/z/dup/nudge/flip), friends search matchWhy,",
       "  room-lock strip + preview blurbs, Groups theme + manager thread flags, passport group medals,",
-      "  mobile immersive Enter from Room menu",
+      "  mobile immersive Enter from Room menu; PNG/Ruffle playback badges",
+      "• be: club Music playlist fidelity (bold current, added-by hover, ▶/✕, Bleep, info/report stubs),",
+      "  chat Speak/Think/Shout mode colors + classic too-chatty copy, Parties board polish,",
+      "  Stuff themed-Whirled Coming Soon filter note, share/embed beginner blurbs",
       "• classic-avatar.js preserved (bb Flash walk/tofu)",
       "",
-      "See STATUS.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md for details.",
+      "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
     ].join("\n");
   }
@@ -4866,17 +4906,16 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Decorate polish: filter/snap/scale/z/duplicate/nudge/flip handlers wired (wiki Furniture)\n"
-        + "• Friends search: email/real name/interests + matchWhy badge\n"
-        + "• Room lock: strip badge + preview who-can-enter; Room menu immersive Enter\n"
-        + "• Groups: accent theme form + manager sticky/announce/lock; join → passport\n"
-        + "• Passport: group medals from joined groups + Room Guardian / Group Joiner stamps\n"
-        + "• UX clarity: loft/Stuff badges — Walking: PNG hybrid (no Ruffle) vs Appearance: Ruffle (SWF); Whirl · PNG\n"
-        + "• Debug: WhirledChrome.getAvatarPlaybackMode() → png-hybrid | ruffle | tofu | png\n"
-        + "Preserve: bc Groups/Admin/broadcast/NaN, bb Flash hybrid, Whirl, chat visit-since, pale-blue, earn-only.",
+        + "• Music playlist (wiki): bold Now playing, hover who-added, owner ▶/✕, Bleep (you-only), info + Report stubs\n"
+        + "• Chat: Speak/Think/Shout mode tint on button+input; classic “too chatty” wait copy\n"
+        + "• Parties board: clearer create/join/invite + follow-host Coming Soon note\n"
+        + "• Stuff: themed Whirled inventory filter Coming Soon banner (no fake catalog)\n"
+        + "• Share/embed: beginner blurb + LOGO_V cache on room links\n"
+        + "Preserve: bd PNG/Ruffle badges + decorate/friends/lock/groups/passport, bc Groups/Admin/broadcast,\n"
+        + "  bb Flash hybrid, Whirl starter, chat visit-since, pale-blue, earn-only.",
       at: new Date().toISOString()
     });
-    // How this works (?v=20260906bd): refresh sticky OP body so Developers see the full overnight list.
+    // How this works (?v=20260906be): refresh sticky OP body so Developers see the full overnight list.
     updates.body = overnightChangelogBody();
     saveGroupThreads(g.id, threads);
   }
@@ -6307,7 +6346,7 @@
       + '<div class="modal-card room-share-card" role="dialog" aria-modal="true" aria-label="Share or embed room" data-room-share-card="1" onclick="event.stopPropagation()">'
       +   '<div class="room-side-head"><h2>Share or embed</h2>'
       +     '<button type="button" class="text-btn" data-room-share-close="1" aria-label="Close">×</button></div>'
-      +   '<p class="meta">Copy a link so friends can open the Rooms lobby and preview this loft. Optional embed uses a plain iframe — no social APIs.</p>'
+      +   '<p class="meta">Wiki Room → Share or embed. Copy a link so friends open the Rooms lobby and preview this loft (cache <code>?v=' + esc(LOGO_V) + '</code>). Optional embed uses a plain iframe — no social APIs, no payments.</p>'
       +   '<label class="invite-link-label">Share URL'
       +     '<input id="room-share-url" readonly value="' + esc(url) + '" /></label>'
       +   '<div class="invite-them-actions">'
@@ -7147,9 +7186,18 @@
     } else {
       body = how + avatarExtra + '<div class="grid">' + items.map(card).join("") + '</div>';
     }
-    return '<section class="page stuff-page"><div class="page-head"><div><h1>Stuff</h1><p class="meta">Your Stuff — what you already own (wiki Stuff tab).</p></div></div>'
+    // How this works (?v=20260906be): wiki Stuff_tab themed Whirled filter — Coming Soon (no fake SKUs).
+    // Beginner: in a classic themed Whirled you only saw marked items; home icon cleared the filter.
+    var themedNote = '<div class="panel stuff-themed-note" role="note">'
+      + '<p class="meta"><b>Themed Whirled filter</b> — <span class="soon-tag">Coming Soon</span>. '
+      + 'Classic wiki: inside a themed Whirled, Stuff only listed items marked for that world; Me → home cleared the filter. '
+      + 'Whirled2 shows your full local inventory here — we never invent a catalog.</p></div>';
+    return '<section class="page stuff-page"><div class="page-head"><div><h1>Stuff</h1><p class="meta">Your Stuff — what you already own (wiki Stuff tab). Categories match classic shelves.</p></div></div>'
+      + themedNote
       + '<div class="stuff-layout">' + catRail("stuff", stuffCat)
-      + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + body + '</div></div></section>';
+      + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>'
+      + '<p class="meta stuff-cat-how">' + esc(meta.how || "") + '</p>'
+      + body + '</div></div></section>';
   }
   function shopItemDetail(item) {
     if (!item) {
@@ -8100,40 +8148,50 @@
       + '</div></div>';
   }
   function partyPanel() {
+    // How this works (?v=20260906be): wiki Parties toolbar — create/join/invite locally; follow-host Coming Soon.
+    // Beginner: Parties! on the room bar opens this board. Open = anyone can Join; Friends = friends list only.
+    // ENGINE DEV: chrome localStorage whirled2.parties — no engine party physics.
     var parties = loadParties();
     var mine = currentParty();
     var rows = parties.length
       ? parties.map(function (p) {
           var members = (p.members || []).map(function (m) { return m.name; }).join(", ") || "empty";
           var joined = mine && mine.id === p.id;
-          return '<div class="party-row panel">'
-            + '<h3>' + esc(p.name || "Party") + '</h3>'
-            + '<p class="meta">' + esc(p.visibility || "open") + ' · host ' + esc(p.creatorName || "member")
-            + ' · ' + esc(String((p.members || []).length)) + ' members</p>'
-            + '<p class="meta">Members: ' + esc(members) + '</p>'
+          var vis = (p.visibility || "open") === "friends" ? "Friends only" : "Open";
+          var n = (p.members || []).length;
+          return '<div class="party-row panel' + (joined ? " is-yours" : "") + '">'
+            + '<div class="party-row-head"><h3>' + esc(p.name || "Party") + '</h3>'
+            + '<span class="party-vis-pill">' + esc(vis) + '</span></div>'
+            + '<p class="meta">Host <b>' + esc(p.creatorName || "member") + '</b> · '
+            + esc(String(n)) + ' / 8 members</p>'
+            + '<p class="meta party-members-line">Members: ' + esc(members) + '</p>'
+            + '<div class="party-row-actions">'
             + (joined
-              ? '<button type="button" class="action-btn" data-party-leave="' + esc(p.id) + '">Leave</button>'
-              : '<button type="button" class="action-btn" data-party-join="' + esc(p.id) + '">Join</button>')
+              ? '<button type="button" class="action-btn" data-party-leave="' + esc(p.id) + '">Leave party</button>'
+              : '<button type="button" class="action-btn" data-party-join="' + esc(p.id) + '">Join party</button>')
+            + '</div>'
             + '</div>';
         }).join("")
-      : '<div class="panel"><p class="meta">No parties yet. Create one below — empty list from <code>whirled2.parties</code>.</p></div>';
+      : '<div class="panel party-empty"><p class="meta"><b>No parties yet.</b> Create one below — list is local (<code>whirled2.parties</code>), not a fake public catalog.</p></div>';
     return '<div class="room-side-panel party-panel" id="party-panel">'
       + '<div class="panel">'
-      +   '<div class="room-side-head"><h2>Party board</h2>'
+      +   '<div class="room-side-head"><h2>Parties!</h2>'
       +     '<button type="button" class="text-btn" data-party-close="1">Close</button></div>'
-      +   '<p class="meta">Wiki Party stub. Follow-the-leader is meta only — shared server later.</p>'
-      +   (mine ? '<p class="party-now"><b>Your party:</b> ' + esc(mine.name) + '</p>' : '<p class="meta">You are not in a party.</p>')
-      +   '<div class="section-label">Parties</div>'
+      +   '<p class="meta">Classic room toolbar Parties — hang out with a named group. <b>Follow the host</b> room-hop is <span class="soon-tag">Coming Soon</span> (shared presence later).</p>'
+      +   (mine ? '<p class="party-now"><b>Your party:</b> ' + esc(mine.name)
+        + ' <span class="meta">· invite friends below or from an occupant menu</span></p>'
+        : '<p class="meta">You are not in a party — Join an open one or Create.</p>')
+      +   '<div class="section-label">Open parties</div>'
       +   rows
       +   '<div class="section-label">Create party</div>'
       +   '<form id="party-create-form" class="party-create-form">'
-      +     '<label>Name <input name="name" maxlength="60" required placeholder="Party name" /></label>'
-      +     '<label>Visibility <select name="visibility"><option value="open">Open</option><option value="friends">Friends</option></select></label>'
+      +     '<label>Name <input name="name" maxlength="60" required placeholder="Friday loft hang" /></label>'
+      +     '<label>Who can join <select name="visibility"><option value="open">Open — anyone in this loft</option><option value="friends">Friends only</option></select></label>'
       +     '<button type="submit">Create party</button>'
       +   '</form>'
       +   (mine ? (function () {
             var friends = loadFriends();
-            if (!friends.length) return '<p class="meta">Add friends to invite them to this party (local).</p>';
+            if (!friends.length) return '<p class="meta">Add friends (Me → Friends) to invite them to this party.</p>';
             var rows = friends.slice(0, 12).map(function (f) {
               var already = (mine.members || []).some(function (m) { return String(m.id) === String(f.id); });
               var invited = (mine.invites || []).some(function (m) { return String(m.id) === String(f.id); });
@@ -8145,7 +8203,7 @@
               return '<div class="party-invite-row"><b>' + esc(f.name) + '</b> ' + act + '</div>';
             }).join("");
             return '<div class="section-label">Invite friends</div><div class="party-invite-list">' + rows + '</div>'
-              + '<p class="meta">Local invites — multi-account Accept later. Follow-the-leader is meta until shared server.</p>';
+              + '<p class="meta">Local invites + mail note. Multi-account Accept works on this device; follow-host travel later.</p>';
           })() : '')
       + '</div></div>';
   }
@@ -10693,8 +10751,11 @@
       +   (function () {
             var sm = loadChatUi().speakMode || "speak";
             var label = sm === "think" ? "Think" : (sm === "shout" ? "Shout" : "Speak");
+            // How this works (?v=20260906be): wiki Chat modes — tint Speak/Think/Shout on the cycle button.
+            // Beginner: tap Speak → Think → Shout → Speak; or type /think /shout /me.
             var ph = sm === "think" ? "Think something…" : (sm === "shout" ? "Shout to the room…" : "Type here to chat!");
-            return '<button type="button" class="chat-speak-mode" id="chat-speak-mode" data-chat-speak-cycle="1" title="Cycle Speak / Think / Shout (or use /think /shout)" aria-label="Chat mode">' + label + '</button>'
+            var modeCls = sm === "think" ? " is-think" : (sm === "shout" ? " is-shout" : " is-speak");
+            return '<button type="button" class="chat-speak-mode' + modeCls + '" id="chat-speak-mode" data-chat-speak-cycle="1" title="Cycle Speak / Think / Shout (or use /think /shout /me)" aria-label="Chat mode: ' + label + '">' + label + '</button>'
               + '<input id="chat-input" maxlength="240" placeholder="' + ph + '" autocomplete="off" data-speak-mode="' + sm + '" />';
           })()
       +   '<button class="send" type="submit">send</button>'
@@ -11407,7 +11468,7 @@
   }
   // ---------------------------------------------------------------------------
   // Chat send / options / name menu / history poll
-  // Soft rate-limit: >5 messages in 3s → system "You're being too chatty…"
+  // Soft rate-limit: >5 messages in 3s → classic wiki Chat copy (?v=20260906be)
   // ---------------------------------------------------------------------------
   async function pushChat(text) {
     text = String(text || "").trim();
@@ -11451,7 +11512,9 @@
     var now = Date.now();
     chatSendTimes = chatSendTimes.filter(function (t) { return now - t < 3000; });
     if (chatSendTimes.length >= 5) {
-      pushSystemChat("You're being too chatty…", { ephemeral: true });
+      // How this works (?v=20260906be): wiki Chat — exact player-facing throttle line.
+      // Beginner: slow down a second if you see this; messages are not lost forever.
+      pushSystemChat("You're being too chatty. Wait a moment and try again.", { ephemeral: true });
       return;
     }
     chatSendTimes.push(now);
@@ -12159,7 +12222,11 @@
       var btn = document.getElementById("chat-speak-mode");
       var cin = document.getElementById("chat-input");
       var sm2 = uiSp.speakMode;
-      if (btn) btn.textContent = sm2 === "think" ? "Think" : (sm2 === "shout" ? "Shout" : "Speak");
+      if (btn) {
+        btn.textContent = sm2 === "think" ? "Think" : (sm2 === "shout" ? "Shout" : "Speak");
+        btn.className = "chat-speak-mode" + (sm2 === "think" ? " is-think" : (sm2 === "shout" ? " is-shout" : " is-speak"));
+        btn.setAttribute("aria-label", "Chat mode: " + btn.textContent);
+      }
       if (cin) {
         cin.placeholder = sm2 === "think" ? "Think something…" : (sm2 === "shout" ? "Shout to the room…" : "Type here to chat!");
         cin.setAttribute("data-speak-mode", sm2);
@@ -14111,6 +14178,44 @@
       playlistPanelDirty = true;
       paint("rooms");
       syncRoomAudio();
+      return;
+    }
+    // How this works (?v=20260906be): wiki Music track menu — info / Bleep / Report stub.
+    var plInfo = ev.target.closest("[data-playlist-info]");
+    if (plInfo && session()) {
+      var plI = loadPlaylist();
+      var ii = Number(plInfo.getAttribute("data-playlist-info"));
+      var tr = plI.tracks[ii];
+      if (tr) {
+        pushNotice("blue", (tr.name || "Track") + " · added by " + (tr.by || "?")
+          + (tr.id ? (" · Stuff id " + tr.id) : " · (local/embed — shop info Coming Soon)"), { transient: true });
+      }
+      return;
+    }
+    var plBleep = ev.target.closest("[data-playlist-bleep]");
+    if (plBleep && session()) {
+      var plB = loadPlaylist();
+      var bi = Number(plBleep.getAttribute("data-playlist-bleep"));
+      var tb = plB.tracks[bi];
+      if (tb) {
+        var bk = playlistTrackKey(tb, bi);
+        if (playlistBleeped[bk]) delete playlistBleeped[bk];
+        else playlistBleeped[bk] = true;
+        pushNotice("green", playlistBleeped[bk]
+          ? ("Bleeped “" + (tb.name || "Track") + "” for you — skipped on Next.")
+          : ("Unbleeped “" + (tb.name || "Track") + "”."), { transient: true });
+        if (playlistBleeped[bk] && plB.current === bi && normalizePlaylistSource(plB.source) === "local") {
+          playlistNext(false);
+          return;
+        }
+        playlistPanelDirty = true;
+        paint("rooms");
+      }
+      return;
+    }
+    var plRep = ev.target.closest("[data-playlist-report]");
+    if (plRep && session()) {
+      pushNotice("orange", "Report music item — Coming Soon (no fake moderation queue). Use Block on chat names for now.", { transient: true });
       return;
     }
     var roomRateBtn = ev.target.closest("[data-room-rate]");

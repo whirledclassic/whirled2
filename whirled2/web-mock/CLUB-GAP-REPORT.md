@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bd` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906be` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,20 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bd`)
+## Closed this pass (`?v=20260906be`)
+
+| Item | Notes |
+|------|--------|
+| Music playlist UI | Bold current, added-by hover, owner ▶/✕, Bleep (you-only), info + Report stubs |
+| Chat mode polish | Speak/Think/Shout button tints; classic “too chatty” wait copy |
+| Parties board | Open/Friends pills, member count, follow-host Coming Soon |
+| Stuff themed filter | Coming Soon banner + category how blurbs (no fake catalog) |
+| Share/embed | Wiki blurb + LOGO_V on room share links |
+| Preserve | bd PNG/Ruffle + decorate/social; bc Groups/Admin/broadcast; bb Flash; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bd`)
 
 | Item | Notes |
 |------|--------|
@@ -110,7 +123,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Backdrops / toys / pets / videos | Not a full classic inventory | **P1–P2** |
 | Music as Stuff items | Room playlist embeds (YT/Spotify), not MP3 Stuff shop | **P1** vs wiki MP3 upload |
 | Send as Gift | Mail/gifts chrome exists in limited form | Full item gift **P2** |
-| Themed Whirled inventory filter | Coming Soon | **P2** |
+| Themed Whirled inventory filter | Banner **Coming Soon** (`be`) — full filter later | **P2** |
 
 ### Room (wiki)
 **Classic:** walkable rooms, backdrops, doors, control bar (chat options, volume, Go, friends, parties, share, room edit/lock).
@@ -122,7 +135,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Decorate / place | Partial | Full furniture edit **P1** |
 | Lock / share / embed | Working chrome + pale-blue dock (ax) | Lock triad + preview blurbs `bd`; wiki-complete share/embed **P2** |
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
-| Parties | Toolbar stub / limited | **P1** |
+| Parties | **Improved** (`be`) board create/join/invite; follow-host Coming Soon | Follow-host presence **P1** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |
 
 ### Door (wiki)
@@ -140,8 +153,8 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
 | Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors | Group tabs still limited |
 | Name click menu | **Working** (`at`) Profile / friend / whisper / block / complain stub | Complain moderation **P2** |
-| Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`) escalating coins | Mode picker polish **P2** |
-| “Too chatty” throttle | Not verified as classic-faithful | **P2** |
+| Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`) | — |
+| “Too chatty” throttle | **Working** (`be`) classic wiki copy | — |
 
 ### Me / Profile (wiki)
 **Classic:** My Profile, photo 80×60, status→friend notices, info fields, passport medals, gender/age, home URL.
@@ -175,7 +188,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Shared soundtrack when API up | **Working** (demo sync) | — |
 | Mute-safe (no fetch when muted) | **Working** | — |
 | MP3 Stuff upload / shop listen-before-buy | **Not shipped** | **P1** |
-| Classic playlist UI (bold current, bleep) | Simplified | **P2** |
+| Classic playlist UI (bold current, bleep) | **Improved** (`be`) bold/hover/▶✕/Bleep/info | Report moderation **P2** |
 
 ### Starting_out (wiki)
 **Classic:** join, permaname, home room, shop, groups, contribute content.
@@ -205,7 +218,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 4. MP3 / classic music item model vs embed-only.
 
 ### P2
-1. Parties polish; complain/block; themed Whirled inventory filter.
+1. ~~Parties board polish~~ **improved `be`**; complain/block; themed Whirled filter still Coming Soon.
 2. Shop/remixable economy (conflicts with earn-only unless redesigned).
 3. SWF avatar states/actions beyond sprite emotes.
 
