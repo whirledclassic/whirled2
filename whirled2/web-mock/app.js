@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906al";
+  var LOGO_V = "20260906ao";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1275,7 +1275,7 @@
 
   var STUFF_CATS = [
     // How this works: wiki Stuff rail categories. howBlurb = empty-state “How do I get stuff?”
-    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload PNG/WebP (optional .aseprite attachment) or Add user packs. Wear shows a sprite billboard in your loft — not Ruffle. Classic SWF lab stays On hold — see STUFF-AVATARS.md." },
+    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Add Cyan Hair (idle+walk) or upload idle+walk PNGs / .aseprite. Wear, then click the loft floor to walk — not Ruffle. Classic SWF lab stays On hold — see STUFF-AVATARS.md." },
     { id: "furniture", label: "Furniture", empty: "You have no furniture yet.", how: "Furniture fills your loft. Upload a named piece with optional thumb, then Decorate Room to place chips." },
     { id: "backdrops", label: "Backdrops", empty: "You have no backdrops yet.", how: "Backdrops set the room scene. Upload an image you have rights to, then place it while decorating." },
     { id: "toys", label: "Toys", empty: "You have no toys yet.", how: "Toys are playful room items. Create your own stub here — no fake catalog fillers." },
@@ -1405,9 +1405,10 @@
 
   // ---------------------------------------------------------------------------
   // Stuff sprite avatars (Aseprite / PNG packs) — classic Stuff feel without SWF
-  // Beginner: Upload PNG/WebP (or seed user-pack) → Wear → see yourself in the loft.
+  // Beginner: Upload PNG/WebP or Add user packs → Wear Cyan Hair → click loft floor to walk.
   // ENGINE DEV: #avatar-wear-layer is chrome overlay sibling of #stage-slot (not Ruffle).
-  // Pack JSON: { name, frames[], thumb, source: "aseprite" }. Lab SWF path stays locked.
+  // Unified pack JSON: { name, states:{idle,walk,stand,pose}, thumb, source:"aseprite-unified" }.
+  // Lab SWF path stays locked. Chrome click-to-walk yields when Pixi mountWhirledEngine owns stage.
   // ---------------------------------------------------------------------------
   var WORN_AVATAR_KEY = "whirled2.wornAvatar";
   var USER_PACK_SEEDED_KEY = "whirled2.userPackSeeded";
@@ -1427,14 +1428,43 @@
     }
     localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(row));
   }
+  function resolveAvatarStates(item) {
+    // How this works: unified packs expose states{idle,walk,...}; legacy packs = idle-only from frames.
+    // Beginner: Cyan Hair has idle + walk so click-to-walk can animate. Parts stay optional.
+    // ENGINE DEV: same shape Pixi Player should later consume from pack.json.
+    var states = null;
+    if (item && item.states && typeof item.states === "object") states = item.states;
+    else if (item && item.pack && item.pack.states) states = item.pack.states;
+    if (states) {
+      var out = {};
+      Object.keys(states).forEach(function (k) {
+        var st = states[k] || {};
+        out[k] = {
+          frames: (st.frames || []).slice(),
+          frameDurationsMs: (st.frameDurationsMs || []).slice()
+        };
+      });
+      return out;
+    }
+    var frames = [];
+    if (item && item.frames && item.frames.length) frames = item.frames.slice();
+    else if (item && item.pack && item.pack.displayFrames) frames = item.pack.displayFrames.slice();
+    else if (item && item.pack && item.pack.frames) frames = item.pack.frames.slice();
+    else if (item && (item.preview || item.thumb)) frames = [item.preview || item.thumb];
+    var durs = (item && item.pack && item.pack.frameDurationsMs) || (item && item.frameDurationsMs) || [];
+    return { idle: { frames: frames, frameDurationsMs: durs.slice() } };
+  }
   function wearStuffAvatar(item) {
-    // How this works: classic Use / Wear — stores preview for loft billboard.
+    // How this works: classic Use / Wear — stores preview + states for loft billboard / walk.
     // Why: SWF/Ruffle still on hold; sprite pack is the modern path until engine Ruffle.
     if (!item) return false;
     var preview = item.preview || item.thumb || "";
     if (!preview && item.pack && item.pack.preview) preview = item.pack.preview;
+    var states = resolveAvatarStates(item);
+    var idle = states.idle || states.stand || { frames: [], frameDurationsMs: [] };
     var frames = [];
-    if (item.frames && item.frames.length) frames = item.frames.slice();
+    if (idle.frames && idle.frames.length) frames = idle.frames.slice();
+    else if (item.frames && item.frames.length) frames = item.frames.slice();
     else if (item.pack && item.pack.displayFrames) frames = item.pack.displayFrames.slice();
     else if (item.pack && item.pack.frames) frames = item.pack.frames.slice();
     else if (preview) frames = [preview];
@@ -1444,9 +1474,14 @@
       thumb: item.thumb || preview || "",
       preview: preview || item.thumb || "",
       frames: frames,
-      frameDurationsMs: (item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || [],
+      frameDurationsMs: (idle.frameDurationsMs && idle.frameDurationsMs.length)
+        ? idle.frameDurationsMs.slice()
+        : ((item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || []),
+      states: states,
+      state: "idle",
       source: item.source || (item.pack && item.pack.source) || "png",
       packPath: item.packPath || "",
+      slug: item.slug || (item.pack && item.pack.slug) || "",
       at: new Date().toISOString()
     };
     saveWornAvatar(row);
@@ -1460,34 +1495,44 @@
   function avatarWearLayerHtml() {
     // How this works: billboard sprite in the room chrome (like item in your space).
     // Beginner: if nothing Worn yet, show classic default tofu so the loft isn’t empty.
-    // ENGINE DEV: pointer-events none; z-index above #stage-slot, below bubbles/menus. No SWF.
+    // ENGINE DEV: layer stays pointer-events none; click-to-walk binds on .stage-host instead.
+    // When Pixi mountWhirledEngine owns #stage-slot, chrome walk disables (see bindChromeClickToWalk).
     var worn = loadWornAvatar();
     if (!worn) worn = makeTofuWornRow();
     var scale = loadAvatarScale(worn.stuffId || TOFU_AVATAR_ID);
     var isTofu = !!(worn.isTofu || worn.stuffId === TOFU_AVATAR_ID || worn.source === "tofu");
+    var x = (typeof worn.xPct === "number" && isFinite(worn.xPct)) ? worn.xPct : 50;
+    var face = worn.face === -1 ? -1 : 1;
+    var posStyle = "--wear-scale:" + scale + ";--wear-x:" + x + "%;--wear-face:" + face + ";";
     if (isTofu) {
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Default tofu avatar">'
-        + '<div class="avatar-wear-billboard" style="--wear-scale:' + scale + '">'
+        + '<div class="avatar-wear-billboard" style="' + posStyle + '">'
         +   tofuSvgHtml("tofu-avatar tofu-wear")
         +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Tofu") + '</div>'
         + '</div></div>';
     }
-    if (!(worn.preview || (worn.frames && worn.frames.length))) {
+    if (!(worn.preview || (worn.frames && worn.frames.length) || (worn.states && worn.states.idle))) {
       return '<div id="avatar-wear-layer" class="avatar-wear-layer" aria-hidden="true"></div>';
     }
-    var frames = (worn.frames && worn.frames.length) ? worn.frames : [worn.preview];
+    var stateName = worn.state || "idle";
+    var st = (worn.states && (worn.states[stateName] || worn.states.idle)) || null;
+    var frames = (st && st.frames && st.frames.length)
+      ? st.frames
+      : ((worn.frames && worn.frames.length) ? worn.frames : [worn.preview]);
     var src0 = frames[0] || worn.preview;
-    var durs = worn.frameDurationsMs || [];
+    var durs = (st && st.frameDurationsMs) || worn.frameDurationsMs || [];
     var meta = ' data-wear-frames="' + esc(JSON.stringify(frames)) + '"'
-      + ' data-wear-durs="' + esc(JSON.stringify(durs)) + '"';
+      + ' data-wear-durs="' + esc(JSON.stringify(durs)) + '"'
+      + ' data-wear-state="' + esc(stateName) + '"';
     return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on" aria-label="Worn avatar">'
-      + '<div class="avatar-wear-billboard"' + meta + ' style="--wear-scale:' + scale + '">'
+      + '<div class="avatar-wear-billboard"' + meta + ' style="' + posStyle + '">'
       +   '<img class="avatar-wear-sprite" src="' + src0 + '" alt="' + esc(worn.name || "Avatar") + '" />'
       +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + '</div>'
       + '</div></div>';
   }
   function startAvatarWearAnim() {
     // Beginner: if the pack has multiple PNG frames, flip them like a tiny GIF.
+    // ENGINE DEV: chrome walk may swap data-wear-frames between idle/walk via setAvatarState.
     var layer = document.getElementById("avatar-wear-layer");
     if (!layer || !layer.classList.contains("is-on")) return;
     var bill = layer.querySelector(".avatar-wear-billboard");
@@ -1497,15 +1542,180 @@
     var durs = [];
     try { frames = JSON.parse(bill.getAttribute("data-wear-frames") || "[]"); } catch (e1) { frames = []; }
     try { durs = JSON.parse(bill.getAttribute("data-wear-durs") || "[]"); } catch (e2) { durs = []; }
-    if (!frames || frames.length < 2) return;
-    if (layer._wearTimer) { try { clearInterval(layer._wearTimer); } catch (e3) {} }
+    if (layer._wearTimer) { try { clearInterval(layer._wearTimer); } catch (e3) {} layer._wearTimer = null; }
+    if (!frames || frames.length < 2) {
+      if (frames && frames[0]) img.src = frames[0];
+      return;
+    }
     var i = 0;
+    img.src = frames[0];
     function tick() {
       i = (i + 1) % frames.length;
       img.src = frames[i];
     }
     var ms = (durs[0] > 0 ? durs[0] : 200);
     layer._wearTimer = setInterval(tick, ms);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chrome click-to-walk (?v=20260906ao) — until Pixi owns the stage
+  // Beginner: click the loft floor → avatar walks there (walk frames), then idles.
+  // ENGINE DEV: when #stage-slot has canvas / [data-whirled-engine], chrome walk yields.
+  // Do NOT put canvas in #avatar-wear-layer; keep walk as chrome overlay only.
+  // ---------------------------------------------------------------------------
+  var chromeWalkTarget = null; // { xPct, yPct, at } for WhirledChrome.getAvatarWalkTarget
+  var chromeWalkRaf = 0;
+  var chromeWalkBound = false;
+
+  function isEngineMountedOnStage() {
+    var slot = document.getElementById("stage-slot");
+    if (!slot) return false;
+    return !!(slot.querySelector("canvas") || slot.querySelector("[data-whirled-engine]"));
+  }
+  function setAvatarState(stateName) {
+    // How this works: swap billboard frames to idle / walk / stand / pose without full paint.
+    var worn = loadWornAvatar();
+    if (!worn || worn.isTofu) return false;
+    var states = worn.states || {};
+    var name = String(stateName || "idle");
+    if (!states[name] && name !== "idle") {
+      if (name === "walk" && states.idle) name = "idle"; // graceful fallback
+      else if (states.idle) name = "idle";
+      else return false;
+    }
+    var st = states[name] || states.idle || { frames: worn.frames || [], frameDurationsMs: worn.frameDurationsMs || [] };
+    worn.state = name;
+    worn.frames = (st.frames || []).slice();
+    worn.frameDurationsMs = (st.frameDurationsMs || []).slice();
+    saveWornAvatar(worn);
+    var layer = document.getElementById("avatar-wear-layer");
+    var bill = layer && layer.querySelector(".avatar-wear-billboard");
+    if (bill) {
+      bill.setAttribute("data-wear-frames", JSON.stringify(worn.frames));
+      bill.setAttribute("data-wear-durs", JSON.stringify(worn.frameDurationsMs));
+      bill.setAttribute("data-wear-state", name);
+    }
+    try { startAvatarWearAnim(); } catch (e) {}
+    return true;
+  }
+  function getAvatarWalkTarget() {
+    return chromeWalkTarget ? { xPct: chromeWalkTarget.xPct, yPct: chromeWalkTarget.yPct, at: chromeWalkTarget.at } : null;
+  }
+  function showWalkTargetMarker(host, xPct, yPct) {
+    // Classic soft white circle on the floor — optional feel, pointer-events none.
+    if (!host) return;
+    var m = host.querySelector(".chrome-walk-target");
+    if (!m) {
+      m = document.createElement("div");
+      m.className = "chrome-walk-target";
+      m.setAttribute("aria-hidden", "true");
+      host.appendChild(m);
+    }
+    m.style.left = xPct + "%";
+    m.style.top = yPct + "%";
+    m.classList.add("is-on");
+    if (m._hideT) { try { clearTimeout(m._hideT); } catch (e) {} }
+    m._hideT = setTimeout(function () { m.classList.remove("is-on"); }, 900);
+  }
+  function applyWearBillboardPose(xPct, face) {
+    var layer = document.getElementById("avatar-wear-layer");
+    var bill = layer && layer.querySelector(".avatar-wear-billboard");
+    if (!bill) return;
+    if (typeof xPct === "number" && isFinite(xPct)) {
+      bill.style.setProperty("--wear-x", xPct + "%");
+    }
+    if (face === 1 || face === -1) {
+      bill.style.setProperty("--wear-face", String(face));
+    }
+  }
+  function persistWearPose(xPct, face) {
+    var worn = loadWornAvatar();
+    if (!worn) return;
+    if (typeof xPct === "number" && isFinite(xPct)) worn.xPct = Math.max(8, Math.min(92, xPct));
+    if (face === 1 || face === -1) worn.face = face;
+    saveWornAvatar(worn);
+  }
+  function chromeWalkTo(xPct, yPct) {
+    // Animate billboard toward floor click. Walk frames while moving; idle on arrive.
+    if (isEngineMountedOnStage()) return; // ENGINE DEV: yield to Pixi
+    var layer = document.getElementById("avatar-wear-layer");
+    var bill = layer && layer.querySelector(".avatar-wear-billboard");
+    if (!bill || !layer.classList.contains("is-on")) return;
+    var worn = loadWornAvatar();
+    if (!worn || worn.isTofu) return;
+    xPct = Math.max(8, Math.min(92, xPct));
+    yPct = Math.max(55, Math.min(92, yPct)); // floor band
+    chromeWalkTarget = { xPct: xPct, yPct: yPct, at: new Date().toISOString() };
+    var host = document.querySelector(".stage-host");
+    showWalkTargetMarker(host, xPct, yPct);
+    var cur = parseFloat((bill.style.getPropertyValue("--wear-x") || "50").replace("%", ""));
+    if (!isFinite(cur)) cur = (typeof worn.xPct === "number" ? worn.xPct : 50);
+    var face = xPct >= cur ? 1 : -1;
+    applyWearBillboardPose(cur, face);
+    setAvatarState((worn.states && worn.states.walk) ? "walk" : "idle");
+    if (chromeWalkRaf) { try { cancelAnimationFrame(chromeWalkRaf); } catch (e) {} chromeWalkRaf = 0; }
+    var start = cur;
+    var dist = Math.abs(xPct - start);
+    var speed = 28; // % per second — classic snappy walk
+    var t0 = performance.now();
+    function step(now) {
+      if (isEngineMountedOnStage()) {
+        setAvatarState("idle");
+        chromeWalkRaf = 0;
+        return;
+      }
+      var elapsed = (now - t0) / 1000;
+      var travel = Math.min(dist, speed * elapsed);
+      var dir = xPct >= start ? 1 : -1;
+      var pos = start + dir * travel;
+      applyWearBillboardPose(pos, face);
+      if (travel >= dist - 0.15) {
+        applyWearBillboardPose(xPct, face);
+        persistWearPose(xPct, face);
+        setAvatarState("idle");
+        chromeWalkRaf = 0;
+        return;
+      }
+      chromeWalkRaf = requestAnimationFrame(step);
+    }
+    chromeWalkRaf = requestAnimationFrame(step);
+  }
+  function onStageHostWalkClick(ev) {
+    // Beginner: tap the floor (lower stage), not the chat strip / buttons.
+    if (isEngineMountedOnStage()) return;
+    if (decorateMode) return;
+    var host = ev.currentTarget;
+    if (!host || !host.classList.contains("stage-host")) return;
+    // Ignore UI chrome inside the host (overlay history, buttons, decorate chips).
+    if (ev.target.closest("#chat-overlay, #stage-bubbles, .decorate-chip, button, a, input, textarea, select, .chrome-walk-target")) return;
+    var rect = host.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    var xPct = ((ev.clientX - rect.left) / rect.width) * 100;
+    var yPct = ((ev.clientY - rect.top) / rect.height) * 100;
+    // Floor band ~ lower 45% of stage (classic loft floor).
+    if (yPct < 52) return;
+    ev.preventDefault();
+    chromeWalkTo(xPct, yPct);
+  }
+  function bindChromeClickToWalk() {
+    // How this works: one listener on .stage-host; no canvas in #stage-slot for chrome walk.
+    // ENGINE DEV: if engine mounted, do not bind / remove listener so Pixi owns pointer.
+    var host = document.querySelector(".stage-host");
+    if (!host) return;
+    if (isEngineMountedOnStage()) {
+      if (host._chromeWalkBound) {
+        host.removeEventListener("click", onStageHostWalkClick);
+        host._chromeWalkBound = false;
+        host.classList.remove("chrome-walk-ready");
+      }
+      return;
+    }
+    if (!host._chromeWalkBound) {
+      host.addEventListener("click", onStageHostWalkClick);
+      host._chromeWalkBound = true;
+    }
+    host.classList.add("chrome-walk-ready");
+    chromeWalkBound = true;
   }
   // ---------------------------------------------------------------------------
   // Avatar scale + Stuff viewer + tofu default (20260906ak)
@@ -1628,13 +1838,15 @@
     // Beginner: see yourself here without entering a room.
     if (!item) return "";
     var frames = [];
-    if (item.frames && item.frames.length) frames = item.frames.slice();
+    var st = (item.states && item.states.idle) || (item.pack && item.pack.states && item.pack.states.idle);
+    if (st && st.frames && st.frames.length) frames = st.frames.slice();
+    else if (item.frames && item.frames.length) frames = item.frames.slice();
     else if (item.pack && item.pack.displayFrames) frames = item.pack.displayFrames.slice();
     else if (item.pack && item.pack.frames) frames = item.pack.frames.slice();
     else if (item.preview) frames = [item.preview];
     else if (item.thumb) frames = [item.thumb];
     var src0 = frames[0] || item.preview || item.thumb || "";
-    var durs = (item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || [];
+    var durs = (st && st.frameDurationsMs) || (item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || [];
     var scale = loadAvatarScale(item.id);
     var worn = isWornStuffId(item.id);
     var pct = Math.round(scale * 100);
@@ -1722,29 +1934,57 @@
   }
 
   function ensureUserPackSeedButtonHtml() {
-    // How this works: one-click import of converted Aseprite packs under assets/avatars/user-pack/.
+    // How this works: one-click import — prefers unified Cyan Hair (idle+walk+pose).
+    // Beginner: one Wearable avatar. Optional part packs stay in index but are not seeded by default.
     return '<div class="panel avatar-pack-seed-panel" id="avatar-pack-seed">'
       + '<h3>Aseprite avatar packs</h3>'
-      + '<p class="meta">Modern Whirled2 path: sprite packs (PNG frames + ~80×60 thumb). Classic SWF wardrobe stays On hold. '
-      + 'Converted packs live in <code>assets/avatars/user-pack/</code>.</p>'
+      + '<p class="meta">Modern Whirled2 path: one <b>Cyan Hair</b> avatar with idle + walk (+ stand/pose). '
+      + 'Classic SWF wardrobe stays On hold. Packs live in <code>assets/avatars/user-pack/</code>.</p>'
       + '<div class="stuff-detail-actions">'
-      +   '<button type="button" class="action-btn" data-seed-user-packs="1">Add user packs to Stuff</button>'
+      +   '<button type="button" class="action-btn" data-seed-user-packs="1">Add Cyan Hair to Stuff</button>'
+      +   '<button type="button" class="text-btn" data-seed-user-packs-parts="1" title="Optional: also add idle/walk/stand/pose as separate part items">Also add part packs…</button>'
       + '</div>'
-      + '<p class="meta" id="avatar-pack-seed-msg">Adds kind=avatar inventory rows with preview images. Then open one → <b>Wear avatar</b>.</p>'
+      + '<p class="meta" id="avatar-pack-seed-msg">Adds the unified Cyan Hair Wearable. Then <b>Wear</b> → Rooms → click the loft floor to walk.</p>'
       + '<div class="stuff-detail-actions">'
       +   '<button type="button" class="action-btn" data-wear-tofu="1">' + happyFaceSvg(false) + ' Wear default tofu</button>'
       + '</div>'
       + '<p class="meta">Classic default blank avatar. Use when you want no custom pack worn.</p>'
       + '</div>';
   }
-  async function seedUserAvatarPacks() {
-    // How this works: fetch index.json, create Stuff rows for each ok pack (skip duplicates by packPath).
+  function absolutizeStateFrames(states, path) {
+    // How this works: pack.json paths are relative; Stuff rows need ./assets…?v= URLs.
+    if (!states) return null;
+    var out = {};
+    Object.keys(states).forEach(function (k) {
+      var st = states[k] || {};
+      out[k] = {
+        frames: (st.frames || []).map(function (f) {
+          if (/^(https?:|data:|\.|\/)/.test(f)) return f.indexOf("?") >= 0 ? f : (f + "?v=" + LOGO_V);
+          return "./" + path + f + "?v=" + LOGO_V;
+        }),
+        frameDurationsMs: (st.frameDurationsMs || []).slice()
+      };
+    });
+    return out;
+  }
+  async function seedUserAvatarPacks(opts) {
+    // How this works: fetch index.json; prefer unified cyan-hair. Parts only if includeParts.
+    // Beginner: one Wearable Cyan Hair with idle+walk. ENGINE DEV: states mirror pack.json.
+    opts = opts || {};
+    var includeParts = !!opts.includeParts;
     var msg = document.getElementById("avatar-pack-seed-msg");
     try {
       var res = await fetch(USER_PACK_INDEX, { cache: "no-store" });
       if (!res.ok) throw new Error("Could not load pack index (" + res.status + ")");
       var index = await res.json();
       var packs = (index && index.packs) || [];
+      var preferred = (index && index.preferred) || "cyan-hair";
+      // Prefer unified first in seed order.
+      packs = packs.slice().sort(function (a, b) {
+        var ap = (a && (a.preferred || a.slug === preferred)) ? 0 : 1;
+        var bp = (b && (b.preferred || b.slug === preferred)) ? 0 : 1;
+        return ap - bp;
+      });
       var items = loadStuff();
       var existing = {};
       items.forEach(function (it) {
@@ -1755,6 +1995,12 @@
       for (var i = 0; i < packs.length; i++) {
         var p = packs[i];
         if (!p || p.ok === false) continue;
+        var isPart = !!(p.partOf || (p.source !== "aseprite-unified" && p.slug !== preferred && !p.preferred));
+        if (isPart && !includeParts) continue;
+        if (!isPart && p.slug !== preferred && !p.preferred && p.source !== "aseprite-unified" && !includeParts) {
+          // Only seed preferred/unified unless parts requested.
+          if (preferred && p.slug !== preferred) continue;
+        }
         var path = p.path || ("assets/avatars/user-pack/" + p.slug + "/");
         if (existing[path] || existing["slug:" + p.slug]) continue;
         var packJson = null;
@@ -1766,19 +2012,40 @@
         } catch (eP) { packJson = null; }
         var thumb = "./" + (p.thumb || (path + "thumb.png")) + "?v=" + LOGO_V;
         var preview = "./" + (p.preview || (path + "preview.png")) + "?v=" + LOGO_V;
+        var states = absolutizeStateFrames(packJson && packJson.states, path);
         var frames = [];
-        if (packJson && packJson.displayFrames) {
+        if (states && states.idle && states.idle.frames && states.idle.frames.length) {
+          frames = states.idle.frames.slice();
+        } else if (packJson && packJson.displayFrames) {
           frames = packJson.displayFrames.map(function (f) { return "./" + path + f + "?v=" + LOGO_V; });
         } else if (packJson && packJson.frames) {
           frames = packJson.frames.map(function (f) { return "./" + path + f + "?v=" + LOGO_V; });
         } else {
           frames = [preview];
         }
+        var durs = (states && states.idle && states.idle.frameDurationsMs)
+          || (packJson && packJson.frameDurationsMs) || [];
         var nid = "av" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        var srcLabel = (packJson && packJson.source) || p.source || "aseprite";
+        var desc;
+        if (states && states.walk) {
+          desc = "Unified Aseprite avatar (idle + walk + stand/pose). Wear, then click the loft floor to walk.";
+        } else if (isPart) {
+          desc = "Optional part pack (" + (p.role || "frames") + ") for Cyan Hair. Prefer the unified Cyan Hair Wearable.";
+        } else {
+          desc = "Aseprite sprite pack (" + ((packJson && packJson.frameCount) || p.frameCount || frames.length) + " frames). Wear to show in your loft.";
+        }
+        var packForRow = packJson ? JSON.parse(JSON.stringify(packJson)) : { name: p.name, frames: frames, thumb: thumb, source: srcLabel };
+        if (states) {
+          packForRow.states = states;
+          packForRow.frames = frames.slice();
+          packForRow.displayFrames = frames.slice();
+          packForRow.frameDurationsMs = durs.slice();
+        }
         items.unshift({
           id: nid,
           name: (packJson && packJson.name) || p.name || p.slug,
-          description: "Aseprite sprite pack (" + ((packJson && packJson.frameCount) || p.frameCount || frames.length) + " frames). Wear to show in your loft.",
+          description: desc,
           kind: "avatar",
           type: "avatar",
           category: "avatars",
@@ -1787,21 +2054,30 @@
           thumb: thumb,
           preview: preview,
           frames: frames,
-          pack: packJson || { name: p.name, frames: frames, thumb: thumb, source: "aseprite" },
+          frameDurationsMs: durs.slice(),
+          states: states || undefined,
+          pack: packForRow,
           packPath: path,
           slug: p.slug,
-          source: "aseprite",
+          source: srcLabel,
+          partOf: p.partOf || undefined,
+          preferred: !!(p.preferred || p.slug === preferred || srcLabel === "aseprite-unified"),
           sourceFile: packJson && packJson.sourceFile,
           owned: true,
           at: new Date().toISOString()
         });
         existing[path] = 1;
+        existing["slug:" + p.slug] = 1;
         added++;
       }
       saveStuff(items);
       try { localStorage.setItem(USER_PACK_SEEDED_KEY, "1"); } catch (eS) {}
-      if (msg) msg.textContent = added ? ("Added " + added + " avatar pack(s) to Stuff.") : "Packs already in Stuff — open one and Wear.";
-      pushNotice("green", added ? ("Added " + added + " avatar pack(s).") : "Avatar packs already seeded.", { transient: true });
+      if (msg) {
+        msg.textContent = added
+          ? ("Added " + added + " avatar(s) to Stuff." + (includeParts ? " (includes part packs)" : " Wear Cyan Hair, then click the floor to walk."))
+          : "Already in Stuff — open Cyan Hair and Wear.";
+      }
+      pushNotice("green", added ? ("Added " + added + " avatar(s).") : "Avatar packs already seeded.", { transient: true });
       paint("stuff");
     } catch (err) {
       if (msg) msg.textContent = String(err && err.message || err);
@@ -4672,7 +4948,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906al";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ao";
   }
   function roomShareUrl() {
     // How this works (20260906af): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
@@ -4915,8 +5191,10 @@
     if (isMusic) {
       fileLabel = 'Audio file (MP3 / WAV / OGG / WebM) <input type="file" name="media" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/*" required />';
     } else if (isAvatar) {
-      fileLabel = 'Preview image (PNG / WebP, ~80×60 thumb OK) <input type="file" name="image" accept="image/png,image/webp,image/jpeg,image/gif" />'
-        + '</label><label>Aseprite source (optional, stored as pack attachment) <input type="file" name="aseprite" accept=".aseprite,.ase,application/octet-stream" />';
+      // Beginner (?v=20260906ao): multi-file → one inventory item with idle + walk states.
+      fileLabel = 'Idle / preview PNGs (multi-select OK) <input type="file" name="image" accept="image/png,image/webp,image/jpeg,image/gif" multiple />'
+        + '</label><label>Walk PNGs (optional multi-select) <input type="file" name="walk" accept="image/png,image/webp,image/jpeg,image/gif" multiple />'
+        + '</label><label>Aseprite sources (optional idle/walk .aseprite) <input type="file" name="aseprite" accept=".aseprite,.ase,application/octet-stream" multiple />';
     } else {
       fileLabel = 'Thumbnail / image (optional) <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" />';
     }
@@ -4924,7 +5202,7 @@
     if (isMusic) {
       blurb = 'Wiki Music: upload an audio file you own or have rights to. Stored as a data URL in this browser (~2–4MB). Add tracks to the room playlist from Room menu. Do <b>not</b> upload copyrighted material you do not own.';
     } else if (isAvatar) {
-      blurb = 'Wiki Create avatars (modern path): PNG/WebP sprite preview for Stuff. Optional <code>.aseprite</code> is kept as a pack attachment (not played via Ruffle). After save, open the item → <b>Wear</b> to show it in your loft. Classic SWF wardrobe stays On hold — see STUFF-AVATARS.md. Images ~200KB; .aseprite ~1MB cap.';
+      blurb = 'Wiki Create avatars (modern path): pick <b>idle</b> PNG(s) + optional <b>walk</b> PNG(s) (or .aseprite attachments) → one Stuff item with states. After save → <b>Wear</b> → click loft floor to walk. Classic SWF stays On hold — see STUFF-AVATARS.md. Each image ~200KB; each .aseprite ~1MB.';
     } else {
       blurb = 'Wiki-style stub: name + description + optional thumbnail. SWF / full media arrives with the engine later. Images only for this mock (png/jpg/gif/webp), ~200KB cap.';
     }
@@ -5921,7 +6199,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906al</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906ao</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -6185,7 +6463,157 @@ function helpPage() {
     }
   };
   var PROFILE_BG_MAX_WARN = 400 * 1024;   // soft warn ~400KB
-  var PROFILE_BG_MAX_HARD = 900 * 1024;   // reject huge uploads
+  var PROFILE_BG_MAX_HARD = 900 * 1024;   // reject huge uploads (file bytes before compress)
+  var PROFILE_BG_TARGET = 700 * 1024;     // aim dataURL under ~700KB for localStorage
+  var PROFILE_BG_MAX_DIM = 1600;          // longest side after resize
+  // Beginner (?v=20260906ao): big phone photos often exceed ~900KB. We shrink/jpeg them so
+  // Choose image can still save a custom profile background in this browser.
+  // ENGINE DEV: chrome-only FileReader + canvas; never touches #stage-slot.
+  function skinMsgSet(text) {
+    var nodes = document.querySelectorAll("#skin-msg, #skin-msg-quick");
+    for (var i = 0; i < nodes.length; i++) nodes[i].textContent = text || "";
+  }
+  function compressProfileImageFile(file, done) {
+    // What: turn a picked File into a data URL small enough for whirled2.profileSkin.* localStorage.
+    // How: FileReader → Image → canvas (max 1600px) → jpeg quality steps; gif stays as-is if small.
+    // Why: hard-reject alone felt broken; compress when reasonable, then clear toast on fail.
+    if (!file) { done({ ok: false, error: "No file selected." }); return; }
+    var okType = /image\/(png|jpeg|jpg|gif|webp)/i.test(file.type) || /\.(png|jpe?g|gif|webp)$/i.test(file.name || "");
+    if (!okType) { done({ ok: false, error: "Use png, jpg, gif, or webp." }); return; }
+    // Absurdly huge files: do not even try (memory). Soft ceiling before decode.
+    if (file.size > 8 * 1024 * 1024) {
+      done({ ok: false, error: "Image too large (keep under ~8MB, or under ~900KB without compress)." });
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function () { done({ ok: false, error: "Could not read that image." }); };
+    reader.onload = function () {
+      var rawUrl = String(reader.result || "");
+      var isGif = /image\/gif/i.test(file.type) || /\.gif$/i.test(file.name || "");
+      // Animated gif: keep bytes if under hard cap; do not flatten via canvas.
+      if (isGif) {
+        if (file.size > PROFILE_BG_MAX_HARD || rawUrl.length > 1200000) {
+          done({ ok: false, error: "GIF too large for this demo (keep under ~900KB)." });
+          return;
+        }
+        done({ ok: true, dataUrl: rawUrl, compressed: false });
+        return;
+      }
+      // Already small enough — use original (png/webp/jpeg).
+      if (file.size <= PROFILE_BG_MAX_WARN && rawUrl.length <= PROFILE_BG_TARGET) {
+        done({ ok: true, dataUrl: rawUrl, compressed: false });
+        return;
+      }
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var w = img.naturalWidth || img.width || 1;
+          var h = img.naturalHeight || img.height || 1;
+          var scale = Math.min(1, PROFILE_BG_MAX_DIM / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = cw;
+          canvas.height = ch;
+          var ctx = canvas.getContext("2d");
+          if (!ctx) {
+            if (file.size > PROFILE_BG_MAX_HARD) {
+              done({ ok: false, error: "Image too large for this demo (keep under ~900KB)." });
+            } else {
+              done({ ok: true, dataUrl: rawUrl, compressed: false });
+            }
+            return;
+          }
+          ctx.fillStyle = "#cfe6f5";
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.drawImage(img, 0, 0, cw, ch);
+          var qualities = [0.82, 0.72, 0.62, 0.52, 0.42];
+          var best = "";
+          for (var qi = 0; qi < qualities.length; qi++) {
+            var out = canvas.toDataURL("image/jpeg", qualities[qi]);
+            best = out;
+            if (out.length <= PROFILE_BG_TARGET) break;
+          }
+          if (!best || best.length > 1200000) {
+            done({ ok: false, error: "Could not shrink image enough for browser storage (~900KB). Try a smaller file." });
+            return;
+          }
+          done({ ok: true, dataUrl: best, compressed: true, note: "Resized/compressed to fit localStorage." });
+        } catch (eComp) {
+          if (file.size > PROFILE_BG_MAX_HARD) {
+            done({ ok: false, error: "Image too large for this demo (keep under ~900KB)." });
+          } else {
+            done({ ok: true, dataUrl: rawUrl, compressed: false });
+          }
+        }
+      };
+      img.onerror = function () { done({ ok: false, error: "Could not decode that image." }); };
+      img.src = rawUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+  function publishQuickProfileBg(dataUrl, meta) {
+    // Beginner (?v=20260906ao): quick upload outside Edit look must SAVE, not only preview.
+    // Root cause: old code set __skinBgPending, painted Edit look, and returned without saveProfileSkin —
+    // so paint() re-applied the previous saved skin and the image disappeared.
+    // How: merge bgType:image + bgImage into current skin → localStorage → applyProfileSkinDom.
+    // ENGINE DEV: profile chrome only; not #stage-slot.
+    if (!session()) return;
+    var uid = session().user.id;
+    var cur = loadProfileSkin(uid);
+    var prevType = cur.bgType;
+    cur.bgType = "image";
+    cur.bgImage = String(dataUrl || "");
+    // First time switching to an image look → cover + scroll (classic “wallpaper” feel).
+    if (prevType !== "image") {
+      cur.bgRepeat = "cover";
+      cur.bgAttachment = "scroll";
+    } else {
+      cur.bgRepeat = normalizeBgRepeat(cur.bgRepeat || "cover");
+      cur.bgAttachment = cur.bgAttachment === "fixed" ? "fixed" : "scroll";
+    }
+    var saved = saveProfileSkin(uid, cur);
+    // If localStorage dropped the image (quota), surface that clearly.
+    if (saved.bgType !== "image" || !saved.bgImage) {
+      skinMsgSet("Could not save background — browser storage full. Clear an old look or use a smaller image.");
+      try { pushNotice("orange", "Background not saved (storage full).", { transient: true }); } catch (eQ) {}
+      return;
+    }
+    window.__skinBgPending = "";
+    meSub = "profile";
+    viewingId = null;
+    var note = (meta && meta.compressed) ? "Background saved (compressed to fit)." : "Background saved — visitors see it on your profile.";
+    skinMsgSet(note);
+    try { pushNotice("green", note, { transient: true }); } catch (eN) {}
+    paint("me");
+    try { applyProfileSkinDom(uid, saved); } catch (eA) {}
+    requestAnimationFrame(function () {
+      try {
+        if (document.querySelector(".page.profile-page")) applyProfileSkinDom(uid, saved);
+      } catch (e2) {}
+    });
+  }
+  function publishQuickProfileBanner(dataUrl, meta) {
+    // Beginner: banner is the thin strip under Me subnav. Same compress + persist idea as BG.
+    if (!session()) return;
+    var uid = session().user.id;
+    var cur = loadProfileSkin(uid);
+    cur.bannerImage = String(dataUrl || "");
+    var saved = saveProfileSkin(uid, cur);
+    if (!saved.bannerImage) {
+      skinMsgSet("Could not save banner — browser storage full or image too big.");
+      try { pushNotice("orange", "Banner not saved.", { transient: true }); } catch (eQ) {}
+      return;
+    }
+    window.__skinBannerPending = "";
+    meSub = "profile";
+    var note = (meta && meta.compressed) ? "Banner saved (compressed)." : "Banner saved.";
+    skinMsgSet(note);
+    try { pushNotice("green", note, { transient: true }); } catch (eN) {}
+    if (!document.getElementById("skin-form")) profileEditSection = "skin";
+    paint("me");
+    try { applyProfileSkinDom(uid, saved); } catch (eA) {}
+  }
   function normalizeFontScale(v) {
     v = Number(v);
     if (v === 0.9 || v === 1.1) return v;
@@ -6297,6 +6725,8 @@ function helpPage() {
     // What: paint a player's Profile look (BG, colors, font scale, corners) onto their profile page.
     // How: set CSS vars + full background shorthand on .page.profile-page / .profile-skin only.
     // Why: visitors see skins on profiles; other tabs must call clearProfileSkinDom so nothing leaks.
+    // Beginner (?v=20260906ao): bgType:image + bgImage becomes CSS background url(...) cover/scroll.
+    // Quick upload now saveProfileSkin BEFORE paint so this reads the real image (not a lost pending).
     // ENGINE DEV: profile page chrome only; not #stage-slot; not room music dock.
     var skin = draftSkin ? normalizeProfileSkin(draftSkin) : loadProfileSkin(userId);
     var page = document.querySelector(".page.profile-page");
@@ -6956,9 +7386,10 @@ function helpPage() {
       +     '</div>'
       +     '<div class="skin-bg-upload-always">'
       +       '<strong>Upload custom background</strong>'
-      +       '<p class="meta" style="margin:4px 0 8px">Image behind everything on your profile. Choose a file, preview live, then Publish look. Only upload images you have rights to.</p>'
+      +       '<p class="meta" style="margin:4px 0 8px">Image behind everything on your profile. Choosing a file <b>saves immediately</b> (large photos are compressed to fit this browser). Only upload images you have rights to.</p>'
       +       '<label class="skin-bg-file">Choose image (png/jpg/gif/webp)'
       +         '<input type="file" id="skin-bg-input-quick" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+      +       '<p class="meta" id="skin-msg-quick"></p>'
       +       (skin.bgImage
               ? ('<div class="skin-bg-thumb-wrap" style="margin-top:8px">'
                 + '<img class="skin-bg-thumb" alt="Current background" src="' + esc(skin.bgImage) + '" />'
@@ -7038,7 +7469,7 @@ function helpPage() {
                     + '<button type="button" class="text-btn" data-skin-clear-bg="1">Clear image</button></div>')
                   : '')
               +     '</div>'
-              +     '<p class="meta">Rights: only upload images you own. Soft warn ~400KB; reject ~900KB. Stored as a data URL in this browser (localStorage).</p>' 
+              +     '<p class="meta">Rights: only upload images you own. Large photos are resized/compressed to fit; huge GIFs still reject ~900KB. Stored as a data URL in this browser (localStorage).</p>' 
               +     '<label class="skin-bg-file">Banner image (thin strip under Me nav)'
               +       '<input type="file" id="skin-banner-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
               +     '<label class="check-row"><input type="checkbox" name="clearBanner" /> Clear banner</label>'
@@ -7877,7 +8308,7 @@ function helpPage() {
 
   function gate() {
     // How this works: Sign Up / Logon with username + password (primary). Discord button fills after status fetch.
-    // Beginner (?v=20260906al): Pages may set WHIRLED_API to tunnel → Discord CTA; hybrid password auth falls back offline.
+    // Beginner (?v=20260906ao): Pages may set WHIRLED_API to tunnel → Discord CTA; hybrid password auth falls back offline.
     return ''
       + '<section class="gate"><div class="gate-card">'
       +   logoImg("gate-logo")
@@ -8016,7 +8447,7 @@ function helpPage() {
       }
       document.getElementById("app").innerHTML = gate();
       document.getElementById("app").setAttribute("data-tab", "gate");
-      // Beginner (?v=20260906al): always bind Sign Up / Logon when gate is shown.
+      // Beginner (?v=20260906ao): always bind Sign Up / Logon when gate is shown.
       try { bindGate(); } catch (eBind) {
         var gePaint = document.getElementById("gate-err");
         if (gePaint) gePaint.textContent = (eBind && eBind.message) ? eBind.message : "Gate buttons failed to bind.";
@@ -8032,7 +8463,7 @@ function helpPage() {
     // 20260906af: landscape immersion (inRoom + phone landscape) — chrome only around #stage-slot.
     try { bindLandscapeImmersionListeners(); updateLandscapeImmersion(); } catch (eImm) {}
     if (!document.getElementById("main")) {
-      // How this works (?v=20260906al): shell paint must not leave a blank app after login.
+      // How this works (?v=20260906ao): shell paint must not leave a blank app after login.
       try {
         document.getElementById("app").innerHTML = shell();
       } catch (eShellPaint) {
@@ -8135,6 +8566,8 @@ function helpPage() {
     // How this works: after room paint, flip multi-frame Worn avatar sprites on #avatar-wear-layer.
     try { startAvatarWearAnim(); } catch (eWearAnim) {}
     try { applyWearBillboardScale(); } catch (eWearSc) {}
+    // Beginner (?v=20260906ao): click loft floor → chrome walk (yields when Pixi mounts).
+    try { bindChromeClickToWalk(); } catch (eWalk) {}
     // Stuff Avatar viewer preview play (when detail is open).
     try { startAvatarViewerAnim(); } catch (eViewAnim) {}
   }
@@ -8159,6 +8592,7 @@ function helpPage() {
     try { ensureStageBubblesEl(); } catch (e) {}
     try { startAvatarWearAnim(); } catch (eWear) {}
     try { applyWearBillboardScale(); } catch (eSc) {}
+    try { bindChromeClickToWalk(); } catch (eWalk2) {}
   }
   // Information: refreshChatLog writes both #chat-log (slide) and #chat-overlay (overlay).
   // How this works: active tab (Room vs PM) picks which message array to render.
@@ -8275,7 +8709,7 @@ function helpPage() {
   function refreshGateDiscord() {
     var el = document.getElementById("gate-discord");
     if (!el) return;
-    // Beginner (?v=20260906al): without WHIRLED_API, Pages cannot hold Discord secrets — Coming Soon.
+    // Beginner (?v=20260906ao): without WHIRLED_API, Pages cannot hold Discord secrets — Coming Soon.
     // With WHIRLED_API (tunnel) + OAuth env → Create account with Discord (creates discord-<id> user).
     var soonPages = '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span> on GitHub Pages '
       + '(needs the demo server; secrets cannot sit on a static host).</p>';
@@ -8457,7 +8891,8 @@ function helpPage() {
   //   resizeTo: host — canvas ONLY inside that element.
   // API (version "0.4"):
   //   version, getStageEl(), getSession(), getRoom(), onChat(fn), sendChat(text),
-  //   onOccupants(fn), getChatUi() → { mode, hideHistory, textSize, bubbleDuration }
+  //   onOccupants(fn), getChatUi() → { mode, hideHistory, textSize, bubbleDuration },
+  //   getWornAvatar() (+states), setAvatarState(name), getAvatarWalkTarget(), isChromeWalkActive()
   // Listen for document event "whirled:ready" if bridge is not ready yet (detail = this object).
   // Do NOT draw outside #stage-slot. Do NOT rebuild login. Coins+Bars earn-only (no payments). No Flash.
   // #decorate-layer, #avatar-wear-layer, and #stage-bubbles are chrome siblings above your canvas.
@@ -8488,7 +8923,20 @@ function helpPage() {
         return w && w.activeId ? w.activeId : null;
       },
       // Stuff sprite Wear (modern path): chrome billboard on #avatar-wear-layer — not #stage-slot.
-      getWornAvatar: function () { return loadWornAvatar(); }
+      // ENGINE DEV (?v=20260906ao): worn row may include states{idle,walk,stand,pose}; chrome walk
+      // uses setAvatarState / getAvatarWalkTarget until mountWhirledEngine owns #stage-slot.
+      getWornAvatar: function () {
+        var w = loadWornAvatar();
+        if (!w) return null;
+        // Ensure states is visible for engine consumers even on legacy worn rows.
+        if (!w.states) {
+          try { w.states = resolveAvatarStates(w); } catch (e) {}
+        }
+        return w;
+      },
+      setAvatarState: function (name) { return setAvatarState(name); },
+      getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
+      isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
   }
@@ -8857,7 +9305,7 @@ function helpPage() {
     finishBootAfterSession();
   }
   function finishBootAfterSession() {
-    // How this works (?v=20260906al): after a successful session, wrap shell/paint so a UI throw
+    // How this works (?v=20260906ao): after a successful session, wrap shell/paint so a UI throw
     // still shows #gate-err or a recoverable shell — never a stuck gate with an empty error.
     // Beginner: login may succeed in WhirledApi while shell() fails; keep the session and recover.
     // ENGINE DEV: chrome-only — never touches #stage-slot mount contract.
@@ -9725,8 +10173,12 @@ function helpPage() {
       return;
     }
     // How this works: seed converted Aseprite packs into Stuff inventory (kind=avatar).
+    if (ev.target.closest("[data-seed-user-packs-parts]") && session()) {
+      seedUserAvatarPacks({ includeParts: true });
+      return;
+    }
     if (ev.target.closest("[data-seed-user-packs]") && session()) {
-      seedUserAvatarPacks();
+      seedUserAvatarPacks({ includeParts: false });
       return;
     }
     // How this works: Wear / Take off Stuff avatars → loft #avatar-wear-layer billboard (not Ruffle).
@@ -11056,32 +11508,30 @@ function helpPage() {
         } catch (eL) {}
       }
     }
-    // How this works: profile background image → data URL (cap ~400KB warn / reject huge).
+    // How this works (?v=20260906ao): profile background → compress if needed → data URL.
+    // Quick (#skin-bg-input-quick): auto-publish via saveProfileSkin so Choose image alone persists.
+    // Edit look (#skin-bg-input): still live-previews; Publish look saves fine-tune fields.
+    // Beginner: without auto-save, paint() wiped __skinBgPending preview. ENGINE DEV: chrome only.
     if ((ev.target.id === "skin-bg-input" || ev.target.id === "skin-bg-input-quick") && session()) {
-      // How this works: pick a file → Background type Image + cover/scroll → live preview → Publish look.
-      // Beginner: this is the custom profile background (image behind everything). ENGINE DEV: chrome only.
       var sfile = ev.target.files && ev.target.files[0];
-      var smsg = document.getElementById("skin-msg");
+      var isQuick = ev.target.id === "skin-bg-input-quick";
       if (!sfile) return;
-      var okType = /image\/(png|jpeg|jpg|gif|webp)/i.test(sfile.type) || /\.(png|jpe?g|gif|webp)$/i.test(sfile.name || "");
-      if (!okType) {
-        if (smsg) smsg.textContent = "Use png, jpg, gif, or webp.";
-        else alert("Use png, jpg, gif, or webp.");
-        return;
-      }
-      if (sfile.size > PROFILE_BG_MAX_HARD) {
-        if (smsg) smsg.textContent = "Image too large for this demo (keep under ~900KB).";
-        alert("Background image too large. Keep under ~900KB.");
-        return;
-      }
-      if (sfile.size > PROFILE_BG_MAX_WARN) {
-        if (smsg) smsg.textContent = "Warning: large image (~400KB+). Saving may fill browser storage.";
-        else alert("Warning: large image (~400KB+). Saving may fill browser storage.");
-      }
-      var sreader = new FileReader();
-      sreader.onload = function () {
-        var dataUrl = String(sreader.result || "");
+      skinMsgSet("Reading image…");
+      compressProfileImageFile(sfile, function (res) {
+        if (!res || !res.ok) {
+          var err = (res && res.error) || "Could not use that image.";
+          skinMsgSet(err);
+          try { pushNotice("orange", err, { transient: true }); } catch (eE) {}
+          return;
+        }
+        var dataUrl = String(res.dataUrl || "");
         window.__skinBgPending = dataUrl;
+        if (isQuick) {
+          // Persist immediately (root-cause fix for missing #skin-form path).
+          publishQuickProfileBg(dataUrl, res);
+          return;
+        }
+        // Edit-look path: wire form + live preview; user can still hit Publish look.
         var hid = document.getElementById("skin-bg-data");
         if (hid) hid.value = "pending";
         var keep = document.querySelector('#skin-form [name="keepImage"]');
@@ -11092,14 +11542,10 @@ function helpPage() {
         if (repSel) repSel.value = "cover";
         var attSel = document.querySelector('#skin-form [name="bgAttachment"]');
         if (attSel) attSel.value = "scroll";
-        if (smsg) smsg.textContent = "Image ready — previewing behind modules; click Publish look to save.";
-        // If Edit look is closed, open it so Publish is obvious; still live-preview immediately.
-        if (!document.getElementById("skin-form")) {
-          profileEditSection = "skin";
-          meSub = "profile";
-          paint("me");
-          return;
-        }
+        var readyMsg = res.compressed
+          ? "Image ready (compressed) — previewing; click Publish look to save fine-tune."
+          : "Image ready — previewing behind modules; click Publish look to save.";
+        skinMsgSet(readyMsg);
         try {
           var formImg = document.getElementById("skin-form");
           var draftImg = readSkinFormDraft(formImg);
@@ -11108,41 +11554,30 @@ function helpPage() {
           for (var ti = 0; ti < thumbs.length; ti++) thumbs[ti].src = dataUrl;
         } catch (eImg) {}
         pushNotice("green", "Background preview on — Publish look to save.", { transient: true });
-      };
-      sreader.readAsDataURL(sfile);
+      });
       return;
     }
-    // How this works: optional thin banner image (same size caps as BG) under me-subnav.
+    // How this works (?v=20260906ao): banner compress + auto-save (thin strip under Me nav).
     if (ev.target.id === "skin-banner-input" && session()) {
       var bfile = ev.target.files && ev.target.files[0];
-      var bmsg = document.getElementById("skin-msg");
       if (!bfile) return;
-      var okB = /image\/(png|jpeg|jpg|gif|webp)/i.test(bfile.type) || /\.(png|jpe?g|gif|webp)$/i.test(bfile.name || "");
-      if (!okB) {
-        if (bmsg) bmsg.textContent = "Use png, jpg, gif, or webp for banner.";
-        return;
-      }
-      if (bfile.size > PROFILE_BG_MAX_HARD) {
-        if (bmsg) bmsg.textContent = "Banner too large (keep under ~900KB).";
-        alert("Banner image too large. Keep under ~900KB.");
-        return;
-      }
-      if (bfile.size > PROFILE_BG_MAX_WARN && bmsg) bmsg.textContent = "Warning: large banner (~400KB+).";
-      var breader = new FileReader();
-      breader.onload = function () {
-        window.__skinBannerPending = String(breader.result || "");
+      skinMsgSet("Reading banner…");
+      compressProfileImageFile(bfile, function (bres) {
+        if (!bres || !bres.ok) {
+          var berr = (bres && bres.error) || "Could not use that banner.";
+          skinMsgSet(berr);
+          try { pushNotice("orange", berr, { transient: true }); } catch (eBe) {}
+          return;
+        }
+        var bUrl = String(bres.dataUrl || "");
+        window.__skinBannerPending = bUrl;
         var keepB = document.querySelector('#skin-form [name="keepBanner"]');
         if (keepB) keepB.value = "0";
         var clearB = document.querySelector('#skin-form [name="clearBanner"]');
         if (clearB) clearB.checked = false;
-        if (bmsg) bmsg.textContent = "Banner ready — previewing; click Publish look to save.";
-        try {
-          var formB = document.getElementById("skin-form");
-          var draftB = readSkinFormDraft(formB);
-          if (draftB && session()) applyProfileSkinDom(session().user.id, draftB);
-        } catch (eB) {}
-      };
-      breader.readAsDataURL(bfile);
+        // Persist banner immediately so Cancel / leave Edit look does not lose it.
+        publishQuickProfileBanner(bUrl, bres);
+      });
       return;
     }
     if (ev.target.id !== "photo-input" || !session()) return;
@@ -11465,14 +11900,17 @@ function helpPage() {
         };
         if (dataUrl) row.dataUrl = dataUrl;
         if (stype === "avatars") {
-          // Beginner: preview image is what Wear shows in the loft.
+          // Beginner: preview / idle frames are what Wear shows; states enable click-to-walk.
           row.preview = thumb || "";
-          row.frames = thumb ? [thumb] : [];
-          row.source = (extra && extra.asepriteName) ? "aseprite" : "png";
-          row.pack = {
+          row.frames = (extra && extra.frames && extra.frames.length) ? extra.frames.slice() : (thumb ? [thumb] : []);
+          row.frameDurationsMs = (extra && extra.frameDurationsMs) || [];
+          row.states = (extra && extra.states) || { idle: { frames: row.frames.slice(), frameDurationsMs: row.frameDurationsMs.slice() } };
+          row.source = (extra && extra.source) || ((extra && extra.asepriteName) ? "aseprite" : "png");
+          row.pack = (extra && extra.pack) || {
             name: sname,
             frames: row.frames.slice(),
             thumb: thumb || "",
+            states: row.states,
             source: row.source
           };
           if (extra && extra.asepriteDataUrl) {
@@ -11480,10 +11918,11 @@ function helpPage() {
             row.asepriteName = extra.asepriteName || "avatar.aseprite";
             row.pack.sourceFile = row.asepriteName;
           }
+          if (extra && extra.asepriteAttachments) row.asepriteAttachments = extra.asepriteAttachments;
         }
         if (extra) {
           Object.keys(extra).forEach(function (k) {
-            if (k === "asepriteDataUrl" || k === "asepriteName") return;
+            if (k === "asepriteDataUrl" || k === "asepriteName" || k === "asepriteAttachments" || k === "pack" || k === "states" || k === "frames" || k === "frameDurationsMs" || k === "source") return;
             row[k] = extra[k];
           });
         }
@@ -11527,48 +11966,116 @@ function helpPage() {
         areader.readAsDataURL(file);
         return;
       }
-      // Avatar uploads: image preview required for Wear; optional .aseprite attachment.
-      var aseInput = ev.target.querySelector('input[name="aseprite"]');
-      var aseFile = aseInput && aseInput.files && aseInput.files[0];
-      function readAseThen(thumbUrl) {
-        if (!aseFile) {
-          finishSave(thumbUrl || "", "", null);
+      // Avatar uploads (?v=20260906ao): multi idle + walk PNGs → one item with states; optional .aseprite.
+      if (stype === "avatars") {
+        var idleInput = ev.target.querySelector('input[name="image"]');
+        var walkInput = ev.target.querySelector('input[name="walk"]');
+        var aseInput = ev.target.querySelector('input[name="aseprite"]');
+        var idleFiles = idleInput && idleInput.files ? Array.prototype.slice.call(idleInput.files, 0) : [];
+        var walkFiles = walkInput && walkInput.files ? Array.prototype.slice.call(walkInput.files, 0) : [];
+        var aseFiles = aseInput && aseInput.files ? Array.prototype.slice.call(aseInput.files, 0) : [];
+        var okTypes = { "image/png":1, "image/jpeg":1, "image/jpg":1, "image/gif":1, "image/webp":1 };
+        function readFileList(files, maxBytes, label) {
+          return new Promise(function (resolve, reject) {
+            if (!files.length) { resolve([]); return; }
+            var out = [];
+            var i = 0;
+            function next() {
+              if (i >= files.length) { resolve(out); return; }
+              var f = files[i++];
+              if (!okTypes[f.type] && label !== "aseprite") {
+                reject(new Error(label + " must be PNG/WebP/JPEG/GIF (" + (f.name || "file") + ")."));
+                return;
+              }
+              if (label === "aseprite") {
+                var looksAse = /\.aseprite$/i.test(f.name || "") || /\.ase$/i.test(f.name || "");
+                if (!looksAse) { reject(new Error("Attachment must be .aseprite / .ase (" + (f.name || "") + ").")); return; }
+                if (f.size > 1000000) { reject(new Error("Aseprite over ~1MB: " + (f.name || ""))); return; }
+              } else if (f.size > maxBytes) {
+                reject(new Error(label + " image over ~200KB: " + (f.name || "")));
+                return;
+              }
+              var r = new FileReader();
+              r.onload = function () {
+                var dataUrl = String(r.result || "");
+                if (label === "aseprite" && dataUrl.length > 1400000) {
+                  reject(new Error("Encoded .aseprite too large: " + (f.name || "")));
+                  return;
+                }
+                if (label !== "aseprite" && dataUrl.length > 280000) {
+                  reject(new Error("Encoded image too large: " + (f.name || "")));
+                  return;
+                }
+                out.push({ name: f.name || (label + out.length), dataUrl: dataUrl });
+                next();
+              };
+              r.onerror = function () { reject(new Error("Could not read " + (f.name || label))); };
+              r.readAsDataURL(f);
+            }
+            next();
+          });
+        }
+        if (!idleFiles.length && !aseFiles.length) {
+          if (msgEl) msgEl.textContent = "Add idle/preview PNG(s) so Wear can show the avatar (walk PNGs optional).";
           return;
         }
-        var looksAse = /\.aseprite$/i.test(aseFile.name || "") || /\.ase$/i.test(aseFile.name || "");
-        if (!looksAse) {
-          if (msgEl) msgEl.textContent = "Attachment must be a .aseprite / .ase file.";
+        if (!idleFiles.length && aseFiles.length) {
+          if (msgEl) msgEl.textContent = "Add at least one idle PNG/WebP preview. .aseprite is stored as an attachment only.";
           return;
         }
-        if (aseFile.size > 1000000) {
-          if (msgEl) msgEl.textContent = "Aseprite file over ~1MB — too large for browser Stuff storage on this mock.";
-          return;
-        }
-        var ar = new FileReader();
-        ar.onload = function () {
-          var aseUrl = String(ar.result || "");
-          if (aseUrl.length > 1400000) {
-            if (msgEl) msgEl.textContent = "Encoded .aseprite too large for localStorage.";
-            return;
+        Promise.all([
+          readFileList(idleFiles, 200000, "Idle"),
+          readFileList(walkFiles, 200000, "Walk"),
+          readFileList(aseFiles, 1000000, "aseprite")
+        ]).then(function (parts) {
+          var idles = parts[0];
+          var walks = parts[1];
+          var ases = parts[2];
+          var idleFrames = idles.map(function (x) { return x.dataUrl; });
+          var walkFrames = walks.map(function (x) { return x.dataUrl; });
+          var thumbUrl = idleFrames[0] || "";
+          var states = {
+            idle: { frames: idleFrames.slice(), frameDurationsMs: idleFrames.map(function () { return 200; }) }
+          };
+          if (walkFrames.length) {
+            states.walk = { frames: walkFrames.slice(), frameDurationsMs: walkFrames.map(function () { return 200; }) };
           }
-          finishSave(thumbUrl || "", "", { asepriteDataUrl: aseUrl, asepriteName: aseFile.name || "avatar.aseprite" });
-        };
-        ar.onerror = function () { if (msgEl) msgEl.textContent = "Could not read .aseprite file."; };
-        ar.readAsDataURL(aseFile);
+          var extra = {
+            states: states,
+            frames: idleFrames.slice(),
+            frameDurationsMs: states.idle.frameDurationsMs.slice(),
+            source: ases.length ? "aseprite" : "png",
+            pack: {
+              name: sname,
+              frames: idleFrames.slice(),
+              displayFrames: idleFrames.slice(),
+              frameDurationsMs: states.idle.frameDurationsMs.slice(),
+              states: states,
+              thumb: thumbUrl,
+              source: ases.length ? "aseprite" : "png"
+            }
+          };
+          if (ases.length) {
+            extra.asepriteDataUrl = ases[0].dataUrl;
+            extra.asepriteName = ases[0].name || "avatar.aseprite";
+            extra.pack.sourceFile = extra.asepriteName;
+            if (ases.length > 1) {
+              extra.asepriteAttachments = ases.map(function (a) { return { name: a.name, dataUrl: a.dataUrl }; });
+            }
+          }
+          finishSave(thumbUrl, "", extra);
+        }).catch(function (err) {
+          if (msgEl) msgEl.textContent = String(err && err.message || err);
+        });
+        return;
       }
       if (!file) {
-        if (stype === "avatars" && aseFile) {
-          if (msgEl) msgEl.textContent = "Add a PNG/WebP preview image so Wear can show the avatar in your loft. .aseprite alone is stored as an attachment after you also pick a preview.";
-          return;
-        }
         finishSave("", "");
         return;
       }
-      var okTypes = { "image/png":1, "image/jpeg":1, "image/jpg":1, "image/gif":1, "image/webp":1 };
-      if (!okTypes[file.type]) {
-        if (msgEl) msgEl.textContent = stype === "avatars"
-          ? "Avatar preview must be PNG/WebP/JPEG/GIF. Optional .aseprite is a separate attachment."
-          : "Images only for this mock (png/jpg/gif/webp). SWF comes later with the engine.";
+      var okTypesImg = { "image/png":1, "image/jpeg":1, "image/jpg":1, "image/gif":1, "image/webp":1 };
+      if (!okTypesImg[file.type]) {
+        if (msgEl) msgEl.textContent = "Images only for this mock (png/jpg/gif/webp). SWF comes later with the engine.";
         return;
       }
       if (file.size > 200000) {
@@ -11583,8 +12090,7 @@ function helpPage() {
           if (msgEl) msgEl.textContent = "Encoded image too large for localStorage — try a smaller file.";
           return;
         }
-        if (stype === "avatars") readAseThen(dataUrl);
-        else finishSave(dataUrl, "");
+        finishSave(dataUrl, "");
       };
       reader.onerror = function () { if (msgEl) msgEl.textContent = "Could not read file."; };
       reader.readAsDataURL(file);
