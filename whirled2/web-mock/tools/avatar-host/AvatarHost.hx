@@ -7,7 +7,8 @@
  * after connect: gotControl_v1 (EntityBackend requestControl parity).
  *
  * JS bridge (ExternalInterface):
- *   hostLoadUrl(url) / hostLoadBytes(b64) / hostWalk(moving, orient) / hostEmote(name) / hostSetState(state)
+ *   hostLoadUrl(url) / hostLoadBytes(b64) / hostWalk(moving, orient) / hostSleep(sleeping) /
+ *   hostSpoke() / hostEmote(name) / hostSetState(state)
  *   callbacks via ExternalInterface.call("WhirledAvatarHostBridge", ...)
  */
 import flash.display.Loader;
@@ -30,6 +31,7 @@ class AvatarHost extends Sprite {
   var connected:Bool = false;
   var orient:Float = 180;
   var moving:Bool = false;
+  var sleeping:Bool = false;
   var state:String = "Default";
   var location:Array<Dynamic>;
   var pendingB64:String;
@@ -59,6 +61,8 @@ class AvatarHost extends Sprite {
         ExternalInterface.addCallback("hostLoadBytesChunk", hostLoadBytesChunk);
         ExternalInterface.addCallback("hostLoadBytesCommit", hostLoadBytesCommit);
         ExternalInterface.addCallback("hostWalk", hostWalk);
+        ExternalInterface.addCallback("hostSleep", hostSleep);
+        ExternalInterface.addCallback("hostSpoke", hostSpoke);
         ExternalInterface.addCallback("hostEmote", hostEmote);
         ExternalInterface.addCallback("hostSetState", hostSetState);
         ExternalInterface.addCallback("hostIsConnected", hostIsConnected);
@@ -100,8 +104,23 @@ class AvatarHost extends Sprite {
     return loader;
   }
 
+  /**
+   * ENGINE DEV (?v=20260906by): child ApplicationDomain (club MultiLoader parity) +
+   * allowCodeImport=true so loadBytes executes avatar AS3 (FP 10.1+ / Ruffle).
+   * Without allowCodeImport, loadBytes may paint frames but NEVER run AvatarControl ctor
+   * → no controlConnect → no walk sync. Do NOT set SecurityDomain for loadBytes.
+   */
   function loaderContext():LoaderContext {
-    return new LoaderContext(false, new ApplicationDomain(ApplicationDomain.currentDomain));
+    var ctx = new LoaderContext(false, new ApplicationDomain(ApplicationDomain.currentDomain));
+    try {
+      // FP 10.1+ / AIR 2+: required for executable SWF via loadBytes
+      ctx.allowCodeImport = true;
+    } catch (e1:Dynamic) {}
+    try {
+      // legacy alias (same flag)
+      untyped ctx.allowLoadBytesCodeExecution = true;
+    } catch (e2:Dynamic) {}
+    return ctx;
   }
 
   /**
@@ -131,7 +150,7 @@ class AvatarHost extends Sprite {
   }
 
   /**
-   * ROOT FIX (?v=20260906bw): EI cannot pass ByteArray — JS sends base64 of SWF bytes.
+   * ROOT FIX (?v=20260906by): EI cannot pass ByteArray — JS sends base64 of SWF bytes.
    * Decode → ByteArray → Loader.loadBytes. Same controlConnect handshake as hostLoadUrl.
    * Beginner: your avatar file lives in IndexedDB; chrome turns it into base64 text; host rebuilds bytes.
    */
@@ -222,15 +241,24 @@ class AvatarHost extends Sprite {
     }
 
     var hostProps:Dynamic = {};
+    // ControlBackend
     Reflect.setField(hostProps, "startTransaction", function() {});
     Reflect.setField(hostProps, "commitTransaction", function() {});
+    // ActorBackend (walk/state)
     Reflect.setField(hostProps, "setLocation_v1", setLocation_v1);
     Reflect.setField(hostProps, "setMoveSpeed_v1", function(_n:Float) {});
-    Reflect.setField(hostProps, "setOrientation_v1", function(o:Float) { orient = o; });
+    // Deprecated 2007 alias: walk speed was in units/sec; club multiplies by 1000 → px/sec
+    Reflect.setField(hostProps, "setWalkSpeed_v1", function(n:Float) {});
+    Reflect.setField(hostProps, "setOrientation_v1", function(o:Float) {
+      orient = o;
+      callAppearance(moving);
+    });
     Reflect.setField(hostProps, "setState_v1", function(s:String) { state = s; });
     Reflect.setField(hostProps, "getState_v1", function() return state);
-    Reflect.setField(hostProps, "setHotSpot_v1", function(_x:Float, _y:Float, _h:Float) {});
+    // AvatarBackend
     Reflect.setField(hostProps, "setPreferredY_v1", function(_p:Int) {});
+    // EntityBackend
+    Reflect.setField(hostProps, "setHotSpot_v1", function(_x:Float, _y:Float, _h:Float) {});
     Reflect.setField(hostProps, "sendMessage_v1", sendMessage_v1);
     Reflect.setField(hostProps, "sendSignal_v1", function(_n:String, _a:Dynamic) {});
     Reflect.setField(hostProps, "getRoomBounds_v1", function() return [800.0, 600.0, 1.0]);
@@ -241,7 +269,7 @@ class AvatarHost extends Sprite {
     Reflect.setField(hostProps, "getEntityIds_v1", function(_t:String) return []);
     Reflect.setField(hostProps, "getEntityProperty_v1", function(_id:String, _k:String) return null);
     Reflect.setField(hostProps, "lookupMemory_v1", function(_k:String) return null);
-    Reflect.setField(hostProps, "updateMemory_v1", function(_k:String, _v:Dynamic, _cb:Dynamic) {});
+    Reflect.setField(hostProps, "updateMemory_v1", function(_k:String, _v:Dynamic, _cb:Dynamic) return true);
     Reflect.setField(hostProps, "getMemories_v1", function() return {});
     Reflect.setField(hostProps, "showPopup_v1", function(_t:String, _p:Dynamic, _w:Float, _h:Float, _c:UInt, _a:Float) return false);
     Reflect.setField(hostProps, "clearPopup_v1", function() {});
@@ -249,14 +277,21 @@ class AvatarHost extends Sprite {
     Reflect.setField(hostProps, "getMicrophone_v1", function(_i:Int) return null);
     Reflect.setField(hostProps, "getMusicId3_v1", function() return null);
     Reflect.setField(hostProps, "getMusicOwner_v1", function() return 0);
+    // Safe ORIGINAL no-ops (club EntityBackend) — not AGPL copies
+    Reflect.setField(hostProps, "selfDestruct_v1", function() {});
+    Reflect.setField(hostProps, "triggerEvent_v1", function(name:String, arg:Dynamic) {
+      sendMessage_v1(name, arg, true);
+    });
 
     var initProps:Dynamic = {};
     Reflect.setField(initProps, "orient", orient);
     Reflect.setField(initProps, "isMoving", moving);
     Reflect.setField(initProps, "location", location);
     Reflect.setField(initProps, "env", "room");
+    // EntityBackend: datapack ByteArray or null (config avatars call getDefaultDataPack)
+    Reflect.setField(initProps, "datapack", null);
     // AvatarBackend populateControlInitProperties parity (sleeping/idle)
-    Reflect.setField(initProps, "isSleeping", false);
+    Reflect.setField(initProps, "isSleeping", sleeping);
     Reflect.setField(hostProps, "initProps", initProps);
 
     try {
@@ -309,7 +344,7 @@ class AvatarHost extends Sprite {
     if (userProps == null) return;
     try {
       if (Reflect.hasField(userProps, "appearanceChanged_v2")) {
-        Reflect.callMethod(userProps, Reflect.field(userProps, "appearanceChanged_v2"), [location, orient, moving, false]);
+        Reflect.callMethod(userProps, Reflect.field(userProps, "appearanceChanged_v2"), [location, orient, moving, sleeping]);
         return;
       }
       if (Reflect.hasField(userProps, "appearanceChanged_v1")) {
@@ -332,6 +367,28 @@ class AvatarHost extends Sprite {
     callAppearance(isMoving);
     bridge("walk", { moving: moving, orient: orient, connected: connected, location: location });
     return connected;
+  }
+
+  function hostSleep(isSleeping:Bool):Bool {
+    sleeping = isSleeping;
+    // Club: idle/AFK flips sleeping and fires appearanceChanged (ActorSprite.isIdle)
+    callAppearance(moving);
+    bridge("sleep", { sleeping: sleeping, connected: connected });
+    return connected;
+  }
+
+  function hostSpoke():Bool {
+    if (userProps == null) return false;
+    try {
+      if (Reflect.hasField(userProps, "avatarSpoke_v1")) {
+        Reflect.callMethod(userProps, Reflect.field(userProps, "avatarSpoke_v1"), []);
+        bridge("spoke", null);
+        return true;
+      }
+    } catch (e:Dynamic) {
+      bridge("spoke_error", Std.string(e));
+    }
+    return false;
   }
 
   function hostEmote(name:String):Bool {
@@ -368,6 +425,7 @@ class AvatarHost extends Sprite {
       connected: connected,
       orient: orient,
       moving: moving,
+      sleeping: sleeping,
       state: state,
       location: location,
       hasUserProps: userProps != null

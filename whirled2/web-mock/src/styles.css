@@ -6492,7 +6492,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   transform-origin: center bottom;
   pointer-events: none !important;
 }
-/* (?v=20260906bx): companion host Body flips via orient — bob Y only (no CSS scaleX double-flip) */
+/* (?v=20260906by): companion host Body flips via orient — bob Y only (no CSS scaleX double-flip) */
 @keyframes whirled-swf-host-bob-y {
   0%, 100% { transform: translateY(0); }
   25% { transform: translateY(-4px); }
@@ -7105,7 +7105,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906bx — Nested companion host + never-tofu Classic Flash loft (stand thumb + hitbox)
+   ?v=20260906by — Nested companion host + never-tofu Classic Flash loft (stand thumb + hitbox)
    Beginner: if Ruffle is slow/fails, last thumb still shows — not grey tofu bean.
    ENGINE DEV: stand thumb PE none; hitbox/nameplate keep emote clicks.
    ========================================================================== */
@@ -7155,7 +7155,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906bx — Companion hostWalk + chrome puppet backup (Wear→loft never blank)
+   ?v=20260906by — Companion hostWalk + chrome puppet backup (Wear→loft never blank)
    Beginner: stand thumb / initial glyph always visible; floor bob + face flip.
    ENGINE DEV: mountRuffle must not wipe stand; sha1-only Wear resolves via IDB.
    ========================================================================== */

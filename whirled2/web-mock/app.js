@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bx";
+  var LOGO_V = "20260906by";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2189,7 +2189,7 @@
 
 
   function classicRuffleWearHtml(worn, posStyle) {
-    // (?v=20260906bx): Always mount Ruffle companion host + hitbox/nameplate + stand thumb OR glyph.
+    // (?v=20260906by): Always mount Ruffle companion host + hitbox/nameplate + stand thumb OR glyph.
     // Beginner: never tofu / never blank when a .swf is worn (sha1-only OK — IDB resolves at mount).
     // ENGINE DEV: data-swf-sha1 on host; PE none on Ruffle; hitbox owns emotes; stand survives mountRuffle.
     var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
@@ -2206,7 +2206,9 @@
       +   '</div>'
       +   '<button type="button" class="avatar-hitbox" data-avatar-hit="1" aria-label="Open avatar emotes" title="Click for emotes"></button>'
       +   '<div class="avatar-wear-nameplate" data-avatar-hit="1">' + esc(worn.name || "SWF avatar")
-      +   ' <span class="classic-exp-badge">Experimental</span> '
+      +   ' ' + (window.WhirledClassicAvatar && WhirledClassicAvatar.ruffleStatusBadgeHtml
+        ? WhirledClassicAvatar.ruffleStatusBadgeHtml({})
+        : '<span class="ruffle-status-badge is-ready" data-ruffle-status-badge="1">Ruffle ready</span>') + ' '
       +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
       + '</div></div>';
   }
@@ -2319,7 +2321,11 @@
     else if (hasPngFrames) playMode = "png";
     var clearBadge = avatarPlaybackBadgeHtml(playMode, worn);
     var plateExtra = " " + clearBadge
-      + (loftMode === "ruffle" ? ' <span class="classic-exp-badge">Experimental</span>' : "");
+      + (loftMode === "ruffle"
+        ? (' ' + (window.WhirledClassicAvatar && WhirledClassicAvatar.ruffleStatusBadgeHtml
+          ? WhirledClassicAvatar.ruffleStatusBadgeHtml({})
+          : '<span class="ruffle-status-badge is-ready" data-ruffle-status-badge="1">Ruffle ready</span>'))
+        : "");
     return '<div id="avatar-wear-layer" class="' + layerClass + '" aria-label="Worn avatar" data-loft-mode="' + loftMode + '" data-playback="' + playMode + '">'
       + '<div class="avatar-wear-billboard" data-avatar-hit="1"' + meta + ' style="' + posStyle + '">'
       +   classicSlot
@@ -2446,6 +2452,8 @@
     // Animate billboard toward floor click. Walk frames while moving; idle on arrive.
     // How this works (?v=20260906bb): Hybrid PNG swaps walk frames (Whirl path). SWF-only MOVES the
     // billboard + synthesized bob/flip (Ruffle PE none). Never tofu mid-walk.
+    // (?v=20260906by): notifyLoftWalk(true) at START keeps loftHostState.moving until arrive → hostWalk(false).
+    // Beginner: Flash walk plays the whole floor trek. ENGINE DEV: classic-avatar ticks locX ~100ms.
     if (isEngineMountedOnStage()) return; // ENGINE DEV: yield to Pixi
     var layer = document.getElementById("avatar-wear-layer");
     var bill = layer && layer.querySelector(".avatar-wear-billboard");
@@ -2475,17 +2483,22 @@
     try { cancelAvatarEmoteTimer(); } catch (eEm0) {}
     var hasWalkPng = !!(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length);
     setAvatarState(hasWalkPng ? "walk" : "idle");
-    // SWF-only / no walk PNGs: bob the Ruffle host while moving (classic-avatar helper).
+    // (?v=20260906by): ALWAYS notify classic module on floor walk when present (Wear + hostWalk).
+    // Beginner: PNG walk still runs; Ruffle companion also gets hostWalk for in-SWF scenes.
+    // ENGINE DEV: do not gate on useSwfMotion — peer Grey Havens lerp/speak/sleep needs every walk pulse.
     var useSwfMotion = !hasWalkPng && !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1
       || worn.mediaKind === "swf" || layerIsSwf || layer.classList.contains("is-swf"));
     try {
-      if (useSwfMotion && window.WhirledClassicAvatar) {
-        // How this works (?v=20260906bl): bob + try EI appearanceChanged / setBodyState(walk).
-        if (WhirledClassicAvatar.notifyLoftWalk) {
-          WhirledClassicAvatar.notifyLoftWalk(true, face);
-        } else if (WhirledClassicAvatar.setLoftWalkMotion) {
-          WhirledClassicAvatar.setLoftWalkMotion(true);
-        }
+      // (?v=20260906by): floor click wakes hostSleep; notifyLoftWalk(true) until arrive → hostWalk(false).
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.noteLoftActivity) {
+        WhirledClassicAvatar.noteLoftActivity();
+      }
+    } catch (eAct0) {}
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.notifyLoftWalk) {
+        WhirledClassicAvatar.notifyLoftWalk(true, face);
+      } else if (useSwfMotion && window.WhirledClassicAvatar && WhirledClassicAvatar.setLoftWalkMotion) {
+        WhirledClassicAvatar.setLoftWalkMotion(true);
       }
     } catch (eMot) {}
     if (chromeWalkRaf) { try { cancelAnimationFrame(chromeWalkRaf); } catch (e) {} chromeWalkRaf = 0; }
@@ -5895,7 +5908,8 @@
   var RECENT_ROOMS_KEY = "whirled2.recentRooms";
   var AWAY_KEY = "whirled2.away.";
   // How this works (?v=20260906bk): wiki Room gray Zzz — local idle after ~2 min without pointer/key/chat.
-  // Beginner: move mouse, type, or chat to clear Idle; /away still wins (yellow). classic-avatar.js untouched.
+  // Beginner: move mouse, type, or chat to clear Idle; /away still wins (yellow).
+  // (?v=20260906by): touchActivity also noteLoftActivity → hostSleep(false); Flash sleep ~60s in classic-avatar.
   var LAST_ACTIVITY_KEY = "whirled2.lastActivity.";
   var IDLE_MS = 120000;
   var lastActivityAt = Date.now();
@@ -5906,6 +5920,12 @@
       var s = session();
       if (s && s.user) localStorage.setItem(LAST_ACTIVITY_KEY + s.user.id, String(lastActivityAt));
     } catch (eTa) {}
+    // (?v=20260906by): wake Flash hostSleep (~60s idle → appearance sleeping).
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.noteLoftActivity) {
+        WhirledClassicAvatar.noteLoftActivity();
+      }
+    } catch (eHostAct) {}
   }
   function isIdleUser(userId) {
     if (!userId) return false;
@@ -12250,6 +12270,8 @@
       listAvatarEmotes: function () { return listAvatarEmotes(); },
       getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
       isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); },
+      // (?v=20260906by): avatar setLocation_v1 bridge → chromeWalkTo (logical x*100 → %).
+      chromeWalkTo: function (xPct, yPct) { return chromeWalkTo(xPct, yPct); },
       // How this works (?v=20260906bd): debug/UX — 'png-hybrid' | 'ruffle' | 'tofu' | 'png'
       // Beginner: Whirl walking → usually 'png' (Ruffle not running). Force Ruffle / SWF-only → 'ruffle'.
       getAvatarPlaybackMode: function () { return getAvatarPlaybackMode(); }
@@ -12768,6 +12790,12 @@
     if (!chat.some(function (m) { return m.id === msg2.id; })) chat.push(msg2);
     refreshChatLog();
     spawnStageBubble(msg2);
+    // (?v=20260906by): loft chat → hostSpoke → avatarSpoke_v1 (talk anim when companion connected).
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.callHostSpoke) {
+        WhirledClassicAvatar.callHostSpoke();
+      }
+    } catch (eSpoke) {}
     listeners.chat.forEach(function (fn) { try { fn(msg2); } catch (e) {} });
     try { awardAction("chat"); } catch (e) {}
   }
@@ -13079,10 +13107,148 @@
       return u.searchParams.get("discord_token");
     } catch (e) { return null; }
   }
+
+  // (?v=20260906by) Guest Flash QA loft — no login gate when ?flashQa=1 or ?avatarDebug=1
+  function flashQaEnabled() {
+    try {
+      var q = new URLSearchParams(location.search || "");
+      return q.get("flashQa") === "1" || q.get("avatarDebug") === "1";
+    } catch (e) { return false; }
+  }
+  function ensureFlashQaGuestSession() {
+    // Beginner: headless QA can open loft without Sign Up. ENGINE DEV: ephemeral local session only.
+    if (session()) return session();
+    var guest = {
+      token: "flash-qa-guest",
+      user: { id: "flash-qa", name: "FlashQA", createdAt: Date.now() }
+    };
+    try { localStorage.setItem("whirled2.session", JSON.stringify(guest)); } catch (e) {}
+    return session();
+  }
+  function runFlashQaLoftBoot() {
+    if (!flashQaEnabled()) return false;
+    try { ensureFlashQaGuestSession(); } catch (eG) {}
+    try {
+      var demoUrl = "./assets/ruffle/demo-qa.swf?v=" + LOGO_V;
+      try { demoUrl = new URL(demoUrl, location.href).href; } catch (eU) {}
+      var item = {
+        id: "flash-qa-demo",
+        name: "Flash QA Demo",
+        type: "avatar",
+        playbackMode: "ruffle",
+        classicFlash: true,
+        forceRuffleInLoft: true,
+        swfUrl: demoUrl,
+        states: {}
+      };
+      wearStuffAvatar(item);
+    } catch (eW) {}
+    try { tryEnterLoft(); } catch (eL) {}
+    try { paint("rooms"); } catch (eP) {}
+    return true;
+  }
+
+  // (?v=20260906by): Guest Flash QA loft WITHOUT login — ?flashQa=1 (and/or avatarDebug=1).
+  // Beginner: was blocked at the login gate for browser QA. Ephemeral session → loft → companion + demo SWF.
+  // ENGINE DEV: does not replace real accounts; marks session.flashQa. Companion hostLoadBytes still primary.
+  function flashQaQueryOn() {
+    try {
+      var q = String(location.search || "");
+      return /(?:\?|&)flashQa=1(?:&|$)/.test(q) || /(?:\?|&)avatarDebug=1(?:&|$)/.test(q);
+    } catch (e) { return false; }
+  }
+  function ensureFlashQaGuestSession() {
+    if (!flashQaQueryOn()) return false;
+    try {
+      var s = session();
+      if (s && s.user) return true;
+      var id = "flashqa-" + Date.now().toString(36);
+      var user = {
+        id: id,
+        name: "FlashQA",
+        bio: "Ephemeral Flash QA guest (no login).",
+        room: "Studio Loft",
+        coins: 0,
+        ephemeral: true,
+        flashQa: true
+      };
+      localStorage.setItem("whirled2.session", JSON.stringify({
+        token: "local-" + id,
+        user: user,
+        flashQa: true
+      }));
+      return true;
+    } catch (e) { return false; }
+  }
+  function wearFlashQaDemoAvatar() {
+    // Prefer a seeded Classic Flash Stuff item; else mount tiny demo SWF under companion.
+    try {
+      var items = (typeof loadStuff === "function" ? loadStuff() : []) || [];
+      var seeded = null;
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (it && (it.swfSha1 || it.swfUrl || it.swfDataUrl || it.mediaKind === "swf")
+          && (it.playbackMode === "ruffle" || it.classicFlashOptIn || it.forceRuffleInLoft || it.mediaKind === "swf")) {
+          seeded = it; break;
+        }
+      }
+      if (seeded && typeof wearStuffAvatar === "function") {
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.setPlaybackModeOnItem) {
+          WhirledClassicAvatar.setPlaybackModeOnItem(seeded, "ruffle");
+        }
+        wearStuffAvatar(seeded);
+        return { mode: "seeded", id: seeded.id };
+      }
+      var demoUrl = "./assets/ruffle/demo-qa.swf?v=" + LOGO_V;
+      try {
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.getDemoQaSwfUrl) {
+          demoUrl = WhirledClassicAvatar.getDemoQaSwfUrl();
+        }
+      } catch (eD) {}
+      var row = {
+        stuffId: "flashqa-demo",
+        id: "flashqa-demo",
+        name: "Flash QA demo",
+        swfUrl: demoUrl,
+        mediaKind: "swf",
+        playbackMode: "ruffle",
+        classicFlashOptIn: true,
+        forceRuffleInLoft: true,
+        source: "flashQa",
+        thumb: "",
+        preview: "",
+        isTofu: false
+      };
+      if (typeof wearStuffAvatar === "function") wearStuffAvatar(row);
+      else {
+        try {
+          localStorage.setItem("whirled2.wornAvatar", JSON.stringify(row));
+        } catch (eW) {}
+      }
+      return { mode: "demo", url: demoUrl };
+    } catch (e) { return { mode: "error", error: String(e && e.message || e) }; }
+  }
+  function runFlashQaLoftBoot() {
+    if (!flashQaQueryOn()) return;
+    try {
+      ensureFlashQaGuestSession();
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.preloadRuffleIfNeeded) {
+        WhirledClassicAvatar.preloadRuffleIfNeeded();
+      } else if (window.WhirledClassicAvatar && WhirledClassicAvatar.ensureRuffle) {
+        WhirledClassicAvatar.ensureRuffle().catch(function () {});
+      }
+      wearFlashQaDemoAvatar();
+      try { tryEnterLoft(); } catch (eEl) {}
+      try { if (typeof pushNotice === "function") pushNotice("green", "Flash QA guest loft — Ruffle + companion. No login.", { transient: true }); } catch (eN) {}
+    } catch (eBoot) {}
+  }
+
   function boot() {
     // How this works: ?avatarLab=1 unlocks the deferred SWF wardrobe lab for side work only.
     // Discord: if URL has discord_token, accept it before paint (async me fetch).
     // Beginner (?v=20260906au): ?page=dev|docs|developers opens Developer Information Hub after login.
+    // (?v=20260906by): ?flashQa=1 / avatarDebug=1 → ephemeral session before gate (browser QA).
+    try { ensureFlashQaGuestSession(); } catch (eFq) {}
     syncAvatarLabFlagFromUrl();
     // ---- MERGE NOTE (?v=20260906ax): wire classic-avatar.js hooks (additive) ----
     try {
@@ -13117,6 +13283,12 @@
         }
       }
     } catch (eClassicBind) {}
+    try {
+      if (flashQaEnabled()) {
+        ensureFlashQaGuestSession();
+        runFlashQaLoftBoot();
+      }
+    } catch (eFlashQa) {}
     try { ensureDevUpdatesGroup(); } catch (eDevUp) {}
     try {
       var pageQ = new URL(location.href).searchParams.get("page");
@@ -13176,6 +13348,8 @@
       } catch (ePaint) {
         showBootRecover(hasUser, ePaint);
       }
+      // Guest Flash QA: enter loft + wear demo/seeded after shell exists.
+      try { if (hasUser && flashQaQueryOn()) runFlashQaLoftBoot(); } catch (eFq2) {}
       // Ensure gate handlers exist whenever the gate is visible (paint usually binds; recover too).
       if (!session() || !session().user) {
         try {

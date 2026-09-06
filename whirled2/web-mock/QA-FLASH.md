@@ -1,35 +1,28 @@
-# QA-FLASH — Flash / loft interact checklist (?v=20260906bu)
+# QA-FLASH — Flash / loft interact checklist (?v=20260906by)
 
-Dual modes: `playbackMode` png-hybrid|ruffle. **bu** = nested companion host (sharedEvents walk); **bt** never-tofu; **bs** Hybrid gate; **bl** interactivity baseline.
+Dual modes: `playbackMode` png-hybrid|ruffle. **bx** = companion `hostLoadBytes`→`loadBytes` walk sync; **bu** nest; **bt** never-tofu; **bs** Hybrid gate.
 
-## Success criteria (?v=20260906bu)
+## Success criteria (?v=20260906by)
 
-0. Worn Classic Flash SWF never shows tofu bean **or blank loft** — host Ruffle and/or last thumb / glyph.
-
-1. Wear **Classic Flash (Ruffle)** → enter loft → **click floor** moves character (chrome bob) **and** plays **in-SWF walk** via `hostWalk` → `appearanceChanged_v2`.
-2. **Click nameplate / hitbox** → emote menu → Wave/Sit/… → **hostEmote** + chrome bubble.
-3. Wear **Whirled2 Smooth** → PNG walk + emotes still fine; Ruffle **not** mounted in loft.
-4. Dual Wear radio cards still present.
-5. Second SWF: Analyze → Classic Flash → Save → Wear & enter loft.
-6. Debug: `?avatarDebug=1` → `WhirledClassicAvatar.getLoftHostDebug()` shows `companionHost: true` + bridge `connected`.
+0. Worn Classic Flash SWF never shows tofu bean **or blank loft** — companion (or DIRECT fallback) + stand thumb / glyph.
+1. Wear **Classic Flash (Ruffle)** → loft → **floor click** moves billboard (chrome bob) **and** plays **in-SWF walk** via `hostWalk` → `appearanceChanged_v2` when companion connected.
+2. **blob/IDB Wear** uses `hostLoadBytes(base64)` (NOT nested blob:/data: into Loader).
+3. Watchdog ~2s / bridge error → remount **DIRECT** outer Ruffle (blob OK).
+4. Wear **Whirled2 Smooth** → PNG walk; Ruffle **not** mounted.
+5. Dual Wear radio cards still present.
+6. Debug: `?avatarDebug=1` → `WhirledClassicAvatar.getLoftHostDebug()` shows `companionHost: true` + bridge `connected` + `hostLoadBytesLen`.
 
 ## Architecture
 
-- Outer Ruffle loads `./assets/avatar-host/avatar-host.swf?v=20260906bu`
-- EI: `hostLoadUrl` / `hostWalk` / `hostEmote` / `hostSetState` / `hostIsConnected` / `hostGetDebug`
+- Outer Ruffle: `./assets/avatar-host/avatar-host.swf?v=20260906by`
+- EI: `hostLoadBytes` / `hostLoadBytesBegin|Chunk|Commit` / `hostLoadUrl` (http only) / `hostWalk` / `hostEmote`
 - Bridge: `window.WhirledAvatarHostBridge(kind, payload)`
 - Source: `tools/avatar-host/AvatarHost.hx` (ORIGINAL MIT; study protocol only — no AGPL copy)
-
-## Pointer events
-
-- Loft `ruffle-player` / canvas: `pointer-events: none`.
-- `.avatar-hitbox` + nameplate: `pointer-events: auto`.
-- Floor: `.stage-host` chrome click-to-walk → `notifyLoftWalk` → `hostWalk`.
 
 ## Commands
 
 ```bash
 node --check src/classic-avatar.js && node --check app.js
 node scripts/qa-flash-check.cjs
-node /tmp/push-bu.js   # dry-run (executor does NOT push)
+node /tmp/push-bx.js   # dry-run (executor does NOT push)
 ```

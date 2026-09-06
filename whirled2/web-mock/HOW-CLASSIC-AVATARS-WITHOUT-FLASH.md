@@ -1,6 +1,6 @@
 # Classic Whirled avatars — without Adobe Flash
 
-**Cache:** `?v=20260906bu`  
+**Cache:** `?v=20260906by`  
 **Audience:** beginners + ENGINE DEV. In-site: Help → **Developers** → *Classic Whirled avatars — without Adobe Flash*. Groups → **Dev Updates** thread.
 
 ---
@@ -36,7 +36,7 @@ Persist choice on the Stuff item as `playbackMode: 'png-hybrid' | 'ruffle'`.
 
 ---
 
-## Root causes fixed (?v=20260906bu / bt)
+## Root causes fixed (?v=20260906by / bt)
 
 | Bug | Fix |
 |-----|-----|
@@ -82,11 +82,11 @@ From `greyhavens/whirled-api` `AbstractControl.as` / `ActorControl.as` / `Avatar
 1. Stuff → Avatars → **Classic Flash / Whirled avatars** panel.  
 2. Drop your **own** `.swf` (plus optional PNG idle + walk).  
 3. **Analyze** → pick **Wear mode** → **Save** → **Wear & enter loft**.  
-4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906bu`.
+4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906by`.
 
 ---
 
-## What works in Classic Flash (Ruffle) after `?v=20260906bu`
+## What works in Classic Flash (Ruffle) after `?v=20260906by`
 
 | Action | Works? | How |
 |--------|--------|-----|
@@ -98,7 +98,7 @@ From `greyhavens/whirled-api` `AbstractControl.as` / `ActorControl.as` / `Avatar
 | Smooth PNG dual Wear | **Yes** | Unchanged |
 | Second SWF one-flow | **Yes** | Analyze → Classic Flash → Save → Wear & enter loft |
 
-### Architecture (?v=20260906bu)
+### Architecture (?v=20260906by)
 
 - Stock Whirled SWFs speak **`controlConnect` on `loaderInfo.sharedEvents`** (not ExternalInterface).
 - **Companion host** (`tools/avatar-host/AvatarHost.hx` → `assets/avatar-host/avatar-host.swf`) is ORIGINAL MIT — protocol studied from Grey Havens, **not** AGPL copy-paste.
@@ -114,3 +114,8 @@ Whirl starter, chat visit-since, pale-blue chrome, transparent Ruffle, PE-none l
 ## Related
 
 - [AVATAR-IMPORT.md](./AVATAR-IMPORT.md) · [QA-FLASH.md](./QA-FLASH.md) · [DEV-HUB.md](./DEV-HUB.md) · `src/classic-avatar.js`
+
+
+## bx note — nested loadBytes
+
+Stock Wear from IDB uses companion `hostLoadBytes(base64)` → `Loader.loadBytes` (not nested blob URLs). See `FLASH-SYNC-RESEARCH.md`.

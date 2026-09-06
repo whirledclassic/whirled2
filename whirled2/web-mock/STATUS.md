@@ -1,10 +1,12 @@
-## What shipped (?v=20260906bx)
+## What shipped (?v=20260906by)
 
-- **Flash sync path:** companion host `hostLoadBytes(base64)` → AS3 `Loader.loadBytes` → `controlConnect` → `appearanceChanged_v2` (club-like walk)
-- Chunked EI: `hostLoadBytesBegin/Chunk/Commit` for large IDB avatars; `hostLoadUrl` only for http(s)
-- Mount: companion-first when bytes/url ready; watchdog / bridge error → DIRECT Ruffle (never blank forever)
-- Preserve: bw reliability, bu host SWF, bt never-tofu, bg dual Wear, Whirl
-- Cache: **`?v=20260906bx`**. Push: `/tmp/push-bx.js`.
+- **Flash sync (preserve bx hostLoadBytes):** companion `hostLoadBytes(base64)` → `Loader.loadBytes` + **`allowCodeImport`** → `controlConnect` → `gotControl_v1` → `appearanceChanged_v2`
+- Host SWF **9407B** (`assets/avatar-host/avatar-host.swf`): `hostWalk` / `hostSleep` / `hostSpoke` / `setLocation_v1` (club idle/speak/usercode-move parity)
+- **Ruffle first-class:** vendored `assets/ruffle/` self-host + jsDelivr/unpkg fallback; `preloadRuffle()`; prefer `callExternalInterface`
+- Guest QA: `?flashQa=1` helpers + `assets/ruffle/demo-qa.swf` / `assets/avatars/flash-qa/demo-avatar.swf`
+- Docs: expanded `FLASH-SYNC-RESEARCH.md` (protocol dig + sibling gaps — **no AGPL copy**)
+- Preserve: bx loadBytes path, bt never-tofu, bg dual Wear, br club, Whirl
+- Cache: **`?v=20260906by`**. Push: `/tmp/push-by.js` (dry-run default). **Do not push from executor.**
 
 ## What shipped (?v=20260906bw)
 
@@ -185,3 +187,9 @@ Date: 2026-09-06
 - No secrets in client — only `WHIRLED_API` origin.
 - **Whirl** is the starter avatar (slug `cyan-hair`).
 - **Walking animation with Whirl/Hybrid PNGs is not Ruffle** — Ruffle is SWF-only.
+
+## Research notes toward ?v=20260906by (not pushed)
+
+- Grey Havens / club protocol dump → `GREY-HAVENS-PROTOCOL.md` + append on `FLASH-SYNC-RESEARCH.md`.
+- AvatarHost ORIGINAL stubs: `selfDestruct_v1`, `triggerEvent_v1`, `setWalkSpeed_v1`, `datapack` init, `hostSleep`/`hostSpoke`; SWF rebuilt locally.
+- Top sync gaps: sleep chrome wire, WalkAnimation loc lerp, setLocation→walk, speak→avatarSpoke, MediaStub/default-avatar.
