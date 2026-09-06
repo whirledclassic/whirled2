@@ -2504,3 +2504,277 @@ body > .party-panel {
   .occ-list { max-height: 120px; }
   .room-embed-frame { min-height: 120px; height: 120px; }
 }
+
+/* ---- 20260906q mobile visual overhaul ---- */
+/* Phone room: full green stage under intact tabs; no giant black slide slab;
+   occupants as thin chip strip; chat tabs above send bar. Desktop slide unchanged. */
+
+@media (max-width: 900px) {
+  /* 1) App column stacking — chrome never eaten by stage */
+  #app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100%;
+    max-height: 100dvh;
+    min-height: 100dvh;
+  }
+  .topbar {
+    flex-shrink: 0 !important;
+    z-index: 20 !important;
+    isolation: isolate;
+    position: relative !important;
+    background: linear-gradient(#cfe6f5, #b7d7ec) !important;
+    border-bottom: 1px solid #8eb6d0 !important;
+    padding-bottom: 6px !important;
+    margin: 0 !important;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.35);
+  }
+  #main {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    z-index: 1;
+  }
+  .bar {
+    flex-shrink: 0 !important;
+    z-index: 15 !important;
+    position: relative !important;
+  }
+
+  /* 2) Tabs sit fully above #main — no stage bleed */
+  .tabs {
+    padding-bottom: 6px !important;
+    margin: 0 !important;
+  }
+  .tab {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 3) Workspace: column + stage gradient (not pure #000 void) */
+  .workspace {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    min-height: 0 !important;
+    flex: 1 1 auto;
+    background:
+      linear-gradient(#2a3d55 0 42%, #6b8f4a 42% 48%, #4e6e36 48%) !important;
+  }
+
+  /* 7) Occupant rail = thin horizontal chip strip ABOVE stage */
+  .rail,
+  .rail.occ-rail {
+    order: 0 !important;
+    flex: 0 0 auto !important;
+    max-height: 56px !important;
+    min-height: 44px;
+    height: auto !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    border-right: 0 !important;
+    border-bottom: 1px solid #000 !important;
+    border-top: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px;
+    padding: 4px 8px !important;
+    background: linear-gradient(180deg, #1b2833, #121920) !important;
+  }
+  .occ-rail-head {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px;
+    padding: 0 !important;
+    border: 0 !important;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .rail.occ-rail h2 {
+    font-size: 10px !important;
+    padding: 0 !important;
+    letter-spacing: 0.06em;
+  }
+  .occ-legend,
+  .occ-filter {
+    display: none !important;
+  }
+  .occ-list {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 4px;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .person-wrap {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    max-width: none;
+  }
+  .person {
+    padding: 4px 8px !important;
+    gap: 5px !important;
+    font-size: 11px !important;
+    white-space: nowrap;
+  }
+  .person-status { display: none; }
+  .occ-empty { padding: 2px 6px; white-space: nowrap; }
+
+  /* Stage wrap fills remaining height */
+  .stage-wrap {
+    order: 1 !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background:
+      linear-gradient(#2a3d55 0 42%, #6b8f4a 42% 48%, #4e6e36 48%) !important;
+  }
+  .room-strip { flex-shrink: 0; }
+
+  .stage-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* 5) Stage host / slot — grow, kill 42vh / 36vh fights */
+  .stage-host,
+  .stage-body.chat-mode-slide .stage-host {
+    flex: 1 1 auto !important;
+    min-height: 200px !important;
+    max-height: none !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+  .stage-host #stage-slot,
+  #stage-slot,
+  .stage-slot {
+    flex: 1 1 auto !important;
+    min-height: 200px !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* 4) Mobile slide chat — never eat the room (prefer JS→overlay; CSS safety net) */
+  .stage-body.chat-mode-slide {
+    flex-direction: column !important;
+  }
+  .stage-body.chat-mode-slide .chat-log {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 112px !important;
+    min-height: 0 !important;
+    height: auto !important;
+    align-self: stretch !important;
+    border-left: 0 !important;
+    border-top: 1px solid #2a3d4c !important;
+    padding: 6px 8px !important;
+    font-size: 12px;
+  }
+  .chat-log:empty,
+  .chat-log.is-empty,
+  .stage-body .chat-log:empty,
+  .stage-body .chat-log.is-empty,
+  .stage-body.chat-mode-slide .chat-log:empty,
+  .stage-body.chat-mode-slide .chat-log.is-empty {
+    display: none !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+    flex: 0 0 0 !important;
+  }
+  /* When session forced overlay (or chat-mobile-overlay), hide slide panel entirely */
+  .stage-body.chat-mode-overlay .chat-log,
+  .stage-body.chat-mobile-overlay .chat-log,
+  body.chat-mobile-overlay .stage-body.chat-mode-slide .chat-log {
+    display: none !important;
+  }
+
+  /* 6) Chat tabs — compact strip under stage, full width, not floating mid-void */
+  .chat-tabs {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    order: 0;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 4px 6px 2px !important;
+    background: rgba(14, 28, 40, 0.88) !important;
+    border-top: 1px solid #2a3d4c;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+  }
+  .chat-tab {
+    flex: 0 0 auto;
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* 9) Invite row compact */
+  .room-invite-row {
+    flex: 0 0 auto;
+    padding: 2px 8px 4px !important;
+    background: rgba(14, 28, 40, 0.75);
+  }
+  .room-invite-row .text-btn { font-size: 11px; }
+
+  /* Embed dock shouldn't dominate */
+  .room-embed-dock {
+    flex-shrink: 0;
+    margin: 4px 6px !important;
+    padding: 6px 8px !important;
+  }
+  .room-embed-frame { min-height: 96px !important; height: 96px !important; }
+
+  /* 8) Header wallet / links — less cramped */
+  .who-stats .stat {
+    padding: 0 6px !important;
+    font-size: 11px !important;
+    gap: 2px !important;
+  }
+  .who-stats .stat .stat-label { font-size: 10px; }
+  .who { max-width: 62%; }
+  .who-links .sep,
+  .who-links [data-help-open],
+  .who-links [data-legal-open] {
+    display: none !important;
+  }
+  /* Keep Club + mail + name + logoff */
+  .who-links [data-me="club"] { display: inline !important; }
+
+  /* 10) Kill negative-margin / absolute pulls that overlap tabs */
+  .workspace,
+  .stage-wrap,
+  .stage-body,
+  .stage-host {
+    margin-top: 0 !important;
+    top: auto !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .who-links [data-me="club"] { display: none !important; }
+  .who-stats .stat .stat-label { display: none; }
+  .who-stats .stat.level { display: none; }
+}

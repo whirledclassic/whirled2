@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906p";
+  var LOGO_V = "20260906q";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1161,7 +1161,7 @@
     saveKnownProfiles(list);
   }
   // ---------------------------------------------------------------------------
-  // Friendly People + news-read cursor + profile privacy (20260906p)
+  // Friendly People + news-read cursor + profile privacy (20260906q)
   // How this works: local flags only; never invent players. ENGINE DEV: chrome keys.
   // ---------------------------------------------------------------------------
   var FRIENDLY_KEY = "whirled2.friendly."; // + userId → "1" | "0"
@@ -1389,6 +1389,37 @@
   }
   function saveChatUi(cfg) {
     try { localStorage.setItem(CHAT_UI_KEY, JSON.stringify(cfg || loadChatUi())); } catch (e) {}
+  }
+  // How this works (20260906q): on phones, Slide's dark panel eats the green stage.
+  // Auto-switch to Overlay once for the session preference so the black slab never returns.
+  function ensureMobileChatOverlay() {
+    try {
+      if (!window.matchMedia || !window.matchMedia("(max-width: 900px)").matches) {
+        document.body.classList.remove("chat-mobile-overlay");
+        return false;
+      }
+      document.body.classList.add("chat-mobile-overlay");
+      var ui = loadChatUi();
+      if (ui.mode === "slide") {
+        ui.mode = "overlay";
+        saveChatUi(ui);
+        try {
+          if (!localStorage.getItem("whirled2.chatMobileOverlayNotice")) {
+            localStorage.setItem("whirled2.chatMobileOverlayNotice", "1");
+            // Soft once — after paint refreshChatLog will show it if in room.
+            setTimeout(function () {
+              try {
+                if (typeof inRoom !== "undefined" && inRoom) {
+                  pushSystemChat("Phone layout uses Overlay chat so the room stays full-size.");
+                }
+              } catch (eN) {}
+            }, 0);
+          }
+        } catch (e2) {}
+        return true;
+      }
+    } catch (e) {}
+    return false;
   }
   var chatOptsOpen = false;
   var chatNameMenu = null; // { id, name, x, y }
@@ -1689,7 +1720,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + dual currency / streaks (?v=20260906p)
+  // Fidelity + dual currency / streaks (?v=20260906q)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -2539,7 +2570,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906p";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906q";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3384,7 +3415,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Profile look extras, room music embeds (owner-controlled), occupant rail polish. Cache <code>?v=20260906p</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: mobile room layout (full stage, Overlay chat on phones, thin occupant strip). Cache <code>?v=20260906q</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5223,6 +5254,8 @@ function helpPage() {
     bootstrapRoles(); // ensure admin badges for test / first user before first paint
     // How this works: daily login claim once per calendar day, then shell can show balances.
     try { claimDailyLogin(); } catch (eDaily) {}
+    // 20260906q: phones force Overlay chat so Slide never opens a black slab under the stage.
+    try { ensureMobileChatOverlay(); } catch (eMob) {}
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
     var tabAttr = tab || "rooms";
     if (tabAttr === "rooms" && !inRoom) tabAttr = "rooms-lobby";
@@ -5345,6 +5378,9 @@ function helpPage() {
       var nearBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 48;
       var stick = !chatPinnedScroll || nearBottom;
       log.innerHTML = html;
+      // 20260906q: hide empty slide panel (no black void under stage)
+      var logEmpty = !msgs.length || !String(html || "").trim();
+      log.classList.toggle("is-empty", logEmpty);
       if (stick) log.scrollTop = log.scrollHeight;
     }
     var ov = document.getElementById("chat-overlay");

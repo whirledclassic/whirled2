@@ -2,17 +2,18 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906p)
+## What shipped (?v=20260906q)
 
-- **Profile look extras**: Ocean / Forest / Candy / Mono presets (+ Classic/Night/Sunset/Paper/Tile Soft/Clear). Font scale, corner radius, module style (frosted/solid/outline), header style, optional banner + tagline. Live preview + Publish. No profile music.
-- **Room music sources**: `whirled2.playlist.loft` supports `local` | `youtube` | `spotify` with embed URL → normalized iframe. Compact `#room-embed-dock` under stage (not `#stage-slot`). Legal meta line on embeds.
-- **Owner controls music (hard)**: only loft owner switches source / pastes embeds / lock settings / remove-next. Guests listen; optional guest local-track adds when `ownerOnlyAdd` is false. Never guest yt/spotify edits. Defaults: `ownerOnlyAdd: true`, `ownerControlsMusic: true`.
-- **Occupant rail**: “In this room (N)”, you-first sort, presence dots (here/away/in-game), friend highlight, owner crown, optional filter when >5, smoother mobile height — real session occupants only.
-- Prior: Daily reward dismiss fix (`dismissDailyRewardModal` + backdrop/Esc). Coins + Bars earn-only; no Buy Bars / payments.
+- **Mobile visual overhaul (iPhone)**: green stage no longer overlaps Me/Stuff/Games/Rooms tabs; `#app` column keeps topbar/bar above `#main`.
+- **No giant black chat slab**: on `max-width: 900px`, Slide auto-switches to Overlay (saved via `saveChatUi`); empty `#chat-log` gets `is-empty` / `:empty` → hidden. Desktop Slide side panel unchanged.
+- **Occupants**: mobile rail is a thin horizontal chip strip above the stage (~56px); legend/filter hidden.
+- **Chat tabs**: compact full-width strip under stage (not floating mid-void); invite row compact.
+- **Header**: smaller wallet pills; Help|Legal hidden on narrow; Club kept until very narrow.
+- Prior (p): Profile look extras, owner-only room music embeds, occupant rail polish, daily reward dismiss, Coins+Bars earn-only.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906p
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906q
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
@@ -20,3 +21,4 @@ Date: 2026-09-06
 - No payments / Buy Bars / Bling cash-out
 - No fake NPCs or invented catalog
 - No private engine edits
+- No GitHub push this pass
