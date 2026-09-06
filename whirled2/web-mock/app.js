@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906q";
+  var LOGO_V = "20260906r";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1720,7 +1720,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + dual currency / streaks (?v=20260906q)
+  // Fidelity + dual currency / streaks (?v=20260906r)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -2570,7 +2570,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906q";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906r";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3415,7 +3415,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: mobile room layout (full stage, Overlay chat on phones, thin occupant strip). Cache <code>?v=20260906q</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: mobile room layout (full stage, Overlay chat on phones, thin occupant strip). Cache <code>?v=20260906r</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5231,6 +5231,7 @@ function helpPage() {
       +         '<button type="button" data-room-menu="lobby">' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '</button>'
       +       '</div>'
       +     '</span>'
+      +     '<button type="button" class="tb-music" data-open-room-music="1" title="Room music" aria-label="Room music"></button>'
       +   '</span>'
       + '</form>';
   }
@@ -6942,6 +6943,24 @@ function helpPage() {
       roomPanelOpen = false;
       leaveRoomResetChat();
       pushNotice("blue", "Group hall → Rooms lobby / Studio Loft (shared halls later).");
+      paint("rooms");
+      return;
+    }
+    var openMusic = ev.target.closest("[data-open-room-music]");
+    if (openMusic && session()) {
+      // How this works: one-tap Room music on mobile (toolbar was hard to find).
+      if (!inRoom) {
+        pushNotice("gray", "Enter a room first to play music.", { transient: true });
+        return;
+      }
+      roomMenuOpen = false;
+      var rmM = document.getElementById("room-menu");
+      if (rmM) rmM.hidden = true;
+      playlistPanelOpen = true;
+      roomPanelOpen = false;
+      roomItemsPanelOpen = false;
+      decorateMode = false;
+      partyPanelOpen = false;
       paint("rooms");
       return;
     }

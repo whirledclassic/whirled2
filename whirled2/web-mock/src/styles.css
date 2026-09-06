@@ -477,10 +477,39 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 @media (max-width: 900px) {
   .bar { background: #0e141a; color: #dce8f0; border-top: 0; }
   .bar input { border-color: #2a3d4c; }
-  .toolbar { display: none; }
-  .chat-opts { display: none; }
+  /* 20260906r: keep Room/Music toolbar on phones (was display:none — blocked View room music) */
+  .toolbar {
+    display: flex !important;
+    flex-shrink: 0;
+    gap: 4px;
+    align-items: center;
+  }
+  .toolbar .tb-go-wrap:not(.tb-room-wrap),
+  .toolbar .tb-friends-wrap,
+  .toolbar .tb-party,
+  .toolbar .tb-vol { display: none !important; }
+  .toolbar .tb-room-wrap { display: inline-flex !important; }
+  .tb-music {
+    display: inline-grid !important;
+    place-items: center;
+    width: 36px; height: 36px; min-width: 36px;
+    border: 0; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(#3aa3e0, #1e6fa8);
+    color: #fff; font: 700 11px/1 var(--ui);
+    padding: 0;
+  }
+  .chat-opts { display: inline-flex !important; min-width: 36px; min-height: 36px; }
   .subtabs { overflow-x: auto; }
   .room-strip { font-size: 11px; }
+  .room-menu {
+    position: fixed !important;
+    left: 8px; right: 8px; bottom: max(56px, calc(52px + env(safe-area-inset-bottom)));
+    top: auto !important;
+    width: auto !important;
+    max-height: min(50vh, 360px);
+    overflow: auto;
+    z-index: 80 !important;
+  }
 }
 
 
