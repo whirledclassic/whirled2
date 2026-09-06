@@ -71,6 +71,9 @@ In your private repo:
 
 The website owns the window. You own **one rectangle**: `#stage-slot`.
 
+**Placeholder loft (chrome only, `?v=20260906ak`):** Until you mount, `#stage-slot` may contain a CSS `.loft-backdrop` (soft walls/floor). Call `host.replaceChildren(app.canvas)` as usual — that clears the placeholder. Worn Stuff sprites stay on sibling `#avatar-wear-layer` (not inside your canvas) until Pixi owns avatars.
+
+
 ```
 header tabs
 left occupants |  #stage-slot  <- your Pixi canvas ONLY here  | (profile elsewhere)

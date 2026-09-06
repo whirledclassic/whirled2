@@ -1,0 +1,51 @@
+{
+  "name": "User Aseprite avatar packs",
+  "source": "aseprite",
+  "version": "20260906ai",
+  "packs": [
+    {
+      "slug": "char-a-dress-idle",
+      "name": "Cyan Hair Idle",
+      "path": "assets/avatars/user-pack/char-a-dress-idle/",
+      "thumb": "assets/avatars/user-pack/char-a-dress-idle/thumb.png",
+      "preview": "assets/avatars/user-pack/char-a-dress-idle/preview.png",
+      "pack": "assets/avatars/user-pack/char-a-dress-idle/pack.json",
+      "frameCount": 2,
+      "source": "aseprite",
+      "ok": true
+    },
+    {
+      "slug": "char-b-dress-walk",
+      "name": "Cyan Hair Walk",
+      "path": "assets/avatars/user-pack/char-b-dress-walk/",
+      "thumb": "assets/avatars/user-pack/char-b-dress-walk/thumb.png",
+      "preview": "assets/avatars/user-pack/char-b-dress-walk/preview.png",
+      "pack": "assets/avatars/user-pack/char-b-dress-walk/pack.json",
+      "frameCount": 4,
+      "source": "aseprite",
+      "ok": true
+    },
+    {
+      "slug": "char-c-dress-stand",
+      "name": "Cyan Hair Stand",
+      "path": "assets/avatars/user-pack/char-c-dress-stand/",
+      "thumb": "assets/avatars/user-pack/char-c-dress-stand/thumb.png",
+      "preview": "assets/avatars/user-pack/char-c-dress-stand/preview.png",
+      "pack": "assets/avatars/user-pack/char-c-dress-stand/pack.json",
+      "frameCount": 1,
+      "source": "aseprite",
+      "ok": true
+    },
+    {
+      "slug": "char-d-dress-pose",
+      "name": "Cyan Hair Pose",
+      "path": "assets/avatars/user-pack/char-d-dress-pose/",
+      "thumb": "assets/avatars/user-pack/char-d-dress-pose/thumb.png",
+      "preview": "assets/avatars/user-pack/char-d-dress-pose/preview.png",
+      "pack": "assets/avatars/user-pack/char-d-dress-pose/pack.json",
+      "frameCount": 2,
+      "source": "aseprite",
+      "ok": true
+    }
+  ]
+}

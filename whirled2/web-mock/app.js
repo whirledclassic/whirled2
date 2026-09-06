@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906af";
+  var LOGO_V = "20260906al";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1275,7 +1275,7 @@
 
   var STUFF_CATS = [
     // How this works: wiki Stuff rail categories. howBlurb = empty-state “How do I get stuff?”
-    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload a stub avatar thumbnail here. Classic SWF wardrobe is On hold (side project) — see AVATAR-IMPORT.md." },
+    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload PNG/WebP (optional .aseprite attachment) or Add user packs. Wear shows a sprite billboard in your loft — not Ruffle. Classic SWF lab stays On hold — see STUFF-AVATARS.md." },
     { id: "furniture", label: "Furniture", empty: "You have no furniture yet.", how: "Furniture fills your loft. Upload a named piece with optional thumb, then Decorate Room to place chips." },
     { id: "backdrops", label: "Backdrops", empty: "You have no backdrops yet.", how: "Backdrops set the room scene. Upload an image you have rights to, then place it while decorating." },
     { id: "toys", label: "Toys", empty: "You have no toys yet.", how: "Toys are playful room items. Create your own stub here — no fake catalog fillers." },
@@ -1401,6 +1401,412 @@
   }
   function saveStuff(items) {
     localStorage.setItem(STUFF_KEY, JSON.stringify(items.slice(0, 200)));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stuff sprite avatars (Aseprite / PNG packs) — classic Stuff feel without SWF
+  // Beginner: Upload PNG/WebP (or seed user-pack) → Wear → see yourself in the loft.
+  // ENGINE DEV: #avatar-wear-layer is chrome overlay sibling of #stage-slot (not Ruffle).
+  // Pack JSON: { name, frames[], thumb, source: "aseprite" }. Lab SWF path stays locked.
+  // ---------------------------------------------------------------------------
+  var WORN_AVATAR_KEY = "whirled2.wornAvatar";
+  var USER_PACK_SEEDED_KEY = "whirled2.userPackSeeded";
+  var USER_PACK_INDEX = "./assets/avatars/user-pack/index.json?v=" + LOGO_V;
+
+  function loadWornAvatar() {
+    // How this works: Wear writes a small JSON { stuffId, name, thumb, preview, frames, source }.
+    try {
+      var raw = JSON.parse(localStorage.getItem(WORN_AVATAR_KEY) || "null");
+      return raw && typeof raw === "object" ? raw : null;
+    } catch (e) { return null; }
+  }
+  function saveWornAvatar(row) {
+    if (!row) {
+      localStorage.removeItem(WORN_AVATAR_KEY);
+      return;
+    }
+    localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(row));
+  }
+  function wearStuffAvatar(item) {
+    // How this works: classic Use / Wear — stores preview for loft billboard.
+    // Why: SWF/Ruffle still on hold; sprite pack is the modern path until engine Ruffle.
+    if (!item) return false;
+    var preview = item.preview || item.thumb || "";
+    if (!preview && item.pack && item.pack.preview) preview = item.pack.preview;
+    var frames = [];
+    if (item.frames && item.frames.length) frames = item.frames.slice();
+    else if (item.pack && item.pack.displayFrames) frames = item.pack.displayFrames.slice();
+    else if (item.pack && item.pack.frames) frames = item.pack.frames.slice();
+    else if (preview) frames = [preview];
+    var row = {
+      stuffId: item.id,
+      name: item.name || "Avatar",
+      thumb: item.thumb || preview || "",
+      preview: preview || item.thumb || "",
+      frames: frames,
+      frameDurationsMs: (item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || [],
+      source: item.source || (item.pack && item.pack.source) || "png",
+      packPath: item.packPath || "",
+      at: new Date().toISOString()
+    };
+    saveWornAvatar(row);
+    pushRecentAvatarId(item.id);
+    return true;
+  }
+  function isWornStuffId(id) {
+    var w = loadWornAvatar();
+    return !!(w && w.stuffId === id);
+  }
+  function avatarWearLayerHtml() {
+    // How this works: billboard sprite in the room chrome (like item in your space).
+    // Beginner: if nothing Worn yet, show classic default tofu so the loft isn’t empty.
+    // ENGINE DEV: pointer-events none; z-index above #stage-slot, below bubbles/menus. No SWF.
+    var worn = loadWornAvatar();
+    if (!worn) worn = makeTofuWornRow();
+    var scale = loadAvatarScale(worn.stuffId || TOFU_AVATAR_ID);
+    var isTofu = !!(worn.isTofu || worn.stuffId === TOFU_AVATAR_ID || worn.source === "tofu");
+    if (isTofu) {
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Default tofu avatar">'
+        + '<div class="avatar-wear-billboard" style="--wear-scale:' + scale + '">'
+        +   tofuSvgHtml("tofu-avatar tofu-wear")
+        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Tofu") + '</div>'
+        + '</div></div>';
+    }
+    if (!(worn.preview || (worn.frames && worn.frames.length))) {
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer" aria-hidden="true"></div>';
+    }
+    var frames = (worn.frames && worn.frames.length) ? worn.frames : [worn.preview];
+    var src0 = frames[0] || worn.preview;
+    var durs = worn.frameDurationsMs || [];
+    var meta = ' data-wear-frames="' + esc(JSON.stringify(frames)) + '"'
+      + ' data-wear-durs="' + esc(JSON.stringify(durs)) + '"';
+    return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on" aria-label="Worn avatar">'
+      + '<div class="avatar-wear-billboard"' + meta + ' style="--wear-scale:' + scale + '">'
+      +   '<img class="avatar-wear-sprite" src="' + src0 + '" alt="' + esc(worn.name || "Avatar") + '" />'
+      +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + '</div>'
+      + '</div></div>';
+  }
+  function startAvatarWearAnim() {
+    // Beginner: if the pack has multiple PNG frames, flip them like a tiny GIF.
+    var layer = document.getElementById("avatar-wear-layer");
+    if (!layer || !layer.classList.contains("is-on")) return;
+    var bill = layer.querySelector(".avatar-wear-billboard");
+    var img = layer.querySelector(".avatar-wear-sprite");
+    if (!bill || !img) return;
+    var frames = [];
+    var durs = [];
+    try { frames = JSON.parse(bill.getAttribute("data-wear-frames") || "[]"); } catch (e1) { frames = []; }
+    try { durs = JSON.parse(bill.getAttribute("data-wear-durs") || "[]"); } catch (e2) { durs = []; }
+    if (!frames || frames.length < 2) return;
+    if (layer._wearTimer) { try { clearInterval(layer._wearTimer); } catch (e3) {} }
+    var i = 0;
+    function tick() {
+      i = (i + 1) % frames.length;
+      img.src = frames[i];
+    }
+    var ms = (durs[0] > 0 ? durs[0] : 200);
+    layer._wearTimer = setInterval(tick, ms);
+  }
+  // ---------------------------------------------------------------------------
+  // Avatar scale + Stuff viewer + tofu default (20260906ak)
+  // Beginner: open Stuff → Avatars → pick one → big preview + scale slider + Wear.
+  // Scale is saved per item (whirled2.avatarScale.{id}) and also sizes the loft billboard.
+  // ENGINE DEV: preview / billboard stay chrome — never mount SWF or touch Pixi in #stage-slot.
+  // ---------------------------------------------------------------------------
+  var AVATAR_RECENT_KEY = "whirled2.avatarRecent";
+  var TOFU_AVATAR_ID = "tofu";
+
+  function avatarScaleKey(id) {
+    return "whirled2.avatarScale." + String(id || "");
+  }
+  function loadAvatarScale(id) {
+    // How this works: slider 50–200% (stored 0.5–2). Default 1.
+    try {
+      var n = parseFloat(localStorage.getItem(avatarScaleKey(id)) || "1");
+      if (!isFinite(n) || n < 0.5) n = 0.5;
+      if (n > 2) n = 2;
+      return n;
+    } catch (e) { return 1; }
+  }
+  function saveAvatarScale(id, n) {
+    n = parseFloat(n);
+    if (!isFinite(n)) n = 1;
+    if (n < 0.5) n = 0.5;
+    if (n > 2) n = 2;
+    try { localStorage.setItem(avatarScaleKey(id), String(n)); } catch (e) {}
+    return n;
+  }
+  function loadRecentAvatarIds() {
+    try {
+      var a = JSON.parse(localStorage.getItem(AVATAR_RECENT_KEY) || "[]");
+      return Array.isArray(a) ? a.filter(Boolean).slice(0, 5) : [];
+    } catch (e) { return []; }
+  }
+  function pushRecentAvatarId(id) {
+    // How this works: classic “recent 5” for Change avatar… from the room.
+    if (!id || id === TOFU_AVATAR_ID) return;
+    var list = loadRecentAvatarIds().filter(function (x) { return x !== id; });
+    list.unshift(id);
+    try { localStorage.setItem(AVATAR_RECENT_KEY, JSON.stringify(list.slice(0, 5))); } catch (e) {}
+  }
+  function happyFaceSvg(filled) {
+    // Classic Stuff “Wear avatar” happy-face — inline SVG (no phone tofu).
+    var stroke = filled ? "#1e6fa8" : "#3aa3e0";
+    var fill = filled ? "#7ec8f0" : "none";
+    return '<svg class="wear-face-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">'
+      + '<circle cx="12" cy="12" r="9" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2"/>'
+      + '<circle cx="9" cy="10" r="1.3" fill="' + stroke + '"/>'
+      + '<circle cx="15" cy="10" r="1.3" fill="' + stroke + '"/>'
+      + '<path d="M8.5 14.5c1.2 1.4 2.3 2 3.5 2s2.3-.6 3.5-2" fill="none" stroke="' + stroke + '" stroke-width="1.6" stroke-linecap="round"/>'
+      + '</svg>';
+  }
+  function tofuSvgHtml(cls) {
+    // Classic default “tofu” blank avatar — soft beige block with simple face.
+    // Beginner: if you have not Worn a pack yet, the loft shows this placeholder.
+    cls = cls || "tofu-avatar";
+    return '<div class="' + cls + '" role="img" aria-label="Default tofu avatar">'
+      + '<svg viewBox="0 0 64 80" width="100%" height="100%" aria-hidden="true" focusable="false">'
+      +   '<rect x="10" y="4" width="44" height="52" rx="8" fill="#f0e6d2" stroke="#c4a882" stroke-width="2"/>'
+      +   '<rect x="18" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+      +   '<rect x="34" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+      +   '<circle cx="24" cy="26" r="3" fill="#8a7048"/>'
+      +   '<circle cx="40" cy="26" r="3" fill="#8a7048"/>'
+      +   '<path d="M26 38c2.5 3 9.5 3 12 0" fill="none" stroke="#8a7048" stroke-width="2" stroke-linecap="round"/>'
+      + '</svg></div>';
+  }
+  function makeTofuWornRow() {
+    return {
+      stuffId: TOFU_AVATAR_ID,
+      name: "Tofu",
+      thumb: "",
+      preview: "",
+      frames: [],
+      frameDurationsMs: [],
+      source: "tofu",
+      packPath: "",
+      at: new Date().toISOString(),
+      isTofu: true
+    };
+  }
+  function loftBackdropHtml(opts) {
+    // How this works: soft classic room wall+floor so Wear billboard isn’t on an empty void.
+    // ENGINE DEV: pure CSS/HTML inside #stage-slot (or viewer). When Pixi mounts, replaceChildren
+    // wipes this — keep #stage-slot free of engine nodes until then.
+    opts = opts || {};
+    var hint = opts.subtle
+      ? '<div class="loft-hint loft-hint-subtle">engine mounts here</div>'
+      : '<div class="loft-hint">Your room — <span class="loft-hint-muted">engine mounts here</span></div>';
+    return '<div class="loft-backdrop" aria-hidden="true">'
+      +   '<div class="loft-sky"></div>'
+      +   '<div class="loft-walls">'
+      +     '<div class="loft-wall loft-wall-l"></div>'
+      +     '<div class="loft-wall loft-wall-r"></div>'
+      +     '<div class="loft-corner"></div>'
+      +   '</div>'
+      +   '<div class="loft-floor"><div class="loft-floor-grid"></div></div>'
+      +   hint
+      + '</div>';
+  }
+  function stagePlaceholderHtml() {
+    // How this works: nicer loft scene when no engine canvas yet.
+    // Soften the old developer “Empty classic stage…” copy — subtle hint only.
+    var worn = loadWornAvatar();
+    var hasWear = !!(worn && (worn.isTofu || worn.preview || (worn.frames && worn.frames.length)));
+    return loftBackdropHtml({ subtle: hasWear || true });
+  }
+  function applyWearBillboardScale() {
+    // How this works: CSS --wear-scale on the loft billboard from per-item scale.
+    var layer = document.getElementById("avatar-wear-layer");
+    if (!layer) return;
+    var worn = loadWornAvatar();
+    var scale = worn ? loadAvatarScale(worn.stuffId || TOFU_AVATAR_ID) : 1;
+    var bill = layer.querySelector(".avatar-wear-billboard");
+    if (bill) bill.style.setProperty("--wear-scale", String(scale));
+  }
+  function avatarViewerHtml(item) {
+    // Classic Stuff Avatar viewer: preview backdrop + scale slider + Wear / Take off.
+    // Beginner: see yourself here without entering a room.
+    if (!item) return "";
+    var frames = [];
+    if (item.frames && item.frames.length) frames = item.frames.slice();
+    else if (item.pack && item.pack.displayFrames) frames = item.pack.displayFrames.slice();
+    else if (item.pack && item.pack.frames) frames = item.pack.frames.slice();
+    else if (item.preview) frames = [item.preview];
+    else if (item.thumb) frames = [item.thumb];
+    var src0 = frames[0] || item.preview || item.thumb || "";
+    var durs = (item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || [];
+    var scale = loadAvatarScale(item.id);
+    var worn = isWornStuffId(item.id);
+    var pct = Math.round(scale * 100);
+    var meta = ' data-viewer-frames="' + esc(JSON.stringify(frames)) + '"'
+      + ' data-viewer-durs="' + esc(JSON.stringify(durs)) + '"';
+    var sprite;
+    if (src0) {
+      sprite = '<img class="avatar-viewer-sprite" src="' + src0 + '" alt="' + esc(item.name || "Avatar") + '" />';
+    } else {
+      sprite = tofuSvgHtml("tofu-avatar tofu-in-viewer");
+    }
+    var wearBtn;
+    if (worn) {
+      wearBtn = '<button type="button" class="action-btn wear-btn is-worn" data-stuff-unwear="' + esc(item.id) + '">'
+        + happyFaceSvg(true) + ' Take off</button>';
+    } else {
+      wearBtn = '<button type="button" class="action-btn wear-btn" data-stuff-wear="' + esc(item.id) + '">'
+        + happyFaceSvg(false) + ' Wear avatar</button>';
+    }
+    return '<div class="avatar-viewer" id="avatar-viewer" data-viewer-id="' + esc(item.id) + '">'
+      +   '<div class="avatar-viewer-stage">'
+      +     loftBackdropHtml({ subtle: true })
+      +     '<div class="avatar-viewer-billboard"' + meta + ' style="--avatar-scale:' + scale + '">'
+      +       sprite
+      +       '<div class="avatar-viewer-nameplate">' + esc(item.name || "Avatar") + '</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div class="avatar-viewer-toolbar">'
+      +     '<label class="avatar-scale-label" title="Scale (classic diagonal-arrow control)">'
+      +       '<span class="avatar-scale-ico" aria-hidden="true">'
+      +         '<svg viewBox="0 0 24 24" width="18" height="18" focusable="false">'
+      +           '<path fill="#e07a28" d="M4 20V10l2 2 4-4 2 2-4 4 2 2H4zm16-16v10l-2-2-4 4-2-2 4-4-2-2h6z"/>'
+      +         '</svg>'
+      +       '</span>'
+      +       '<span class="avatar-scale-text">Scale <b id="avatar-scale-pct">' + pct + '%</b></span>'
+      +       '<input type="range" id="avatar-scale-slider" min="50" max="200" step="5" value="' + pct + '"'
+      +         ' data-avatar-scale="' + esc(item.id) + '" aria-label="Avatar scale" />'
+      +     '</label>'
+      +     '<div class="avatar-viewer-actions">'
+      +       wearBtn
+      +       '<button type="button" class="text-btn" data-avatar-states-soon="1" title="Classic SWF states — Coming Soon">States / actions…</button>'
+      +     '</div>'
+      +     '<p class="meta avatar-viewer-note">Preview play flips sprite-pack frames when available. Classic SWF states stay Coming Soon (lab locked).</p>'
+      +   '</div>'
+      + '</div>';
+  }
+  function startAvatarViewerAnim() {
+    // Beginner: multi-frame packs “preview play” in the Stuff viewer (not Ruffle).
+    var viewer = document.getElementById("avatar-viewer");
+    if (!viewer) return;
+    var bill = viewer.querySelector(".avatar-viewer-billboard");
+    var img = viewer.querySelector(".avatar-viewer-sprite");
+    if (!bill || !img) return;
+    var frames = [];
+    var durs = [];
+    try { frames = JSON.parse(bill.getAttribute("data-viewer-frames") || "[]"); } catch (e1) { frames = []; }
+    try { durs = JSON.parse(bill.getAttribute("data-viewer-durs") || "[]"); } catch (e2) { durs = []; }
+    if (!frames || frames.length < 2) return;
+    if (viewer._viewerTimer) { try { clearInterval(viewer._viewerTimer); } catch (e3) {} }
+    var i = 0;
+    viewer._viewerTimer = setInterval(function () {
+      i = (i + 1) % frames.length;
+      img.src = frames[i];
+    }, (durs[0] > 0 ? durs[0] : 200));
+  }
+  function changeAvatarMenuHtml() {
+    // How this works: room self-menu → recent 5 + tofu + View full list → Stuff Avatars.
+    var recent = loadRecentAvatarIds();
+    var rows = recent.map(function (id) {
+      var it = findStuff(id);
+      if (!it) return "";
+      var on = isWornStuffId(id);
+      return '<button type="button" class="occ-menu-item' + (on ? " is-on" : "") + '" data-stuff-wear="' + esc(id) + '">'
+        + esc(it.name || id) + (on ? " ✓" : "") + '</button>';
+    }).join("");
+    var tofuOn = isWornStuffId(TOFU_AVATAR_ID) || (!loadWornAvatar());
+    return ''
+      + '<button type="button" class="occ-menu-item" data-change-avatar="1">Change avatar…</button>'
+      + '<div class="occ-change-avatar" id="occ-change-avatar" hidden>'
+      +   '<div class="occ-change-title">Recent</div>'
+      +   (rows || '<p class="meta occ-change-empty">No recent packs yet — open Stuff.</p>')
+      +   '<button type="button" class="occ-menu-item' + (tofuOn && isWornStuffId(TOFU_AVATAR_ID) ? " is-on" : "") + '" data-wear-tofu="1">Default tofu</button>'
+      +   '<button type="button" class="occ-menu-item" data-goto-stuff-avatars="1">View full list…</button>'
+      + '</div>';
+  }
+
+  function ensureUserPackSeedButtonHtml() {
+    // How this works: one-click import of converted Aseprite packs under assets/avatars/user-pack/.
+    return '<div class="panel avatar-pack-seed-panel" id="avatar-pack-seed">'
+      + '<h3>Aseprite avatar packs</h3>'
+      + '<p class="meta">Modern Whirled2 path: sprite packs (PNG frames + ~80×60 thumb). Classic SWF wardrobe stays On hold. '
+      + 'Converted packs live in <code>assets/avatars/user-pack/</code>.</p>'
+      + '<div class="stuff-detail-actions">'
+      +   '<button type="button" class="action-btn" data-seed-user-packs="1">Add user packs to Stuff</button>'
+      + '</div>'
+      + '<p class="meta" id="avatar-pack-seed-msg">Adds kind=avatar inventory rows with preview images. Then open one → <b>Wear avatar</b>.</p>'
+      + '<div class="stuff-detail-actions">'
+      +   '<button type="button" class="action-btn" data-wear-tofu="1">' + happyFaceSvg(false) + ' Wear default tofu</button>'
+      + '</div>'
+      + '<p class="meta">Classic default blank avatar. Use when you want no custom pack worn.</p>'
+      + '</div>';
+  }
+  async function seedUserAvatarPacks() {
+    // How this works: fetch index.json, create Stuff rows for each ok pack (skip duplicates by packPath).
+    var msg = document.getElementById("avatar-pack-seed-msg");
+    try {
+      var res = await fetch(USER_PACK_INDEX, { cache: "no-store" });
+      if (!res.ok) throw new Error("Could not load pack index (" + res.status + ")");
+      var index = await res.json();
+      var packs = (index && index.packs) || [];
+      var items = loadStuff();
+      var existing = {};
+      items.forEach(function (it) {
+        if (it.packPath) existing[it.packPath] = 1;
+        if (it.slug) existing["slug:" + it.slug] = 1;
+      });
+      var added = 0;
+      for (var i = 0; i < packs.length; i++) {
+        var p = packs[i];
+        if (!p || p.ok === false) continue;
+        var path = p.path || ("assets/avatars/user-pack/" + p.slug + "/");
+        if (existing[path] || existing["slug:" + p.slug]) continue;
+        var packJson = null;
+        try {
+          var packUrl = "./" + (p.pack || (path + "pack.json"));
+          if (packUrl.indexOf("?") < 0) packUrl += "?v=" + LOGO_V;
+          var pr = await fetch(packUrl, { cache: "no-store" });
+          if (pr.ok) packJson = await pr.json();
+        } catch (eP) { packJson = null; }
+        var thumb = "./" + (p.thumb || (path + "thumb.png")) + "?v=" + LOGO_V;
+        var preview = "./" + (p.preview || (path + "preview.png")) + "?v=" + LOGO_V;
+        var frames = [];
+        if (packJson && packJson.displayFrames) {
+          frames = packJson.displayFrames.map(function (f) { return "./" + path + f + "?v=" + LOGO_V; });
+        } else if (packJson && packJson.frames) {
+          frames = packJson.frames.map(function (f) { return "./" + path + f + "?v=" + LOGO_V; });
+        } else {
+          frames = [preview];
+        }
+        var nid = "av" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        items.unshift({
+          id: nid,
+          name: (packJson && packJson.name) || p.name || p.slug,
+          description: "Aseprite sprite pack (" + ((packJson && packJson.frameCount) || p.frameCount || frames.length) + " frames). Wear to show in your loft.",
+          kind: "avatar",
+          type: "avatar",
+          category: "avatars",
+          creator: (session() && session().user && session().user.name) || "you",
+          ownerId: (session() && session().user && session().user.id) || "",
+          thumb: thumb,
+          preview: preview,
+          frames: frames,
+          pack: packJson || { name: p.name, frames: frames, thumb: thumb, source: "aseprite" },
+          packPath: path,
+          slug: p.slug,
+          source: "aseprite",
+          sourceFile: packJson && packJson.sourceFile,
+          owned: true,
+          at: new Date().toISOString()
+        });
+        existing[path] = 1;
+        added++;
+      }
+      saveStuff(items);
+      try { localStorage.setItem(USER_PACK_SEEDED_KEY, "1"); } catch (eS) {}
+      if (msg) msg.textContent = added ? ("Added " + added + " avatar pack(s) to Stuff.") : "Packs already in Stuff — open one and Wear.";
+      pushNotice("green", added ? ("Added " + added + " avatar pack(s).") : "Avatar packs already seeded.", { transient: true });
+      paint("stuff");
+    } catch (err) {
+      if (msg) msg.textContent = String(err && err.message || err);
+      pushNotice("status", "Could not seed avatar packs.");
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -3110,7 +3516,7 @@
     var isFav = favs.indexOf(id) >= 0;
     var visual = item.thumb
       ? '<img class="stuff-thumb" src="' + item.thumb + '" alt="" />'
-      : '<div class="swatch ' + tone + '"></div>';
+      : '<div class="swatch swatch-empty ' + tone + '" aria-hidden="true"></div>';
     return '<div class="card shop-card" data-shop-item="' + esc(id) + '" role="button" tabindex="0">'
       + '<button type="button" class="shop-card-fav fav-btn' + (isFav ? " is-on" : "") + '" data-shop-fav="' + esc(id) + '" title="'
       + (isFav ? "Remove favorite" : "Favorite") + '" aria-label="' + (isFav ? "Remove favorite" : "Favorite") + '">'
@@ -4109,6 +4515,20 @@
   // Session helpers + occupant / chat row HTML builders
   // ---------------------------------------------------------------------------
   function session() { return window.WhirledApi ? window.WhirledApi.session() : null; }
+  function discordLinkedBadgeHtml(user) {
+    // Purpose: Discord as attached account (icon + Discord username), not profile display name.
+    // How: chip under Whirled2 name when discordUsername is set from Continue with Discord.
+    if (!user || !(user.discord || user.discordId)) return "";
+    var handle = String(user.discordUsername || "Linked").replace(/^@+/, "");
+    // How this works (20260906ai): inline SVG Discord mark — phones often show tofu for &#120143;.
+    // Beginner: blurple chip stays; white SVG icon is crisp on every device (no weird square).
+    return '<span class="discord-link-badge" title="Discord account linked to this Whirled2 profile">'
+      + '<svg class="discord-link-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
+      +   '<path fill="currentColor" d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>'
+      + '</svg>'
+      + '<span class="discord-link-label">Discord</span> '
+      + '<span class="discord-link-user">@' + esc(handle) + '</span></span>';
+  }
   function you() {
     var s = session();
     if (s && s.user) {
@@ -4122,10 +4542,11 @@
         streakDays: snap.streakDays,
         room: s.user.room || ROOM
       };
-      // Discord link flag from /api/me publicUser (no secrets).
+      // Discord is a linked account badge — not the Whirled2 display name.
       if (s.user.discord || s.user.discordId) {
         out.discord = true;
         if (s.user.discordId) out.discordId = s.user.discordId;
+        if (s.user.discordUsername) out.discordUsername = s.user.discordUsername;
       }
       return out;
     }
@@ -4177,9 +4598,11 @@
     var isOwner = isLoftOwnerId(id);
     var menu;
     if (p.you) {
+      // How this works (20260906ak): Change avatar… → recent 5 + tofu + Stuff list (classic).
       menu = '<div class="occ-menu" role="menu">'
         + '<button type="button" class="occ-menu-item" data-profile="' + esc(id) + '">View Profile</button>'
         + '<button type="button" class="occ-menu-item" data-me="profile">Edit profile</button>'
+        + changeAvatarMenuHtml()
         + '</div>';
     } else {
       menu = '<div class="occ-menu" role="menu">'
@@ -4249,7 +4672,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906af";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906al";
   }
   function roomShareUrl() {
     // How this works (20260906af): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
@@ -4304,15 +4727,45 @@
     var el = document.getElementById("room-share-modal");
     if (el) el.remove();
   }
+  function tbIconSvg(kind) {
+    // How this works (20260906ak): crisp inline SVG toolbar icons (currentColor) — no CSS bg / emoji tofu.
+    // Beginner: Chat options, Volume, Go, Friends, Parties, Room all share this helper.
+    var common = ' class="tb-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"';
+    if (kind === "chatopts") {
+      return '<svg' + common + '><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>';
+    }
+    if (kind === "vol") {
+      return '<svg' + common + '><path fill="currentColor" d="M3 10v4h4l5 4V6L7 10H3zm13.5 2a3.5 3.5 0 0 0-1.8-3.1v6.2A3.5 3.5 0 0 0 16.5 12zM14 5.2v1.7a5.5 5.5 0 0 1 0 10.2v1.7a7.2 7.2 0 0 0 0-13.6z"/></svg>';
+    }
+    if (kind === "vol-mute") {
+      return '<svg' + common + '><path fill="currentColor" d="M3 10v4h4l5 4V6L7 10H3zm14.5.3 1.4-1.4 1.1 1.1-1.4 1.4 1.4 1.4-1.1 1.1-1.4-1.4-1.4 1.4-1.1-1.1 1.4-1.4-1.4-1.4 1.1-1.1 1.4 1.4z"/></svg>';
+    }
+    if (kind === "go") {
+      return '<svg' + common + '><path fill="currentColor" d="M4 11h9.2L10.6 8.4 12 7l6 6-6 6-1.4-1.4L13.2 13H4v-2z"/></svg>';
+    }
+    if (kind === "friends") {
+      return '<svg' + common + '><path fill="currentColor" d="M9 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm6.5-.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19c0-2.8 2.7-5 6.5-5s6.5 2.2 6.5 5v1h-13v-1zm14 .5v.5h5v-1c0-1.9-1.3-3.5-3.2-4.3 1 .6 1.7 1.8 1.7 3.3z"/></svg>';
+    }
+    if (kind === "party") {
+      return '<svg' + common + '><path fill="currentColor" d="M12 3 9.5 9H4l4.5 3.4L6.5 19 12 15.2 17.5 19l-2-6.6L20 9h-5.5L12 3z"/></svg>';
+    }
+    if (kind === "room") {
+      return '<svg' + common + '><path fill="currentColor" d="M4 20V9l8-5 8 5v11h-5v-6H9v6H4zm2-2h1v-6h10v6h1v-8.2l-6-3.8-6 3.8V18z"/></svg>';
+    }
+    return "";
+  }
   function volToolbarHtml() {
-    // How this works (20260906af): classic-ish Volume — mute toggle + slider popover.
+    // How this works (20260906af/ak): classic-ish Volume — mute toggle + slider popover + SVG speaker.
     // Beginner: speaker button mutes; open the slider to set loudness (saved on this browser).
     // ENGINE DEV: volume applies to local <audio>; mute-safe skips embed/local load when muted.
     var pct = Math.round((roomAudioVolume || 0) * 100);
     var muteTitle = roomAudioMuted ? "Unmute room music" : "Mute room music";
+    var ico = roomAudioMuted ? tbIconSvg("vol-mute") : tbIconSvg("vol");
     return '<span class="tb-vol-wrap' + (roomAudioMuted ? " is-muted" : "") + (volPopoverOpen ? " is-open" : "") + '">'
-      + '<button type="button" class="tb tb-vol" title="' + muteTitle + '" aria-label="Volume" data-room-mute="1"></button>'
-      + '<button type="button" class="tb-vol-open text-btn" title="Volume slider" aria-label="Open volume slider" data-vol-toggle="1">▾</button>'
+      + '<button type="button" class="tb tb-vol" title="' + muteTitle + '" aria-label="Volume" data-room-mute="1">' + ico + '</button>'
+      + '<button type="button" class="tb-vol-open text-btn" title="Volume slider" aria-label="Open volume slider" data-vol-toggle="1">'
+      +   '<svg class="tb-ico tb-ico-caret" viewBox="0 0 12 12" width="10" height="10" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 4l4 4 4-4z"/></svg>'
+      + '</button>'
       + '<div class="tb-vol-pop" id="tb-vol-pop"' + (volPopoverOpen ? "" : " hidden") + ' role="dialog" aria-label="Room volume">'
       +   '<label class="tb-vol-label">Volume <span id="tb-vol-pct">' + pct + '%</span>'
       +     '<input type="range" id="tb-vol-slider" min="0" max="100" step="1" value="' + pct + '" data-vol-slider="1" />'
@@ -4421,14 +4874,32 @@
   }
   function card(item) {
     var id = item.id || "";
+    var isAv = itemCat(item) === "avatars";
+    var worn = isAv && isWornStuffId(id);
     var thumb = item.thumb
       ? '<img class="stuff-thumb" src="' + item.thumb + '" alt="" />'
-      : '<div class="swatch"></div>';
-    return '<button type="button" class="card stuff-card" data-stuff-item="' + esc(id) + '">'
+      : '<div class="swatch swatch-empty" aria-hidden="true"></div>';
+    // How this works (20260906ak): classic My Avatars card — Wear / Remove + worn badge.
+    var wearRow = "";
+    if (isAv) {
+      wearRow = '<div class="stuff-card-wear">'
+        + (worn
+          ? ('<span class="stuff-worn-badge" title="Currently worn">Worn</span>'
+            + '<button type="button" class="stuff-wear-chip is-worn" data-stuff-unwear="' + esc(id) + '">'
+            + happyFaceSvg(true) + ' Remove avatar</button>')
+          : ('<button type="button" class="stuff-wear-chip" data-stuff-wear="' + esc(id) + '">'
+            + happyFaceSvg(false) + ' Wear avatar</button>'))
+        + '</div>';
+    }
+    return '<div class="card stuff-card' + (worn ? " is-worn" : "") + '">'
+      + '<button type="button" class="stuff-card-open" data-stuff-item="' + esc(id) + '">'
       + thumb
+      + (worn ? '<span class="stuff-worn-ribbon" aria-hidden="true">★</span>' : "")
       + '<div class="body"><h3>' + esc(item.name || "Item") + '</h3>'
       + '<p class="meta">' + esc(item.kind || itemCat(item)) + (item.creator ? (" · " + esc(item.creator)) : "") + '</p>'
-      + '<div class="price">owned</div></div></button>';
+      + '<div class="price">owned</div></div></button>'
+      + wearRow
+      + '</div>';
   }
   function findStuff(id) {
     var all = loadStuff();
@@ -4436,21 +4907,34 @@
     return null;
   }
   function stuffUploadForm(meta) {
-    // How this works: Music category accepts audio files (data URL in whirled2.stuff).
+    // How this works: Music = audio data URL. Avatars = PNG/WebP preview (+ optional .aseprite attachment).
     // Other categories stay image-thumb stubs. Copyright checkbox is always required.
     var isMusic = meta.id === "music";
-    var fileLabel = isMusic
-      ? 'Audio file (MP3 / WAV / OGG / WebM) <input type="file" name="media" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/*" required />'
-      : 'Thumbnail / image (optional) <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" />';
-    var blurb = isMusic
-      ? 'Wiki Music: upload an audio file you own or have rights to. Stored as a data URL in this browser (~2–4MB). Add tracks to the room playlist from Room menu. Do <b>not</b> upload copyrighted material you do not own.'
-      : 'Wiki-style stub: name + description + optional thumbnail. SWF / full media arrives with the engine later. Images only for this mock (png/jpg/gif/webp), ~200KB cap.';
+    var isAvatar = meta.id === "avatars";
+    var fileLabel;
+    if (isMusic) {
+      fileLabel = 'Audio file (MP3 / WAV / OGG / WebM) <input type="file" name="media" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/*" required />';
+    } else if (isAvatar) {
+      fileLabel = 'Preview image (PNG / WebP, ~80×60 thumb OK) <input type="file" name="image" accept="image/png,image/webp,image/jpeg,image/gif" />'
+        + '</label><label>Aseprite source (optional, stored as pack attachment) <input type="file" name="aseprite" accept=".aseprite,.ase,application/octet-stream" />';
+    } else {
+      fileLabel = 'Thumbnail / image (optional) <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" />';
+    }
+    var blurb;
+    if (isMusic) {
+      blurb = 'Wiki Music: upload an audio file you own or have rights to. Stored as a data URL in this browser (~2–4MB). Add tracks to the room playlist from Room menu. Do <b>not</b> upload copyrighted material you do not own.';
+    } else if (isAvatar) {
+      blurb = 'Wiki Create avatars (modern path): PNG/WebP sprite preview for Stuff. Optional <code>.aseprite</code> is kept as a pack attachment (not played via Ruffle). After save, open the item → <b>Wear</b> to show it in your loft. Classic SWF wardrobe stays On hold — see STUFF-AVATARS.md. Images ~200KB; .aseprite ~1MB cap.';
+    } else {
+      blurb = 'Wiki-style stub: name + description + optional thumbnail. SWF / full media arrives with the engine later. Images only for this mock (png/jpg/gif/webp), ~200KB cap.';
+    }
+    var ph = isMusic ? "Track name" : (isAvatar ? "Avatar name" : "Item name");
     return '<div class="panel stuff-upload-panel">'
       + '<div class="room-side-head"><h2>Upload / Create — ' + esc(meta.label) + '</h2>'
       +   '<button type="button" class="text-btn" data-stuff-mode="browse">Cancel</button></div>'
       + '<p class="meta">' + blurb + '</p>'
       + '<form id="stuff-upload-form" class="stuff-upload-form">'
-      +   '<label>Name <input name="name" maxlength="80" required placeholder="' + (isMusic ? "Track name" : "Item name") + '" /></label>'
+      +   '<label>Name <input name="name" maxlength="80" required placeholder="' + ph + '" /></label>'
       +   '<label>Description <textarea name="description" rows="3" maxlength="400" placeholder="What is it?"></textarea></label>'
       +   '<label>Type <input name="type" readonly value="' + esc(meta.label) + '" data-type-id="' + esc(meta.id) + '" /></label>'
       +   '<input type="hidden" name="typeId" value="' + esc(meta.id) + '" />'
@@ -4471,7 +4955,7 @@
     }).join("");
     var thumb = item.thumb
       ? '<img class="stuff-detail-thumb" src="' + item.thumb + '" alt="" />'
-      : '<div class="swatch"></div>';
+      : '<div class="swatch swatch-empty" aria-hidden="true"></div>';
     var edit = stuffMode === "edit";
     var listing = findShopListingByStuff(item.id);
     var body = edit
@@ -4508,14 +4992,28 @@
           + '<p class="meta">Creator loop: list a copy into Shop. Price is display-only.</p>';
       }
     }
-    return '<div class="panel stuff-detail-panel">'
+    var isAvatar = itemCat(item) === "avatars";
+    // How this works (20260906ak): avatars get a classic Avatar viewer (backdrop + scale + Wear).
+    var viewerBlock = (!edit && isAvatar) ? avatarViewerHtml(item) : "";
+    var headBlock = isAvatar
+      ? ('<div class="stuff-detail-head stuff-detail-head-avatar"><div><h2>' + esc(item.name || "Item") + '</h2>'
+        + (edit ? body : ('<p class="meta">by ' + esc(item.creator || "you") + ' · ' + esc(item.kind || "avatar") + '</p>'
+          + '<p>' + esc(item.description || "No description.") + '</p>'))
+        + '</div></div>')
+      : ('<div class="stuff-detail-head">' + thumb + '<div><h2>' + esc(item.name || "Item") + '</h2>' + body + '</div></div>');
+    return '<div class="panel stuff-detail-panel' + (isAvatar ? " stuff-detail-avatar" : "") + '">'
       + '<button type="button" class="text-btn" data-stuff-mode="browse">← Back to ' + esc(catMeta(stuffCat).label) + '</button>'
-      + '<div class="stuff-detail-head">' + thumb + '<div><h2>' + esc(item.name || "Item") + '</h2>' + body + '</div></div>'
+      + viewerBlock
+      + headBlock
       + (edit ? "" : (
         '<div class="stuff-detail-actions">'
-        + '<button type="button" class="action-btn" data-stuff-edit-open="' + esc(item.id) + '">Edit name/desc</button>'
-        + '<button type="button" class="action-btn danger" data-stuff-delete="' + esc(item.id) + '">Delete</button>'
+        + (isAvatar ? "" : "")
+        + '<button type="button" class="action-btn" data-stuff-edit-open="' + esc(item.id) + '">Rename</button>'
+        + '<button type="button" class="action-btn danger" data-stuff-delete="' + esc(item.id) + '">Delete Item</button>'
         + '</div>'
+        + (isAvatar
+          ? '<p class="meta">Wear shows this avatar in your loft on <code>#avatar-wear-layer</code> (sprite billboard — not Ruffle/SWF). Scale applies to preview + loft.</p>'
+          : "")
         + listBlock
         + '<div class="section-label">Send as Gift</div>'
         + (friends.length
@@ -4544,7 +5042,9 @@
     // How this works: quiet On hold note (default) OR full Avatar lab (flag on) — only on Avatars browse.
     var avatarExtra = "";
     if (stuffCat === "avatars" && stuffMode === "browse") {
-      avatarExtra = isAvatarLabOn() ? avatarLabPanelHtml() : avatarLabHoldPanelHtml();
+      // How this works: sprite packs first (Wear in loft); SWF lab stays On hold unless ?avatarLab=1.
+      avatarExtra = ensureUserPackSeedButtonHtml()
+        + (isAvatarLabOn() ? avatarLabPanelHtml() : avatarLabHoldPanelHtml());
     }
     var body;
     if (stuffMode === "upload") {
@@ -4685,7 +5185,7 @@
     var coins = (g.coins != null ? g.coins : g.price);
     var price = coins != null ? formatShopPrice(coins, false) : "free";
     return '<button type="button" class="card shop-card game-card" data-game-open="' + esc(id) + '">'
-      + '<div class="swatch"></div><div class="body"><h3>' + esc(g.name || "Game") + '</h3>'
+      + '<div class="swatch swatch-empty" aria-hidden="true"></div><div class="body"><h3>' + esc(g.name || "Game") + '</h3>'
       + '<p class="meta">' + esc(gameGenreLabel(gameGenreOf(g))) + " · " + esc(g.creator || "member") + '</p>'
       + '<div class="price">' + esc(String(price)) + '</div></div></button>';
   }
@@ -5053,7 +5553,7 @@
       : ' class="room-tile is-empty"';
     var chips = (enter && rid === "loft") ? roomOccupantChipsHtml(3) : (enter ? "" : "");
     return '<' + tag + attrs + '>'
-      + '<div class="thumb" aria-hidden="true"></div>'
+      + '<div class="thumb room-thumb-ph" aria-hidden="true"></div>'
       + '<div class="body"><h3>' + roomLockGlyphHtml(lockMode) + ' ' + esc(opts.name || ROOM) + '</h3>'
       +   '<p class="meta">' + esc(opts.meta || "") + '</p>'
       +   '<div class="room-rating">' + esc(rating) + '</div>'
@@ -5404,7 +5904,7 @@ function helpPage() {
       + '<div class="panel"><h2>Starting Out</h2>'
       + '<ul class="help-tips">'
       + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname), Transactions (Coins &amp; Bars).</li>'
-      + '<li><b>Sign-in</b> — username / password is primary. Discord / Google Coming Soon (OAuth apps needed). Facebook Connect removed (Meta App ID was required for Pages).</li>'
+      + '<li><b>Sign-in</b> — username / password works everywhere. <b>Create account with Discord</b> works on the demo server / phone tunnel (not GitHub Pages — no secrets on a static host). Google Coming Soon. Facebook Connect removed.</li>'
       + '<li><b>Rooms</b> — tap a lobby tile to <b>preview</b> then Enter; <b>Create Room</b> from My Rooms (first free; later 10k coins or 1 bar). Phone landscape = immersive stage + corner chat.</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
       + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Owner pastes a YouTube/Spotify link → <b>Set embed</b> → <b>Done</b>. <b>Everyone in this loft hears the same loop (synced)</b> when the demo server is running; Pages alone is local-only. Closing the sheet does <b>not</b> stop playback. On phones use <b>Open player</b> if the embed is hard to tap.</li>'
@@ -5421,7 +5921,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: avatar lab deferred (On hold; unlock <code>?avatarLab=1</code>). Cache <code>?v=20260906af</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Stuff sprite avatars + Wear billboard (see STUFF-AVATARS.md). SWF lab On hold (<code>?avatarLab=1</code>). Cache <code>?v=20260906al</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5498,8 +5998,13 @@ function helpPage() {
       +       '<button type="button" class="text-btn room-immersive-exit" data-immersive-exit="1" hidden>Exit fullscreen</button></div>'
       +     '<div class="stage-body chat-mode-' + esc(loadChatUi().mode) + ' text-size-' + esc(loadChatUi().textSize) + (loadChatUi().hideHistory ? ' hide-history' : '') + '">'
       +     '<div class="stage-host">'
-      +       '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
+      // How this works (20260906ak): CSS loft backdrop placeholder so Wear looks intentional.
+      // ENGINE DEV: when Pixi mounts, host.replaceChildren(canvas) clears this HTML.
+      +       '<div id="stage-slot">' + stagePlaceholderHtml() + '</div>'
       +       decorateLayerHtml()
+      // How this works: #avatar-wear-layer = worn Stuff avatar billboard (sprite pack, not SWF).
+      // ENGINE DEV: chrome overlay; Pixi may later own the avatar sprite inside #stage-slot.
+      +       avatarWearLayerHtml()
       // How this works: #stage-bubbles = temporary avatar speech/thought over the stage
       // (separate from Slide/Overlay history). ENGINE DEV: Pixi may later replace these.
       +       '<div id="stage-bubbles" class="stage-bubbles" aria-live="polite"></div>'
@@ -6397,6 +6902,7 @@ function helpPage() {
       +       '<div class="cp-edit-row">' + editToggle("photo", "photo") + '</div></div>'
       +     '<div class="cp-main">'
       +       '<div class="cp-name-row"><span class="cp-name">' + esc(me.name) + '</span>' + roleBadgeHtml(getRole(sid)) + '<span class="level-badge">Level 1</span></div>'
+      +       (discordLinkedBadgeHtml(me) ? ('<div class="cp-discord-link">' + discordLinkedBadgeHtml(me) + '</div>') : '')
       +       '<div class="cp-status-block">'
       +         '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
       +         (skin.motto ? ('<div class="cp-motto">' + esc(skin.motto) + '</div>') : '')
@@ -6921,8 +7427,10 @@ function helpPage() {
       +   '<h2>Other sign-in</h2>'
       +   '<p class="meta">Username / password is primary (no Meta App ID steps).</p>'
       +   (me.discord || me.discordId
-            ? '<p class="meta">Discord — <b>Linked</b></p>'
-            : '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span> (link via gate when local demo OAuth env is set).</p>')
+            ? ('<p class="meta discord-account-row">Discord — <b>Linked</b> '
+              + (me.discordUsername ? (' ' + discordLinkedBadgeHtml(me)) : '')
+              + '</p>')
+            : '<p class="meta">Discord — use <b>Continue with Discord</b> on the gate (demo server) to create/link your account.</p>')
       +   '<p class="meta">Google — <span class="club-badge-soon">Coming Soon</span></p>'
       +   '<p class="meta">GitHub / Apple OAuth also need a developer app — none are zero-setup on a static site.</p>'
       + '</div>'
@@ -7022,7 +7530,7 @@ function helpPage() {
           ? '<div class="gallery-grid">' + imgs.map(function (im) {
               var thumb = im.thumb
                 ? '<img src="' + im.thumb + '" alt="' + esc(im.name || "") + '" />'
-                : '<div class="swatch"></div>';
+                : '<div class="swatch swatch-empty" aria-hidden="true"></div>';
               return '<div class="gallery-cell">' + thumb
                 + '<div class="meta">' + esc(im.name || "image") + '</div>'
                 + '<button type="button" class="text-btn" data-gallery-remove-img="' + esc(im.id) + '" data-gallery-id="' + esc(g.id) + '">Remove</button>'
@@ -7369,7 +7877,7 @@ function helpPage() {
 
   function gate() {
     // How this works: Sign Up / Logon with username + password (primary). Discord button fills after status fetch.
-    // Beginner: Pages (no WHIRLED_API) keeps Coming Soon; local server + env → Continue with Discord.
+    // Beginner (?v=20260906al): Pages may set WHIRLED_API to tunnel → Discord CTA; hybrid password auth falls back offline.
     return ''
       + '<section class="gate"><div class="gate-card">'
       +   logoImg("gate-logo")
@@ -7388,7 +7896,7 @@ function helpPage() {
       +   '</div>'
       +   '<p class="gate-err" id="gate-err"></p>'
       +   '<div id="gate-discord" class="gate-discord">'
-      +     '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span></p>'
+      +     '<p class="meta">Discord — checking demo server…</p>'
       +   '</div>'
       +   '<p class="meta">Username / password is the primary sign-in. Google — Coming Soon (need OAuth app setup).</p>'
       +   '<p class="meta">Offline preview stays in this browser. Shared chat + shared soundtrack need server/server.mjs.</p>'
@@ -7406,8 +7914,16 @@ function helpPage() {
           }).join("") + '</nav>'
       +   '<div class="who">'
       +     '<div class="row who-links">'
-      +       '<button type="button" class="mail mail-btn" data-me="mail" title="Mail">&#9993; <u>(' + unreadCount() + ')</u></button>'
-      +       '<button type="button" class="notice-bell-btn" data-me="notices" title="Notices">&#128276;'
+      // How this works (20260906ai): SVG mail + bell — avoid high-codepoint emoji tofu on phones.
+      // Beginner: same buttons as before; icons are tiny inline SVGs (pale-blue ink).
+      +       '<button type="button" class="mail mail-btn" data-me="mail" title="Mail">'
+      +         '<svg class="who-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
+      +           '<path fill="currentColor" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"/>'
+      +         '</svg> <u>(' + unreadCount() + ')</u></button>'
+      +       '<button type="button" class="notice-bell-btn" data-me="notices" title="Notices">'
+      +         '<svg class="who-ico" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
+      +           '<path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z"/>'
+      +         '</svg>'
       +         (unreadNoticesCount() ? (' <u>(' + unreadNoticesCount() + ')</u>') : '')
       +       '</button>'
       +       '<b>' + esc(me.name) + '</b>'
@@ -7432,9 +7948,12 @@ function helpPage() {
       // Beginner: Open / Close player keep working after expand — dock stays inside #app for click handlers.
       // ENGINE DEV: do not put #room-embed-dock under .stage-body; do not move it to document.body.
       + '<div id="room-embed-dock" class="room-embed-dock" hidden></div>'
+      // How this works (20260906ak): bottom chat bar — crisp SVG icons (no black squares / emoji tofu).
       + '<form class="bar" id="chat-form">'
       +   '<div class="chat-opts-wrap">'
-      +   '<button type="button" class="chat-opts" id="chat-opts-btn" title="Chat options" aria-label="Chat options" data-chat-opts="1">&#9679;</button>'
+      +   '<button type="button" class="chat-opts" id="chat-opts-btn" title="Chat options" aria-label="Chat options" data-chat-opts="1">'
+      +     tbIconSvg("chatopts")
+      +   '</button>'
       +   '<div class="chat-opts-menu" id="chat-opts-menu" hidden></div>'
       +   '</div>'
       +   '<input id="chat-input" maxlength="240" placeholder="Type here to chat!" autocomplete="off" />'
@@ -7442,16 +7961,16 @@ function helpPage() {
       +   '<span class="toolbar">'
       +     volToolbarHtml()
       +     '<span class="tb-go-wrap">'
-      +       '<button type="button" class="tb tb-go" title="Go" aria-label="Go" data-tb="go"></button>'
+      +       '<button type="button" class="tb tb-go" title="Go" aria-label="Go" data-tb="go">' + tbIconSvg("go") + '</button>'
       +       goMenuHtml()
       +     '</span>'
       +     '<span class="tb-friends-wrap">'
-      +       '<button type="button" class="tb tb-friends" title="Friends" aria-label="Friends" data-tb="friends"></button>'
+      +       '<button type="button" class="tb tb-friends" title="Friends" aria-label="Friends" data-tb="friends">' + tbIconSvg("friends") + '</button>'
       +       friendsToolbarPopupHtml()
       +     '</span>'
-      +     '<button type="button" class="tb tb-party" title="Parties" aria-label="Parties" data-tb="party"></button>'
+      +     '<button type="button" class="tb tb-party" title="Parties" aria-label="Parties" data-tb="party">' + tbIconSvg("party") + '</button>'
       +     '<span class="tb-go-wrap tb-room-wrap">'
-      +       '<button type="button" class="tb tb-room" title="Room" aria-label="Room" data-tb="room"></button>'
+      +       '<button type="button" class="tb tb-room" title="Room" aria-label="Room" data-tb="room">' + tbIconSvg("room") + '</button>'
       +       '<div class="go-menu room-menu" id="room-menu" hidden>'
       +         '<button type="button" data-room-menu="comment">Comment or rate</button>'
       +         '<button type="button" data-room-menu="decorate">Decorate Room</button>'
@@ -7497,7 +8016,11 @@ function helpPage() {
       }
       document.getElementById("app").innerHTML = gate();
       document.getElementById("app").setAttribute("data-tab", "gate");
-      bindGate();
+      // Beginner (?v=20260906al): always bind Sign Up / Logon when gate is shown.
+      try { bindGate(); } catch (eBind) {
+        var gePaint = document.getElementById("gate-err");
+        if (gePaint) gePaint.textContent = (eBind && eBind.message) ? eBind.message : "Gate buttons failed to bind.";
+      }
       try { window.__whirledBoot = true; } catch (e) {}
       return;
     }
@@ -7508,7 +8031,14 @@ function helpPage() {
     try { ensureMobileChatOverlay(); } catch (eMob) {}
     // 20260906af: landscape immersion (inRoom + phone landscape) — chrome only around #stage-slot.
     try { bindLandscapeImmersionListeners(); updateLandscapeImmersion(); } catch (eImm) {}
-    if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
+    if (!document.getElementById("main")) {
+      // How this works (?v=20260906al): shell paint must not leave a blank app after login.
+      try {
+        document.getElementById("app").innerHTML = shell();
+      } catch (eShellPaint) {
+        throw eShellPaint;
+      }
+    }
     var tabAttr = tab || "rooms";
     if (tabAttr === "rooms" && !inRoom) tabAttr = "rooms-lobby";
     if (tabAttr === "rooms" && inRoom) tabAttr = "rooms";
@@ -7522,13 +8052,15 @@ function helpPage() {
     // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts only when playlistPanelDirty (never while paste field focused; clears dirty instead).
     if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; main.innerHTML = legalPage(); }
     else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; main.innerHTML = helpPage(); }
-    else if (tab === "rooms") main.innerHTML = rooms();
+    // How this works (QA 20260906ai): rooms-lobby is a CSS state on #app, not a paint tab.
+    // Beginner: if something still calls paint("rooms-lobby"), show the Rooms lobby — never the old Groups stub.
+    else if (tab === "rooms" || tab === "rooms-lobby") main.innerHTML = rooms();
     else if (tab === "me") main.innerHTML = mePage();
     else if (tab === "stuff") main.innerHTML = stuffPage();
     else if (tab === "shop") main.innerHTML = shopPage();
     else if (tab === "games") main.innerHTML = gamesPage();
     else if (tab === "groups") main.innerHTML = groupsPage();
-    else main.innerHTML = '<section class="page"><h1>Groups</h1><p class="meta">No groups yet. Shared whirleds come later.</p></section>';
+    else main.innerHTML = rooms();
     if (partyPanelOpen && !(tab === "rooms" && inRoom)) {
       var existingParty = document.getElementById("party-panel");
       if (!existingParty) {
@@ -7600,19 +8132,33 @@ function helpPage() {
         }
       }
     } catch (ePop) {}
+    // How this works: after room paint, flip multi-frame Worn avatar sprites on #avatar-wear-layer.
+    try { startAvatarWearAnim(); } catch (eWearAnim) {}
+    try { applyWearBillboardScale(); } catch (eWearSc) {}
+    // Stuff Avatar viewer preview play (when detail is open).
+    try { startAvatarViewerAnim(); } catch (eViewAnim) {}
   }
   function ensureStagePlaceholder() {
+    // How this works (20260906ak): keep loft backdrop if engine has not mounted yet.
+    // Never re-inject the old developer-y stage-copy void text.
     var slot = document.getElementById("stage-slot");
     if (!slot) return;
     var hasEngine = !!(slot.querySelector("canvas") || slot.querySelector("[data-whirled-engine]"));
     if (hasEngine) return;
-    if (slot.querySelector(".stage-copy")) return;
-    slot.innerHTML = '<div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div>';
+    if (!slot.querySelector(".loft-backdrop")) {
+      slot.innerHTML = stagePlaceholderHtml();
+    }
     var host = slot.parentElement;
     if (host && host.classList.contains("stage-host") && !document.getElementById("decorate-layer")) {
       host.insertAdjacentHTML("beforeend", decorateLayerHtml());
     }
+    if (host && host.classList.contains("stage-host") && !document.getElementById("avatar-wear-layer")) {
+      // How this works: re-attach Wear billboard if room chrome was rebuilt without a full paint.
+      host.insertAdjacentHTML("beforeend", avatarWearLayerHtml());
+    }
     try { ensureStageBubblesEl(); } catch (e) {}
+    try { startAvatarWearAnim(); } catch (eWear) {}
+    try { applyWearBillboardScale(); } catch (eSc) {}
   }
   // Information: refreshChatLog writes both #chat-log (slide) and #chat-overlay (overlay).
   // How this works: active tab (Room vs PM) picks which message array to render.
@@ -7729,9 +8275,14 @@ function helpPage() {
   function refreshGateDiscord() {
     var el = document.getElementById("gate-discord");
     if (!el) return;
-    var soon = '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span></p>';
+    // Beginner (?v=20260906al): without WHIRLED_API, Pages cannot hold Discord secrets — Coming Soon.
+    // With WHIRLED_API (tunnel) + OAuth env → Create account with Discord (creates discord-<id> user).
+    var soonPages = '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span> on GitHub Pages '
+      + '(needs the demo server; secrets cannot sit on a static host).</p>';
+    var soonOff = '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span> '
+      + '(demo server OAuth not configured yet).</p>';
     if (!isDemoApi() || !window.WhirledApi || !window.WhirledApi.discordAuthStatus) {
-      el.innerHTML = soon;
+      el.innerHTML = soonPages;
       return;
     }
     window.WhirledApi.discordAuthStatus().then(function (st) {
@@ -7739,14 +8290,14 @@ function helpPage() {
       if (st && st.enabled) {
         var href = window.WhirledApi.discordAuthStartUrl();
         el.innerHTML = '<p class="gate-discord-row">'
-          + '<a class="action-btn gate-discord-btn" href="' + href + '">Continue with Discord</a>'
+          + '<a class="action-btn gate-discord-btn" href="' + href + '">Create account with Discord</a>'
           + '</p>'
-          + '<p class="meta">Local Discord OAuth — signs you in via the demo server.</p>';
+          + '<p class="meta">Creates / links a Whirled2 account via Discord. Your Discord handle shows as a linked badge — not your display name.</p>';
       } else {
-        el.innerHTML = soon;
+        el.innerHTML = soonOff;
       }
     }).catch(function () {
-      if (el.isConnected) el.innerHTML = soon;
+      if (el.isConnected) el.innerHTML = soonOff;
     });
   }
   var _decDrag = null;
@@ -7909,7 +8460,8 @@ function helpPage() {
   //   onOccupants(fn), getChatUi() → { mode, hideHistory, textSize, bubbleDuration }
   // Listen for document event "whirled:ready" if bridge is not ready yet (detail = this object).
   // Do NOT draw outside #stage-slot. Do NOT rebuild login. Coins+Bars earn-only (no payments). No Flash.
-  // #decorate-layer and #stage-bubbles are chrome siblings above your canvas (see z-index in ENGINE-BRIDGE.md).
+  // #decorate-layer, #avatar-wear-layer, and #stage-bubbles are chrome siblings above your canvas.
+  // ENGINE DEV: Wear billboard is temporary until Pixi owns avatars inside #stage-slot. No Ruffle.
   // Chrome may show temporary #stage-bubbles until you own Pixi nametag bubbles.
   // ---------------------------------------------------------------------------
   function exposeBridge() {
@@ -7934,7 +8486,9 @@ function helpPage() {
       getActiveAvatarId: function () {
         var w = loadWardrobe();
         return w && w.activeId ? w.activeId : null;
-      }
+      },
+      // Stuff sprite Wear (modern path): chrome billboard on #avatar-wear-layer — not #stage-slot.
+      getWornAvatar: function () { return loadWornAvatar(); }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
   }
@@ -8303,23 +8857,86 @@ function helpPage() {
     finishBootAfterSession();
   }
   function finishBootAfterSession() {
-    if (session() && session().user) {
-      stripStuckPokeNotices();
-      try { syncFriendsFromPerUser(); } catch (eSF) {}
-      try { awayMode = isAway(session().user.id); } catch (eAw) {}
-      pushNotice("green", you().name + " logged on.", { transient: true });
-    }
-    // How this works: a new page load is a new session visit — wipe leftover loft
-    // chat from earlier. Do not loadHistory() on boot (that rehydrated old chats).
-    clearRoomChatDisplay(true);
-    paint(session() && session().user ? "rooms" : "");
-    if (session() && session().user) {
-      startPoll();
-      startOccPoll();
-      ensureNoticeBar();
-      try { applyHashRoute(); } catch (eH) {}
+    // How this works (?v=20260906al): after a successful session, wrap shell/paint so a UI throw
+    // still shows #gate-err or a recoverable shell — never a stuck gate with an empty error.
+    // Beginner: login may succeed in WhirledApi while shell() fails; keep the session and recover.
+    // ENGINE DEV: chrome-only — never touches #stage-slot mount contract.
+    var hasUser = !!(session() && session().user);
+    try {
+      if (hasUser) {
+        try { stripStuckPokeNotices(); } catch (eSp) {}
+        try { syncFriendsFromPerUser(); } catch (eSF) {}
+        try { awayMode = isAway(session().user.id); } catch (eAw) {}
+        try { pushNotice("green", you().name + " logged on.", { transient: true }); } catch (eN) {}
+      }
+      // How this works: a new page load is a new session visit — wipe leftover loft
+      // chat from earlier. Do not loadHistory() on boot (that rehydrated old chats).
+      try { clearRoomChatDisplay(true); } catch (eClr) {}
+      try {
+        paint(hasUser ? "rooms" : "");
+      } catch (ePaint) {
+        showBootRecover(hasUser, ePaint);
+      }
+      // Ensure gate handlers exist whenever the gate is visible (paint usually binds; recover too).
+      if (!session() || !session().user) {
+        try {
+          if (document.getElementById("gate-err") || document.querySelector(".gate")) bindGate();
+        } catch (eBg) {}
+      }
+      if (session() && session().user) {
+        try { startPoll(); } catch (eP) {}
+        try { startOccPoll(); } catch (eO) {}
+        try { ensureNoticeBar(); } catch (eNb) {}
+        try { applyHashRoute(); } catch (eH) {}
+      }
+    } catch (eBoot) {
+      showBootRecover(!!(session() && session().user), eBoot);
     }
     try { window.__whirledBoot = true; } catch (e) {}
+  }
+  function showBootRecover(hasUser, err) {
+    // Purpose: surface paint/shell failures after auth instead of an empty stuck gate.
+    var msg = (err && err.message) ? err.message : String(err || "Chrome hit a snag after sign-in.");
+    try {
+      var appEl = document.getElementById("app");
+      if (!appEl) return;
+      if (hasUser && session() && session().user) {
+        try {
+          appEl.innerHTML = shell();
+          var main = document.getElementById("main");
+          if (main) {
+            main.innerHTML = '<section class="panel"><h2>Almost in</h2>'
+              + '<p class="gate-err" id="gate-err">' + esc(msg) + '</p>'
+              + '<p class="meta">Your session is saved. Open Rooms or reload if the chrome looks empty.</p>'
+              + '<p><button type="button" class="action-btn" data-tab="rooms">Open Rooms</button></p></section>';
+          }
+          appEl.setAttribute("data-tab", "rooms");
+        } catch (eShell) {
+          appEl.innerHTML = gate();
+          appEl.setAttribute("data-tab", "gate");
+          bindGate();
+          var ge2 = document.getElementById("gate-err");
+          if (ge2) ge2.textContent = msg + " (shell recover failed — try reload.)";
+        }
+      } else {
+        appEl.innerHTML = gate();
+        appEl.setAttribute("data-tab", "gate");
+        bindGate();
+        var ge = document.getElementById("gate-err");
+        if (ge) ge.textContent = msg;
+      }
+    } catch (eRec) {
+      try {
+        var el = document.getElementById("app");
+        if (el) {
+          el.innerHTML = '<section class="gate"><div class="gate-card"><h1>Chrome error</h1>'
+            + '<p class="gate-err" id="gate-err"></p></div></section>';
+          var g = document.getElementById("gate-err");
+          if (g) g.textContent = msg;
+          try { bindGate(); } catch (eB) {}
+        }
+      } catch (eFinal) {}
+    }
   }
 
   function onVisible() {
@@ -9105,6 +9722,70 @@ function helpPage() {
         inp.select();
         try { document.execCommand("copy"); copied(); } catch (e) { if (msg) msg.textContent = val; }
       }
+      return;
+    }
+    // How this works: seed converted Aseprite packs into Stuff inventory (kind=avatar).
+    if (ev.target.closest("[data-seed-user-packs]") && session()) {
+      seedUserAvatarPacks();
+      return;
+    }
+    // How this works: Wear / Take off Stuff avatars → loft #avatar-wear-layer billboard (not Ruffle).
+    if (ev.target.closest("[data-stuff-wear]") && session()) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      var wearStuffId = ev.target.closest("[data-stuff-wear]").getAttribute("data-stuff-wear");
+      var wearItem = findStuff(wearStuffId);
+      if (!wearItem || itemCat(wearItem) !== "avatars") {
+        pushNotice("status", "Avatar not found in Stuff.");
+        return;
+      }
+      if (!wearItem.thumb && !wearItem.preview && !(wearItem.frames && wearItem.frames.length)) {
+        pushNotice("status", "This avatar needs a preview image before Wear.");
+        return;
+      }
+      wearStuffAvatar(wearItem);
+      pushNotice("green", "Wearing “" + (wearItem.name || "Avatar") + "” — visible in Stuff preview and your loft.", { transient: true });
+      // How this works: refresh the tab you’re on (don’t yank out of Rooms if Stuff detail was stale).
+      var curTabW = document.querySelector(".tab.is-on");
+      var tabW = curTabW ? curTabW.getAttribute("data-tab") : "stuff";
+      paint(tabW || "stuff");
+      return;
+    }
+    if (ev.target.closest("[data-stuff-unwear]") && session()) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      saveWornAvatar(null);
+      pushNotice("green", "Avatar taken off — loft shows default tofu.", { transient: true });
+      var curTabU = document.querySelector(".tab.is-on");
+      var tabU = curTabU ? curTabU.getAttribute("data-tab") : "stuff";
+      paint(tabU || "stuff");
+      return;
+    }
+    // How this works: Wear classic default tofu (blank avatar).
+    if (ev.target.closest("[data-wear-tofu]") && session()) {
+      ev.preventDefault();
+      saveWornAvatar(makeTofuWornRow());
+      pushNotice("green", "Wearing default tofu.", { transient: true });
+      var curTabT = document.querySelector(".tab.is-on");
+      paint(curTabT ? curTabT.getAttribute("data-tab") : "stuff");
+      return;
+    }
+    // How this works: room self-menu → Change avatar… expands recent list.
+    if (ev.target.closest("[data-change-avatar]") && session()) {
+      var ca = document.getElementById("occ-change-avatar");
+      if (ca) ca.hidden = !ca.hidden;
+      return;
+    }
+    if (ev.target.closest("[data-goto-stuff-avatars]") && session()) {
+      stuffCat = "avatars";
+      stuffMode = "browse";
+      stuffItemId = null;
+      inRoom = false;
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-avatar-states-soon]") && session()) {
+      pushNotice("status", "States / custom actions: Coming Soon for SWF. Sprite packs already preview-play frames in the viewer.", { transient: true });
       return;
     }
     var stuffModeBtn = ev.target.closest("[data-stuff-mode]");
@@ -9898,7 +10579,7 @@ function helpPage() {
       paint("rooms");
       return;
     }
-        var stuffCatBtn = ev.target.closest("[data-stuff-cat]");
+    var stuffCatBtn = ev.target.closest("[data-stuff-cat]");
     if (stuffCatBtn && session()) {
       stuffCat = stuffCatBtn.getAttribute("data-stuff-cat") || "avatars";
       stuffMode = "browse";
@@ -10198,9 +10879,13 @@ function helpPage() {
       // Own profile must never poke self — leftover demo id is a no-op.
       return;
     }
-    var tab = ev.target.closest("[data-tab]");
+    // How this works (QA 20260906ai): #app also has data-tab="rooms-lobby" for CSS (hide chat bar).
+    // Beginner: closest("[data-tab]") used to match #app → paint("rooms-lobby") → wrong Groups stub.
+    // Only real nav buttons/links with known tab ids may switch pages.
+    var tab = ev.target.closest("button[data-tab], a[data-tab]");
     if (tab && tab.getAttribute("data-tab") && session()) {
       var t = tab.getAttribute("data-tab");
+      if (t !== "me" && t !== "stuff" && t !== "games" && t !== "rooms" && t !== "groups" && t !== "shop") return;
       clearStrayUI();
       if (t === "me") { meSub = "home"; viewingId = null; galleryViewId = null; }
       if (t === "rooms") { /* keep inRoom; decorate stays until leave */ }
@@ -10235,6 +10920,22 @@ function helpPage() {
         try { syncRoomAudio(); } catch (eUnmute) {}
         var volWrap = document.querySelector(".tb-vol-wrap");
         if (volWrap) volWrap.classList.remove("is-muted");
+      }
+      return;
+    }
+    // How this works (20260906ak): Avatar viewer scale slider — persist per item + live preview.
+    // Beginner: drag Scale; preview grows/shrinks. Same value sizes the loft Wear billboard.
+    if (ev.target.getAttribute && ev.target.hasAttribute("data-avatar-scale")) {
+      var aid = ev.target.getAttribute("data-avatar-scale");
+      var spct = Math.max(50, Math.min(200, Number(ev.target.value) || 100));
+      var s = saveAvatarScale(aid, spct / 100);
+      var spEl = document.getElementById("avatar-scale-pct");
+      if (spEl) spEl.textContent = Math.round(s * 100) + "%";
+      var vBill = document.querySelector("#avatar-viewer .avatar-viewer-billboard");
+      if (vBill) vBill.style.setProperty("--avatar-scale", String(s));
+      var wornNow = loadWornAvatar();
+      if (wornNow && wornNow.stuffId === aid) {
+        try { applyWearBillboardScale(); } catch (eWs) {}
       }
       return;
     }
@@ -10745,15 +11446,16 @@ function helpPage() {
       var fileInput = ev.target.querySelector(isMusicUp ? 'input[name="media"]' : 'input[name="image"]');
       var file = fileInput && fileInput.files && fileInput.files[0];
       // How this works: finishSave writes whirled2.stuff. Music keeps audio in dataUrl; thumb optional.
-      function finishSave(thumb, dataUrl) {
+      function finishSave(thumb, dataUrl, extra) {
         var items = loadStuff();
         var nid = "st" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        var kind = stype === "avatars" ? "avatar" : stype;
         var row = {
           id: nid,
           name: sname,
           description: sdesc,
-          kind: stype,
-          type: stype,
+          kind: kind,
+          type: kind,
           category: stype,
           creator: session().user.name,
           ownerId: session().user.id,
@@ -10762,12 +11464,35 @@ function helpPage() {
           at: new Date().toISOString()
         };
         if (dataUrl) row.dataUrl = dataUrl;
+        if (stype === "avatars") {
+          // Beginner: preview image is what Wear shows in the loft.
+          row.preview = thumb || "";
+          row.frames = thumb ? [thumb] : [];
+          row.source = (extra && extra.asepriteName) ? "aseprite" : "png";
+          row.pack = {
+            name: sname,
+            frames: row.frames.slice(),
+            thumb: thumb || "",
+            source: row.source
+          };
+          if (extra && extra.asepriteDataUrl) {
+            row.asepriteDataUrl = extra.asepriteDataUrl;
+            row.asepriteName = extra.asepriteName || "avatar.aseprite";
+            row.pack.sourceFile = row.asepriteName;
+          }
+        }
+        if (extra) {
+          Object.keys(extra).forEach(function (k) {
+            if (k === "asepriteDataUrl" || k === "asepriteName") return;
+            row[k] = extra[k];
+          });
+        }
         items.unshift(row);
         saveStuff(items);
         stuffItemId = nid;
         stuffMode = "detail";
-        appendTransaction({ kind: "upload", label: "Uploaded Stuff “" + sname + "” (" + stype + ")", coins: 0 });
-        pushNotice("green", "Saved “" + sname + "” to Stuff.", { transient: true });
+        appendTransaction({ kind: "upload", label: "Uploaded Stuff “" + sname + "” (" + kind + ")", coins: 0 });
+        pushNotice("green", "Saved “" + sname + "” to Stuff." + (stype === "avatars" ? " Open it and Wear to show in your loft." : ""), { transient: true });
         try { awardAction("upload"); } catch (e) {}
         paint("stuff");
       }
@@ -10802,10 +11527,48 @@ function helpPage() {
         areader.readAsDataURL(file);
         return;
       }
-      if (!file) { finishSave("", ""); return; }
+      // Avatar uploads: image preview required for Wear; optional .aseprite attachment.
+      var aseInput = ev.target.querySelector('input[name="aseprite"]');
+      var aseFile = aseInput && aseInput.files && aseInput.files[0];
+      function readAseThen(thumbUrl) {
+        if (!aseFile) {
+          finishSave(thumbUrl || "", "", null);
+          return;
+        }
+        var looksAse = /\.aseprite$/i.test(aseFile.name || "") || /\.ase$/i.test(aseFile.name || "");
+        if (!looksAse) {
+          if (msgEl) msgEl.textContent = "Attachment must be a .aseprite / .ase file.";
+          return;
+        }
+        if (aseFile.size > 1000000) {
+          if (msgEl) msgEl.textContent = "Aseprite file over ~1MB — too large for browser Stuff storage on this mock.";
+          return;
+        }
+        var ar = new FileReader();
+        ar.onload = function () {
+          var aseUrl = String(ar.result || "");
+          if (aseUrl.length > 1400000) {
+            if (msgEl) msgEl.textContent = "Encoded .aseprite too large for localStorage.";
+            return;
+          }
+          finishSave(thumbUrl || "", "", { asepriteDataUrl: aseUrl, asepriteName: aseFile.name || "avatar.aseprite" });
+        };
+        ar.onerror = function () { if (msgEl) msgEl.textContent = "Could not read .aseprite file."; };
+        ar.readAsDataURL(aseFile);
+      }
+      if (!file) {
+        if (stype === "avatars" && aseFile) {
+          if (msgEl) msgEl.textContent = "Add a PNG/WebP preview image so Wear can show the avatar in your loft. .aseprite alone is stored as an attachment after you also pick a preview.";
+          return;
+        }
+        finishSave("", "");
+        return;
+      }
       var okTypes = { "image/png":1, "image/jpeg":1, "image/jpg":1, "image/gif":1, "image/webp":1 };
       if (!okTypes[file.type]) {
-        if (msgEl) msgEl.textContent = "Images only for this mock (png/jpg/gif/webp). SWF comes later with the engine.";
+        if (msgEl) msgEl.textContent = stype === "avatars"
+          ? "Avatar preview must be PNG/WebP/JPEG/GIF. Optional .aseprite is a separate attachment."
+          : "Images only for this mock (png/jpg/gif/webp). SWF comes later with the engine.";
         return;
       }
       if (file.size > 200000) {
@@ -10820,7 +11583,8 @@ function helpPage() {
           if (msgEl) msgEl.textContent = "Encoded image too large for localStorage — try a smaller file.";
           return;
         }
-        finishSave(dataUrl, "");
+        if (stype === "avatars") readAseThen(dataUrl);
+        else finishSave(dataUrl, "");
       };
       reader.onerror = function () { if (msgEl) msgEl.textContent = "Could not read file."; };
       reader.readAsDataURL(file);

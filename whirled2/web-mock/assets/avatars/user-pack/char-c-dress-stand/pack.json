@@ -1,0 +1,37 @@
+{
+  "name": "Cyan Hair Stand",
+  "slug": "char-c-dress-stand",
+  "frames": [
+    "frames/frame_00.png"
+  ],
+  "displayFrames": [
+    "frames/display_00.png"
+  ],
+  "frameDurationsMs": [
+    833
+  ],
+  "thumb": "thumb.png",
+  "preview": "preview.png",
+  "source": "aseprite",
+  "sourceFile": "char-c-dress-stand.aseprite",
+  "sourceSha1": "17ef599f8776166519292053ea235c402b3454a1",
+  "size": {
+    "width": 512,
+    "height": 512
+  },
+  "layers": [
+    "leg_l",
+    "leg_r",
+    "torso",
+    "dress",
+    "arm_l",
+    "arm_r",
+    "hair_back",
+    "head",
+    "face",
+    "hair_front"
+  ],
+  "frameCount": 1,
+  "_beginner": "PNG frames + thumb from your .aseprite. Wear in Stuff shows this in the loft.",
+  "_engineDev": "Chrome mounts preview/display frames on #avatar-wear-layer. Do not load .aseprite in Ruffle."
+}

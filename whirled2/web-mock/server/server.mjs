@@ -3,7 +3,8 @@
  *
  * How this works:
  * - Run locally (see README). Point the page at it with window.WHIRLED_API = "http://localhost:PORT".
- * - On GitHub Pages, WHIRLED_API is empty — app.js uses WhirledApi offline localStorage instead.
+ * - GitHub Pages may set WHIRLED_API to the demo tunnel (origin only). Hybrid auth falls back to offline localStorage.
+ * - Discord success can redirect to CLIENT_RETURN_ORIGIN (Pages) while DISCORD_REDIRECT_URI stays the tunnel callback.
  * - In-memory users + loft chat; not a production database.
  * - Endpoints used by src/api.js: /api/register, /api/login, /api/me,
  *   /api/auth/discord (+ /status, /callback), /api/rooms/:id/chat, occupants,
@@ -75,12 +76,64 @@ function discordRedirectUri() {
   return "http://" + HOST + ":" + PORT + "/api/auth/discord/callback";
 }
 function publicOrigin() {
-  // Purpose: browser return URL after Discord (carries ?discord_token=).
+  // Purpose: browser return URL after Discord when staying on the tunnel (carries ?discord_token=).
   // How: PUBLIC_ORIGIN for tunnels; else local host:port.
   if (process.env.PUBLIC_ORIGIN) return String(process.env.PUBLIC_ORIGIN).replace(/\/$/, "");
   return "http://" + HOST + ":" + PORT;
 }
-// In-memory OAuth state → { at } with 5 min TTL (CSRF protection).
+function clientReturnOrigin() {
+  // Purpose (?v=20260906al): after Discord callback, optionally send the browser to main Pages
+  // instead of only the tunnel. Discord portal Redirect URI stays DISCORD_REDIRECT_URI (tunnel).
+  // Beginner: set CLIENT_RETURN_ORIGIN=https://whirledclassic.github.io/whirled2/whirled2/web-mock
+  // (or DISCORD_SUCCESS_ORIGIN). Never put secrets here — origin path only.
+  const a = process.env.CLIENT_RETURN_ORIGIN || process.env.DISCORD_SUCCESS_ORIGIN || "";
+  return String(a).replace(/\/$/, "").trim();
+}
+function normalizeReturnCandidate(raw) {
+  // Accept full origin+pathname from Pages (?return=) or env; strip trailing slash / query / hash.
+  try {
+    const u = new URL(String(raw || "").trim());
+    let path = u.pathname || "/";
+    if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+    return (u.origin + path).replace(/\/$/, "") || u.origin;
+  } catch {
+    return "";
+  }
+}
+function isAllowlistedReturnOrigin(candidate) {
+  // Allow: CLIENT_RETURN_ORIGIN / DISCORD_SUCCESS_ORIGIN, PUBLIC_ORIGIN / tunnel, local, github.io whirledclassic web-mock.
+  const c = normalizeReturnCandidate(candidate);
+  if (!c) return false;
+  const allowed = new Set();
+  const cro = clientReturnOrigin();
+  if (cro) allowed.add(normalizeReturnCandidate(cro));
+  allowed.add(normalizeReturnCandidate(publicOrigin()));
+  allowed.add(normalizeReturnCandidate("http://" + HOST + ":" + PORT));
+  allowed.add(normalizeReturnCandidate("https://whirledclassic.github.io/whirled2/whirled2/web-mock"));
+  if (allowed.has(c)) return true;
+  try {
+    const u = new URL(c);
+    if (
+      u.hostname === "whirledclassic.github.io" &&
+      u.pathname.indexOf("/whirled2/") !== -1 &&
+      u.pathname.indexOf("web-mock") !== -1
+    ) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+function discordSuccessRedirectBase(stateRow) {
+  // Prefer per-login ?return= (allowlisted), else CLIENT_RETURN_ORIGIN, else PUBLIC_ORIGIN (tunnel).
+  const fromState = stateRow && stateRow.returnOrigin ? String(stateRow.returnOrigin) : "";
+  if (fromState && isAllowlistedReturnOrigin(fromState)) return normalizeReturnCandidate(fromState);
+  const cro = clientReturnOrigin();
+  if (cro && isAllowlistedReturnOrigin(cro)) return normalizeReturnCandidate(cro);
+  return publicOrigin();
+}
+// In-memory OAuth state → { at, returnOrigin? } with 5 min TTL (CSRF protection).
 const oauthStates = new Map();
 function pruneOauthStates() {
   const now = Date.now();
@@ -126,6 +179,15 @@ function hashPassword(password, salt) {
   const hash = crypto.scryptSync(password, useSalt, 32).toString("hex");
   return { salt: useSalt, hash };
 }
+function discordHandleFrom(discordUser) {
+  // Purpose: Discord login name for a linked-account badge (NOT the Whirled2 display name).
+  const un = String((discordUser && discordUser.username) || "").trim();
+  const disc = discordUser && discordUser.discriminator != null ? String(discordUser.discriminator) : "";
+  if (un && disc && disc !== "0") return un + "#" + disc;
+  if (un) return "@" + un;
+  const gn = String((discordUser && discordUser.global_name) || "").trim();
+  return gn || "";
+}
 function publicUser(row) {
   // How this works: never expose password hash / client secrets. discord:true = linked.
   const out = {
@@ -140,6 +202,7 @@ function publicUser(row) {
     out.discord = true;
     out.discordId = row.discordId;
   }
+  if (row.discordUsername) out.discordUsername = String(row.discordUsername).slice(0, 64);
   if (row.authProvider) out.authProvider = row.authProvider;
   return out;
 }
@@ -529,7 +592,16 @@ const server = http.createServer(async (req, res) => {
       }
       pruneOauthStates();
       const state = crypto.randomBytes(16).toString("hex");
-      oauthStates.set(state, { at: Date.now() });
+      // How this works (?v=20260906al): optional ?return= from Pages — honor if allowlisted.
+      // Discord portal still uses DISCORD_REDIRECT_URI (tunnel callback). Success may land on Pages.
+      let returnOrigin = "";
+      const retRaw = url.searchParams.get("return") || "";
+      if (retRaw && isAllowlistedReturnOrigin(retRaw)) {
+        returnOrigin = normalizeReturnCandidate(retRaw);
+      } else if (clientReturnOrigin()) {
+        returnOrigin = normalizeReturnCandidate(clientReturnOrigin());
+      }
+      oauthStates.set(state, { at: Date.now(), returnOrigin });
       const params = new URLSearchParams({
         client_id: process.env.DISCORD_CLIENT_ID,
         response_type: "code",
@@ -576,6 +648,8 @@ const server = http.createServer(async (req, res) => {
       }
       // Create or find user: stable id = discord-<discordId>
       let user = findUserByDiscordId(db, String(discordUser.id));
+      // Linked Discord handle for badge (icon + @user) — Whirled2 display name stays separate.
+      const discordHandle = discordHandleFrom(discordUser);
       if (!user) {
         const id = "discord-" + discordUser.id;
         const display =
@@ -590,13 +664,15 @@ const server = http.createServer(async (req, res) => {
           room: "Studio Loft",
           coins: 0,
           discordId: String(discordUser.id),
+          discordUsername: discordHandle,
           authProvider: "discord",
           ...unusable
         };
         db.users[id] = user;
       } else {
-        // Refresh display name gently if empty; keep discordId linked.
+        // Refresh Discord link only — do not overwrite Whirled2 display name.
         user.discordId = String(discordUser.id);
+        if (discordHandle) user.discordUsername = discordHandle;
         user.authProvider = user.authProvider || "discord";
         db.users[user.id] = user;
       }
@@ -605,7 +681,12 @@ const server = http.createServer(async (req, res) => {
       touchPresence(db, user, "loft");
       save(db);
       // Strip code from URL via redirect — client reads ?discord_token= and enters shell.
-      return redirect(res, publicOrigin() + "/?discord_token=" + encodeURIComponent(token));
+      // Beginner (?v=20260906al): may return to Pages (CLIENT_RETURN_ORIGIN / ?return=) or tunnel.
+      const successBase = discordSuccessRedirectBase(st);
+      return redirect(
+        res,
+        successBase + "/?discord_token=" + encodeURIComponent(token) + "&v=20260906al"
+      );
     }
 
     // logout clears session presence
@@ -635,7 +716,12 @@ const server = http.createServer(async (req, res) => {
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return send(res, 404, { error: "Not found." });
   let raw = fs.readFileSync(filePath);
   if (filePath.endsWith("index.html")) {
-    raw = Buffer.from(String(raw).replace('window.WHIRLED_API = window.WHIRLED_API || "";', 'window.WHIRLED_API = window.WHIRLED_API || location.origin;'));
+    // When this server serves the page, force WHIRLED_API to this origin (tunnel or local).
+    // Pages ships a tunnel default string; replace any WHIRLED_API || … assignment.
+    raw = Buffer.from(String(raw).replace(
+      /window\.WHIRLED_API\s*=\s*window\.WHIRLED_API\s*\|\|\s*[^;]+;/,
+      'window.WHIRLED_API = window.WHIRLED_API || location.origin;'
+    ));
   }
   res.writeHead(200, { "Content-Type": mime(filePath) });
   res.end(raw);

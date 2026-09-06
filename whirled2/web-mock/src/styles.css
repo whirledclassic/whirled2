@@ -180,9 +180,10 @@ body {
 .page a:hover, .panel a:hover, .text-btn:hover { text-decoration: underline; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
 .card { background: var(--card); border: 1px solid var(--border-soft); border-radius: var(--radius-card); overflow: hidden; }
-.card .swatch { height: 90px; background: linear-gradient(#9fd3f0, #e8f4fb); }
-.card .swatch.night { background: linear-gradient(#1a2834, #4a3a28); }
-.card .swatch.fox { background: linear-gradient(#e07a28, #f4e6d4); }
+/* How this works (20260906ah): empty Stuff/Shop thumbs use soft sky wash — not raw gray boxes. */
+.card .swatch { height: 90px; background: linear-gradient(165deg, #b8dff2 0%, #e8f4fb 48%, #d4eaf6 100%); }
+.card .swatch.night { background: linear-gradient(165deg, #243447 0%, #1a2834 55%, #3a4a3a 100%); }
+.card .swatch.fox { background: linear-gradient(165deg, #e89550 0%, #f4e6d4 55%, #f7efe6 100%); }
 .card .body { padding: 8px 10px 10px; }
 .card h3 { margin: 0 0 3px; font-size: 14px; }
 .price { margin-top: 6px; font-size: 12px; font-weight: 700; color: #1e6fa8; }
@@ -325,13 +326,17 @@ body {
 .page .featured { margin: -18px -22px 16px; }
 .room-tile {
   display: grid; grid-template-columns: 120px 1fr; gap: 10px;
-  border: 1px solid #c5deee; border-radius: 6px; background: #fff; overflow: hidden;
+  border: 1px solid var(--border-soft); border-radius: 10px; background: #fff; overflow: hidden;
   padding: 0; text-align: left; cursor: pointer; width: 100%;
   font: inherit; color: inherit;
+  box-shadow: 0 1px 3px rgba(22, 50, 74, 0.06);
 }
+/* How this works (20260906ah): room lobby thumb = soft sky/lawn mini-scene (CSS only). */
 .room-tile .thumb {
   min-height: 80px;
-  background: linear-gradient(#2a3d55 0 42%, #6b8f4a 42% 48%, #4e6e36 48%);
+  background:
+    radial-gradient(ellipse 40% 28% at 72% 28%, rgba(255,255,255,0.55) 0 40%, transparent 55%),
+    linear-gradient(180deg, #9fd3f0 0%, #c5e4f5 38%, #a8c978 38%, #6b8f4a 48%, #4e6e36 100%);
 }
 .room-tile .body { padding: 8px 10px 10px; }
 .room-tile h3 { margin: 0 0 4px; color: #1e6fa8; font-size: 14px; }
@@ -561,21 +566,33 @@ body {
   padding: 6px 14px;
 }
 .chat-opts {
-  border: 0; width: 28px; height: 28px; border-radius: 50%;
-  background: #3aa3e0; color: #fff; font-size: 10px; cursor: default;
+  border: 1px solid #2b87c0; width: 32px; height: 32px; min-width: 32px; min-height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(#7ec8f0, #3aa3e0); color: #fff;
+  display: inline-grid; place-items: center; padding: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+  cursor: pointer;
 }
+.chat-opts .tb-ico { display: block; }
+.chat-opts:hover { filter: brightness(1.06); }
 .toolbar { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
+/* How this works (20260906ak): toolbar buttons use inline SVG (currentColor) — never CSS bg-image tofu. */
 .tb {
-  width: 26px; height: 26px; display: inline-block; border-radius: 4px;
-  border: 1px solid #b7d3e8; background: #fff center/16px 16px no-repeat;
-  box-shadow: inset 0 1px 0 #fff;
+  width: 30px; height: 30px; min-width: 30px; min-height: 30px;
+  display: inline-grid; place-items: center; border-radius: 6px;
+  border: 1px solid #b7d3e8; background: #fff;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(22,50,74,0.06);
+  color: #1e6fa8; padding: 0; cursor: pointer;
 }
-.tb-vol { background-image: linear-gradient(#7ec8f0, #3aa3e0); }
-.tb-go { background: #fff; position: relative; }
-.tb-go::after { content: "Go"; display: grid; place-items: center; height: 100%; font: 700 9px var(--ui); color: #1e6fa8; }
-.tb-friends { background-image: radial-gradient(circle at 50% 40%, #7ec8f0 0 40%, transparent 41%), linear-gradient(#e8f4fb, #cfe4f2); }
-.tb-party { background: repeating-linear-gradient(45deg, #7ec8f0, #7ec8f0 3px, #e8f4fb 3px, #e8f4fb 6px); }
-.tb-room { background: linear-gradient(#9fd3f0 0 55%, #6b8f4a 55%); }
+.tb:hover { background: #e8f4fb; border-color: #7ec8f0; }
+.tb:active { transform: translateY(1px); }
+.tb .tb-ico { display: block; }
+.tb-vol, .tb-go, .tb-friends, .tb-party, .tb-room {
+  background-image: none !important;
+}
+.tb-go::after { content: none !important; display: none !important; }
+.tb-vol { color: #1e6fa8; }
+.tb-vol-wrap.is-muted .tb-vol { color: #6a8292; }
 
 @media (max-width: 900px) {
   .bar { background: #0e141a; color: #dce8f0; border-top: 0; }
@@ -946,9 +963,15 @@ body {
   border: 1px solid #8abfd8; border-radius: 2px; background: #fff;
   display: block;
 }
+/* How this works (20260906ah): missing photo = soft classic circle frame (not a harsh square). */
 .profile-photo.missing {
   display: grid; place-items: center;
-  font: 700 22px var(--ui); color: #fff; background: #3aa3e0;
+  width: 72px; height: 72px;
+  font: 700 22px var(--ui); color: #fff;
+  background: linear-gradient(160deg, #6eb8e8 0%, #3aa3e0 55%, #2f8fd0 100%);
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1px #8abfd8, 0 2px 6px rgba(30, 111, 168, 0.18);
 }
 .cp-name-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cp-name { font-size: 26px; font-weight: 700; color: #1e6fa8; line-height: 1.1; }
@@ -4473,4 +4496,564 @@ button.tb.tb-music,
   body.room-immersive #app[data-tab="rooms"] > .topbar {
     /* safety: portrait should not stay immersive (JS clears class) */
   }
+}
+
+
+/* Discord linked-account badge (attached to profile — not the display name) */
+.cp-discord-link { margin: 4px 0 8px; }
+.discord-link-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px 3px 8px; border-radius: 999px;
+  background: #5865F2; color: #fff; font-size: 12px; font-weight: 600;
+  box-shadow: 0 1px 3px rgba(88, 101, 242, 0.35);
+  line-height: 1.2;
+}
+.discord-link-icon {
+  display: block; flex: 0 0 auto; width: 14px; height: 14px;
+  color: #fff;
+}
+.discord-link-label { opacity: 0.92; font-weight: 500; }
+.discord-link-user { font-weight: 700; letter-spacing: 0.01em; }
+
+/* ============================================================
+ * Visual polish — ugly squares / tofu pass (?v=20260906ah)
+ * How this works (beginner): soft pale-blue placeholders + SVG icons.
+ * Never MySpace (no neon, no tiled personal backgrounds on chrome).
+ * Avatar lab stays locked. ENGINE DEV: do not restyle #stage-slot here.
+ * ============================================================ */
+
+/* Empty Stuff / Shop / gallery swatches — soft Whirled-ish sky wash + dots */
+.swatch.swatch-empty,
+.card .swatch.swatch-empty,
+.gallery-cell .swatch.swatch-empty {
+  position: relative;
+  min-height: 80px;
+  border-radius: 0; /* card clips; gallery cells set their own */
+  background:
+    radial-gradient(circle at 28% 36%, rgba(255,255,255,0.7) 0 10%, transparent 12%),
+    radial-gradient(circle at 68% 58%, rgba(126, 200, 240, 0.45) 0 14%, transparent 16%),
+    radial-gradient(circle at 48% 72%, rgba(255,255,255,0.35) 0 8%, transparent 10%),
+    linear-gradient(165deg, #a8d6ef 0%, #e8f4fb 42%, #d2eaf6 100%);
+  box-shadow: inset 0 0 0 1px rgba(183, 211, 232, 0.55);
+}
+.gallery-cell .swatch.swatch-empty {
+  border-radius: 8px;
+  min-height: 80px;
+}
+.swatch.swatch-empty.night {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(126,200,240,0.2) 0 12%, transparent 14%),
+    linear-gradient(165deg, #2a3d55 0%, #1a2834 50%, #3a4538 100%);
+}
+.swatch.swatch-empty.fox {
+  background:
+    radial-gradient(circle at 35% 40%, rgba(255,255,255,0.45) 0 12%, transparent 14%),
+    linear-gradient(165deg, #e89550 0%, #f4e6d4 55%, #f7efe6 100%);
+}
+/* Tiny faux silhouette cue (CSS-only) so empty thumbs feel intentional */
+.swatch.swatch-empty::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 54%;
+  width: 28px; height: 20px;
+  transform: translate(-50%, -50%);
+  border-radius: 40% 40% 30% 30%;
+  background: rgba(30, 111, 168, 0.12);
+  box-shadow: 0 -14px 0 -4px rgba(30, 111, 168, 0.14);
+  pointer-events: none;
+}
+.swatch.swatch-empty.night::after {
+  background: rgba(126, 200, 240, 0.12);
+  box-shadow: 0 -14px 0 -4px rgba(126, 200, 240, 0.14);
+}
+.swatch.swatch-empty.fox::after {
+  background: rgba(160, 80, 30, 0.12);
+  box-shadow: 0 -14px 0 -4px rgba(160, 80, 30, 0.14);
+}
+
+.dec-inv-swatch {
+  background:
+    radial-gradient(circle at 40% 40%, rgba(255,255,255,0.55) 0 30%, transparent 32%),
+    linear-gradient(145deg, #cfe6f5, #e8f4fb) !important;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(183, 211, 232, 0.6);
+}
+.avatar-lab-swatch {
+  background:
+    radial-gradient(circle at 40% 40%, rgba(255,255,255,0.55) 0 28%, transparent 30%),
+    linear-gradient(145deg, #cfe6f5, #e8f4fb) !important;
+}
+
+/* Room lobby placeholder thumbs — softer scene, rounded clip via tile */
+.room-tile .thumb.room-thumb-ph,
+.room-tile .room-thumb-ph {
+  border-right: 1px solid rgba(183, 211, 232, 0.55);
+}
+.room-tile.is-empty {
+  opacity: 1;
+  box-shadow: none;
+  border-style: dashed;
+  background: linear-gradient(180deg, #f7fbfe, #eef6fc);
+}
+.room-tile.is-empty .thumb {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,255,255,0.65) 0 18%, transparent 22%),
+    linear-gradient(165deg, #d7eaf6 0%, #e8f4fb 55%, #cfe6f5 100%);
+  opacity: 0.95;
+}
+
+/* Cards / panels — softer chrome (pale blue theme kept) */
+.card,
+.stuff-card,
+.shop-card,
+.gallery-cell,
+.cp-section,
+.cp-header,
+.panel {
+  border-color: var(--border-soft);
+  box-shadow: 0 1px 3px rgba(22, 50, 74, 0.05);
+}
+.card, .stuff-card, .shop-card {
+  border-radius: 10px;
+}
+.gallery-cell {
+  border-radius: 10px;
+  padding: 8px;
+}
+.panel {
+  border-radius: 10px;
+}
+.cp-header {
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(22, 50, 74, 0.06);
+}
+.cp-section {
+  border-radius: 10px;
+}
+.profile-photo:not(.missing) {
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(22, 50, 74, 0.1);
+}
+
+/* Toolbar who-icons (mail / bell SVGs) */
+.who-ico {
+  display: inline-block;
+  vertical-align: -2px;
+  width: 14px; height: 14px;
+  color: inherit;
+}
+.mail-btn, .notice-bell-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Mobile: no black slabs / overlapping weird boxes on paper pages */
+@media (max-width: 900px) {
+  .card, .stuff-card, .shop-card, .room-tile, .gallery-cell, .panel {
+    box-shadow: 0 1px 2px rgba(22, 50, 74, 0.06);
+  }
+  .swatch.swatch-empty,
+  .card .swatch {
+    min-height: 72px;
+  }
+  .room-tile {
+    grid-template-columns: 96px 1fr;
+  }
+  .room-tile .thumb { min-height: 72px; }
+  /* Keep Me/Stuff/Shop paper — avoid accidental dark flash behind empty grids */
+  .grid, .room-tiles, .gallery-grid, .popular-grid {
+    background: transparent;
+  }
+  .profile-photo.missing {
+    width: 64px; height: 64px;
+    font-size: 20px;
+  }
+}
+
+
+/* ---- Worn Stuff avatar billboard (20260906ai) ----
+ * Beginner: after Wear in Stuff → Avatars, this sprite shows in your loft.
+ * ENGINE DEV: chrome overlay sibling of #stage-slot — not Ruffle, not inside Pixi yet.
+ * pointer-events:none so it never steals clicks from decorate / stage.
+ */
+.avatar-wear-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+.avatar-wear-layer[aria-hidden="true"]:not(.is-on) {
+  display: none;
+}
+.avatar-wear-layer.is-on {
+  display: block;
+}
+.avatar-wear-billboard {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  /* How this works (20260906ak): --wear-scale from Stuff slider (default 1). */
+  transform: translateX(-50%) scale(var(--wear-scale, 1));
+  transform-origin: center bottom;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  max-width: min(200px, 42%);
+  filter: drop-shadow(0 2px 4px rgba(22, 50, 74, 0.35));
+}
+.avatar-wear-sprite {
+  display: block;
+  max-height: min(160px, 42vh);
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  object-fit: contain;
+}
+.avatar-wear-nameplate {
+  background: rgba(255, 255, 255, 0.92);
+  color: #16324a;
+  border: 1px solid #7eb6d4;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(22, 50, 74, 0.15);
+}
+.avatar-pack-seed-panel h3 {
+  margin: 0 0 6px;
+  color: #1e6fa8;
+  font-size: 15px;
+}
+@media (max-width: 700px) {
+  .avatar-wear-billboard { bottom: 8%; max-width: 46%; }
+  .avatar-wear-sprite { max-height: min(120px, 36vh); }
+}
+
+
+/* ========================================================================
+ * 20260906ak — Loft placeholder backdrop + Stuff Avatar viewer + bar SVG polish
+ * Beginner: room looks like a soft classic loft; Stuff has a big avatar preview.
+ * ENGINE DEV: .loft-backdrop lives inside #stage-slot until Pixi replaceChildren.
+ * ======================================================================== */
+
+/* ---- Soft classic loft backdrop (placeholder room) ---- */
+.loft-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  background: #2a4060;
+}
+#stage-slot {
+  position: relative;
+  overflow: hidden;
+}
+#stage-slot .loft-backdrop { border-radius: 0; }
+.loft-sky {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 28%;
+  background: linear-gradient(180deg, #a8d4f0 0%, #6a9ec4 55%, #4a7aa0 100%);
+}
+.loft-walls {
+  position: absolute;
+  left: 0; right: 0;
+  top: 18%;
+  bottom: 32%;
+  perspective: 600px;
+}
+.loft-wall {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: linear-gradient(180deg, #1e3a5c 0%, #16304c 40%, #122838 100%);
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.25);
+}
+.loft-wall-l {
+  left: 0; width: 52%;
+  transform: skewY(-4deg);
+  transform-origin: bottom right;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.loft-wall-r {
+  right: 0; width: 52%;
+  transform: skewY(4deg);
+  transform-origin: bottom left;
+  background: linear-gradient(180deg, #244868 0%, #1a3854 45%, #143044 100%);
+}
+.loft-corner {
+  position: absolute;
+  left: 48%;
+  top: 0; bottom: 0;
+  width: 4%;
+  background: linear-gradient(90deg, rgba(0,0,0,0.35), rgba(0,0,0,0.05), rgba(0,0,0,0.3));
+  z-index: 1;
+}
+.loft-floor {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 38%;
+  background: linear-gradient(180deg, #6b4a28 0%, #5a3c20 30%, #4a3018 100%);
+  transform: perspective(400px) rotateX(12deg);
+  transform-origin: top center;
+  overflow: hidden;
+}
+.loft-floor-grid {
+  position: absolute;
+  inset: -10%;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.14) 1px, transparent 1px);
+  background-size: 36px 28px;
+  opacity: 0.55;
+}
+.loft-hint {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font: 600 11px/1.3 var(--ui);
+  color: rgba(220, 235, 245, 0.55);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.loft-hint-subtle { font-weight: 500; font-size: 10px; opacity: 0.75; top: 8%; }
+.loft-hint-muted { opacity: 0.7; font-weight: 500; }
+/* Hide old developer stage-copy if anything re-injects it */
+.stage-copy { display: none !important; }
+
+/* Wear billboard scale (from Stuff slider) */
+.avatar-wear-billboard {
+  transform: translateX(-50%) scale(var(--wear-scale, 1));
+  transform-origin: center bottom;
+}
+.avatar-wear-layer.is-tofu .avatar-wear-billboard {
+  max-width: min(140px, 36%);
+}
+
+/* Default tofu avatar */
+.tofu-avatar {
+  width: 72px;
+  height: 90px;
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(22,50,74,0.3));
+}
+.tofu-avatar svg { display: block; width: 100%; height: 100%; }
+.tofu-in-viewer { width: 96px; height: 120px; }
+.tofu-wear { width: 64px; height: 80px; }
+
+/* ---- Stuff Avatar viewer (classic whirled.club feel) ---- */
+.stuff-detail-avatar { max-width: 720px; }
+.avatar-viewer {
+  margin: 10px 0 14px;
+  border: 1px solid #9ec4de;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e8f4fb;
+  box-shadow: 0 2px 10px rgba(22,50,74,0.1);
+}
+.avatar-viewer-stage {
+  position: relative;
+  height: min(320px, 52vh);
+  min-height: 220px;
+  background: #2a4060;
+}
+.avatar-viewer-stage .loft-backdrop { border-radius: 0; }
+.avatar-viewer-billboard {
+  position: absolute;
+  left: 50%;
+  bottom: 14%;
+  transform: translateX(-50%) scale(var(--avatar-scale, 1));
+  transform-origin: center bottom;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 46%;
+  filter: drop-shadow(0 2px 4px rgba(22,50,74,0.35));
+  pointer-events: none;
+}
+.avatar-viewer-sprite {
+  display: block;
+  max-height: min(180px, 40vh);
+  width: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  object-fit: contain;
+}
+.avatar-viewer-nameplate {
+  background: rgba(255,255,255,0.94);
+  color: #16324a;
+  border: 1px solid #7eb6d4;
+  border-radius: 10px;
+  padding: 2px 10px;
+  font-size: 12px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.avatar-viewer-toolbar {
+  padding: 10px 12px 12px;
+  background: linear-gradient(#f7fbfe, #e8f4fb);
+  border-top: 1px solid #b7d3e8;
+}
+.avatar-scale-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 13px;
+  color: #16324a;
+  margin-bottom: 8px;
+}
+.avatar-scale-ico { display: inline-grid; place-items: center; }
+.avatar-scale-text b { color: #e07a28; }
+.avatar-scale-label input[type="range"] {
+  flex: 1;
+  min-width: 120px;
+  accent-color: #e07a28;
+}
+.avatar-viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.wear-btn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+}
+.wear-btn.is-worn {
+  background: #dfeaf2;
+  color: #1e6fa8;
+  border-color: #7eb6d4;
+}
+.wear-face-ico { display: block; flex-shrink: 0; }
+.avatar-viewer-note { margin: 4px 0 0; }
+
+/* Stuff list cards — Wear chip + worn badge */
+.stuff-card { position: relative; }
+.stuff-card-open {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  padding: 0; border: 0; background: transparent; color: inherit; font: inherit;
+}
+.stuff-card.is-worn { border-color: #3aa3e0; box-shadow: 0 0 0 1px rgba(58,163,224,0.35); }
+.stuff-worn-ribbon {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(#7ec8f0, #3aa3e0);
+  color: #fff; font-size: 12px; line-height: 22px; text-align: center;
+  box-shadow: 0 1px 3px rgba(22,50,74,0.25);
+  z-index: 2; pointer-events: none;
+}
+.stuff-card-wear {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid #e0eef6;
+  background: #f7fbfe;
+}
+.stuff-wear-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid #9ec4de; background: #fff; color: #1e6fa8;
+  border-radius: 14px; padding: 4px 10px;
+  font: 700 11px var(--ui); cursor: pointer;
+}
+.stuff-wear-chip:hover { background: #e8f4fb; }
+.stuff-wear-chip.is-worn { background: #dfeaf2; color: #5a7a90; }
+.stuff-worn-badge {
+  font: 700 10px var(--ui); color: #fff;
+  background: #3aa3e0; border-radius: 8px; padding: 2px 6px;
+}
+
+/* Change avatar submenu in occupant rail */
+.occ-change-avatar {
+  margin: 0 6px 6px; padding: 4px;
+  background: #0c2436; border-radius: 4px;
+  border: 1px solid #2a5570;
+}
+.occ-change-title {
+  font: 700 10px var(--ui); color: #7ec8f0;
+  padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.occ-change-empty { padding: 4px 8px; margin: 0; color: #7aa0b5; font-size: 11px; }
+.occ-menu-item.is-on { background: rgba(58,163,224,0.3); color: #fff; }
+
+/* ---- Bottom .bar polish (mobile + desktop) ---- */
+.bar {
+  min-height: 50px;
+  height: auto;
+  padding: 6px 10px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.bar input#chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  height: 36px;
+  font-size: 14px;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.bar .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.tb-vol-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+.tb-vol-open {
+  width: 18px; height: 28px; min-width: 18px;
+  padding: 0; display: inline-grid; place-items: center;
+  color: #1e6fa8; background: transparent; border: 0;
+}
+.tb-vol-open .tb-ico-caret { display: block; }
+@media (max-width: 900px) {
+  .bar {
+    background: #f3f7fa !important;
+    color: #16324a !important;
+    border-top: 1px solid #b7d3e8 !important;
+  }
+  .bar input#chat-input {
+    font-size: 16px; /* iOS zoom-safe */
+    height: 40px;
+  }
+  .chat-opts {
+    min-width: 38px; min-height: 38px; width: 38px; height: 38px;
+  }
+  .tb {
+    width: 36px; height: 36px; min-width: 36px; min-height: 36px;
+  }
+  .toolbar .tb-go-wrap:not(.tb-room-wrap),
+  .toolbar .tb-friends-wrap,
+  .toolbar .tb-party,
+  .toolbar .tb-vol-wrap { display: none !important; }
+  .toolbar .tb-room-wrap { display: inline-flex !important; }
+  .avatar-viewer-stage { height: min(260px, 46vh); min-height: 180px; }
+}
+@media (max-width: 700px) {
+  .avatar-viewer-sprite { max-height: min(140px, 34vh); }
 }

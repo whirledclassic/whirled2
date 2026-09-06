@@ -1,0 +1,46 @@
+{
+  "name": "Cyan Hair Walk",
+  "slug": "char-b-dress-walk",
+  "frames": [
+    "frames/frame_00.png",
+    "frames/frame_01.png",
+    "frames/frame_02.png",
+    "frames/frame_03.png"
+  ],
+  "displayFrames": [
+    "frames/display_00.png",
+    "frames/display_01.png",
+    "frames/display_02.png",
+    "frames/display_03.png"
+  ],
+  "frameDurationsMs": [
+    200,
+    200,
+    200,
+    200
+  ],
+  "thumb": "thumb.png",
+  "preview": "preview.png",
+  "source": "aseprite",
+  "sourceFile": "char-b-dress-walk.aseprite",
+  "sourceSha1": "f8787e02b9664c4ea4ee1ec9044e01c13c65d08f",
+  "size": {
+    "width": 512,
+    "height": 512
+  },
+  "layers": [
+    "leg_l",
+    "leg_r",
+    "arm_l",
+    "torso",
+    "dress",
+    "arm_r",
+    "hair_back",
+    "head",
+    "face",
+    "hair_front"
+  ],
+  "frameCount": 4,
+  "_beginner": "PNG frames + thumb from your .aseprite. Wear in Stuff shows this in the loft.",
+  "_engineDev": "Chrome mounts preview/display frames on #avatar-wear-layer. Do not load .aseprite in Ruffle."
+}

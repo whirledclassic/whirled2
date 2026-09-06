@@ -1,0 +1,40 @@
+{
+  "name": "Cyan Hair Idle",
+  "slug": "char-a-dress-idle",
+  "frames": [
+    "frames/frame_00.png",
+    "frames/frame_01.png"
+  ],
+  "displayFrames": [
+    "frames/display_00.png",
+    "frames/display_01.png"
+  ],
+  "frameDurationsMs": [
+    200,
+    200
+  ],
+  "thumb": "thumb.png",
+  "preview": "preview.png",
+  "source": "aseprite",
+  "sourceFile": "char-a-dress-idle.aseprite",
+  "sourceSha1": "411b85e565d2647f039ff6197d88f424fcef04ce",
+  "size": {
+    "width": 512,
+    "height": 512
+  },
+  "layers": [
+    "leg_l",
+    "leg_r",
+    "arm_l",
+    "torso",
+    "arm_r",
+    "dress",
+    "hair_back",
+    "head",
+    "face",
+    "hair_front"
+  ],
+  "frameCount": 2,
+  "_beginner": "PNG frames + thumb from your .aseprite. Wear in Stuff shows this in the loft.",
+  "_engineDev": "Chrome mounts preview/display frames on #avatar-wear-layer. Do not load .aseprite in Ruffle."
+}

@@ -1,0 +1,40 @@
+{
+  "name": "Cyan Hair Pose",
+  "slug": "char-d-dress-pose",
+  "frames": [
+    "frames/frame_00.png",
+    "frames/frame_01.png"
+  ],
+  "displayFrames": [
+    "frames/display_00.png",
+    "frames/display_01.png"
+  ],
+  "frameDurationsMs": [
+    833,
+    833
+  ],
+  "thumb": "thumb.png",
+  "preview": "preview.png",
+  "source": "aseprite",
+  "sourceFile": "char-d-dress-pose.aseprite",
+  "sourceSha1": "be05e912f761d54d4973a251d59e9187b3e2a41a",
+  "size": {
+    "width": 512,
+    "height": 512
+  },
+  "layers": [
+    "leg_l",
+    "leg_r",
+    "arm_l",
+    "torso",
+    "arm_r",
+    "dress",
+    "hair_back",
+    "head",
+    "face",
+    "hair_front"
+  ],
+  "frameCount": 2,
+  "_beginner": "PNG frames + thumb from your .aseprite. Wear in Stuff shows this in the loft.",
+  "_engineDev": "Chrome mounts preview/display frames on #avatar-wear-layer. Do not load .aseprite in Ruffle."
+}

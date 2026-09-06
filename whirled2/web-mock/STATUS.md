@@ -2,37 +2,30 @@
 
 Date: 2026-09-06
 
-## Avatar research (same wave)
+## What shipped (?v=20260906al)
 
-- Deep dive of Grey Havens GitHub (`msoy`, `whirled-sdk`, `whirled-projects`) + community `lulzsun/whirled2` SWF/Ruffle path.
-- Plan doc: [AVATAR-IMPORT.md](./AVATAR-IMPORT.md) — deep Grey Havens research (SWF + remix ZIP + ~80×60 thumb, SHA-1 HashMediaDesc, Ruffle host shim, ENGINE-BRIDGE policy bump for Phase 2).
-- Avatar lab stays **locked** (Stuff → Avatars On hold unless `?avatarLab=1`). No Ruffle/SWF in rooms.
+**Hybrid auth + Discord return to Pages + boot resilience:**
 
-## What shipped (?v=20260906af)
+1. **Login fix:** When `WHIRLED_API` is set (demo tunnel / Pages), `WhirledApi.login` / `register` prefer the Node API; on credential/taken **or** network failure they **fall back to offline `localStorage` users** so Pages-created accounts still Logon on the tunnel. Clearer errors when both fail. Beginner comments: Pages offline vs demo API.
+2. **Boot/shell:** `finishBootAfterSession` / shell paint wrapped — a UI throw after successful session shows `#gate-err` or a recoverable shell (not a stuck empty gate). `bindGate` always runs when the gate is shown.
+3. **Discord → Pages:** `CLIENT_RETURN_ORIGIN` / `DISCORD_SUCCESS_ORIGIN` + allowlisted `?return=` on `/api/auth/discord`. Portal **Redirect URI stays the tunnel** (`DISCORD_REDIRECT_URI`). Success can redirect to Pages `/?discord_token=…&v=20260906al`. Pages `index.html` sets `WHIRLED_API` to the live tunnel; `discordAuthStartUrl` appends `?return=` when page origin ≠ API.
+4. Prior loft backdrop / tofu / chat SVG icons kept (`ak`). SWF lab stays **locked**. `#stage-slot` contract unchanged.
 
-**Local Discord OAuth** on the demo Node server (chrome-only; never touches `#stage-slot`):
+**Restart demo server with:**
+`CLIENT_RETURN_ORIGIN=https://whirledclassic.github.io/whirled2/whirled2/web-mock`
+(`PUBLIC_ORIGIN` / `DISCORD_REDIRECT_URI` still tunnel.)
 
-1. Env: `DISCORD_CLIENT_ID` + `DISCORD_CLIENT_SECRET` (process.env and/or `/home/box/.config/whirled2/discord.env` / `server/.env.local`).
-2. Routes: `/api/auth/discord/status`, `/api/auth/discord`, `/api/auth/discord/callback` → `/?discord_token=…`.
-3. Gate: **Continue with Discord** when demo API + OAuth enabled; else Coming Soon.
-4. Account: shows Discord **Linked** when `discordId` / `discord: true` on `/api/me`.
-5. Helper: `server/start-local.sh`. See `SOCIAL-LOGIN.md`.
+## Prior (?v=20260906ak)
 
-Prior **ae**: Rooms create fidelity + mobile landscape immersion (My Rooms, Create Room, multi-room persist, landscape immersion).
+**Loft placeholder + Stuff Avatar viewer + chat-bar SVG icons** — see STUFF-AVATARS.md / AVATAR-STUFF-FIDELITY.md.
 
-Prior **ad**: Friendly People, wall Delete, Shop ♥, Volume + mute-safe, Share/embed, lock triad.
+## Prior (?v=20260906aj)
 
-## Live URL
+- Discord create-account UX; QA pass ([QA-PAGES.md](./QA-PAGES.md)).
 
-- Local / Pages cache: `?v=20260906af` (`LOGO_V` in `app.js` / `index.html`)
-- Live mock (when pushed): https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906af
-- Site root: https://whirledclassic.github.io/whirled2/
+## Standing rules
 
-## Out of scope
-
-- No payments / Buy Bars / live membership checkout
-- No fake NPCs / invented live game catalog titles
-- No zero-setup social OAuth on static Pages (Discord needs local demo server + env)
-- Avatar SWF / Ruffle in rooms (**ON HOLD**)
-- Doors graph / snapshot rasterize / glow hold (Coming Soon)
-- Do not push unless instructed
+- Coins/Bars earn-only; never invent fake catalog.
+- Never say MySpace; say Profile look.
+- `#stage-slot` = engine mount; Wear on `#avatar-wear-layer` sibling.
+- No secrets in client — only `WHIRLED_API` origin.

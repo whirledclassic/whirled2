@@ -1,0 +1,34 @@
+[
+  {
+    "file": "fe7f4557182987eacc7ff3a0465019ff2edd778c157f639e560b97d1d4ac4e9a.aseprite",
+    "slug": "char-a-dress-idle",
+    "ok": true,
+    "frames": 2,
+    "size": "512x512",
+    "sha1": "411b85e565d2"
+  },
+  {
+    "file": "97f84698d087eb4be3fba14313cf2bc1511d2f40d5041292924442fb5e7deec8.aseprite",
+    "slug": "char-b-dress-walk",
+    "ok": true,
+    "frames": 4,
+    "size": "512x512",
+    "sha1": "f8787e02b966"
+  },
+  {
+    "file": "6db2a2b8a500cf84f42e27e3ab175be2eb5785458498dbdd8f7d143d3dbfce8b.aseprite",
+    "slug": "char-c-dress-stand",
+    "ok": true,
+    "frames": 1,
+    "size": "512x512",
+    "sha1": "17ef599f8776"
+  },
+  {
+    "file": "02775217104ad6242a9eb4b89abb56923dcdb0085f7732045fc42755831c04f7.aseprite",
+    "slug": "char-d-dress-pose",
+    "ok": true,
+    "frames": 2,
+    "size": "512x512",
+    "sha1": "be05e912f761"
+  }
+]

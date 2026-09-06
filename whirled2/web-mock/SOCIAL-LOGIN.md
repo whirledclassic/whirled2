@@ -1,6 +1,6 @@
 # Social login — easiest path for Whirled2 (Pages + optional demo Node)
 
-**Date:** 2026-09-06 (ET)  
+**Date:** 2026-09-06 (ET) — hybrid auth / Pages return in `?v=20260906al`  
 **Project:** `whirledclassic/whirled2` web-mock — static **GitHub Pages** + optional `server/server.mjs` demo API.  
 **Constraint:** Username/password stays primary. **Facebook Connect stays removed** (Meta App ID / SDK friction). Buttons may remain **Coming Soon** until credentials exist.  
 **Reality check:** Pure static Pages **cannot** safely complete OAuth code↔token exchange (client secret must not ship in the browser). Real social login needs the **demo Node server** (or another tiny callback host) with env vars.
@@ -19,6 +19,24 @@ As of **`?v=20260906af`**, Discord OAuth works on the **local demo server** when
 5. Server logs only `Discord OAuth: enabled` or `… disabled (missing …)` — never prints secrets.
 
 GitHub / Google remain Coming Soon. Pages without `WHIRLED_API` keeps Discord as Coming Soon.
+
+
+### Pages + WHIRLED_API + Discord return (?v=20260906al)
+
+**Problem fixed:** Pages Sign Up stores users in `localStorage`. With `WHIRLED_API` pointed at the demo tunnel, Logon used to hit Node only and fail with “Name or password is wrong.” Hybrid auth now falls back to offline users on credential/network errors.
+
+**Pages setup:**
+1. `index.html` sets `window.WHIRLED_API` to the live tunnel origin (public — **not** a secret).
+2. Gate Discord CTA calls `/api/auth/discord?return=` + Pages `origin+pathname`.
+3. Demo server allowlists that return (github.io whirledclassic `web-mock` + tunnel) and redirects success to Pages `/?discord_token=…&v=…`.
+
+**Server env (restart required):**
+- `DISCORD_REDIRECT_URI` = tunnel `…/api/auth/discord/callback` (Discord Developer Portal Redirects — **unchanged**).
+- `PUBLIC_ORIGIN` = tunnel origin (API / tunnel page).
+- `CLIENT_RETURN_ORIGIN` (or `DISCORD_SUCCESS_ORIGIN`) = `https://whirledclassic.github.io/whirled2/whirled2/web-mock` so Discord can land on main Pages.
+
+Password remains primary. Offline and demo accounts may still differ — if both fail, Sign Up again on the server you’re using.
+
 
 Whirled2 is not affiliated with Three Rings / whirled.club.
 

@@ -10,6 +10,11 @@
 #   export DISCORD_CLIENT_ID="your_client_id"
 #   export DISCORD_CLIENT_SECRET="your_client_secret"
 #
+# Tunnel / Pages return (optional):
+#   export PUBLIC_ORIGIN="https://….trycloudflare.com"
+#   export DISCORD_REDIRECT_URI="$PUBLIC_ORIGIN/api/auth/discord/callback"
+#   export CLIENT_RETURN_ORIGIN="https://whirledclassic.github.io/whirled2/whirled2/web-mock"
+#
 # Then:
 #   ./start-local.sh
 # Open http://127.0.0.1:8787/ — gate shows Continue with Discord when enabled.

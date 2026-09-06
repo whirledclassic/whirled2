@@ -3,10 +3,14 @@
  *
  * How this works:
  * - If window.WHIRLED_API is set and the server is up, requests go to server/server.mjs.
- * - If not (GitHub Pages default), everything falls back to localStorage so the chrome
- *   still works offline in one browser.
+ * - GitHub Pages can also set WHIRLED_API to the demo tunnel origin (no secrets — origin only)
+ *   so Discord + shared chat work from Pages while password auth stays hybrid.
+ * - Hybrid login/register (?v=20260906al): prefer API when apiBase() is set; on credential/taken
+ *   OR network failure, fall back to offline localStorage users so Pages-created accounts still
+ *   Logon on the demo/tunnel. API success uses the API session.
+ * - If WHIRLED_API is empty, everything is offline localStorage in one browser.
  * - Session: localStorage key "whirled2.session" { token, user }.
- * - Discord (local): discordAuthStatus / discordAuthStartUrl; callback uses ?discord_token=.
+ * - Discord: discordAuthStatus / discordAuthStartUrl (?return= Pages origin); callback ?discord_token=.
  * - Offline users: "whirled2.users". First register also sets "whirled2.firstUserId".
  * - Offline loft chat: "whirled2.chat.loft" (array of messages).
  * - Shared soundtrack: getRoomMusic / setRoomMusic — HTTP when server; else localStorage
@@ -46,6 +50,21 @@
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }
 
+  // Beginner (?v=20260906al): Pages offline accounts live in localStorage; the demo tunnel
+  // hits the Node API first. If the API says wrong password / name taken, OR the network
+  // fails, we still try offline users so a Pages Sign Up can Logon on the tunnel.
+  // ENGINE DEV: chrome session only — never touches #stage-slot.
+  function isHybridAuthFallback(err) {
+    if (!err) return false;
+    var msg = String(err.message || err || "");
+    if (msg === "no-api") return true;
+    if (err.name === "TypeError") return true; // Failed to fetch / CORS / offline
+    if (/Failed to fetch|NetworkError|network|Load failed|fetch/i.test(msg)) return true;
+    if (/Name or password is wrong/i.test(msg)) return true;
+    if (/That name is taken/i.test(msg)) return true;
+    if (/^http 401\b/i.test(msg) || /^http 409\b/i.test(msg) || /^http 5\d\d\b/i.test(msg)) return true;
+    return false;
+  }
 
   async function request(path, opts) {
     var base = apiBase();
@@ -63,19 +82,27 @@
     session: loadSession,
 
     async register(name, password) {
+      // How this works (?v=20260906al): prefer demo API when WHIRLED_API is set; on taken/network
+      // failure, create offline localStorage user so Pages + tunnel both work for beginners.
       name = String(name || "").trim();
       password = String(password || "");
       if (name.length < 2) throw new Error("Name needs at least 2 characters.");
       if (password.length < 4) throw new Error("Password needs at least 4 characters.");
+      var apiErr = null;
+      if (apiBase()) {
+        try {
+          var body = await request("/api/register", {
+            method: "POST",
+            body: JSON.stringify({ name: name, password: password })
+          });
+          saveSession(body);
+          return body;
+        } catch (err) {
+          apiErr = err;
+          if (!isHybridAuthFallback(err)) throw err;
+        }
+      }
       try {
-        var body = await request("/api/register", {
-          method: "POST",
-          body: JSON.stringify({ name: name, password: password })
-        });
-        saveSession(body);
-        return body;
-      } catch (err) {
-        if (apiBase() && err.message !== "no-api") throw err;
         var users = localUsers();
         var id = name.toLowerCase();
         if (users[id]) throw new Error("That name is taken on this browser.");
@@ -97,21 +124,38 @@
         var session = { token: "local-" + id, user: publicUser(users[id]) };
         saveSession(session);
         return session;
+      } catch (offErr) {
+        if (apiErr) {
+          throw new Error(
+            (offErr && offErr.message ? offErr.message : "Could not create offline account.")
+            + " Demo server also said: " + (apiErr.message || String(apiErr))
+            + " — offline and demo accounts can differ; try another name or Logon on this server."
+          );
+        }
+        throw offErr;
       }
     },
 
     async login(name, password) {
+      // How this works (?v=20260906al): try API first when set; if wrong password / network,
+      // fall back to whirled2.users so a Pages Sign Up still Logons on the demo tunnel.
       name = String(name || "").trim();
       password = String(password || "");
+      var apiErr = null;
+      if (apiBase()) {
+        try {
+          var body = await request("/api/login", {
+            method: "POST",
+            body: JSON.stringify({ name: name, password: password })
+          });
+          saveSession(body);
+          return body;
+        } catch (err) {
+          apiErr = err;
+          if (!isHybridAuthFallback(err)) throw err;
+        }
+      }
       try {
-        var body = await request("/api/login", {
-          method: "POST",
-          body: JSON.stringify({ name: name, password: password })
-        });
-        saveSession(body);
-        return body;
-      } catch (err) {
-        if (apiBase() && err.message !== "no-api") throw err;
         var users = localUsers();
         var row = users[name.toLowerCase()];
         if (!row || row.password !== hashGuess(password)) {
@@ -120,6 +164,15 @@
         var session = { token: "local-" + row.id, user: publicUser(row) };
         saveSession(session);
         return session;
+      } catch (offErr) {
+        if (apiErr) {
+          throw new Error(
+            "Name or password is wrong on the demo server and in this browser. "
+            + "If you signed up on GitHub Pages (offline), try Sign Up again on this server — "
+            + "offline and demo accounts may differ."
+          );
+        }
+        throw offErr;
       }
     },
 
@@ -389,9 +442,19 @@
     },
 
     discordAuthStartUrl: function () {
+      // How this works (?v=20260906al): when the page is on Pages (or any host ≠ API),
+      // pass ?return= so the server can redirect back to Pages with ?discord_token=.
+      // Beginner: Discord portal redirect URI stays the tunnel callback; return is allowlisted.
       var base = apiBase();
       if (!base) return "";
-      return base + "/api/auth/discord";
+      var url = base + "/api/auth/discord";
+      try {
+        var pageBase = location.origin + location.pathname;
+        if (location.origin.replace(/\/$/, "") !== base.replace(/\/$/, "")) {
+          url += "?return=" + encodeURIComponent(pageBase);
+        }
+      } catch (eRet) {}
+      return url;
     },
 
     async me() {
