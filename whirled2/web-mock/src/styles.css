@@ -1252,25 +1252,40 @@ body > .party-panel {
 .stage-body.hide-history .chat-overlay {
   display: none !important;
 }
+/* How this works: overlay is a bubble stack over the room — NOT a solid black panel.
+   Desktop: left side of stage. Mobile: docked above the send bar (see @media below). */
 .chat-overlay {
   position: absolute;
-  left: 8px;
-  top: 8px;
-  bottom: auto;
-  max-height: calc(100% - 16px);
-  width: min(280px, 42%);
-  z-index: 4;
+  left: 10px;
+  right: auto;
+  top: auto;
+  bottom: 10px;
+  max-height: 42%;
+  width: min(300px, 46%);
+  z-index: 5;
   overflow: auto;
-  pointer-events: auto;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(8, 14, 20, 0.42);
-  backdrop-filter: blur(2px);
+  pointer-events: none; /* stage stays clickable; bubbles re-enable below */
+  padding: 0;
+  border-radius: 0;
+  background: transparent !important;
+  backdrop-filter: none;
+  border: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 4px;
-  scrollbar-width: thin;
+  gap: 6px;
+  scrollbar-width: none;
+}
+.chat-overlay::-webkit-scrollbar { display: none; }
+.chat-overlay .chat-row {
+  pointer-events: auto;
+  max-width: 100%;
+}
+.chat-overlay .chat-bubble:not(.emote):not(.system) {
+  background: rgba(244, 249, 252, 0.94);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(10, 30, 50, 0.18);
 }
 .chat-overlay[hidden],
 .chat-overlay.is-empty {
@@ -1735,5 +1750,52 @@ body > .party-panel {
   }
   .bar {
     padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ---- 20260906d: mobile room chat dock (classic vibe, phone-friendly) ---- */
+@media (max-width: 700px) {
+  /* How this works: on phones, overlay chats sit ABOVE the black send bar as a
+     full-width bubble strip — no left-side dark rectangle eating the stage. */
+  .chat-overlay {
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
+    top: auto !important;
+    bottom: calc(52px + env(safe-area-inset-bottom, 0px)) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 34vh !important;
+    z-index: 35 !important;
+    padding: 0 2px !important;
+    background: transparent !important;
+    pointer-events: none !important;
+  }
+  .chat-overlay .chat-row {
+    pointer-events: auto;
+  }
+  .chat-overlay .chat-bubble:not(.emote):not(.system) {
+    max-width: min(92vw, 420px);
+    font-size: 13px;
+    padding: 7px 11px;
+    border-radius: 14px;
+  }
+  .chat-overlay .chat-who { font-size: 12px; color: #e8f4fb; text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
+  .chat-overlay .chat-row time { display: none; } /* quieter on phones */
+  .chat-overlay .chat-row:nth-last-child(n+7) { display: none; } /* only recent */
+  /* Slide mode on mobile: shorter log under stage */
+  .stage-body.chat-mode-slide {
+    flex-direction: column !important;
+  }
+  .stage-body.chat-mode-slide .chat-log {
+    width: 100% !important;
+    max-height: 28vh !important;
+    min-height: 0 !important;
+    border-radius: 0;
+    border-left: 0;
+    border-top: 1px solid #2a3d4c;
+  }
+  .stage-body.chat-mode-overlay .occupants {
+    max-height: 88px;
   }
 }

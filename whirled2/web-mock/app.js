@@ -2985,13 +2985,22 @@ function helpPage() {
     }
     var ov = document.getElementById("chat-overlay");
     if (ov) {
+      // How this works: overlay shows bubbles over the room. On narrow screens we
+      // only render the last few lines so the dock above the send bar stays light.
       var showOv = ui.mode === "overlay" && !ui.hideHistory && chat.length > 0;
       if (showOv) {
         ov.hidden = false;
         ov.classList.remove("is-empty");
         var nearB = (ov.scrollHeight - ov.scrollTop - ov.clientHeight) < 48;
         var stickO = !chatPinnedScroll || nearB;
-        ov.innerHTML = html;
+        var ovHtml = html;
+        try {
+          if (window.matchMedia && window.matchMedia("(max-width: 700px)").matches) {
+            var recent = chat.slice(-6).map(chatRow).join("");
+            ovHtml = recent;
+          }
+        } catch (eOv) {}
+        ov.innerHTML = ovHtml;
         if (stickO) ov.scrollTop = ov.scrollHeight;
       } else {
         ov.hidden = true;
@@ -3144,7 +3153,7 @@ function helpPage() {
     var ui = loadChatUi();
     menu.innerHTML = ''
       + '<div class="chat-opts-title">Chat options</div>'
-      + '<label class="chat-opts-row" data-chat-mode="overlay"><input type="radio" name="chat-mode" value="overlay"' + (ui.mode === "overlay" ? " checked" : "") + ' /> Overlay chat</label>'
+      + '<label class="chat-opts-row" data-chat-mode="overlay"><input type="radio" name="chat-mode" value="overlay"' + (ui.mode === "overlay" ? " checked" : "") + ' /> Overlay chat <span class="meta">(bubbles on room)</span></label>'
       + '<label class="chat-opts-row" data-chat-mode="slide"><input type="radio" name="chat-mode" value="slide"' + (ui.mode === "slide" ? " checked" : "") + ' /> Slide chat</label>'
       + '<label class="chat-opts-row' + (ui.mode !== "overlay" ? " is-disabled" : "") + '" data-chat-hide-row="1"><input type="checkbox" data-chat-hide="1"' + (ui.hideHistory ? " checked" : "") + (ui.mode !== "overlay" ? " disabled" : "") + ' /> Hide chat history <span class="meta">(F9)</span></label>'
       + '<div class="chat-opts-title">Text size</div>'
