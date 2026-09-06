@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bh)
+
+- **Club gaps + polish (after bg):** furniture orange/white stub clicks + on-stage glow legend; occupant name colors (blue/yellow/gray Zzz); `/help` + `/away <msg>` + `/action` stub; presence feed orange party invites + Clear; Friends toolbar Visit home (offline); Room View items categories; chat name-menu Send Mail; hangout batch invite copy
+- **Preserve:** bg Flash dual Wear modes (`classic-avatar.js` playbackMode cards UNTOUCHED), bf club Go/Friends/glow/presence, be Music/Parties, bd badges, bc Groups/Admin/broadcast, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bh`**. Push: `/tmp/push-bh.js` (dry-run default).
+
 ## What shipped (?v=20260906bg)
 
 - **Dual Wear modes (Flash):** clear radio/cards before Wear — **Whirled2 Smooth** (`playbackMode: png-hybrid`) vs **Classic Flash (Ruffle)** (`playbackMode: ruffle`)

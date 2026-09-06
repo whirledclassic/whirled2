@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bg";
+  var LOGO_V = "20260906bh";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -4793,11 +4793,11 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be + bf) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg + bh) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
-      "• Flash hybrid: PNG walk/emotes default; transparent Ruffle optional (no Adobe Flash plugin)",
+      "• Flash dual Wear modes (bg): Whirled2 Smooth (png-hybrid) vs Classic Flash/Ruffle — playbackMode cards",
       "• Room visuals: pale-blue chrome (az) — no brown/black slabs",
       "• Dev Hub (?page=dev), Make Door / Drop Door, passport seals",
       "• ba/bc: real Groups forum + Admin panel + /broadcast (escalating coins)",
@@ -4811,7 +4811,11 @@
       "• bf: Go menu wiki sections, Friends toolbar online+offline, clickable furniture glow legend",
       "  (green door / orange link stub / white game stub), friend login-logout corner feed,",
       "  room comment + volume beginner blurbs, chat name-menu Complain clarity",
-      "• classic-avatar.js preserved (bb Flash walk/tofu) — dual-mode agent owns Flash path",
+      "• bg: Flash dual Wear modes preserved — classic-avatar.js playbackMode cards (Smooth + Ruffle)",
+      "• bh: furniture glow stub clicks + on-stage legend, occupant name colors (away/idle),",
+      "  /help + /away message, presence feed orange party invites + Clear,",
+      "  Friends Visit home offline, View items categories, chat name-menu Send Mail,",
+      "  hangout batch invite copy polish — classic-avatar.js dual-mode UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -4825,8 +4829,8 @@
       "",
       "1) Hybrid (smooth) — default when a Stuff avatar has PNG/WebP idle+walk frames:",
       "   chrome walks the billboard on #avatar-wear-layer; emotes swap frames.",
-      "2) Optional Ruffle — experimental SWF preview / Force Ruffle loft uses the",
-      "   open-source Ruffle emulator (transparent wmode) — still not a Flash plugin.",
+      "2) Dual Wear modes (bg): pick Whirled2 Smooth (png-hybrid) OR Classic Flash (Ruffle)",
+      "   before Wear — Ruffle is optional WASM, never an Adobe Flash plugin.",
       "3) SWF-only packs move as a billboard; full AvatarControl states need the engine later.",
       "",
       "Doc: HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md (web-mock root).",
@@ -4943,13 +4947,13 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Go menu: wiki sections (home / recent / friends online / games)\n"
-        + "• Friends toolbar: online first + offline grey rows; Whisper / Profile / Join\n"
-        + "• Clickable furniture glow legend: green doors, orange link stub, white game stub\n"
-        + "• Friend login/logout corner feed (wiki Chat grey notices)\n"
-        + "• Room comment + volume beginner blurbs; Complain… Coming Soon clarity\n"
-        + "Preserve: be Music/Parties/Stuff, bd PNG/Ruffle + decorate/social, bc Groups/Admin/broadcast,\n"
-        + "  bb Flash hybrid (no classic-avatar.js edits this letter), Whirl, visit-since, pale-blue, earn-only.",
+        + "• Clickable furniture: orange link + white game stub clicks (Coming Soon toasts) + on-stage glow legend\n"
+        + "• Occupant name colors: blue here / yellow away / gray idle Zzz (wiki Room)\n"
+        + "• Chat: /help command list; /away <msg>; presence feed orange party invites + Clear log\n"
+        + "• Friends toolbar Visit home (offline); View items categories; name-menu Send Mail\n"
+        + "• Hangout batch invite copy polish (wiki Friend after leave)\n"
+        + "Preserve: bg Flash dual Wear modes (classic-avatar.js UNTOUCHED), bf club Go/Friends/glow,\n"
+        + "  be Music/Parties, bd badges, bc Groups/Admin/broadcast, Whirl, visit-since, pale-blue, earn-only.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -5461,17 +5465,24 @@
     savePresenceFeed(rows);
   }
   function presenceFeedHtml() {
-    // How this works (?v=20260906bf): compact corner log matching wiki Chat login/logout messages.
-    var rows = loadPresenceFeed().slice(0, presenceFeedOpen ? 12 : 3);
+    // How this works (?v=20260906bh): wiki Chat grey corner log — login/logout + orange party invites.
+    // Beginner: lower-right Presence list; expand for more; Clear empties this browser log only.
+    var rows = loadPresenceFeed().slice(0, presenceFeedOpen ? 14 : 4);
     if (!rows.length) return "";
     var body = rows.map(function (r) {
       var cls = "presence-feed-row kind-" + esc(r.kind || "gray");
       return '<div class="' + cls + '">' + esc(r.text || "") + '</div>';
     }).join("");
     return '<div class="presence-feed" id="presence-feed" aria-label="Friend login messages">'
+      + '<div class="presence-feed-head">'
       + '<button type="button" class="presence-feed-toggle text-btn" data-presence-feed-toggle="1" title="Friend login / logout log">'
       + (presenceFeedOpen ? "▾ Presence" : "▴ Presence") + '</button>'
+      + (presenceFeedOpen
+        ? '<button type="button" class="text-btn presence-feed-clear" data-presence-feed-clear="1" title="Clear this log">Clear</button>'
+        : '')
+      + '</div>'
       + '<div class="presence-feed-body"' + (presenceFeedOpen ? "" : ' data-collapsed="1"') + '>' + body + '</div>'
+      + '<p class="meta presence-feed-hint">Grey = login/logout · Orange = party invite (local)</p>'
       + '</div>';
   }
   var friendsPopupOpen = false;
@@ -5856,7 +5867,7 @@
         +   '<button type="button" data-profile="' + esc(f.id) + '">Profile</button>'
         +   (isOn
           ? '<button type="button" data-join-them="1" data-join-name="' + esc(f.name) + '">Join them</button>'
-          : '')
+          : '<button type="button" data-enter-room="loft" data-visit-friend="' + esc(f.id) + '" title="Open Rooms / home loft">Visit home</button>')
         + '</div></div>';
     }
     var rows = "";
@@ -5971,14 +5982,25 @@
   function isAway(userId) {
     try { return localStorage.getItem(AWAY_KEY + userId) === "1"; } catch (e) { return false; }
   }
-  function setAway(on) {
+  function setAway(on, msg) {
+    // How this works (?v=20260906bh): wiki /away <message> — yellow name + optional PM auto-reply note.
     var s = session();
     if (!s || !s.user) return;
     awayMode = !!on;
     try {
-      if (on) localStorage.setItem(AWAY_KEY + s.user.id, "1");
-      else localStorage.removeItem(AWAY_KEY + s.user.id);
+      if (on) {
+        localStorage.setItem(AWAY_KEY + s.user.id, "1");
+        var note = String(msg || "").trim().slice(0, 120);
+        if (note) localStorage.setItem(AWAY_KEY + s.user.id + ".msg", note);
+        else localStorage.removeItem(AWAY_KEY + s.user.id + ".msg");
+      } else {
+        localStorage.removeItem(AWAY_KEY + s.user.id);
+        localStorage.removeItem(AWAY_KEY + s.user.id + ".msg");
+      }
     } catch (e) {}
+  }
+  function getAwayMessage(userId) {
+    try { return localStorage.getItem(AWAY_KEY + userId + ".msg") || ""; } catch (e) { return ""; }
   }
 
   function copyInviteLink(kind, id) {
@@ -6050,7 +6072,9 @@
       +     '<li><b>/think</b> <b>/shout</b> <b>/me</b> <b>/speak</b> — chat modes (or Speak button)</li>'
       + '<li><b>/broadcast</b> <i>msg</i> — highlighted room broadcast (escalating coins)</li>'
       +     '<li><b>/clear</b> — clear active chat tab</li>'
-      +     '<li><b>/away</b> <b>/back</b> — away stub (yellow name + PM auto-reply note)</li>'
+      +     '<li><b>/help</b> — chat command list</li>'
+      +     '<li><b>/away</b> [msg] <b>/back</b> — yellow name + optional away note</li>'
+      +     '<li><b>/action</b> <i>name</i> — avatar action stub (Coming Soon)</li>'
       +   '</ul></div></div>';
   }
   function runCommand(cmd) {
@@ -6365,17 +6389,25 @@
       + (p.you ? " is-you" : "")
       + (isFriend ? " is-friend" : "")
       + (isOwner ? " is-owner" : "");
-    var statusLabel = p.you ? "you" : (p.inGame ? "in game" : (isAway(id) ? "away" : "here"));
+    var awayOn = !!(id && isAway(id));
+    var idleOn = !!(p && p.idle) && !awayOn && !p.you;
+    var nameColorCls = "person-name"
+      + (awayOn ? " name-away" : "")
+      + (idleOn ? " name-idle" : "")
+      + ((!awayOn && !idleOn) ? " name-here" : "");
+    var statusLabel = p.you ? "you" : (p.inGame ? "in game" : (awayOn ? "away" : (idleOn ? "Zzz" : "here")));
+    var awayTip = awayOn ? (getAwayMessage(id) || "away") : "";
     return '<div class="' + wrapCls + '">'
-      + '<button type="button" class="person" data-occ-menu="' + esc(id) + '" title="' + esc(niceName || id) + '">'
+      + '<button type="button" class="person" data-occ-menu="' + esc(id) + '" title="' + esc((niceName || id) + (awayTip ? (" — " + awayTip) : "")) + '">'
       + '<span class="' + presenceDotClass(p) + '" aria-hidden="true"></span>'
       + '<span class="ava' + (p.you ? " you" : "") + (isOwner ? " owner" : "") + '">' + esc(niceInitials || "?") + '</span>'
       + '<span class="person-meta">'
-      +   '<span class="person-name">' + esc(niceName)
-      +     + roleBadgeHtml(getRole(id))
-      +     + (isOwner ? ' <span class="owner-crown" title="Loft owner">♛</span>' : "")
-      +     + (p.you ? ' <span class="sub">(you)</span>' : "")
-      +     + (isFriend && !p.you ? ' <span class="friend-mark" title="Friend">★</span>' : "")
+      +   '<span class="' + nameColorCls + '">' + esc(niceName)
+      +     (idleOn ? ' <span class="idle-zzz" aria-hidden="true">Zzz</span>' : '')
+      +     roleBadgeHtml(getRole(id))
+      +     (isOwner ? ' <span class="owner-crown" title="Loft owner">♛</span>' : "")
+      +     (p.you ? ' <span class="sub">(you)</span>' : "")
+      +     (isFriend && !p.you ? ' <span class="friend-mark" title="Friend">★</span>' : "")
       +   '</span>'
       +   '<span class="sub person-status">' + esc(statusLabel) + '</span>'
       + '</span></button>'
@@ -6383,9 +6415,11 @@
       + '</div>';
   }
   function occLegend() {
-    return '<div class="occ-legend" title="Presence + classic glow legend">'
+    // How this works (?v=20260906bh): wiki Room name colors — blue here, yellow /away, gray Zzz idle.
+    return '<div class="occ-legend" title="Presence + classic name colors">'
       + '<span><i class="lg green"></i> Here</span>'
       + '<span><i class="lg yellow"></i> Away</span>'
+      + '<span><i class="lg gray"></i> Idle</span>'
       + '<span><i class="lg orange"></i> In game</span>'
       + '</div>';
   }
@@ -6552,7 +6586,7 @@
     return '<div class="modal-backdrop" id="hangout-invite-modal" data-hangout-skip="1">'
       + '<div class="modal-card" role="dialog" aria-label="Invite hangout friends" onclick="event.stopPropagation()">'
       +   '<h2>Invite people you hung out with?</h2>'
-      +   '<p class="meta">Send friend requests to players from this loft visit. Skip if you prefer.</p>'
+      +   '<p class="meta">Wiki Friend — after leaving a room or game you can batch-invite people from this loft visit. Uncheck anyone you skip.</p>'
       +   '<div class="hangout-list">' + rows + '</div>'
       +   '<div class="invite-them-actions">'
       +     '<button type="button" class="action-btn" data-hangout-send="1">Invite selected</button>'
@@ -8094,27 +8128,29 @@
     if (flipX) title += " · flipped";
     // How this works (?v=20260906bf): wiki clickable furniture glow —
     // green = door travel; orange = in-Whirled link stub; white = game stub (Coming Soon).
+    // How this works (?v=20260906bh): always classify glowKind for stub clicks; preview toggles CSS glow.
     var glowKind = "";
-    if (doorGlowPreview) {
-      if (isDoor) glowKind = "door";
-      else {
-        var kGlow = String((it && (it.kind || it.type || it.category)) || "").toLowerCase();
-        if (kGlow.indexOf("game") >= 0 || kGlow.indexOf("launcher") >= 0) glowKind = "game";
-        else if (kGlow.indexOf("toy") >= 0 || kGlow.indexOf("pet") >= 0 || it.linkTo) glowKind = "link";
-      }
+    if (isDoor) glowKind = "door";
+    else {
+      var kGlow = String((it && (it.kind || it.type || it.category)) || "").toLowerCase();
+      var catGlow = String(itemCat(it) || "").toLowerCase();
+      if (kGlow.indexOf("game") >= 0 || kGlow.indexOf("launcher") >= 0 || catGlow === "games") glowKind = "game";
+      else if (kGlow.indexOf("toy") >= 0 || kGlow.indexOf("pet") >= 0 || catGlow === "toys" || catGlow === "pets" || it.linkTo) glowKind = "link";
     }
+    var showGlow = !!doorGlowPreview && !!glowKind;
     var cls = "decorate-chip"
       + (isDoor ? " is-door" : "")
       + (selected ? " is-selected" : "")
-      + (glowKind === "door" ? " is-glowing" : "")
-      + (glowKind === "link" ? " is-glow-orange" : "")
-      + (glowKind === "game" ? " is-glow-white" : "")
+      + (showGlow && glowKind === "door" ? " is-glowing" : "")
+      + (showGlow && glowKind === "link" ? " is-glow-orange" : "")
+      + (showGlow && glowKind === "game" ? " is-glow-white" : "")
       + (flipX ? " is-flipped" : "");
     var sx = (flipX ? -scale : scale);
     var style = "left:" + x + "px;top:" + y + "px;z-index:" + (10 + Math.round(z))
       + ";transform:scale(" + sx + "," + scale + ");transform-origin:top left";
     return '<div class="' + cls + '" data-dec-id="' + esc(it.id) + '"'
       + (isDoor ? (' data-door-to="' + esc(it.doorTo) + '"') : "")
+      + (glowKind ? (' data-glow-kind="' + esc(glowKind) + '"') : "")
       + ' style="' + style + '" title="' + esc(title) + '" role="button" tabindex="0">'
       + thumb
       + (isDoor ? '<span class="dec-door-badge" aria-hidden="true" title="Door">🚪</span>' : "")
@@ -8139,29 +8175,72 @@
 
   // How this works: Room menu → View items lists decorate-layer chips + playlist track names (local data).
   // ENGINE DEV: chrome overlay only; not #stage-slot contents.
+  function furnitureGlowLegendHtml() {
+    // How this works (?v=20260906bh): wiki clickable furniture glow legend while preview is on.
+    if (!doorGlowPreview || !inRoom) return "";
+    return '<div class="furniture-glow-legend" id="furniture-glow-legend" aria-label="Clickable furniture legend">'
+      + '<div class="fgl-title">Clickable furniture</div>'
+      + '<div class="fgl-row"><i class="fgl green"></i> Green — door travel</div>'
+      + '<div class="fgl-row"><i class="fgl orange"></i> Orange — in-Whirled link <span class="soon-tag">Coming Soon</span></div>'
+      + '<div class="fgl-row"><i class="fgl white"></i> White — game launcher <span class="soon-tag">Coming Soon</span></div>'
+      + '<button type="button" class="text-btn" data-room-menu="clickable">Hide glow</button>'
+      + '</div>';
+  }
   function roomItemsPanel() {
+    // How this works (?v=20260906bh): wiki Room → View items — furniture/toys/doors/images + playlist.
+    // Beginner: list excludes avatars/pets (classic). Local decorate chips only — no fake catalog.
     var layout = loadRoomLayout();
     var placed = layout.items || [];
     var pl = loadPlaylist();
     var tracks = (pl && pl.tracks) ? pl.tracks : [];
-    var placedRows = placed.length
-      ? '<ul class="room-items-list">' + placed.map(function (it) {
-          var usage = it.doorTo ? ("doorway → " + (it.doorLabel || it.doorTo)) : "furniture";
-          return '<li><span class="room-item-chip">' + esc(it.name || "Item") + '</span> <span class="meta">' + esc(usage) + ' · (' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span></li>';
-        }).join("") + '</ul>'
+    function itemUsage(it) {
+      if (it.doorTo) return "door → " + (it.doorLabel || it.doorTo);
+      var cat = itemCat(it);
+      if (cat === "toys") return "toy";
+      if (cat === "backdrops") return "backdrop";
+      if (cat === "images") return "image";
+      if (cat === "games") return "game launcher (stub)";
+      return "furniture";
+    }
+    var byCat = { doors: [], furniture: [], toys: [], images: [], other: [] };
+    placed.forEach(function (it) {
+      if (!it) return;
+      if (it.doorTo) byCat.doors.push(it);
+      else {
+        var c = itemCat(it);
+        if (c === "toys" || c === "pets") byCat.toys.push(it);
+        else if (c === "images" || c === "backdrops") byCat.images.push(it);
+        else if (c === "furniture") byCat.furniture.push(it);
+        else byCat.other.push(it);
+      }
+    });
+    function listBlock(label, arr) {
+      if (!arr.length) return "";
+      return '<div class="section-label">' + esc(label) + ' (' + arr.length + ')</div>'
+        + '<ul class="room-items-list">' + arr.map(function (it) {
+          return '<li><span class="room-item-chip">' + esc(it.name || "Item") + '</span> <span class="meta">'
+            + esc(itemUsage(it)) + ' · (' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span></li>';
+        }).join("") + '</ul>';
+    }
+    var placedBody = placed.length
+      ? (listBlock("Doors", byCat.doors)
+        + listBlock("Furniture", byCat.furniture)
+        + listBlock("Toys / links", byCat.toys)
+        + listBlock("Images / backdrops", byCat.images)
+        + listBlock("Other", byCat.other))
       : '<p class="meta">No decorate items placed yet.</p>';
     var trackRows = tracks.length
       ? '<ul class="room-items-list">' + tracks.map(function (t, i) {
           var nm = (t && (t.name || t.title)) || ("Track " + (i + 1));
           return '<li>♪ ' + esc(nm) + '</li>';
         }).join("") + '</ul>'
-      : '<p class="meta">Playlist empty — add Music from Stuff.</p>';
+      : '<p class="meta">Playlist empty — add Music from Stuff (embeds; MP3 shop Coming Soon).</p>';
     return '<div class="room-side-panel room-items-panel" id="room-items-panel">'
       + '<div class="panel">'
       +   '<div class="room-side-head"><h2>Room View items</h2>'
       +     '<button type="button" class="text-btn" data-room-items-close="1">Close</button></div>'
-      +   '<p class="meta">Decorate-layer chips and playlist tracks from local data (no invented catalog).</p>'
-      +   '<div class="section-label">Decorate items</div>' + placedRows
+      +   '<p class="meta">Wiki View items — furniture, toys, doors, images, playlist. Avatars &amp; pets are not listed (classic).</p>'
+      +   placedBody
       +   '<div class="section-label">Playlist</div>' + trackRows
       + '</div></div>';
   }
@@ -8662,6 +8741,7 @@
       +     (makeDoorPanelOpen ? makeDoorPanelHtml() : '')
       +     (partyPanelOpen ? partyPanel() : '')
       +     '<button type="button" class="music-gesture-fab" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
+      +     furnitureGlowLegendHtml()
       +     presenceFeedHtml()
       +   '</section>'
       + '</div>'
@@ -11401,20 +11481,34 @@
     layer.addEventListener("pointercancel", endDrag);
   }
   function bindDoorLayerClicks() {
-    // How this works: outside decorate mode, door chips travel on click/tap.
-    // Beginner: green 🚪 chips = doors. ENGINE DEV: does not steal floor walk (only .is-door).
+    // How this works (?v=20260906bh): doors travel; orange link / white game stubs toast Coming Soon.
+    // Beginner: green 🚪 = door. Orange/white glow chips explain wiki furniture kinds without fake actions.
+    // ENGINE DEV: does not steal floor walk — only chips with data-glow-kind / .is-door.
     var layer = document.getElementById("decorate-layer");
     if (!layer) return;
     if (layer._doorBound) return;
     layer._doorBound = true;
     layer.addEventListener("click", function (ev) {
       if (decorateMode) return;
-      var chip = ev.target.closest(".decorate-chip.is-door");
+      var chip = ev.target.closest(".decorate-chip");
       if (!chip) return;
+      var kind = chip.getAttribute("data-glow-kind") || (chip.classList.contains("is-door") ? "door" : "");
+      if (!kind) return;
       ev.preventDefault();
       ev.stopPropagation();
-      var id = chip.getAttribute("data-dec-id");
-      travelThroughDoor(id);
+      if (kind === "door") {
+        var id = chip.getAttribute("data-dec-id");
+        travelThroughDoor(id);
+        return;
+      }
+      if (kind === "link") {
+        pushNotice("orange", "In-Whirled link furniture — Coming Soon (toy/link stub).", { transient: true });
+        return;
+      }
+      if (kind === "game") {
+        pushNotice("orange", "Game launcher furniture — Coming Soon (parlor/AVR).", { transient: true });
+        return;
+      }
     });
   }
   // ---------------------------------------------------------------------------
@@ -11609,16 +11703,49 @@
       }
       return;
     }
-    if (/^\/away$/i.test(text)) {
-      setAway(true);
-      pushSystemChat("You are now away. (Yellow name tint · PM auto-reply note)");
+    if (/^\/help(?:\s|$)/i.test(text)) {
+      // How this works (?v=20260906bh): wiki Chat /help — common commands (local chrome).
+      var helpTopic = text.replace(/^\/help\s*/i, "").trim().toLowerCase();
+      var helpLines = [
+        "Chat commands:",
+        "/help [cmd] — this list",
+        "/speak /think /shout /me — modes",
+        "/broadcast <msg> — highlighted (coins)",
+        "/away [msg] · /back — yellow name",
+        "/action <name> — avatar action stub",
+        "/clear — clear active chat tab"
+      ];
+      if (helpTopic === "away" || helpTopic === "afk") {
+        helpLines = ["/away [message] — mark yourself away (yellow name). /back returns."];
+      } else if (helpTopic === "broadcast") {
+        helpLines = ["/broadcast <msg> — room-wide highlight; escalating coin cost (earn-only)."];
+      } else if (helpTopic === "action" || helpTopic === "ac") {
+        helpLines = ["/action <name> (/ac) — trigger avatar action. Full AvatarControl Coming Soon."];
+      }
+      pushSystemChat(helpLines.join(" · "), { ephemeral: true });
+      return;
+    }
+    if (/^\/(away|afk)(?:\s|$)/i.test(text)) {
+      var awayMsg = text.replace(/^\/(away|afk)\s*/i, "").trim();
+      setAway(true, awayMsg);
+      pushSystemChat(awayMsg
+        ? ('You are now away: "' + awayMsg.slice(0, 80) + '" (Yellow name · PM auto-reply note)')
+        : "You are now away. (Yellow name tint · PM auto-reply note)");
+      try { refreshOccupantRail(); } catch (eAw) {}
       refreshChatLog();
       return;
     }
     if (/^\/back$/i.test(text)) {
       setAway(false);
       pushSystemChat("You are back.");
+      try { refreshOccupantRail(); } catch (eBk) {}
       refreshChatLog();
+      return;
+    }
+    if (/^\/(action|ac)\b/i.test(text)) {
+      var actName = text.replace(/^\/(action|ac)\s*/i, "").trim() || "wave";
+      pushSystemChat("Action “" + actName + "” — Coming Soon (AvatarControl / engine).", { ephemeral: true });
+      pushNotice("orange", "Avatar /action — Coming Soon.", { transient: true });
       return;
     }
     if (/^\/speak\s+/i.test(text) || /^\/sp\s+/i.test(text)) {
@@ -11780,6 +11907,7 @@
       + '<button type="button" data-profile="' + esc(id) + '">Profile</button>'
       + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Invite to be your friend</button>')
       + (self ? '' : '<button type="button" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(name) + '">Whisper</button>')
+      + (self ? '' : '<button type="button" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name || id) + '">Send Mail</button>')
       + partyInviteBtn
       + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>')
       + (self ? '' : '<button type="button" data-complain-stub="' + esc(id) + '" title="Report player — Coming Soon">Complain… <span class="soon-tag">Coming Soon</span></button>');
@@ -12508,6 +12636,13 @@
         var cin = document.getElementById("chat-input");
         if (cin) cin.focus();
       }
+      return;
+    }
+    if (ev.target.closest("[data-presence-feed-clear]") && session()) {
+      // How this works (?v=20260906bh): clear local presence corner log only.
+      try { savePresenceFeed([]); } catch (ePc) {}
+      pushNotice("gray", "Presence log cleared.", { transient: true });
+      if (inRoom) paint("rooms");
       return;
     }
     if (ev.target.closest("[data-presence-feed-toggle]") && session()) {
@@ -13677,6 +13812,9 @@
       }
       saveParties(plistI);
       pushNotice("blue", "Invited " + fname + " to party “" + (pty.name || "Party") + "”.", { transient: true });
+      try {
+        appendPresenceFeed("orange", "Party invite → " + fname + " (“" + (pty.name || "Party") + "”).");
+      } catch (ePf) {}
       partyPanelOpen = true;
       if (inRoom) paint("rooms"); else paint("rooms");
       return;

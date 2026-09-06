@@ -6897,3 +6897,35 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   border-color: #f0c090;
   color: #a24f00;
 }
+
+
+/* ---- ?v=20260906bh club polish (preserve bg dual-mode Flash cards) ---- */
+.furniture-glow-legend {
+  position: absolute; left: 10px; bottom: 56px; z-index: 41;
+  width: min(220px, 48vw);
+  background: rgba(255, 254, 248, 0.95);
+  border: 1px solid #9ec4de; border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(22, 50, 74, 0.16);
+  padding: 8px 10px; font-size: 12px; pointer-events: auto;
+}
+.furniture-glow-legend .fgl-title { font-weight: 700; color: #1e6fa8; margin-bottom: 4px; }
+.furniture-glow-legend .fgl-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: #3a5a72; }
+.furniture-glow-legend .fgl {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto;
+}
+.furniture-glow-legend .fgl.green { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+.furniture-glow-legend .fgl.orange { background: #e07a2a; box-shadow: 0 0 6px #e07a2a; }
+.furniture-glow-legend .fgl.white { background: #fff; border: 1px solid #9ec4de; box-shadow: 0 0 6px #fff; }
+.person-name.name-here { color: #1e6fa8 !important; }
+.person-name.name-away { color: #c9a227 !important; font-weight: 700; }
+.person-name.name-idle { color: #7a8a98 !important; }
+.idle-zzz { font-size: 10px; opacity: 0.85; margin-left: 2px; }
+.occ-legend .lg.gray { background: #9aa8b5; }
+.presence-feed-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #c5deee; }
+.presence-feed-clear { font-size: 11px; padding: 2px 8px !important; }
+.presence-feed-row.kind-orange { color: #c45a12; font-weight: 600; }
+.presence-feed-hint { margin: 0; padding: 2px 8px 6px; font-size: 10px; opacity: 0.85; }
+.friends-pop-row.is-offline .friends-pop-actions button { opacity: 0.95; }
+@media (max-width: 700px) {
+  .furniture-glow-legend { left: 6px; bottom: 64px; width: min(200px, 58vw); font-size: 11px; }
+}

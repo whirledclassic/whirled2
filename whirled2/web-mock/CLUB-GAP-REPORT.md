@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bf` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bh` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,32 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bf`)
+## Closed this pass (`?v=20260906bh`)
+
+| Item | Notes |
+|------|--------|
+| Furniture glow stubs | Orange link + white game chip clicks → Coming Soon toasts; on-stage glow legend |
+| Occupant name colors | Blue here / yellow `/away` / gray idle Zzz (wiki Room) |
+| Chat commands | `/help`, `/away [msg]`, `/action` stub; shortcuts list |
+| Presence feed | Orange party-invite rows + Clear; wiki grey corner fidelity |
+| Friends toolbar | Visit home for offline friends |
+| View items | Categorized doors/furniture/toys/images + playlist (no avatars/pets) |
+| Name menu | Send Mail added; Complain still Coming Soon |
+| Preserve | bg dual Wear modes (`classic-avatar.js` untouched); bf Go/Friends/glow; bc Groups/Admin; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bg`)
+
+| Item | Notes |
+|------|--------|
+| Dual Wear modes | Whirled2 Smooth (`png-hybrid`) vs Classic Flash/Ruffle (`playbackMode` cards) |
+| Wear persist | Strip huge SWF data URLs from worn snapshot; loft resolves SWF from IndexedDB |
+| Docs / QA | HOW-CLASSIC dual-mode; qa-flash-check bg |
+
+---
+
+## Closed earlier (`?v=20260906bf`)
 
 | Item | Notes |
 |------|--------|
@@ -152,7 +177,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
 | Parties | **Improved** (`be`) board create/join/invite; follow-host Coming Soon | Follow-host presence **P1** |
 | Go / Friends toolbar | **Improved** (`bf`) Go sections + Friends online/offline popup | Server presence **P1** |
-| Clickable furniture glow | **Improved** (`bf`) green/orange/white legend | Orange/white actions still stubs **P2** |
+| Clickable furniture glow | **Improved** (`bh`) legend + stub clicks (Coming Soon toasts) | Full link/game travel later **P2** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |
 
 ### Door (wiki)
@@ -169,7 +194,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 |------|----------|-----|
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
 | Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors | Group tabs still limited |
-| Name click menu | **Improved** (`bf`) Invite wording + party invite + Complain Coming Soon tag | Complain moderation **P2** |
+| Name click menu | **Improved** (`bh`) Invite + Send Mail + party + Complain Coming Soon | Complain moderation **P2** |
 | Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`) | — |
 | “Too chatty” throttle | **Working** (`be`) classic wiki copy | — |
 
@@ -195,7 +220,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Friends toolbar popup / online approx | **Working** (occupant-diff heuristic) | Server presence **P1** |
 | Rich search (email/permaname) | **Improved** (`ba`) name/id/email/realName/interests (local) | Server directory **P1** |
 | Friends toolbar popup | **Improved** (`bf`) online + offline rows; Join/Whisper/Profile | Server presence **P1** |
-| Login/logout notices | **Improved** (`bf`) corner presence feed (local) | Full grey corner log fidelity **P2** |
+| Login/logout notices | **Improved** (`bh`) presence feed + orange party invites + Clear | Server presence **P1** |
 | Room avatar “Invite to be your friend” | Partial vs wiki | **P2** |
 
 ### Music (wiki)
