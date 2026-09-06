@@ -6391,3 +6391,75 @@ body.room-immersive #app[data-tab="rooms"] .workspace {
   min-height: 0 !important;
   height: 0 !important;
 }
+
+
+/* ==========================================================================
+   ?v=20260906az — Extra room chrome polish (on top of ay bar kill)
+   Beginner: loft viewport is a clean pale card; wood stays inside stage only.
+   ENGINE DEV: CSS-only — do not touch Hybrid / Whirl / chat visit-since JS.
+   ========================================================================== */
+
+/* Stage viewport = rounded pale card; loft-backdrop paints the scene inside */
+#app[data-tab="rooms"] .stage-wrap {
+  background: #cfe4f4 !important; /* flat pale — no stripe bands reading as bars */
+  border: 1px solid #9bb8cc !important;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+}
+#app[data-tab="rooms"] .stage-host {
+  background: transparent !important;
+  overflow: hidden !important;
+  border-radius: 0;
+  min-height: 240px;
+}
+#app[data-tab="rooms"] #stage-slot {
+  overflow: hidden !important;
+  border-radius: 0;
+  background: transparent !important;
+}
+/* Contain wood floor strictly inside stage-slot */
+#app[data-tab="rooms"] #stage-slot .loft-backdrop,
+#app[data-tab="rooms"] #stage-slot .loft-floor {
+  max-width: 100%;
+  pointer-events: none;
+}
+
+/* Immersive: pale loft, not charcoal void */
+body.room-immersive #app[data-tab="rooms"] > #main {
+  background: #cfe4f4 !important;
+}
+body.room-immersive #app[data-tab="rooms"] .workspace,
+body.room-immersive #app[data-tab="rooms"] .stage-wrap {
+  background: #cfe4f4 !important;
+}
+body.room-immersive #app[data-tab="rooms"] .room-strip {
+  background: rgba(234, 246, 252, 0.92) !important;
+  color: #16324a !important;
+  border: 1px solid #9bb8cc;
+  box-shadow: 0 2px 8px rgba(20, 60, 90, 0.12);
+}
+body.room-immersive #app[data-tab="rooms"] .room-strip .room-name,
+body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
+  color: #1e6fa8 !important;
+}
+
+/* Soft loft wood edge — reads as floor, not a chrome stripe */
+#app[data-tab="rooms"] .loft-floor {
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* Music gesture FAB — pale, not black pill */
+.music-gesture-fab {
+  background: linear-gradient(180deg, #eaf6fc, #d7ebf8) !important;
+  color: #1e6fa8 !important;
+  border: 1px solid #9bb8cc !important;
+  box-shadow: 0 4px 14px rgba(20, 60, 90, 0.18);
+}
+
+/* Mobile: stage-wrap flat pale (kill any leftover multi-stop stripe) */
+@media (max-width: 900px) {
+  #app[data-tab="rooms"] .stage-wrap {
+    background: #cfe4f4 !important;
+    border-radius: 0;
+  }
+}

@@ -1,3 +1,11 @@
+## What shipped (?v=20260906az)
+
+- **Extra visual polish** on ay bar kill: flat pale stage-wrap (no stripe bands), soft loft viewport containment, wood floor clipped inside `#stage-slot` only.
+- Immersive mode: pale `#cfe4f4` main/workspace (not charcoal `#1a2a38`); room-strip frosted pale card.
+- Music gesture FAB pale-blue; collapsed embed letterbox stays hidden.
+- CSS-only — **no JS**. Preserves Flash Hybrid / Whirl / av chat visit-since / Clear / classic-avatar.
+- Cache: **`?v=20260906az`**. Push: `/tmp/push-az.js` (dry-run default).
+
 ## What shipped (?v=20260906ay) — visual bar kill (merged into ay styles)
 
 - **Room chrome stacking:** killed full-width brown `#5c4030`/`#8b6914` bands on `.stage-wrap` / `.workspace`; pale loft-blue chrome only.
@@ -6,7 +14,7 @@
 - **Floor:** subtle warm wood + grid stays **inside** `.loft-floor` / `#stage-slot` only — not a full-width brown bar under the stage eating UI.
 - Music mini-bar stays pale-blue (ax); expanded player hole deep-blue not pure black chrome.
 - Preserves **av** chat visit-since / Clear, **Whirl** default, **classic-avatar** / Hybrid ay path. No JS touched (CSS-only).
-- Cache stays **`?v=20260906ay`** (Flash owns ay). **No az bump** — merged into ay styles. No `/tmp/push-az.js`.
+- Bar kill landed under ay; **extras polished as `?v=20260906az`** (see below).
 
 ## What shipped (?v=20260906ay)
 
