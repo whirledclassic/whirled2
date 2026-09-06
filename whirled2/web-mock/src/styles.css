@@ -4354,3 +4354,123 @@ button.tb.tb-music,
   .friendly-row .action-btn { width: 100%; }
   .room-share-card { width: 100%; max-width: 100%; }
 }
+
+/* ---- 20260906ae: Create Room + My Rooms ---- */
+.create-room-panel { margin: 12px 0; }
+.create-room-label { display: block; margin: 8px 0; font-size: 13px; color: #16324a; }
+.create-room-label input[type="text"] {
+  display: block; width: 100%; max-width: 360px; margin-top: 4px; box-sizing: border-box;
+  border: 1px solid #b7d3e8; border-radius: 4px; padding: 8px 10px; font: inherit; color: #16324a; background: #fff;
+}
+.create-room-lock-row { display: flex; flex-wrap: wrap; gap: 10px 14px; margin: 8px 0 12px; }
+.create-lock-opt { font-size: 13px; color: #16324a; cursor: pointer; }
+.create-room-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.create-room-cost { margin: 0 0 8px; }
+.me-rooms-page .create-room-panel { max-width: 520px; }
+.room-immersive-exit {
+  margin-left: auto; font-size: 12px; padding: 2px 8px;
+  background: rgba(255,255,255,0.85); border-radius: 4px; border: 1px solid #9bb8cc;
+}
+
+/* ---- 20260906ae: Mobile landscape immersion (inRoom) ---- */
+/* How this works: body.room-immersive hides top chrome; stage fills viewport; chat bottom-corner.
+   ENGINE DEV: #stage-slot stays mounted — only chrome/layout around it changes. */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.room-immersive #app[data-tab="rooms"] > .topbar {
+    display: none !important;
+  }
+  body.room-immersive #app[data-tab="rooms"] > #main {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 40;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    overflow: hidden !important;
+    background: #1a2a38;
+  }
+  body.room-immersive #app[data-tab="rooms"] .workspace {
+    height: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+  }
+  body.room-immersive #app[data-tab="rooms"] .occ-rail {
+    display: none !important;
+  }
+  body.room-immersive #app[data-tab="rooms"] .stage-wrap {
+    flex: 1 1 auto !important;
+    min-height: 100% !important;
+    height: 100% !important;
+  }
+  body.room-immersive #app[data-tab="rooms"] .room-strip {
+    position: absolute; top: 4px; left: 4px; right: 4px; z-index: 50;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    background: rgba(10, 20, 30, 0.45); color: #e8f4fb; padding: 4px 8px; border-radius: 6px;
+  }
+  body.room-immersive #app[data-tab="rooms"] .room-immersive-exit {
+    display: inline-block !important;
+    color: #16324a;
+  }
+  body.room-immersive #app[data-tab="rooms"] .stage-host {
+    flex: 1 1 auto !important;
+    min-height: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+  }
+  body.room-immersive #app[data-tab="rooms"] .chat-tabs,
+  body.room-immersive #app[data-tab="rooms"] .room-invite-row,
+  body.room-immersive #app[data-tab="rooms"] .chat-log {
+    display: none !important;
+  }
+  /* Compact Overlay chat in bottom corner */
+  body.room-immersive #app[data-tab="rooms"] .chat-overlay {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    position: absolute !important;
+    left: auto !important;
+    right: 6px !important;
+    top: auto !important;
+    bottom: 52px !important;
+    width: min(46vw, 280px) !important;
+    max-height: 42vh !important;
+    z-index: 55 !important;
+    pointer-events: none;
+  }
+  body.room-immersive #app[data-tab="rooms"] .chat-overlay .chat-bubble,
+  body.room-immersive #app[data-tab="rooms"] .chat-overlay > * {
+    pointer-events: auto;
+  }
+  /* Thin input bar docked bottom */
+  body.room-immersive #app[data-tab="rooms"] > .bar {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 60 !important;
+    display: flex !important;
+    padding: 4px 8px max(4px, env(safe-area-inset-bottom)) !important;
+    background: rgba(232, 244, 251, 0.94) !important;
+    border-top: 1px solid #9bb8cc;
+    gap: 6px;
+  }
+  body.room-immersive #app[data-tab="rooms"] > .bar .toolbar {
+    display: none !important; /* keep input + send only for immersion */
+  }
+  body.room-immersive #app[data-tab="rooms"] > .bar .chat-opts-wrap {
+    display: none !important;
+  }
+  body.room-immersive #app[data-tab="rooms"] > .bar #chat-input {
+    flex: 1 1 auto;
+    font-size: 16px !important; /* iOS zoom-safe */
+    min-height: 36px;
+  }
+  body.room-immersive #app[data-tab="rooms"] > #room-embed-dock {
+    z-index: 70;
+  }
+}
+@media (orientation: portrait) {
+  body.room-immersive #app[data-tab="rooms"] > .topbar {
+    /* safety: portrait should not stay immersive (JS clears class) */
+  }
+}

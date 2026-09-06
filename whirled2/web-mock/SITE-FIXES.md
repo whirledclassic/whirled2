@@ -19,6 +19,7 @@ Whirled2 is a same-spirit revival chrome mock — not affiliated with Three Ring
 
 | Wave | User-visible |
 |------|----------------|
+| **?v=20260906ae** | **Create Room** (My Rooms + 10k coins/1 bar, first free) + **mobile landscape immersion** (stage + corner Overlay chat). |
 | **?v=20260906ad** | **SITE-FIXES top 5** — Friendly People strip; wall Delete; Shop grid ♥; Volume + mute-safe music; Share/embed room; owner lock triad. Avatar lab still locked. |
 | **?v=20260906ac** | **Chat** polish — Overlay bubbles (cyan names, contrast, fade), readable Slide panel, clearer tabs/unread, Send + 16px mobile input, stage bubbles. Mobile Overlay-only (no black hood). |
 | **?v=20260906ac** | **Games** expand — Browse / Tables / AVR Coming Soon / My scores; Parlor vs AVR explainers; labeled Coming Soon cards (**not** fake catalog); detail Play / Watch / Tables; local `whirled2.gameScores` stub. |
@@ -79,11 +80,11 @@ Ranked by **user-visible impact** × **effort (small/medium chrome only)**. Skip
 **Also in ?v=20260906ad:** Room lock Unlocked / Friends / Locked owner-only UI polish.
 
 Then: View Rooms → owner filter; snapshot thumbs; glow hold; friends’ rooms strip.  
-PLAN only (not shipped): mobile landscape fullscreen + corner chat.
+✅ Mobile landscape immersion shipped in `?v=20260906ae`.
 
 ---
 
-*Shipped in `?v=20260906ad` (see `STATUS.md` / `LOGO_V`). Avatar lab remains locked. Do not push unless asked.*
+*Shipped in `?v=20260906ae` (create room + landscape) / prior `?v=20260906ad` (see `STATUS.md` / `LOGO_V`). Avatar lab remains locked. Do not push unless asked.*
 
 ---
 
@@ -111,15 +112,15 @@ PLAN only (not shipped): mobile landscape fullscreen + corner chat.
 
 | Piece | Mock (`whirled2-web-mock`) |
 |-------|----------------------------|
-| My Rooms | Lobby section + Me links → **same single Studio Loft** tile only |
-| Create / buy room | **Missing** — no pay buttons, no second room id, no “Home” spawn |
+| My Rooms | **Shipped ae** — lobby + Me → My Rooms list owned rooms (loft seed kept) |
+| Create / buy room | **Shipped ae** — Create Room panel; 10k coins / 1 bar; first free; multi-id |
 | Privacy | **Present** — Room menu lock triad `unlocked` / `friends` / `locked` + `canEnterLoft` (`whirled2.roomLock.loft`) |
 | Group / theme at create | **Missing** as create choice; Groups have Edit Whirled theme **Coming Soon** + optional local header hex |
 | Party | Local party board create/join — **not** a create-room type; no follow-leader |
 | Doors | **Missing** — decorate chips only; no Make Door / Drop Door / link target |
 | Clickable glows | **Missing** — occupant legend exists; no hold-to-glow on chips (SITE-FIXES #9) |
 | Snapshot thumbs | **Stub** — Room menu “Take snapshot (stub)”; lobby `.thumb` = gradient (SITE-FIXES #8) |
-| Multi-room model | Still single loft keys (`*.loft`) — see `ROOMS-FIDELITY.md` |
+| Multi-room model | **Shipped ae** — `whirled2.rooms` map; loft seed + owned rooms |
 
 ### Implementable checklist (chrome-first)
 
@@ -127,11 +128,11 @@ Wire in beginner comments (`// How this works` / `// Beginner:`). Prefer local k
 
 **Create shell (P0 chrome)**
 
-- [ ] **My Rooms → Create room** panel (lobby + Me → Rooms): name field (default `Home` / `{display}'s Room`), optional blurb.
-- [ ] **Privacy click-choice** on create (same triad as Room menu): Unlocked / Friends / Locked — default Unlocked; write `mode` + `ownerId` on the new room record.
-- [ ] Honest **cost copy**: classic was 1 bar / 10k coins — mock may use **earn-only** labels (“Coming Soon · classic cost was…”) or a local coin sink if wallet already has coins; **never** enable Buy Bars.
-- [ ] On confirm: append to `whirled2.rooms` (or migrate from loft-only) → refresh My Rooms tiles → open preview (existing preview sheet) for the new id.
-- [ ] Keep **no Party / no Theme radios** on this dialog — link text: “Parties = toolbar · Themed Whirled = Groups (Coming Soon)”.
+- [x] **My Rooms → Create room** panel (lobby + Me → Rooms): name field (default `Home` / `{display}'s Room`), optional blurb.
+- [x] **Privacy click-choice** on create (same triad as Room menu): Unlocked / Friends / Locked — default Unlocked; write `mode` + `ownerId` on the new room record.
+- [x] Honest **cost copy**: classic was 1 bar / 10k coins — mock may use **earn-only** labels (“Coming Soon · classic cost was…”) or a local coin sink if wallet already has coins; **never** enable Buy Bars.
+- [x] On confirm: append to `whirled2.rooms` (or migrate from loft-only) → refresh My Rooms tiles → open preview (existing preview sheet) for the new id.
+- [x] Keep **no Party / no Theme radios** on this dialog — link text: “Parties = toolbar · Themed Whirled = Groups (Coming Soon)”.
 
 **Not on create dialog (document in UI help)**
 
@@ -174,5 +175,5 @@ whirled2.rooms[roomId] = {
 - ENGINE DEV: only retarget chrome around `#stage-slot` — do not remount Pixi on rotate.
 - Accessibility: provide Exit control even if orientation flip fails (tablet docked, etc.).
 
-**Status:** Planned / not shipped. Track here; no `app.js` work in this doc pass.
+**Status:** ✅ Shipped in `?v=20260906ae` — `body.room-immersive` + orientation media queries; Exit control; Overlay corner chat; ENGINE DEV `#stage-slot` untouched.
 

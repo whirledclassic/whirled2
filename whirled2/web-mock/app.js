@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ad";
+  var LOGO_V = "20260906ae";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -48,6 +48,12 @@
   var MAIL_KEY = "whirled2.mail";
   var PARTIES_KEY = "whirled2.parties";
   var ROOM_LAYOUT_KEY = "whirled2.roomLayout.loft";
+  // How this works (20260906ae): multi-room catalog in whirled2.rooms (object map by id).
+  // Beginner: Studio Loft stays the default seed; Create Room adds more you own.
+  // ENGINE DEV: catalog is chrome/localStorage only — does not remount #stage-slot.
+  var ROOMS_CATALOG_KEY = "whirled2.rooms";
+  var ROOM_CREATE_COINS = 10000; // classic: 10,000 coins OR 1 bar
+  var ROOM_CREATE_BARS = 1;
   var MY_PARTY_KEY = "whirled2.myParty";
   var BLOCKLIST_KEY = "whirled2.blocklist";
   var GALLERIES_KEY = "whirled2.galleries";
@@ -792,7 +798,7 @@
     // Beginner: on a phone, tap "Open player" / "Open on YouTube" — those always work even if the tiny iframe play button is hard to hit.
     // ENGINE DEV: #room-embed-dock is created in shell() after #main / before .bar — paint never destroys it.
     // Touch: raise z-index + pointer-events; expand sheet for ~220px tap target on iOS.
-    // How this works (20260906ad mute-safe): when muted, do NOT mount the embed iframe (classic wiki:
+    // How this works (20260906ae mute-safe): when muted, do NOT mount the embed iframe (classic wiki:
     // muted → do not load the track — avoids a bad stream breaking the room). Labels still update elsewhere.
     // Beginner: Mute = no YouTube/Spotify load; Unmute remounts from saved playlist embedSrc.
     if (roomAudioMuted) {
@@ -1086,7 +1092,7 @@
     // How this works: local → <audio>; youtube/spotify → #room-embed-dock iframe; pause local when not local.
     // Beginner: closing the Room music modal does NOT call this teardown — only leave/local-switch does.
     // ENGINE DEV: single-track sets audio.loop=true; multi-track uses playlistNext on ended for continuous play.
-    // How this works (20260906ad): mute-safe — when muted, unload local src and skip embed mount (do not fetch).
+    // How this works (20260906ae): mute-safe — when muted, unload local src and skip embed mount (do not fetch).
     // Beginner: Mute never breaks the room; Unmute loads music again from the saved playlist.
     var a = ensureRoomAudioEl();
     a.muted = !!roomAudioMuted;
@@ -1316,7 +1322,7 @@
   var helpOpen = false;
   var legalOpen = false; // Help → Legal / Disclaimer
   var musicGestureNeeded = false; // browser blocked autoplay — show Click to play
-  // How this works (20260906ad): mute + volume prefs persist in localStorage.
+  // How this works (20260906ae): mute + volume prefs persist in localStorage.
   // Beginner: Mute remembers across reloads; volume slider is 0–100%.
   // ENGINE DEV: mute-safe load skips mounting audio/embed when muted (classic wiki Music).
   var ROOM_MUTE_KEY = "whirled2.roomMute";
@@ -2130,18 +2136,23 @@
     try { localStorage.setItem(groupThreadsKey(gid), JSON.stringify((threads || []).slice(0, 100))); } catch (e) {}
   }
   // ---------------------------------------------------------------------------
-  // Room lock (wiki Room) — enforced locally on this browser mock
-  // How this works: whirled2.roomLock.loft stores { mode, ownerId }.
-  //   unlocked → anyone may enter Studio Loft
-  //   friends  → lock owner, loft first-user, or mutual friends (loadFriends)
-  //   locked   → only the lock owner (and loft first-user) may enter
-  // ENGINE DEV: lock is chrome/lobby gate only — does not change #stage-slot.
-  // Migrate: old builds stored a bare string ("unlocked"|"friends"|"locked").
+  // Room lock + multi-room catalog (wiki Room / Create Whirleds)
+  // How this works: whirled2.rooms maps roomId → { id, name, ownerId, lock, createdAt }.
+  //   Legacy whirled2.roomLock.loft still syncs for Studio Loft.
+  //   unlocked → anyone may enter
+  //   friends  → lock owner, room owner, loft first-user, or mutual friends
+  //   locked   → only room/lock owner (and loft first-user for loft)
+  // ENGINE DEV: lock + catalog are chrome/lobby gates only — never remount #stage-slot.
   // ---------------------------------------------------------------------------
   function defaultRoomLock() {
     return { mode: "unlocked", ownerId: "" };
   }
-  function loadRoomLock() {
+  function normalizeLockMode(mode) {
+    mode = mode || "unlocked";
+    if (mode !== "unlocked" && mode !== "friends" && mode !== "locked") mode = "unlocked";
+    return mode;
+  }
+  function readLegacyLoftLock() {
     // How this works: always return { mode, ownerId }; migrate legacy string values.
     try {
       var raw = localStorage.getItem(ROOM_LOCK_KEY);
@@ -2158,82 +2169,328 @@
       }
       var obj = JSON.parse(raw);
       if (!obj || typeof obj !== "object") return defaultRoomLock();
-      var mode = obj.mode || "unlocked";
-      if (mode !== "unlocked" && mode !== "friends" && mode !== "locked") mode = "unlocked";
-      return { mode: mode, ownerId: String(obj.ownerId || "") };
+      return { mode: normalizeLockMode(obj.mode), ownerId: String(obj.ownerId || "") };
     } catch (e) { return defaultRoomLock(); }
   }
-  function canSetRoomLock() {
-    // How this works: loft owner (first user) or current lock ownerId may change Unlocked/Friends/Locked.
+  function defaultLoftRoom() {
+    // How this works: Studio Loft is the seeded home whirled (not a fake public catalog).
+    // Beginner: loft always exists; other rooms appear only when you Create Room.
+    var first = "";
+    try { first = localStorage.getItem(FIRST_USER_KEY) || ""; } catch (e) {}
+    var legacy = readLegacyLoftLock();
+    var ownerId = String(legacy.ownerId || first || "");
+    return {
+      id: "loft",
+      name: "Studio Loft",
+      ownerId: ownerId,
+      lock: { mode: normalizeLockMode(legacy.mode), ownerId: ownerId || String(legacy.ownerId || "") },
+      createdAt: "",
+      blurb: "home whirled",
+      thumbDataUrl: null,
+      markedWhirledId: null,
+      seed: true
+    };
+  }
+  function loadRoomsCatalog() {
+    // How this works: load whirled2.rooms object map; always ensure loft seed exists.
+    // Beginner: one shared Studio Loft + any rooms you paid (or first-free) to create.
+    var map = {};
+    try {
+      var raw = localStorage.getItem(ROOMS_CATALOG_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) map = parsed;
+        else if (Array.isArray(parsed)) {
+          parsed.forEach(function (r) { if (r && r.id) map[r.id] = r; });
+        }
+      }
+    } catch (e) { map = {}; }
+    if (!map.loft) map.loft = defaultLoftRoom();
+    else {
+      // Merge legacy lock onto loft if catalog lock missing.
+      var loft = map.loft;
+      if (!loft.lock || !loft.lock.mode) {
+        var leg = readLegacyLoftLock();
+        loft.lock = { mode: normalizeLockMode(leg.mode), ownerId: String(leg.ownerId || loft.ownerId || "") };
+      }
+      loft.name = loft.name || "Studio Loft";
+      loft.id = "loft";
+      map.loft = loft;
+    }
+    return map;
+  }
+  function saveRoomsCatalog(map) {
+    try { localStorage.setItem(ROOMS_CATALOG_KEY, JSON.stringify(map || {})); } catch (e) {}
+  }
+  function getRoom(roomId) {
+    roomId = roomId || currentRoomId || "loft";
+    var map = loadRoomsCatalog();
+    return map[roomId] || (roomId === "loft" ? defaultLoftRoom() : null);
+  }
+  function activeRoomName() {
+    var r = getRoom(currentRoomId || "loft");
+    return (r && r.name) || ROOM || "Studio Loft";
+  }
+  function ownedRoomsFor(userId) {
+    // How this works: My Rooms = rooms whose ownerId matches this player.
+    userId = String(userId || "");
+    if (!userId) return [];
+    var map = loadRoomsCatalog();
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(function (r) {
+      return r && String(r.ownerId || "") === userId;
+    }).sort(function (a, b) {
+      return String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+    });
+  }
+  function listRoomsArray() {
+    var map = loadRoomsCatalog();
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(Boolean);
+  }
+  function newRoomId() {
+    return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+  function spendCurrency(userId, coinsSpend, barsSpend, meta) {
+    // How this works: deduct earn-only Coins/Bars for room create (never Buy Bars).
+    // Beginner: fails honestly if the wallet cannot cover the cost.
+    if (!userId) return { ok: false, reason: "session" };
+    coinsSpend = Math.max(0, Number(coinsSpend) || 0);
+    barsSpend = Math.max(0, Number(barsSpend) || 0);
+    var w = loadWallet(userId);
+    if ((Number(w.coins) || 0) < coinsSpend) return { ok: false, reason: "coins", wallet: w };
+    if ((Number(w.bars) || 0) < barsSpend) return { ok: false, reason: "bars", wallet: w };
+    var next = grantCurrency(userId, -coinsSpend, -barsSpend, meta || { kind: "spend", label: "Spend" });
+    return { ok: true, wallet: next };
+  }
+  function createOwnedRoom(opts) {
+    // How this works: Me → My Rooms / lobby Create Room — name + pay Coins OR Bars + optional lock.
+    // Beginner: first owned room is free; later rooms cost 10,000 coins OR 1 bar (classic).
+    // ENGINE DEV: only writes whirled2.rooms + wallet; does not touch #stage-slot until Enter.
+    opts = opts || {};
+    var s = session();
+    if (!s || !s.user) return { ok: false, error: "Sign in to create a room." };
+    var uid = String(s.user.id);
+    var name = String(opts.name || "").trim() || "Home";
+    name = name.slice(0, 48);
+    var blurb = String(opts.blurb || "").trim().slice(0, 120);
+    var lockMode = normalizeLockMode(opts.lockMode || "unlocked");
+    // How this works: Studio Loft seed does not consume the classic “one free home” create.
+    // Beginner: your first *created* room is free; loft stays the Featured seed.
+    var owned = ownedRoomsFor(uid).filter(function (r) { return r && !r.seed; });
+    var isFree = owned.length === 0;
+    var payWith = String(opts.payWith || (isFree ? "free" : "coins"));
+    if (!isFree) {
+      if (payWith !== "coins" && payWith !== "bars") {
+        return { ok: false, error: "Choose Coins (10,000) or Bars (1)." };
+      }
+      var spent = payWith === "bars"
+        ? spendCurrency(uid, 0, ROOM_CREATE_BARS, {
+            kind: "room",
+            label: "Create room",
+            note: "−1 bar for room “" + name + "”"
+          })
+        : spendCurrency(uid, ROOM_CREATE_COINS, 0, {
+            kind: "room",
+            label: "Create room",
+            note: "−" + ROOM_CREATE_COINS + " coins for room “" + name + "”"
+          });
+      if (!spent.ok) {
+        if (spent.reason === "bars") {
+          return { ok: false, error: "Not enough Bars (need 1). Earn Bars from login streaks — Buy stays disabled." };
+        }
+        return { ok: false, error: "Not enough Coins (need 10,000). Earn Coins from daily login — no payments." };
+      }
+    }
+    var id = newRoomId();
+    var room = {
+      id: id,
+      name: name,
+      ownerId: uid,
+      lock: { mode: lockMode, ownerId: uid },
+      createdAt: new Date().toISOString(),
+      blurb: blurb || (isFree ? "first home (free)" : ""),
+      thumbDataUrl: null,
+      markedWhirledId: null,
+      seed: false
+    };
+    var map = loadRoomsCatalog();
+    map[id] = room;
+    saveRoomsCatalog(map);
+    return { ok: true, room: room, free: isFree, payWith: isFree ? "free" : payWith };
+  }
+  function loadRoomLock(roomId) {
+    // How this works: prefer lock on whirled2.rooms[roomId]; loft also mirrors legacy key.
+    roomId = roomId || currentRoomId || "loft";
+    var room = getRoom(roomId);
+    if (room && room.lock && room.lock.mode) {
+      return { mode: normalizeLockMode(room.lock.mode), ownerId: String(room.lock.ownerId || room.ownerId || "") };
+    }
+    if (roomId === "loft") return readLegacyLoftLock();
+    return defaultRoomLock();
+  }
+  function canSetRoomLock(roomId) {
+    // How this works: room owner (or loft first-user on loft) may change Unlocked/Friends/Locked.
     // Beginner: only the room owner flips the three lock choices (wiki Room control bar).
+    roomId = roomId || currentRoomId || "loft";
     var s = session();
     if (!s || !s.user) return false;
     var sid = String(s.user.id);
-    if (isLoftOwner()) return true;
-    var lock = loadRoomLock();
+    var room = getRoom(roomId);
+    if (room && room.ownerId && String(room.ownerId) === sid) return true;
+    if (roomId === "loft" && isLoftOwner()) return true;
+    var lock = loadRoomLock(roomId);
     if (lock && lock.ownerId && String(lock.ownerId) === sid) return true;
-    // First set: no owner yet → allow current session to claim (same as saveRoomLock).
     if (!lock || !lock.ownerId) return true;
     return false;
   }
-  function saveRoomLock(mode) {
-    // How this works: owner sets Unlocked / Friends / Locked; stamps ownerId.
+  function saveRoomLock(mode, roomId) {
+    // How this works: owner sets Unlocked / Friends / Locked; stamps ownerId on room + legacy loft key.
     // Beginner: guests cannot change the lock — buttons are disabled for them.
-    if (!canSetRoomLock()) return;
-    mode = mode || "unlocked";
-    if (mode !== "unlocked" && mode !== "friends" && mode !== "locked") mode = "unlocked";
+    roomId = roomId || currentRoomId || "loft";
+    if (!canSetRoomLock(roomId)) return;
+    mode = normalizeLockMode(mode);
     var ownerId = "";
     try {
       if (session() && session().user && session().user.id) ownerId = String(session().user.id);
       else ownerId = localStorage.getItem(FIRST_USER_KEY) || "";
     } catch (e) {}
-    // Keep prior ownerId if loft owner is adjusting someone else's claimed lock? Prefer session claimer.
-    try {
-      var prev = loadRoomLock();
-      if (prev && prev.ownerId && isLoftOwner() && String(prev.ownerId) !== ownerId) {
-        // loft first-user may always set; keep themselves as ownerId for clarity
-      }
-      localStorage.setItem(ROOM_LOCK_KEY, JSON.stringify({ mode: mode, ownerId: ownerId }));
-    } catch (e2) {}
+    var map = loadRoomsCatalog();
+    var room = map[roomId] || (roomId === "loft" ? defaultLoftRoom() : null);
+    if (!room) return;
+    room.lock = { mode: mode, ownerId: ownerId };
+    if (!room.ownerId) room.ownerId = ownerId;
+    map[roomId] = room;
+    saveRoomsCatalog(map);
+    if (roomId === "loft") {
+      try { localStorage.setItem(ROOM_LOCK_KEY, JSON.stringify({ mode: mode, ownerId: ownerId })); } catch (e2) {}
+    }
   }
-  function canEnterLoft(viewerId) {
-    // How this works: gate [data-enter-room] / Join them / Go home before setting inRoom.
-    var lock = loadRoomLock();
+  function canEnterRoom(viewerId, roomId) {
+    // How this works: gate preview Enter / Visit Home / Go home before setting inRoom.
+    roomId = roomId || "loft";
+    var lock = loadRoomLock(roomId);
     var mode = (lock && lock.mode) || "unlocked";
     if (mode === "unlocked") return true;
     viewerId = String(viewerId || "");
     if (!viewerId) return false;
     var ownerId = String((lock && lock.ownerId) || "");
+    var room = getRoom(roomId);
+    if (room && room.ownerId && String(room.ownerId) === viewerId) return true;
     var first = "";
     try { first = localStorage.getItem(FIRST_USER_KEY) || ""; } catch (e) {}
-    // Owner of the lock + loft first-user always enter.
-    if (viewerId === ownerId || (first && viewerId === first)) return true;
+    if (viewerId === ownerId || (roomId === "loft" && first && viewerId === first)) return true;
     if (mode === "locked") return false;
     if (mode === "friends") {
       var friends = loadFriends();
-      // Allow if viewer↔owner friendship appears on this browser's friends list.
       if (ownerId && friends.some(function (f) { return String(f.id) === ownerId; })) return true;
-      if (viewerId && friends.some(function (f) { return String(f.id) === viewerId; })) return true;
+      if (room && room.ownerId && friends.some(function (f) { return String(f.id) === String(room.ownerId); })) return true;
       return false;
     }
     return true;
   }
-  function tryEnterLoft() {
-    // How this works: shared enter path — block → notice + stay lobby; else enter loft.
+  function canEnterLoft(viewerId) {
+    return canEnterRoom(viewerId, "loft");
+  }
+  function tryEnterRoom(roomId) {
+    // How this works: shared enter path — block → notice + stay lobby; else enter room id.
+    // Beginner: currentRoomId drives name/lock chrome; #stage-slot still mounts the same way.
+    roomId = roomId || "loft";
+    if (!getRoom(roomId)) {
+      pushNotice("orange", "That room is not on this browser.");
+      inRoom = false;
+      return false;
+    }
     var sid = session() && session().user && session().user.id;
-    if (!canEnterLoft(sid)) {
-      var mode = (loadRoomLock().mode || "locked");
+    if (!canEnterRoom(sid, roomId)) {
+      var mode = (loadRoomLock(roomId).mode || "locked");
+      var rname = (getRoom(roomId) && getRoom(roomId).name) || roomId;
       var msg = mode === "friends"
-        ? "Studio Loft is friends-only right now. You cannot enter."
-        : "Studio Loft is locked. Only the room owner can enter.";
+        ? (rname + " is friends-only right now. You cannot enter.")
+        : (rname + " is locked. Only the room owner can enter.");
       pushNotice("orange", msg);
       inRoom = false;
       return false;
     }
+    currentRoomId = roomId;
     inRoom = true;
-    try { trackRecentRoom({ id: "loft", name: ROOM }); } catch (eR) {}
+    roomImmersiveForcedOff = false;
+    try { trackRecentRoom({ id: roomId, name: activeRoomName() }); } catch (eR) {}
+    try { updateLandscapeImmersion(); } catch (eImm) {}
     return true;
   }
+  function tryEnterLoft() {
+    // How this works: legacy alias — Go home / Visit Home still enter Studio Loft.
+    return tryEnterRoom("loft");
+  }
+  function createRoomPanelHtml(opts) {
+    // How this works: Create Room shell — name, optional lock triad, pay Coins OR Bars.
+    // Beginner: first owned room is free; later costs classic 10k coins or 1 bar (earn-only).
+    opts = opts || {};
+    var s = session();
+    var uid = s && s.user ? String(s.user.id) : "";
+    var ownedN = ownedRoomsFor(uid).filter(function (r) { return r && !r.seed; }).length;
+    var isFree = ownedN === 0;
+    var snap = uid ? getWalletSnapshot(uid) : { coins: 0, bars: 0 };
+    var defName = isFree ? "Home" : ((you().name || "Player") + "'s Room");
+    var costMeta = isFree
+      ? '<p class="meta create-room-cost">Your <b>first</b> room is <b>free</b> (classic one free home). Later rooms cost <b>10,000 coins</b> OR <b>1 bar</b> — earn-only, no Buy Bars.</p>'
+      : '<p class="meta create-room-cost">Classic cost: <b>10,000 coins</b> OR <b>1 bar</b>. Wallet: '
+        + esc(String(snap.coins)) + ' coins · ' + esc(String(snap.bars)) + ' bars (earn-only).</p>';
+    var payBtns = isFree
+      ? '<button type="button" class="action-btn" data-create-room-pay="free">Create free room</button>'
+      : ('<button type="button" class="action-btn" data-create-room-pay="coins"'
+        + ((snap.coins >= ROOM_CREATE_COINS) ? "" : " disabled") + '>Pay 10,000 Coins</button>'
+        + '<button type="button" class="action-btn" data-create-room-pay="bars"'
+        + ((snap.bars >= ROOM_CREATE_BARS) ? "" : " disabled") + '>Pay 1 Bar</button>');
+    return '<div class="panel create-room-panel" id="create-room-panel">'
+      +   '<div class="room-side-head"><h2>Create Room</h2>'
+      +     (opts.closeable !== false ? '<button type="button" class="text-btn" data-create-room-close="1">Close</button>' : '')
+      +   '</div>'
+      +   '<p class="meta">Classic path: Me → My Rooms. Starts Home-like. Parties = toolbar · Themed Whirled = Groups (Coming Soon).</p>'
+      +   costMeta
+      +   '<label class="create-room-label">Room name'
+      +     '<input type="text" id="create-room-name" maxlength="48" value="' + esc(defName) + '" placeholder="Home" /></label>'
+      +   '<label class="create-room-label">Blurb (optional)'
+      +     '<input type="text" id="create-room-blurb" maxlength="120" placeholder="Short description" /></label>'
+      +   '<div class="section-label">Starting lock (optional)</div>'
+      +   '<div class="create-room-lock-row" role="group" aria-label="Starting privacy">'
+      +     '<label class="create-lock-opt"><input type="radio" name="create-room-lock" value="unlocked" checked /> 🔓 Unlocked</label>'
+      +     '<label class="create-lock-opt"><input type="radio" name="create-room-lock" value="friends" /> 👥 Friends</label>'
+      +     '<label class="create-lock-opt"><input type="radio" name="create-room-lock" value="locked" /> 🔒 Locked</label>'
+      +   '</div>'
+      +   '<p class="meta">Doors / Make Door / snapshot thumbs — Coming Soon. Glows hold — Coming Soon.</p>'
+      +   '<div class="create-room-actions">' + payBtns + '</div>'
+      + '</div>';
+  }
+  function myRoomsTilesHtml(ownerId, opts) {
+    // How this works: tiles for rooms you own (+ always show loft seed in lobby Featured separately).
+    opts = opts || {};
+    var me = you();
+    ownerId = String(ownerId || (session() && session().user && session().user.id) || "");
+    var list = ownedRoomsFor(ownerId);
+    if (!list.length && opts.includeLoftFallback) {
+      // Beginner: if you own nothing yet, still show Studio Loft so My Rooms is never a blank void.
+      var loft = getRoom("loft");
+      list = loft ? [loft] : [];
+    }
+    if (!list.length) {
+      return '<div class="panel"><p class="meta">No owned rooms yet. Create your first room free below.</p></div>';
+    }
+    var online = liveOccupants.length || 0;
+    return '<div class="room-tiles">' + list.map(function (r) {
+      var isLoft = r.id === "loft";
+      var occ = (isLoft && currentRoomId === "loft") ? (online || (session() ? 1 : 0)) : (session() && currentRoomId === r.id ? 1 : 0);
+      return roomTile({
+        id: r.id,
+        name: r.name || "Room",
+        meta: "owner: " + me.name + (r.blurb ? (" · " + r.blurb) : (isLoft ? " · home" : "")),
+        online: occ,
+        rating: isLoft ? loftRatingLabel() : "Rating: new",
+        enterable: true,
+        lockMode: (r.lock && r.lock.mode) || "unlocked"
+      });
+    }).join("") + '</div>';
+  }
+
   function loadRoomRating() {
     try {
       var n = Number(localStorage.getItem(ROOM_RATING_KEY) || 0);
@@ -2509,7 +2766,7 @@
     });
   }
   function friendlyPeopleStripHtml() {
-    // How this works (20260906ad): Me home lists Friendly People under Friends Online.
+    // How this works (20260906ae): Me home lists Friendly People under Friends Online.
     // Beginner: Friendly helpers auto-accept friend requests. Empty = honest "none yet".
     // ENGINE DEV: only real local users with whirled2.friendly.{id}=1 — never invent NPCs.
     var people = listFriendlyPeople();
@@ -2670,13 +2927,98 @@
   // How this works (20260906q): on phones, Slide's dark panel eats the green stage.
   // Auto-switch to Overlay once for the session preference so the black slab never returns.
   // ---------------------------------------------------------------------------
-  // PLAN (future — do not implement in this pass): mobile landscape fullscreen + corner chat
-  // How this would work later: when phone is landscape + in-room, offer a fullscreen stage
-  // (screen.orientation / CSS fullscreen on .stage-host) and tuck Overlay chat into a
-  // corner drawer so the room stays readable. Portrait keeps today's Overlay-only path.
-  // Beginner: landscape mode is a polish idea for phones held sideways — not shipped yet.
-  // ENGINE DEV: never move #room-embed-dock under #stage-slot; fullscreen host = .stage-host only.
+  // Mobile landscape immersion (20260906ae) — phone sideways + inRoom
+  // How this works: orientation landscape + inRoom → body.room-immersive hides top tabs,
+  // stage fills viewport, Overlay chat docks bottom-corner with thin input bar.
+  // Portrait or Exit control restores chrome. Optional Fullscreen API when allowed.
+  // Beginner: rotate the phone sideways while in a room to go immersive; Exit or rotate back to leave.
+  // ENGINE DEV: only chrome CSS/layout around #stage-slot — never remount Pixi on rotate.
   // ---------------------------------------------------------------------------
+  function isPhoneLandscape() {
+    try {
+      if (!window.matchMedia) return false;
+      // Narrow phones / small tablets — avoid forcing immersive on wide desktop landscape.
+      var land = window.matchMedia("(orientation: landscape)").matches;
+      var narrow = window.matchMedia("(max-height: 520px), (max-width: 900px)").matches;
+      return land && narrow;
+    } catch (e) { return false; }
+  }
+  function requestRoomFullscreen() {
+    // How this works: optional Fullscreen API on #app (chrome host). Failures are ignored.
+    try {
+      var el = document.getElementById("app") || document.documentElement;
+      if (!el) return;
+      var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (req && !document.fullscreenElement && !document.webkitFullscreenElement) {
+        var p = req.call(el);
+        if (p && p.catch) p.catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function exitRoomFullscreen() {
+    try {
+      var ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (ex && (document.fullscreenElement || document.webkitFullscreenElement)) {
+        var p = ex.call(document);
+        if (p && p.catch) p.catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function updateLandscapeImmersion() {
+    // How this works: session-only immersive flag from landscape + inRoom (unless Exit forced off).
+    // Beginner: Exit sets roomImmersiveForcedOff until you leave the room or rotate away and back.
+    try {
+      var want = !!(inRoom && isPhoneLandscape() && !roomImmersiveForcedOff);
+      roomImmersive = want;
+      document.body.classList.toggle("room-immersive", want);
+      var exitBtn = document.querySelector(".room-immersive-exit");
+      if (exitBtn) exitBtn.hidden = !want;
+      if (want) {
+        document.body.classList.add("chat-mobile-overlay");
+        try {
+          var ui = loadChatUi();
+          if (ui.mode === "slide") {
+            ui.mode = "overlay";
+            saveChatUi(ui);
+          }
+        } catch (eUi) {}
+        // Soft fullscreen attempt — browsers may deny without gesture; CSS still immerses.
+        try { requestRoomFullscreen(); } catch (eFs) {}
+      } else {
+        try { exitRoomFullscreen(); } catch (eFs2) {}
+      }
+    } catch (e) {
+      roomImmersive = false;
+      try { document.body.classList.remove("room-immersive"); } catch (e2) {}
+    }
+    return roomImmersive;
+  }
+  function exitLandscapeImmersion() {
+    // How this works: Exit control restores top tabs / full chrome without leaving the room.
+    roomImmersiveForcedOff = true;
+    roomImmersive = false;
+    try { document.body.classList.remove("room-immersive"); } catch (e) {}
+    try { exitRoomFullscreen(); } catch (e2) {}
+    var exitBtn = document.querySelector(".room-immersive-exit");
+    if (exitBtn) exitBtn.hidden = true;
+  }
+  function bindLandscapeImmersionListeners() {
+    // How this works: once — orientation / resize / fullscreen change retarget chrome only.
+    if (window.__whirledImmersiveBound) return;
+    window.__whirledImmersiveBound = true;
+    function onChange() {
+      try {
+        if (!isPhoneLandscape()) roomImmersiveForcedOff = false;
+        updateLandscapeImmersion();
+      } catch (e) {}
+    }
+    try { window.addEventListener("orientationchange", onChange); } catch (e0) {}
+    try { window.addEventListener("resize", onChange); } catch (e1) {}
+    try { window.matchMedia("(orientation: landscape)").addEventListener("change", onChange); } catch (e2) {
+      try { window.matchMedia("(orientation: landscape)").addListener(onChange); } catch (e3) {}
+    }
+    try { document.addEventListener("fullscreenchange", onChange); } catch (e4) {}
+  }
   function ensureMobileChatOverlay() {
     // Purpose: phones force Overlay chat so Slide never opens a black slab under the stage.
     // How: if narrow viewport and mode was slide, flip to overlay once and notice once.
@@ -2754,7 +3096,7 @@
     return arr;
   }
   function shopCard(item) {
-    // How this works (20260906ad): grid card opens detail; ♥ toggles favorite without leaving the grid.
+    // How this works (20260906ae): grid card opens detail; ♥ toggles favorite without leaving the grid.
     // Beginner: heart uses the same whirled2.favorites list as the item detail page.
     // ENGINE DEV: div (not button) so the fav control is not nested buttons; click order checks fav first.
     var id = item.id || item.name || "";
@@ -2890,13 +3232,19 @@
     var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
-  var meSub = "home"; // home | profile | friends | mail | passport | account | themes | club | blocklist | galleries | transactions | contests | share
+  var meSub = "home"; // home | profile | rooms | friends | mail | passport | account | themes | club | blocklist | galleries | transactions | contests | share
   var newsFilter = "all"; // all | comments | friendings | status | stamps | rooms
   var roomSharePanelOpen = false; // Room menu → Share / Embed
   var profileEditSection = null; // null | status | photo | info | skin
   var tourTip = 0;
   var goMenuOpen = false;
   var inRoom = false;
+  // How this works (20260906ae): which room id the stage chrome is showing (default loft).
+  // Beginner: leaving to lobby clears immersion; currentRoomId stays last visited until next enter.
+  var currentRoomId = "loft";
+  var createRoomOpen = false; // Create Room panel (lobby / Me → My Rooms)
+  var roomImmersive = false; // phone landscape immersion (session-only)
+  var roomImmersiveForcedOff = false; // Exit control until rotate / re-enter
   var viewingId = null; // profile being viewed
   var FRIENDS_KEY = "whirled2.friends";
   var pollTimer = null;
@@ -3096,7 +3444,7 @@
       acceptFriendRequest(incoming.id);
       return incoming;
     }
-    // How this works (20260906ad): Friendly People auto-accept incoming friend requests (classic).
+    // How this works (20260906ae): Friendly People auto-accept incoming friend requests (classic).
     // Beginner: if they turned on Friendly, you become friends immediately — no Accept wait.
     // ENGINE DEV: same-browser mock; still writes both sides via addFriendForUser.
     if (isFriendly(toId)) {
@@ -3891,10 +4239,10 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ad";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ae";
   }
   function roomShareUrl() {
-    // How this works (20260906ad): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
+    // How this works (20260906ae): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
     // Beginner: same base Pages URL + #rooms — no fake social APIs.
     var base = shareInviteUrl();
     if (base.indexOf("#") >= 0) base = base.split("#")[0];
@@ -3947,7 +4295,7 @@
     if (el) el.remove();
   }
   function volToolbarHtml() {
-    // How this works (20260906ad): classic-ish Volume — mute toggle + slider popover.
+    // How this works (20260906ae): classic-ish Volume — mute toggle + slider popover.
     // Beginner: speaker button mutes; open the slider to set loudness (saved on this browser).
     // ENGINE DEV: volume applies to local <audio>; mute-safe skips embed/local load when muted.
     var pct = Math.round((roomAudioVolume || 0) * 100);
@@ -4665,8 +5013,16 @@
     if (extra > 0) chips += '<span class="room-occ-chip is-more">+' + extra + '</span>';
     return '<div class="room-occ-chips" aria-label="People in room">' + chips + '</div>';
   }
-  function roomLockGlyphHtml() {
-    var mode = (loadRoomLock().mode || "unlocked");
+  function roomLockGlyphHtml(modeOrRoomId) {
+    // How this works: lock glyph for lobby tiles / preview; pass mode string or room id.
+    var mode = "unlocked";
+    if (modeOrRoomId === "unlocked" || modeOrRoomId === "friends" || modeOrRoomId === "locked") {
+      mode = modeOrRoomId;
+    } else if (modeOrRoomId) {
+      mode = (loadRoomLock(modeOrRoomId).mode || "unlocked");
+    } else {
+      mode = (loadRoomLock(currentRoomId || "loft").mode || "unlocked");
+    }
     if (mode === "friends") return '<span class="room-lock-glyph" title="Friends only">👥</span>';
     if (mode === "locked") return '<span class="room-lock-glyph" title="Locked">🔒</span>';
     return '<span class="room-lock-glyph" title="Unlocked">🔓</span>';
@@ -4680,17 +5036,19 @@
     var enter = opts.enterable !== false;
     var rating = opts.rating || "Rating: new";
     var rid = opts.id || "loft";
+    var lockMode = opts.lockMode || (loadRoomLock(rid).mode || "unlocked");
     var tag = enter ? "button" : "div";
     var attrs = enter
       ? (' type="button" class="room-tile" data-room-preview="' + esc(rid) + '"')
       : ' class="room-tile is-empty"';
+    var chips = (enter && rid === "loft") ? roomOccupantChipsHtml(3) : (enter ? "" : "");
     return '<' + tag + attrs + '>'
       + '<div class="thumb" aria-hidden="true"></div>'
-      + '<div class="body"><h3>' + roomLockGlyphHtml() + ' ' + esc(opts.name || ROOM) + '</h3>'
+      + '<div class="body"><h3>' + roomLockGlyphHtml(lockMode) + ' ' + esc(opts.name || ROOM) + '</h3>'
       +   '<p class="meta">' + esc(opts.meta || "") + '</p>'
       +   '<div class="room-rating">' + esc(rating) + '</div>'
       +   '<div class="online">' + (online > 0 ? (online + " online now!") : "0 players") + '</div>'
-      +   (enter ? roomOccupantChipsHtml(3) : "")
+      +   chips
       +   (enter ? '<span class="enter-label">Preview</span>' : '<span class="meta">—</span>')
       + '</div></' + tag + '>';
   }
@@ -4707,34 +5065,53 @@
     // How this works: pre-enter sheet — name, owner, lock, rating, occupant chips, optional now-playing.
     roomId = roomId || "loft";
     var me = you();
-    var lock = loadRoomLock();
+    var room = getRoom(roomId) || { id: roomId, name: ROOM, ownerId: "", blurb: "" };
+    var lock = loadRoomLock(roomId);
     var mode = (lock && lock.mode) || "unlocked";
     var lockLabel = mode === "friends" ? "Friends only" : (mode === "locked" ? "Locked" : "Unlocked");
-    var online = (liveOccupants || []).length || (session() ? 1 : 0);
+    var online = (roomId === "loft")
+      ? ((liveOccupants || []).length || (session() ? 1 : 0))
+      : (session() ? 1 : 0);
+    var ownerName = me.name;
+    try {
+      if (room.ownerId && session() && String(room.ownerId) === String(session().user.id)) ownerName = me.name;
+      else if (room.ownerId) {
+        var users = [];
+        try { users = JSON.parse(localStorage.getItem("whirled2.users") || "[]"); } catch (eU) {}
+        var hit = users.filter(function (u) { return u && String(u.id) === String(room.ownerId); })[0];
+        if (hit && hit.name) ownerName = hit.name;
+      }
+    } catch (eO) {}
     var pl = loadPlaylist();
     var nowPlaying = "";
-    if (pl && pl.embedSrc && (pl.source === "youtube" || pl.source === "spotify")) {
+    if (roomId === "loft" && pl && pl.embedSrc && (pl.source === "youtube" || pl.source === "spotify")) {
       nowPlaying = '<p class="meta room-preview-music">♪ Now playing: <b>' + esc(pl.embedTitle || pl.source) + '</b></p>';
-    } else if (pl && pl.source === "local" && pl.tracks && pl.tracks[pl.current]) {
+    } else if (roomId === "loft" && pl && pl.source === "local" && pl.tracks && pl.tracks[pl.current]) {
       nowPlaying = '<p class="meta room-preview-music">♪ Queue: <b>' + esc(pl.tracks[pl.current].name || "Track") + '</b></p>';
     }
-    var syncNote = isWhirledApiLive()
-      ? '<p class="meta">Shared soundtrack sync is on (demo server).</p>'
-      : '<p class="meta">Shared soundtrack syncs when the demo server is running; Pages alone is local-only.</p>';
+    var syncNote = roomId === "loft"
+      ? (isWhirledApiLive()
+        ? '<p class="meta">Shared soundtrack sync is on (demo server).</p>'
+        : '<p class="meta">Shared soundtrack syncs when the demo server is running; Pages alone is local-only.</p>')
+      : '<p class="meta">Per-room soundtrack sync comes later — chrome uses the shared loft music dock for now.</p>';
+    var rating = roomId === "loft" ? loftRatingLabel() : "Rating: new";
+    var people = roomId === "loft" ? roomOccupantChipsHtml(8) : '<p class="meta">Occupants list for new rooms arrives with presence sync.</p>';
     return ''
       + '<div class="room-preview-modal" id="room-preview-panel" data-room-preview-backdrop="1" role="dialog" aria-modal="true" aria-label="Room preview">'
       +   '<div class="room-preview-card panel" data-room-preview-card="1">'
       +     '<div class="room-side-head"><h2>Room preview</h2>'
       +       '<button type="button" class="text-btn" data-room-preview-close="1">Cancel</button></div>'
       +     '<div class="room-preview-thumb" aria-hidden="true"></div>'
-      +     '<h3 class="room-preview-name">' + roomLockGlyphHtml() + ' ' + esc(ROOM) + '</h3>'
-      +     '<p class="meta">owner: <b>' + esc(me.name) + '</b> · home whirled</p>'
-      +     '<p class="meta">Lock: <b>' + esc(lockLabel) + '</b> · ' + esc(loftRatingLabel()) + ' · ' + online + ' online</p>'
+      +     '<h3 class="room-preview-name">' + roomLockGlyphHtml(mode) + ' ' + esc(room.name || ROOM) + '</h3>'
+      +     '<p class="meta">owner: <b>' + esc(ownerName) + '</b>' + (room.blurb ? (" · " + esc(room.blurb)) : (roomId === "loft" ? " · home whirled" : "")) + '</p>'
+      +     '<p class="meta">Lock: <b>' + esc(lockLabel) + '</b> · ' + esc(rating) + ' · ' + online + ' online</p>'
       +     '<div class="section-label">People here</div>'
-      +     roomOccupantChipsHtml(8)
+      +     people
       +     nowPlaying
       +     syncNote
-      +     '<p class="meta">Everyone in this loft hears the same loop (synced) after you enter (when sync is available).</p>'
+      +     '<p class="meta">' + (roomId === "loft"
+          ? "Everyone in this loft hears the same loop (synced) after you enter (when sync is available)."
+          : "Enter to open this room stage (same #stage-slot mount).") + '</p>'
       +     '<div class="room-preview-actions">'
       +       '<button type="button" class="action-btn room-preview-enter-btn" data-room-preview-enter="' + esc(roomId) + '">Enter</button>'
       +       '<button type="button" class="text-btn" data-room-preview-close="1">Cancel</button>'
@@ -4794,10 +5171,13 @@
     }, 420);
   }
   function confirmEnterFromPreview(roomId) {
-    // How this works: preview Enter → soft curtain → tryEnterLoft → paint roomView.
+    // How this works: preview Enter → soft curtain → tryEnterRoom → paint roomView.
+    roomId = roomId || "loft";
+    var r = getRoom(roomId);
+    var nm = (r && r.name) || ROOM;
     closeRoomPreview();
-    showEnterCurtain(ROOM, function () {
-      if (!tryEnterLoft()) {
+    showEnterCurtain(nm, function () {
+      if (!tryEnterRoom(roomId)) {
         paint("rooms");
         return;
       }
@@ -4810,49 +5190,57 @@
     });
   }
   function roomsLobby() {
+    // How this works (20260906ae): Featured = Studio Loft seed; My Rooms = rooms you own + Create.
+    // Beginner: never invent Hot New catalog rows — empty until a shared server publishes.
     var me = you();
+    var sid = session() && session().user && session().user.id;
     var online = liveOccupants.length || 0;
+    var loft = getRoom("loft") || defaultLoftRoom();
     var featured = roomTile({
       id: "loft",
-      name: ROOM,
+      name: loft.name || ROOM,
       meta: "owner: " + me.name + " · home",
       online: online || (session() ? 1 : 0),
       rating: loftRatingLabel(),
-      enterable: true
+      enterable: true,
+      lockMode: (loft.lock && loft.lock.mode) || "unlocked"
     });
     var activeBody = online > 0
       ? roomTile({
           id: "loft",
-          name: ROOM,
+          name: loft.name || ROOM,
           meta: "owner: " + me.name + " · active",
           online: online,
           rating: loftRatingLabel(),
-          enterable: true
+          enterable: true,
+          lockMode: (loft.lock && loft.lock.mode) || "unlocked"
         })
       : '<div class="panel"><p class="meta">No active rooms right now. Enter Studio Loft to open one.</p></div>';
     var tips = [
       "Me — profile, friends, mail, passport, and account live under the Me tab.",
       "Stuff — your inventory by category. Empty shelves stay empty until you own items.",
-      "Rooms — decorate and hang out. Studio Loft is your home whirled.",
+      "Rooms — Create Room from My Rooms (first free; later 10k coins or 1 bar).",
       "Mail — send notes to friends from profiles or the Mail sub-tab."
     ];
     var tip = tips[tourTip % tips.length];
+    var createBlock = createRoomOpen
+      ? createRoomPanelHtml({ closeable: true })
+      : '<div class="rooms-lobby-links">'
+        +   '<button type="button" class="action-btn" data-create-room-open="1">Create Room…</button>'
+        +   '<button type="button" class="action-btn" data-tour-tip="1">Take the Whirled Tour</button>'
+        + '</div>';
     return '<section class="page rooms-lobby">'
       + '<div class="featured">Featured Rooms</div>'
-      + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Tap a room tile to <b>preview</b> who is there, then Enter — engine mounts inside the loft.</p>'
+      + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Tap a room tile to <b>preview</b> who is there, then Enter — engine mounts inside the room.</p>'
       + recentRoomsStripHtml()
       + '<div class="room-tiles">' + featured + '</div>'
       + '<div class="section-label">Active Rooms</div>'
       + (online > 0 ? '<div class="room-tiles">' + activeBody + '</div>' : activeBody)
       + '<div class="section-label">Hot New Rooms</div>'
-      + '<div class="panel"><p class="meta">No hot new rooms yet. Public listings arrive when the shared server publishes them.</p></div>'
+      + '<div class="panel"><p class="meta">No hot new rooms yet. Public listings arrive when the shared server publishes them — we never invent catalog rooms.</p></div>'
       + '<div class="section-label">My Rooms</div>'
-      + '<div class="room-tiles">'
-      +   roomTile({ id: "loft", name: ROOM, meta: "owner: " + me.name + " · home", online: online || (session() ? 1 : 0), rating: loftRatingLabel(), enterable: true })
-      + '</div>'
-      + '<div class="rooms-lobby-links">'
-      +   '<button type="button" class="action-btn" data-tour-tip="1">Take the Whirled Tour</button>'
-      + '</div>'
+      + myRoomsTilesHtml(sid, { includeLoftFallback: true })
+      + createBlock
       + '<div class="panel tour-panel" id="tour-panel">'
       +   '<p class="tour-tip"><b>Tip ' + ((tourTip % tips.length) + 1) + '/' + tips.length + ':</b> ' + esc(tip) + '</p>'
       +   '<p class="meta">Local tips only — not a tour of other players.</p>'
@@ -5007,7 +5395,7 @@ function helpPage() {
       + '<ul class="help-tips">'
       + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname), Transactions (Coins &amp; Bars).</li>'
       + '<li><b>Sign-in</b> — username / password is primary. Discord / Google Coming Soon (OAuth apps needed). Facebook Connect removed (Meta App ID was required for Pages).</li>'
-      + '<li><b>Rooms</b> — tap a lobby tile to <b>preview</b> (who is there, lock) then Enter; chat in the bar; Room menu for comment/rate, decorate, lock.</li>'
+      + '<li><b>Rooms</b> — tap a lobby tile to <b>preview</b> then Enter; <b>Create Room</b> from My Rooms (first free; later 10k coins or 1 bar). Phone landscape = immersive stage + corner chat.</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
       + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Owner pastes a YouTube/Spotify link → <b>Set embed</b> → <b>Done</b>. <b>Everyone in this loft hears the same loop (synced)</b> when the demo server is running; Pages alone is local-only. Closing the sheet does <b>not</b> stop playback. On phones use <b>Open player</b> if the embed is hard to tap.</li>'
       + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
@@ -5023,7 +5411,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: avatar lab deferred (On hold; unlock <code>?avatarLab=1</code>). Cache <code>?v=20260906ad</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: avatar lab deferred (On hold; unlock <code>?avatarLab=1</code>). Cache <code>?v=20260906ae</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5065,9 +5453,12 @@ function helpPage() {
   // ---------------------------------------------------------------------------
   function roomView() {
     var me = you();
+    var rname = activeRoomName();
+    var rid = currentRoomId || "loft";
+    var room = getRoom(rid) || {};
     var here = liveOccupants.slice();
     if (!here.some(function (p) { return p.you || (session() && p.id === session().user.id); })) {
-      here = [{ id: session() && session().user && session().user.id, name: me.name, initials: me.initials, online: true, room: ROOM, you: true }].concat(here);
+      here = [{ id: session() && session().user && session().user.id, name: me.name, initials: me.initials, online: true, room: rname, you: true }].concat(here);
     } else {
       here = here.map(function (p) {
         if (session() && p.id === session().user.id) return Object.assign({}, p, { you: true, initials: p.initials || me.initials });
@@ -5076,18 +5467,25 @@ function helpPage() {
     }
     here = sortOccupantsYouFirst(here);
     var empty = here.length === 0;
-    var lock = loadRoomLock();
+    var lock = loadRoomLock(rid);
     var lockMode = lock.mode || "unlocked";
+    var ownerLabel = me.name;
+    try {
+      if (room.ownerId && session() && String(room.ownerId) === String(session().user.id)) ownerLabel = me.name;
+      else if (room.ownerId) ownerLabel = String(room.ownerId).slice(0, 12);
+    } catch (eOw) {}
+    var ratingBadge = rid === "loft" ? loftRatingLabel() : "Rating: new";
     return ''
       + '<div class="workspace">'
       +   '<aside class="rail occ-rail">'
       +     occupantRailHtml(here)
       +   '</aside>'
       +   '<section class="stage-wrap">'
-      +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span>'
-      +       '<span class="room-owner">owner: ' + esc(me.name) + '</span>'
+      +     '<div class="room-strip"><span class="room-name">' + esc(rname) + '</span>'
+      +       '<span class="room-owner">owner: ' + esc(ownerLabel) + '</span>'
       +       '<span class="room-lock-badge" title="Enforced on this browser — friends/locked gate entry" data-lock="' + esc(lockMode) + '">🔒 ' + esc(lockLabel(lockMode)) + '</span>'
-      +       '<span class="room-rating-badge">' + esc(loftRatingLabel()) + '</span></div>'
+      +       '<span class="room-rating-badge">' + esc(ratingBadge) + '</span>'
+      +       '<button type="button" class="text-btn room-immersive-exit" data-immersive-exit="1" hidden>Exit fullscreen</button></div>'
       +     '<div class="stage-body chat-mode-' + esc(loadChatUi().mode) + ' text-size-' + esc(loadChatUi().textSize) + (loadChatUi().hideHistory ? ' hide-history' : '') + '">'
       +     '<div class="stage-host">'
       +       '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
@@ -5147,7 +5545,7 @@ function helpPage() {
     return String(w.at || "") + "|" + String(w.fromId || w.who || "") + "|" + String(w.text || "").slice(0, 80);
   }
   function canDeleteWallPost(wallOwnerId, post) {
-    // How this works (20260906ad): profile owner may delete any post on their wall;
+    // How this works (20260906ae): profile owner may delete any post on their wall;
     // authors may delete their own posts (classic comment wall).
     // Beginner: if it is your profile OR you wrote the comment, you see Delete.
     var s = session();
@@ -5799,7 +6197,7 @@ function helpPage() {
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "profile" ? " is-on" : "") + '" data-me="profile">My Profile</button>'
       + '<span class="sep">|</span>'
-      + '<button type="button" class="me-link" data-enter-room="loft">My Rooms</button>'
+      + '<button type="button" class="me-link' + (meSub === "rooms" ? " is-on" : "") + '" data-me="rooms">My Rooms</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "friends" ? " is-on" : "") + '" data-me="friends">Friends'
       +   (incomingFriendRequestCount() ? (' <span class="me-badge">' + incomingFriendRequestCount() + '</span>') : '')
@@ -5915,7 +6313,7 @@ function helpPage() {
       +     '<div class="panel links-panel">'
       +       '<div class="online-count">People Online Now: <b>' + peopleNow + '</b></div>'
       +       '<button type="button" class="text-btn" data-me="profile">My Profile</button>'
-      +       '<button type="button" class="text-btn" data-enter-room="loft">My Rooms</button>'
+      +       '<button type="button" class="text-btn" data-me="rooms">My Rooms</button>'
       +       '<button type="button" class="text-btn" data-me="passport">My Passport</button>'
       +       '<button type="button" class="text-btn" data-me="mail">Mail' + (unread ? ' (' + unread + ')' : '') + '</button>'
       +       '<button type="button" class="text-btn" data-me="notices">Notices' + (unreadNoticesCount() ? ' (' + unreadNoticesCount() + ')' : '') + '</button>'
@@ -5958,7 +6356,7 @@ function helpPage() {
       ? '<img class="profile-photo" src="' + photo + '" alt="Profile photo" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(me.initials) + '</span></div>';
     wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
-    // How this works (20260906ad): owner sees Delete on every wall post; authors on their own.
+    // How this works (20260906ae): owner sees Delete on every wall post; authors on their own.
     var wallHtml = wall.length ? wall.map(function (w) {
       return wallRowHtml(w, sid);
     }).join("") : '<p class="meta">No comments yet.</p>';
@@ -6498,7 +6896,7 @@ function helpPage() {
       +   '<p class="meta">Browser look: <button type="button" class="text-btn" data-me="themes">Themes</button> (CSS presets on this device). Group world themes live on group pages for managers.</p>'
       +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
       + '</div>'
-      // How this works (20260906ad): Friendly People toggle — demo ignores Level 10 / 20-friends gate.
+      // How this works (20260906ae): Friendly People toggle — demo ignores Level 10 / 20-friends gate.
       // Beginner: turn on to appear on others' Me → Friendly People and auto-accept friend requests.
       // ENGINE DEV: flag is whirled2.friendly.{userId} only — no invented helpers.
       + '<div class="panel friendly-toggle-panel">'
@@ -6536,7 +6934,7 @@ function helpPage() {
       ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(initials) + '</span></div>';
     wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
-    // How this works (20260906ad): profile owner or comment author can Delete.
+    // How this works (20260906ae): profile owner or comment author can Delete.
     var wallHtml = wall.length ? wall.map(function (w) {
       return wallRowHtml(w, id);
     }).join("") : '<p class="meta">No comments yet.</p>';
@@ -6898,6 +7296,27 @@ function helpPage() {
       + '</div></section>';
   }
 
+
+  function meRooms() {
+    // How this works (20260906ae): Me → My Rooms — owned room tiles + Create Room (classic pay path).
+    // Beginner: first room free; later 10,000 coins OR 1 bar from earn-only wallet.
+    // ENGINE DEV: create only writes whirled2.rooms; Enter still mounts via #stage-slot later.
+    var sid = session() && session().user && session().user.id;
+    var owned = ownedRoomsFor(sid);
+    var createBlock = createRoomOpen || owned.length === 0
+      ? createRoomPanelHtml({ closeable: owned.length > 0 })
+      : '<button type="button" class="action-btn" data-create-room-open="1">Create Room…</button>';
+    return '<section class="page me-page me-rooms-page">' + meSubnav()
+      + '<div class="page-head"><div><h1>My Rooms</h1>'
+      + '<p>Rooms you own on this browser. Create a new home-like room (classic Me → My Rooms).</p></div></div>'
+      + '<div class="section-label">Your rooms (' + owned.length + ')</div>'
+      + myRoomsTilesHtml(sid, { includeLoftFallback: false })
+      + (owned.length ? '' : '<p class="meta">Studio Loft stays in the Rooms lobby Featured seed — create below for your own My Rooms list.</p>')
+      + createBlock
+      + '<p class="meta">Doors / Make Door from decorate — Coming Soon. Snapshot lobby thumbs — Coming Soon.</p>'
+      + '</section>';
+  }
+
   function mePage() {
     if (viewingId && session() && viewingId !== session().user.id) {
       if (isBlocked(viewingId)) {
@@ -6921,6 +7340,7 @@ function helpPage() {
     if (meSub === "share") return meShare();
     if (meSub === "themes") return meThemes();
     if (meSub === "club") return meClub();
+    if (meSub === "rooms") return meRooms();
     return meHome();
   }
 
@@ -7026,13 +7446,13 @@ function helpPage() {
       +         '<button type="button" data-room-menu="playlist">View room music</button>'
       +         '<button type="button" data-room-share="1">Share / embed room…</button>'
       +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
-      // How this works (20260906ad): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
+      // How this works (20260906ae): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
       // Beginner: room owner picks who may enter. Guests see the current mode but cannot change it.
-      // ENGINE DEV: chrome gate via canEnterLoft; does not touch #stage-slot.
-      +         '<div class="room-lock-row meta">Room lock (owner)' + (canSetRoomLock() ? "" : " — view only") + '</div>'
-      +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock().mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + (canSetRoomLock() ? "" : " disabled") + '>🔓 Unlocked</button>'
-      +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock().mode || "") === "friends" ? ' class="is-on"' : '') + (canSetRoomLock() ? "" : " disabled") + '>👥 Friends</button>'
-      +         '<button type="button" data-room-lock="locked"' + ((loadRoomLock().mode || "") === "locked" ? ' class="is-on"' : '') + (canSetRoomLock() ? "" : " disabled") + '>🔒 Locked</button>'
+      // ENGINE DEV: chrome gate via canEnterRoom; does not touch #stage-slot.
+      +         '<div class="room-lock-row meta">Room lock (owner)' + (canSetRoomLock(currentRoomId) ? "" : " — view only") + '</div>'
+      +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock(currentRoomId).mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>🔓 Unlocked</button>'
+      +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock(currentRoomId).mode || "") === "friends" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>👥 Friends</button>'
+      +         '<button type="button" data-room-lock="locked"' + ((loadRoomLock(currentRoomId).mode || "") === "locked" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>🔒 Locked</button>'
       +         '<button type="button" data-room-menu="lobby">' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '</button>'
       +       '</div>'
       +     '</span>'
@@ -7071,6 +7491,8 @@ function helpPage() {
     try { claimDailyLogin(); } catch (eDaily) {}
     // 20260906q: phones force Overlay chat so Slide never opens a black slab under the stage.
     try { ensureMobileChatOverlay(); } catch (eMob) {}
+    // 20260906ae: landscape immersion (inRoom + phone landscape) — chrome only around #stage-slot.
+    try { bindLandscapeImmersionListeners(); updateLandscapeImmersion(); } catch (eImm) {}
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
     var tabAttr = tab || "rooms";
     if (tabAttr === "rooms" && !inRoom) tabAttr = "rooms-lobby";
@@ -8252,7 +8674,8 @@ function helpPage() {
       goMenuOpen = false;
       var gmR = document.getElementById("go-menu");
       if (gmR) gmR.hidden = true;
-      if (tryEnterLoft()) {
+      var goRid = goRoom.getAttribute("data-go-room") || "loft";
+      if (tryEnterRoom(goRid)) {
         clearRoomChatDisplay(true);
         paint("rooms");
         loadOccupants();
@@ -8300,7 +8723,9 @@ function helpPage() {
       var byeName = you().name;
       window.WhirledApi.logout();
       leaveRoomResetChat();
-      liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
+      liveOccupants = []; inRoom = false; roomImmersiveForcedOff = false; currentRoomId = "loft"; createRoomOpen = false;
+      try { updateLandscapeImmersion(); } catch (eOutImm) {}
+      viewingId = null; meSub = "home";
       shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
       gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
       decorateMode = false; partyPanelOpen = false; playlistPanelOpen = false; roomPreviewOpen = false; roomPreviewId = null; helpOpen = false; legalOpen = false; galleryViewId = null; stuffListMode = false;
@@ -8313,6 +8738,57 @@ function helpPage() {
       } catch (eDm) {}
       clearStrayUI();
       paint("");
+      return;
+    }
+    // How this works (20260906ae): Create Room panel open/close + pay Coins/Bars/free.
+    // Beginner: first owned room is free; later deduct 10k coins OR 1 bar honestly.
+    if (ev.target.closest("[data-create-room-open]") && session()) {
+      createRoomOpen = true;
+      if (meSub === "rooms") paint("me");
+      else paint("rooms");
+      return;
+    }
+    if (ev.target.closest("[data-create-room-close]") && session()) {
+      createRoomOpen = false;
+      if (meSub === "rooms") paint("me");
+      else paint("rooms");
+      return;
+    }
+    var createPay = ev.target.closest("[data-create-room-pay]");
+    if (createPay && session()) {
+      ev.preventDefault();
+      var nameEl = document.getElementById("create-room-name");
+      var blurbEl = document.getElementById("create-room-blurb");
+      var lockEl = document.querySelector('input[name="create-room-lock"]:checked');
+      var result = createOwnedRoom({
+        name: nameEl ? nameEl.value : "Home",
+        blurb: blurbEl ? blurbEl.value : "",
+        lockMode: lockEl ? lockEl.value : "unlocked",
+        payWith: createPay.getAttribute("data-create-room-pay") || "coins"
+      });
+      if (!result.ok) {
+        pushNotice("orange", result.error || "Could not create room.");
+        return;
+      }
+      createRoomOpen = false;
+      var payNote = result.free ? "free first room" : ("paid with " + result.payWith);
+      pushNotice("green", "Created “" + result.room.name + "” (" + payNote + ").", { transient: true });
+      try { awardAction("decorate"); } catch (eAw) {}
+      // Open preview for the new room so player can Enter.
+      roomPreviewId = result.room.id;
+      roomPreviewOpen = true;
+      if (meSub === "rooms") {
+        // Stay on Me rooms list after create; also show preview overlay.
+        paint("me");
+        try { ensureRoomPreviewPanel(); } catch (ePr) {}
+      } else {
+        paint("rooms");
+        try { ensureRoomPreviewPanel(); } catch (ePr2) {}
+      }
+      return;
+    }
+    if (ev.target.closest("[data-immersive-exit]")) {
+      exitLandscapeImmersion();
       return;
     }
     // How this works: lobby tile / recent chip → preview sheet (NOT inRoom yet).
@@ -8335,9 +8811,10 @@ function helpPage() {
     }
     var enter = ev.target.closest("[data-enter-room]");
     if (enter && session()) {
-      // How this works: Visit Home / Join them / hash — still may enter directly (or open preview from lobby tiles via data-room-preview).
+      // How this works: Visit Home / Join them / hash — enter room id (default loft).
       // Beginner: profile Visit Home skips the lobby sheet for speed; lock still gates.
-      if (!tryEnterLoft()) {
+      var enterId = enter.getAttribute("data-enter-room") || "loft";
+      if (!tryEnterRoom(enterId)) {
         paint("rooms");
         return;
       }
@@ -8352,6 +8829,8 @@ function helpPage() {
     if (ev.target.closest("[data-leave-room]")) {
       var leavePeople = (loftVisitOccupants || []).slice();
       inRoom = false;
+      roomImmersiveForcedOff = false;
+      try { updateLandscapeImmersion(); } catch (eLvImm) {}
       decorateMode = false;
       roomPanelOpen = false;
       playlistPanelOpen = false;
@@ -8367,6 +8846,8 @@ function helpPage() {
     var roomsLobbyBtn = ev.target.closest("[data-rooms-lobby]");
     if (roomsLobbyBtn && session()) {
       inRoom = false;
+      roomImmersiveForcedOff = false;
+      try { updateLandscapeImmersion(); } catch (eLbImm) {}
       decorateMode = false;
       roomPanelOpen = false;
       leaveRoomResetChat();
@@ -9063,6 +9544,8 @@ function helpPage() {
       roomMenuOpen = false;
       if (rm === "lobby") {
         inRoom = false;
+        roomImmersiveForcedOff = false;
+        try { updateLandscapeImmersion(); } catch (eRmImm) {}
         roomPanelOpen = false;
         playlistPanelOpen = false;
         decorateMode = false;
@@ -9114,11 +9597,11 @@ function helpPage() {
     var roomLockBtn = ev.target.closest("[data-room-lock]");
     if (roomLockBtn && session()) {
       // How this works: three click choices — Unlocked / Friends / Locked (wiki). Owner only.
-      if (!canSetRoomLock()) {
+      if (!canSetRoomLock(currentRoomId || "loft")) {
         pushNotice("orange", "Only the room owner can change the lock.", { transient: true });
         return;
       }
-      saveRoomLock(roomLockBtn.getAttribute("data-room-lock") || "unlocked");
+      saveRoomLock(roomLockBtn.getAttribute("data-room-lock") || "unlocked", currentRoomId || "loft");
       pushNotice("green", "Room lock: " + (roomLockBtn.getAttribute("data-room-lock") || "unlocked") + ".", { transient: true });
       var rmenu2 = document.getElementById("room-menu");
       if (rmenu2) rmenu2.hidden = true;
@@ -9251,7 +9734,7 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-room-mute]") && session()) {
-      // How this works (20260906ad): toggle mute, persist, then mute-safe sync (unload when muted).
+      // How this works (20260906ae): toggle mute, persist, then mute-safe sync (unload when muted).
       // Beginner: Mute remembers on this browser and does not leave a broken half-loaded track.
       // ENGINE DEV: muted → remove embed dock / clear local audio src; unmute remounts from playlist.
       roomAudioMuted = !roomAudioMuted;
@@ -9650,7 +10133,7 @@ function helpPage() {
   // ENGINE DEV: profile page chrome only; not #stage-slot.
   app.addEventListener("input", function (ev) {
     if (!session() || !ev.target || !ev.target.closest) return;
-    // How this works (20260906ad): live volume slider — persist + apply to local <audio>.
+    // How this works (20260906ae): live volume slider — persist + apply to local <audio>.
     // Beginner: drag the slider; music gets quieter/louder. Mute still unloads media safely.
     if (ev.target.getAttribute && ev.target.getAttribute("data-vol-slider") === "1") {
       var pct = Math.max(0, Math.min(100, Number(ev.target.value) || 0));
@@ -9744,7 +10227,7 @@ function helpPage() {
       savePlaylist(plO);
       return;
     }
-    // How this works (20260906ad): Account → Friendly People checkbox.
+    // How this works (20260906ae): Account → Friendly People checkbox.
     // Beginner: when checked, you auto-accept friend requests and appear on Me → Friendly People.
     if (ev.target.matches && ev.target.matches("[data-friendly-toggle]") && session()) {
       setFriendly(session().user.id, !!ev.target.checked);
