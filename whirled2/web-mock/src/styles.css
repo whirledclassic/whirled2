@@ -484,8 +484,9 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 .me-subnav .sep { color: rgba(255,255,255,0.45); }
 .me-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr); gap: 14px; }
 .panel {
-  background: #fff; border: 1px solid #c5deee; border-radius: 8px;
+  background: #fff; border: 1px solid #c5deee; border-radius: 10px;
   padding: 12px 14px; margin-bottom: 12px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 2px 8px rgba(20,60,90,0.06);
 }
 .panel h2 { margin: 0 0 10px; color: #1e6fa8; font-size: 16px; }
 .news-row, .wall-row, .friend-row {
@@ -558,7 +559,9 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   font: 700 11px var(--ui); cursor: pointer; padding: 4px 6px;
 }
 .notice-clear-all:hover { text-decoration: underline; }
-.notice-empty { padding: 10px; color: #4a6a80; }
+.notice-empty { padding: 10px; color: #4a6a80; display: none; }
+/* How this works: never leave a cream floating panel when there are no notices. */
+.notice-bar.is-empty, .notice-bar[hidden] { display: none !important; }
 .invite-banner {
   background: linear-gradient(#e8f4fb, #d7ebf6); color: #1e6fa8; font-weight: 700;
 }
@@ -1545,3 +1548,103 @@ body > .party-panel {
 }
 .edit-photo-pick { display: inline-flex; margin-top: 6px; }
 .info-form { max-width: 480px; }
+
+
+/* ---- Browser themes (data-theme on #app) ---- */
+/* How this works: CSS variables override :root when #app[data-theme=…] is set.
+   Saved in localStorage whirled2.browserTheme. Premium cards are Coming Soon only. */
+#app[data-theme="night"] {
+  --header: #1a2838;
+  --sky: #243447;
+  --paper: #1e2a38;
+  --ink: #d7e6f2;
+  --muted: #9bb4c8;
+  --header-edge: #2a3f55;
+  --tab: #3a5f7a;
+  --tab-on: #4a90c0;
+  --send: #4a90c0;
+  --chat: #0a1018;
+  --stage: #121a22;
+}
+#app[data-theme="night"] .topbar {
+  background: linear-gradient(#243447, #1a2838);
+}
+#app[data-theme="night"] .panel {
+  background: #243447; border-color: #3a5470; color: var(--ink);
+  box-shadow: none;
+}
+#app[data-theme="night"] .panel h2 { color: #7ec8f0; }
+#app[data-theme="soft"] {
+  --header: #f4faff;
+  --sky: #cfe8f6;
+  --paper: #f7fbfe;
+  --tab: #9fd4f2;
+  --tab-on: #5bb3e0;
+  --header-edge: #c5deee;
+}
+#app[data-theme="soft"] .panel {
+  border-radius: 12px;
+  border-color: #d2e6f4;
+  box-shadow: 0 4px 14px rgba(80,140,180,0.08);
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.theme-card {
+  border: 1px solid #c5deee;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f7fbfe;
+}
+.theme-card.is-on { border-color: #3aa3e0; box-shadow: 0 0 0 2px rgba(58,163,224,0.25); }
+.theme-card.is-premium { opacity: 0.92; background: #eef6fc; }
+.theme-swatch {
+  height: 36px; border-radius: 6px; margin-bottom: 8px;
+  border: 1px solid #b7d3e8;
+}
+.theme-swatch-classic { background: linear-gradient(90deg, #eaf6fc, #89C6E3 55%, #3aa3e0); }
+.theme-swatch-night { background: linear-gradient(90deg, #1a2838, #243447 55%, #4a90c0); }
+.theme-swatch-soft { background: linear-gradient(90deg, #f7fbfe, #cfe8f6 55%, #5bb3e0); }
+.theme-swatch-premium { background: linear-gradient(90deg, #d7eaf6, #a8d4ef 40%, #6eb8e8); }
+
+.group-page[style*="--group-accent"] .group-featured-head,
+.group-page[style*="--group-accent"] .group-title-accent {
+  color: var(--group-accent, #1e6fa8);
+}
+.group-theme-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 8px; }
+
+/* Room playlist */
+.playlist-list { max-height: 220px; overflow: auto; margin-bottom: 8px; }
+.playlist-row { padding: 6px 0; border-bottom: 1px dotted #c5deee; font-size: 13px; }
+.playlist-row.is-playing { background: #e8f4fb; border-radius: 4px; padding-left: 6px; }
+.playlist-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.playlist-add-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.music-gesture-fab {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  z-index: 6; border: 0; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(#6eb8e8, #3aa3e0); color: #fff;
+  font: 700 12px var(--ui); padding: 8px 14px;
+  box-shadow: 0 4px 12px rgba(20,60,90,0.25);
+}
+.music-gesture-fab[hidden] { display: none !important; }
+.stage-body { position: relative; }
+
+.legal-panel p { line-height: 1.45; }
+.gate-legal { margin-top: 12px; text-align: center; }
+
+/* Logo: transparent PNG preferred; if a black fringe remains, soft blend on pale header only */
+.brand .logo {
+  mix-blend-mode: multiply;
+}
+#app[data-theme="night"] .brand .logo {
+  mix-blend-mode: normal;
+  filter: brightness(1.05);
+}
+
+@media (max-width: 900px) {
+  .theme-grid { grid-template-columns: 1fr 1fr; }
+  .music-gesture-fab { bottom: 64px; }
+}

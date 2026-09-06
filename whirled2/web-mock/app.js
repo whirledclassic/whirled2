@@ -51,6 +51,185 @@
   var ROLES_KEY = "whirled2.roles";
   var CHAT_UI_KEY = "whirled2.chatUi";
   var FIRST_USER_KEY = "whirled2.firstUserId";
+  var BROWSER_THEME_KEY = "whirled2.browserTheme";
+  // How this works: browser themes are CSS-variable presets on #app[data-theme=…].
+  // Saved in localStorage whirled2.browserTheme. Premium cards are labels only (Coming Soon).
+  var BROWSER_THEMES = {
+    classic: { id: "classic", label: "Classic Blue", blurb: "Default pale-blue Whirled chrome." },
+    night: { id: "night", label: "Night Loft", blurb: "Dim stage chrome for late sessions." },
+    soft: { id: "soft", label: "Soft Sky", blurb: "Airy light panels and soft tab blues." }
+  };
+  function loadBrowserTheme() {
+    try {
+      var t = localStorage.getItem(BROWSER_THEME_KEY) || "classic";
+      return BROWSER_THEMES[t] ? t : "classic";
+    } catch (e) { return "classic"; }
+  }
+  function saveBrowserTheme(id) {
+    if (!BROWSER_THEMES[id]) id = "classic";
+    try { localStorage.setItem(BROWSER_THEME_KEY, id); } catch (e) {}
+    applyBrowserTheme(id);
+  }
+  function applyBrowserTheme(id) {
+    id = id || loadBrowserTheme();
+    if (!BROWSER_THEMES[id]) id = "classic";
+    var el = document.getElementById("app");
+    if (el) el.setAttribute("data-theme", id);
+  }
+  function loadGroupTheme(gid) {
+    try { return JSON.parse(localStorage.getItem("whirled2.groupTheme." + gid) || "null"); }
+    catch (e) { return null; }
+  }
+  function saveGroupTheme(gid, hex) {
+    // How this works: prototype only — tints that group's detail header on this browser.
+    // Full themed Whirled (skin top bar, mark items, mark rooms) is Coming Soon — no payments.
+    var draft = { hex: hex, updatedAt: new Date().toISOString() };
+    try { localStorage.setItem("whirled2.groupTheme." + gid, JSON.stringify(draft)); } catch (e) {}
+    return draft;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Room music / playlist (wiki Music) — offline Pages-safe
+  // How this works: MP3/etc upload → Stuff (type music, data URL). Room menu opens
+  // playlist panel. Tracks live in localStorage whirled2.playlist.loft. HTML5
+  // <audio id="room-audio"> plays current; onended advances. Max 99 tracks.
+  // ---------------------------------------------------------------------------
+  var PLAYLIST_KEY = "whirled2.playlist.loft";
+  var MUSIC_WARN_BYTES = 2 * 1024 * 1024; // soft warn ~2MB
+  var MUSIC_MAX_BYTES = 4 * 1024 * 1024;  // hard reject ~4MB
+  function isLoftOwner() {
+    // How this works: loft "owner" ≈ first registered user on this browser (Pages).
+    var sid = session() && session().user && session().user.id;
+    if (!sid) return false;
+    try {
+      var first = localStorage.getItem(FIRST_USER_KEY);
+      if (first) return sid === first;
+    } catch (e) {}
+    return true;
+  }
+  function defaultPlaylist() {
+    return { tracks: [], currentIndex: 0, ownerOnlyAdd: false };
+  }
+  function loadPlaylist() {
+    try {
+      var p = JSON.parse(localStorage.getItem(PLAYLIST_KEY) || "null");
+      if (!p || !Array.isArray(p.tracks)) return defaultPlaylist();
+      if (typeof p.currentIndex !== "number") p.currentIndex = 0;
+      if (typeof p.ownerOnlyAdd !== "boolean") p.ownerOnlyAdd = false;
+      return p;
+    } catch (e) { return defaultPlaylist(); }
+  }
+  function savePlaylist(p) {
+    try { localStorage.setItem(PLAYLIST_KEY, JSON.stringify(p)); } catch (e) {}
+  }
+  function myMusicStuff() {
+    return loadStuff().filter(function (it) {
+      var k = String(it.kind || it.type || it.category || "").toLowerCase();
+      return k === "music" && (it.dataUrl || it.audio || it.thumb);
+    });
+  }
+  function ensureRoomAudioEl() {
+    var a = document.getElementById("room-audio");
+    if (a) return a;
+    a = document.createElement("audio");
+    a.id = "room-audio";
+    a.preload = "auto";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.addEventListener("ended", function () { playlistNext(true); });
+    return a;
+  }
+  function syncRoomAudio() {
+    // How this works: keep <audio> pointed at playlist current track; try play when in room.
+    var a = ensureRoomAudioEl();
+    a.muted = !!roomAudioMuted;
+    if (!inRoom) {
+      try { a.pause(); } catch (e) {}
+      return;
+    }
+    var pl = loadPlaylist();
+    var track = pl.tracks[pl.currentIndex];
+    if (!track || !track.dataUrl) {
+      try { a.pause(); a.removeAttribute("src"); } catch (e2) {}
+      return;
+    }
+    if (a.getAttribute("data-track-id") !== track.id) {
+      a.setAttribute("data-track-id", track.id);
+      a.src = track.dataUrl;
+    }
+    var playPromise = a.play();
+    if (playPromise && typeof playPromise.then === "function") {
+      playPromise.then(function () {
+        musicGestureNeeded = false;
+        var btn = document.getElementById("music-gesture-btn");
+        if (btn) btn.hidden = true;
+      }).catch(function () {
+        musicGestureNeeded = true;
+        var btn2 = document.getElementById("music-gesture-btn");
+        if (btn2) btn2.hidden = false;
+      });
+    }
+  }
+  function playlistNext(fromEnded) {
+    var pl = loadPlaylist();
+    if (!pl.tracks.length) return;
+    pl.currentIndex = (pl.currentIndex + 1) % pl.tracks.length;
+    savePlaylist(pl);
+    if (playlistPanelOpen && inRoom) paint("rooms");
+    else syncRoomAudio();
+  }
+  function playlistPanel() {
+    var pl = loadPlaylist();
+    var owner = isLoftOwner();
+    var canAdd = owner || !pl.ownerOnlyAdd;
+    var music = myMusicStuff();
+    var rows = pl.tracks.length
+      ? pl.tracks.map(function (t, i) {
+          var now = i === pl.currentIndex;
+          return '<div class="playlist-row' + (now ? " is-playing" : "") + '">'
+            + (now ? "<b>" : "") + esc(t.name || "Track") + (now ? "</b>" : "")
+            + ' <span class="meta">by ' + esc(t.by || "?") + '</span>'
+            + (owner ? (' <button type="button" class="text-btn" data-playlist-play="' + i + '">Play</button>'
+              + ' <button type="button" class="text-btn" data-playlist-remove="' + i + '">Remove</button>') : "")
+            + '</div>';
+        }).join("")
+      : '<p class="meta">Playlist empty. Add a track from My Music (Stuff → Music).</p>';
+    var addOpts = music.length
+      ? music.map(function (m) {
+          return '<option value="' + esc(m.id) + '">' + esc(m.name || "Untitled") + '</option>';
+        }).join("")
+      : "";
+    return '<div class="room-side-panel" id="room-playlist-panel">'
+      + '<div class="panel">'
+      +   '<div class="room-side-head"><h2>Room playlist</h2>'
+      +     '<button type="button" class="text-btn" data-playlist-close="1">Close</button></div>'
+      +   '<p class="meta">Classic wiki Music vibe: anyone can add (unless owner locks). Max 99. Offline localStorage only — no shared server yet.</p>'
+      +   '<div class="playlist-now">'
+      +     (pl.tracks[pl.currentIndex]
+            ? ('Now playing: <b>' + esc(pl.tracks[pl.currentIndex].name || "Track") + '</b>')
+            : "Nothing playing.")
+      +   '</div>'
+      +   '<div class="playlist-controls">'
+      +     '<button type="button" class="action-btn" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
+      +     (owner ? '<button type="button" class="action-btn" data-playlist-next="1">Next</button>' : "")
+      +     '<button type="button" class="action-btn" data-room-mute="1">' + (roomAudioMuted ? "Unmute" : "Mute") + '</button>'
+      +   '</div>'
+      +   '<div class="section-label">Queue (' + pl.tracks.length + '/99)</div>'
+      +   '<div class="playlist-list">' + rows + '</div>'
+      +   (owner
+          ? ('<label class="check-row"><input type="checkbox" data-playlist-owner-only="1"' + (pl.ownerOnlyAdd ? " checked" : "") + ' /> Only owner may add tracks</label>')
+          : ('<p class="meta">' + (pl.ownerOnlyAdd ? "Owner locked adds — only loft owner can add." : "Anyone in the room may add (classic default).") + '</p>'))
+      +   (canAdd
+          ? ('<div class="section-label">Add from My Music</div>'
+            + (music.length
+              ? ('<form id="playlist-add-form" class="playlist-add-form">'
+                + '<select name="stuffId" required><option value="">— pick a track —</option>' + addOpts + '</select>'
+                + '<button type="submit">Add to playlist</button></form>')
+              : '<p class="meta">No Music in Stuff yet. Stuff → Music → Upload… (MP3/WAV/OGG; copyright checkbox required).</p>'))
+          : '<p class="meta">Adds locked to loft owner.</p>')
+      + '</div></div>';
+  }
+
   var STUFF_CATS = [
     { id: "avatars", label: "Avatars", empty: "You have no avatars yet." },
     { id: "furniture", label: "Furniture", empty: "You have no furniture yet." },
@@ -78,9 +257,13 @@
   var groupThreadId = null;
   var roomMenuOpen = false;
   var roomPanelOpen = false;
+  var playlistPanelOpen = false; // Room menu → View room playlist
   var decorateMode = false;
   var partyPanelOpen = false;
   var helpOpen = false;
+  var legalOpen = false; // Help → Legal / Disclaimer
+  var musicGestureNeeded = false; // browser blocked autoplay — show Click to play
+  var roomAudioMuted = false;
   var stuffListMode = false; // show list form on stuff detail
   var FEED = [];
   var GROUPS_KEY = "whirled2.groups";
@@ -229,7 +412,9 @@
     goMenuOpen = false;
     roomMenuOpen = false;
     partyPanelOpen = false;
+    playlistPanelOpen = false;
     helpOpen = false;
+    legalOpen = false;
     invitePanelOpen = false;
     occMenuId = null;
     friendInvitePending = null;
@@ -577,7 +762,7 @@
     var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
-  var meSub = "home"; // home | profile | friends | mail | passport | account | club | blocklist | galleries | transactions | contests | share
+  var meSub = "home"; // home | profile | friends | mail | passport | account | themes | club | blocklist | galleries | transactions | contests | share
   var profileEditSection = null; // null | status | photo | info
   var tourTip = 0;
   var goMenuOpen = false;
@@ -818,17 +1003,26 @@
     return null;
   }
   function stuffUploadForm(meta) {
+    // How this works: Music category accepts audio files (data URL in whirled2.stuff).
+    // Other categories stay image-thumb stubs. Copyright checkbox is always required.
+    var isMusic = meta.id === "music";
+    var fileLabel = isMusic
+      ? 'Audio file (MP3 / WAV / OGG / WebM) <input type="file" name="media" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/*" required />'
+      : 'Thumbnail / image (optional) <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" />';
+    var blurb = isMusic
+      ? 'Wiki Music: upload an audio file you own or have rights to. Stored as a data URL in this browser (~2–4MB). Add tracks to the room playlist from Room menu. Do <b>not</b> upload copyrighted material you do not own.'
+      : 'Wiki-style stub: name + description + optional thumbnail. SWF / full media arrives with the engine later. Images only for this mock (png/jpg/gif/webp), ~200KB cap.';
     return '<div class="panel stuff-upload-panel">'
       + '<div class="room-side-head"><h2>Upload / Create — ' + esc(meta.label) + '</h2>'
       +   '<button type="button" class="text-btn" data-stuff-mode="browse">Cancel</button></div>'
-      + '<p class="meta">Wiki-style stub: name + description + optional thumbnail. SWF / full media arrives with the engine later. Images only for this mock (png/jpg/gif/webp), ~200KB cap.</p>'
+      + '<p class="meta">' + blurb + '</p>'
       + '<form id="stuff-upload-form" class="stuff-upload-form">'
-      +   '<label>Name <input name="name" maxlength="80" required placeholder="Item name" /></label>'
+      +   '<label>Name <input name="name" maxlength="80" required placeholder="' + (isMusic ? "Track name" : "Item name") + '" /></label>'
       +   '<label>Description <textarea name="description" rows="3" maxlength="400" placeholder="What is it?"></textarea></label>'
       +   '<label>Type <input name="type" readonly value="' + esc(meta.label) + '" data-type-id="' + esc(meta.id) + '" /></label>'
       +   '<input type="hidden" name="typeId" value="' + esc(meta.id) + '" />'
-      +   '<label>Thumbnail / image (optional) <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
-      +   '<label class="check-row"><input type="checkbox" name="copyright" required /> I confirm I have the right to upload this (copyright).</label>'
+      +   '<label>' + fileLabel + '</label>'
+      +   '<label class="check-row"><input type="checkbox" name="copyright" required /> I confirm I have the right to upload this (copyright). I will not upload material I do not own or lack permission to use.</label>'
       +   '<button type="submit">Save to Stuff</button>'
       +   '<p class="meta" id="stuff-upload-msg"></p>'
       + '</form></div>';
@@ -1231,16 +1425,32 @@
     var joinBtn = isMember
       ? '<button type="button" class="action-btn" data-group-leave="' + esc(g.id) + '"' + (isCreator ? ' disabled title="Creators stay in their group"' : '') + '>Leave</button>'
       : '<button type="button" class="action-btn" data-group-join="' + esc(g.id) + '">Join this group</button>';
-    return '<section class="page group-page">'
+    // How this works: creators act as managers here. Theme panel is Coming Soon (wiki Whirleds FAQ)
+    // plus an optional local hex draft that only tints this group's header on this browser.
+    var gTheme = loadGroupTheme(g.id) || {};
+    var headerStyle = (gTheme.hex ? (' style="--group-accent:' + esc(gTheme.hex) + '"') : '');
+    var themePanel = isCreator
+      ? ('<div class="section-label">Edit Whirled theme</div>'
+        + '<div class="panel group-theme-panel">'
+        +   '<span class="club-badge-soon">Coming Soon</span>'
+        +   '<p>Classic themed Whirleds let managers <b>skin the top bar</b> (hex + images), <b>mark items</b> allowed in the whirled, and <b>mark rooms</b>. See wiki Whirleds FAQ / Create Whirleds.</p>'
+        +   '<p class="meta">No payments here. Prototype below only tints this group page header on your browser (<code>whirled2.groupTheme.' + esc(g.id) + '</code>).</p>'
+        +   '<form id="group-theme-form" data-group-theme="' + esc(g.id) + '" class="group-theme-form">'
+        +     '<label>Draft header color <input type="color" name="hex" value="' + esc(gTheme.hex || "#3aa3e0") + '" /></label>'
+        +     '<button type="submit" class="action-btn">Save local draft</button>'
+        +   '</form></div>')
+      : '';
+    return '<section class="page group-page"' + headerStyle + '>'
       + '<button type="button" class="text-btn" data-group-back="1">← All groups</button>'
-      + '<div class="featured">Group</div>'
-      + '<h1>' + esc(g.name) + '</h1>'
+      + '<div class="featured group-featured-head">Group</div>'
+      + '<h1 class="group-title-accent">' + esc(g.name) + '</h1>'
       + '<p class="lobby-blurb">' + esc(g.blurb || "") + '</p>'
       + '<div class="group-actions">'
       +   joinBtn
       +   '<button type="button" class="action-btn" data-group-hall="' + esc(g.id) + '">Enter hall</button>'
       + '</div>'
       + '<p class="meta">Enter hall opens the Rooms lobby / Studio Loft (shared whirled halls come later).</p>'
+      + themePanel
       + '<div class="section-label">Members</div>'
       + '<div class="panel">' + memberRows + '</div>'
       + '<div class="section-label">Discussion forum</div>'
@@ -1448,7 +1658,26 @@
       +   '</form>'
       + '</div></div>';
   }
-  function helpPage() {
+    // How this works: Legal / Disclaimer is a first-class page (Help link + gate footer).
+  // No copyrighted uploads; Whirled2 is not official whirled.club.
+  function legalPage() {
+    return '<section class="page legal-page"><div class="page-head"><div><h1>Legal / Disclaimer</h1>'
+      + '<p>Please read before uploading or sharing.</p></div>'
+      + '<button type="button" class="text-btn" data-legal-close="1">Close</button></div>'
+      + '<div class="panel legal-panel">'
+      +   '<h2>Copyright &amp; uploads</h2>'
+      +   '<p><b>We do not promote or allow</b> uploading copyrighted material you do not own or have rights to use.</p>'
+      +   '<p>Users must only upload content they <b>created</b> or are <b>authorized</b> to use. The copyright checkbox on Upload / List Item is required — check it only if that statement is true.</p>'
+      +   '<p class="meta">Room music and Stuff media stay in <b>your browser</b> on GitHub Pages (localStorage). That does not make unauthorized uploads OK.</p>'
+      + '</div>'
+      + '<div class="panel legal-panel">'
+      +   '<h2>Whirled2 is not the original Whirled</h2>'
+      +   '<p>Whirled2 is inspired by the original Whirled concept, public research, community docs, and open-source references (including <a href="https://github.com/greyhavens/msoy" target="_blank" rel="noopener">greyhavens/msoy</a>). We do <b>not</b> copy or redistribute original proprietary assets from whirled.club, Three Rings Design, or other projects.</p>'
+      +   '<p>Logos and UI here are <b>Whirled2 originals</b> or user-supplied. This is <b>not</b> official Whirled Club / whirled.club.</p>'
+      +   '<p>Features are <b>prototypes</b> and subject to change. Coins and bars are <b>labels only</b> — no live payments on this mock.</p>'
+      + '</div></section>';
+  }
+function helpPage() {
     return '<section class="page help-page"><div class="page-head"><div><h1>Help</h1>'
       + '<p>Starting Out — Whirled2 chrome tips.</p></div>'
       + '<button type="button" class="text-btn" data-help-close="1">Close Help</button></div>'
@@ -1456,7 +1685,9 @@
       + '<ul class="help-tips">'
       + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname). Coins are labels only.</li>'
       + '<li><b>Rooms</b> — enter Studio Loft; chat in the bar; Room menu for comment/rate, decorate, lock (visual).</li>'
-      + '<li><b>Stuff upload</b> — create furniture/media with Upload… (images for now). List Item copies into Shop.</li>'
+      + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
+      + '<li><b>Room playlist</b> — Room menu → View room playlist. Add from My Music; owner can remove/next. Soft autoplay with Click-to-play if blocked.</li>'
+      + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
       + '<li><b>Mail</b> — header count; compose from Me → Mail or profiles.</li>'
       + '<li><b>Groups</b> — local clubs with discussion + Enter hall (lobby meta).</li>'
       + '<li><b>Games lobby</b> — genre filters and local tables from <code>whirled2.games</code> only — never invented titles.</li>'
@@ -1466,9 +1697,10 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Whirled2 branding, Club/Membership Coming Soon, roles/badges, chat Slide/Overlay. Cache <code>?v=20260905z</code>.</p>'
+      + '<p class="meta">This pass: chat-send fix, empty notice-bar, themes shells, room music playlist, Legal page. Cache <code>?v=20260906a</code>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
-      + '<p class="meta">Live docs live in-repo as CONCEPT.md / STATUS.md — no external secrets.</p>'
+      + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
+      + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
       + '</div></section>';
   }
   function roomCommentsPanel() {
@@ -1539,8 +1771,10 @@
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
       +     '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
+      +     (playlistPanelOpen ? playlistPanel() : '')
       +     (decorateMode ? decoratePanel() : '')
       +     (partyPanelOpen ? partyPanel() : '')
+      +     '<button type="button" class="music-gesture-fab" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
       +   '</section>'
       + '</div>'
       + friendInvitePopup();
@@ -1684,7 +1918,16 @@
     var partyRow = party
       ? '<div class="notice-row kind-blue party-notice">Party: ' + esc(party.name) + ' <span class="meta">(follow-leader — shared server later)</span></div>'
       : "";
-    if (!notices.length && !partyRow) { el.innerHTML = '<div class="notice-empty">No notifications</div>'; return; }
+    // How this works: hide the floating cream panel when there is nothing to show.
+    // Never leave a permanent "No notifications" placeholder (looked like a stuck toast).
+    if (!notices.length && !partyRow) {
+      el.innerHTML = "";
+      el.hidden = true;
+      el.classList.add("is-empty");
+      return;
+    }
+    el.hidden = false;
+    el.classList.remove("is-empty");
     var clearBtn = notices.length
       ? '<div class="notice-toolbar"><button type="button" class="notice-clear-all" data-notice-clear-all="1">Clear all</button></div>'
       : "";
@@ -1795,6 +2038,8 @@
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "passport" ? " is-on" : "") + '" data-me="passport">My Passport</button>'
       + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link' + (meSub === "themes" ? " is-on" : "") + '" data-me="themes">Themes</button>'
+      + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "club" ? " is-on" : "") + '" data-me="club">Club</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "account" ? " is-on" : "") + '" data-me="account">Account</button>'
@@ -1888,7 +2133,9 @@
       +       '<button type="button" class="text-btn" data-me="passport">My Passport</button>'
       +       '<button type="button" class="text-btn" data-me="mail">Mail' + (unread ? ' (' + unread + ')' : '') + '</button>'
       +       '<button type="button" class="text-btn" data-me="account">Account</button>'
+      +       '<button type="button" class="text-btn" data-me="themes">Themes</button>'
       +       '<button type="button" class="text-btn" data-me="club">Club / Membership</button>'
+      +       '<button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button>'
       +       '<hr class="me-side-rule" />'
       +       '<button type="button" class="text-btn" data-me="blocklist">My Blocklist</button>'
       +       '<button type="button" class="text-btn" data-me="galleries">My Galleries</button>'
@@ -2250,6 +2497,7 @@
       +       '<span class="meta"> Local-only note. Not synced.</span></span></div>'
       +   '</div>'
       +   '<p class="meta">Password changes are managed by register / login — not required on this chrome.</p>'
+      +   '<p class="meta">Browser look: <button type="button" class="text-btn" data-me="themes">Themes</button> (CSS presets on this device). Group world themes live on group pages for managers.</p>'
       +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
       + '</div>'
       + rolePanel
@@ -2417,6 +2665,43 @@
   // ---------------------------------------------------------------------------
   // Club / Membership — Coming Soon (no payments; local notify stub only)
   // ---------------------------------------------------------------------------
+  // How this works: Me → Themes previews CSS variable presets via #app[data-theme].
+  // Premium cards are Coming Soon labels only — no payments.
+  function meThemes() {
+    var cur = loadBrowserTheme();
+    function card(id, premium) {
+      var t = id ? BROWSER_THEMES[id] : null;
+      if (premium) {
+        return '<div class="theme-card is-premium">'
+          + '<div class="theme-swatch theme-swatch-premium" aria-hidden="true"></div>'
+          + '<h3>' + esc(premium.label) + '</h3>'
+          + '<p class="meta">' + esc(premium.blurb) + '</p>'
+          + '<span class="club-badge-soon">Coming Soon</span>'
+          + '<p class="meta">May be purchasable later — labels only, no checkout today.</p>'
+          + '</div>';
+      }
+      var on = cur === id;
+      return '<div class="theme-card' + (on ? " is-on" : "") + '">'
+        + '<div class="theme-swatch theme-swatch-' + esc(id) + '" aria-hidden="true"></div>'
+        + '<h3>' + esc(t.label) + '</h3>'
+        + '<p class="meta">' + esc(t.blurb) + '</p>'
+        + '<button type="button" class="action-btn" data-browser-theme="' + esc(id) + '">'
+        + (on ? "Selected" : "Preview") + '</button></div>';
+    }
+    return '<section class="page me-page themes-page">' + meSubnav()
+      + '<div class="panel"><h2>Browser themes</h2>'
+      + '<p class="meta">Reskin the chrome on <b>this browser</b> with CSS presets (saved as <code>whirled2.browserTheme</code>). Soft visual polish only — does not change the engine.</p>'
+      + '<div class="theme-grid">'
+      +   card("classic") + card("night") + card("soft")
+      +   card(null, { label: "Aurora Club", blurb: "Premium accent pack inspired by Club flair." })
+      +   card(null, { label: "Neon Arcade", blurb: "High-contrast play chrome — maybe later." })
+      + '</div></div>'
+      + '<div class="panel"><h2>Group world themes</h2>'
+      + '<p class="meta">Classic themed Whirleds let group managers reskin the top bar (hex + images), mark allowed items, and mark rooms. See wiki Whirleds FAQ. In Whirled2 that editor is <b>Coming Soon</b> — a tiny local hex draft lives on each group page for managers (prototype only, no payments).</p>'
+      + '<button type="button" class="text-btn" data-tab="groups">Browse Groups</button>'
+      + '</div></section>';
+  }
+
   function meClub() {
     var sid = session() && session().user ? session().user.id : "guest";
     var note = "";
@@ -2446,6 +2731,7 @@
       +   '<p><b>Whirled2</b> is <b>not affiliated</b> with Three Rings Design, the operators of whirled.club, or any official Whirled commercial entity. We do not claim to be official whirled.club.</p>'
       +   '<p>Whirled2 is a same-game-spirit revival on a <b>new engine</b>, informed by public research, community docs, and the open-source <a href="https://github.com/greyhavens/msoy" target="_blank" rel="noopener">greyhavens/msoy</a> reference (BSD) — not a Flash/msoy port and not a private-engine dump.</p>'
       +   '<p>Features you see here are <b>prototypes</b>. Items, pages, and perks may appear or disappear before any launch. <b>Nothing is final.</b></p>'
+      +   '<p class="meta">Full IP / upload rules: <button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button>. Coins stay labels only — no payments.</p>'
       + '</div>'
       + '<div class="panel">'
       +   '<h2>Notify me</h2>'
@@ -2496,6 +2782,7 @@
     if (meSub === "transactions") return meTransactions();
     if (meSub === "contests") return meContests();
     if (meSub === "share") return meShare();
+    if (meSub === "themes") return meThemes();
     if (meSub === "club") return meClub();
     return meHome();
   }
@@ -2525,6 +2812,8 @@
       +   '</div>'
       +   '<p class="gate-err" id="gate-err"></p>'
       +   '<p class="meta">Offline preview stays in this browser. Shared chat needs server/server.mjs.</p>'
+      +   '<p class="gate-legal meta">By continuing you agree not to upload copyrighted material you do not own. '
+      +     '<button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button></p>'
       + '</div></section>';
   }
   function shell() {
@@ -2544,6 +2833,8 @@
       +       '<span class="sep">|</span>'
       +       '<button type="button" class="text-btn" data-help-open="1">Help</button>'
       +       '<span class="sep">|</span>'
+      +       '<button type="button" class="text-btn" data-legal-open="1">Legal</button>'
+      +       '<span class="sep">|</span>'
       +       '<button type="button" id="logout-btn" class="text-btn">Logoff</button>'
       +     '</div>'
       +     '<div class="row who-stats">'
@@ -2561,7 +2852,7 @@
       +   '<input id="chat-input" maxlength="240" placeholder="Type here to chat!" autocomplete="off" />'
       +   '<button class="send" type="submit">send</button>'
       +   '<span class="toolbar">'
-      +     '<button type="button" class="tb tb-vol" title="Coming soon" disabled aria-label="Volume"></button>'
+      +     '<button type="button" class="tb tb-vol" title="Mute / unmute room music" aria-label="Volume" data-room-mute="1"></button>'
       +     '<span class="tb-go-wrap">'
       +       '<button type="button" class="tb tb-go" title="Go" aria-label="Go" data-tb="go"></button>'
       +       '<div class="go-menu" id="go-menu" hidden>'
@@ -2578,6 +2869,7 @@
       +       '<div class="go-menu room-menu" id="room-menu" hidden>'
       +         '<button type="button" data-room-menu="comment">Comment or rate</button>'
       +         '<button type="button" data-room-menu="decorate">Decorate Room</button>'
+      +         '<button type="button" data-room-menu="playlist">View room playlist</button>'
       +         '<div class="room-lock-row meta">Lock (visual only)</div>'
       +         '<button type="button" data-room-lock="unlocked"' + (loadRoomLock() === "unlocked" ? ' class="is-on"' : '') + '>🔓 Unlocked</button>'
       +         '<button type="button" data-room-lock="friends"' + (loadRoomLock() === "friends" ? ' class="is-on"' : '') + '>👥 Friends</button>'
@@ -2590,6 +2882,15 @@
   }
   function paint(tab) {
     if (!session()) {
+      applyBrowserTheme();
+      // How this works: Legal page is readable from the gate (logged out) too.
+      if (legalOpen || tab === "legal") {
+        legalOpen = true;
+        document.getElementById("app").innerHTML = legalPage();
+        document.getElementById("app").setAttribute("data-tab", "legal");
+        try { window.__whirledBoot = true; } catch (e) {}
+        return;
+      }
       document.getElementById("app").innerHTML = gate();
       document.getElementById("app").setAttribute("data-tab", "gate");
       bindGate();
@@ -2605,7 +2906,9 @@
     document.querySelectorAll(".tab").forEach(function (btn) { btn.classList.toggle("is-on", btn.getAttribute("data-tab") === tab); });
     var main = document.getElementById("main");
     if (!main) return;
-    if (helpOpen || tab === "help") { helpOpen = true; main.innerHTML = helpPage(); }
+    applyBrowserTheme();
+    if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; main.innerHTML = legalPage(); }
+    else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; main.innerHTML = helpPage(); }
     else if (tab === "rooms") main.innerHTML = rooms();
     else if (tab === "me") main.innerHTML = mePage();
     else if (tab === "stuff") main.innerHTML = stuffPage();
@@ -2643,6 +2946,7 @@
     } catch (e) {}
     try { ensureStagePlaceholder(); } catch (e) {}
     try { if (decorateMode) bindDecorateDrag(); } catch (e) {}
+    try { syncRoomAudio(); } catch (e) {}
   }
   function ensureStagePlaceholder() {
     var slot = document.getElementById("stage-slot");
@@ -2925,6 +3229,7 @@
   // Boot + presence / chat polling timers
   // ---------------------------------------------------------------------------
   function boot() {
+    applyBrowserTheme();
     if (session()) stripStuckPokeNotices();
     paint(session() ? "rooms" : "");
     if (session()) { loadHistory(); startPoll(); startOccPoll(); ensureNoticeBar(); }
@@ -3073,7 +3378,7 @@
       chat = []; liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
       shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
       gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
-      decorateMode = false; partyPanelOpen = false; helpOpen = false; galleryViewId = null; stuffListMode = false;
+      decorateMode = false; partyPanelOpen = false; playlistPanelOpen = false; helpOpen = false; legalOpen = false; galleryViewId = null; stuffListMode = false;
       clearStrayUI();
       paint("");
       return;
@@ -3089,6 +3394,7 @@
       inRoom = false;
       decorateMode = false;
       roomPanelOpen = false;
+      playlistPanelOpen = false;
       paint("rooms");
       return;
     }
@@ -3292,6 +3598,7 @@
     }
     if (ev.target.closest("[data-help-open]") && session()) {
       helpOpen = true;
+      legalOpen = false;
       partyPanelOpen = false;
       paint("help");
       return;
@@ -3299,6 +3606,26 @@
     if (ev.target.closest("[data-help-close]") && session()) {
       helpOpen = false;
       paint("rooms");
+      return;
+    }
+    // Legal works logged-in or from the gate.
+    if (ev.target.closest("[data-legal-open]")) {
+      legalOpen = true;
+      helpOpen = false;
+      partyPanelOpen = false;
+      paint("legal");
+      return;
+    }
+    if (ev.target.closest("[data-legal-close]")) {
+      legalOpen = false;
+      if (session()) paint("rooms");
+      else paint("");
+      return;
+    }
+    if (ev.target.closest("[data-browser-theme]") && session()) {
+      saveBrowserTheme(ev.target.closest("[data-browser-theme]").getAttribute("data-browser-theme"));
+      meSub = "themes";
+      paint("me");
       return;
     }
     if (ev.target.closest("[data-decorate-close]") && session()) {
@@ -3651,21 +3978,33 @@
       if (rm === "lobby") {
         inRoom = false;
         roomPanelOpen = false;
+        playlistPanelOpen = false;
         decorateMode = false;
         paint("rooms");
       } else if (rm === "comment") {
         if (!inRoom) { inRoom = true; }
         roomPanelOpen = true;
+        playlistPanelOpen = false;
         paint("rooms");
         loadOccupants();
       } else if (rm === "decorate") {
         if (!inRoom) { inRoom = true; }
         decorateMode = true;
         roomPanelOpen = false;
+        playlistPanelOpen = false;
         partyPanelOpen = false;
         paint("rooms");
         loadOccupants();
         bindDecorateDrag();
+      } else if (rm === "playlist") {
+        if (!inRoom) { inRoom = true; }
+        playlistPanelOpen = true;
+        roomPanelOpen = false;
+        decorateMode = false;
+        partyPanelOpen = false;
+        paint("rooms");
+        loadOccupants();
+        syncRoomAudio();
       }
       return;
     }
@@ -3685,6 +4024,54 @@
     if (ev.target.closest("[data-room-panel-close]") && session()) {
       roomPanelOpen = false;
       paint("rooms");
+      return;
+    }
+    if (ev.target.closest("[data-playlist-close]") && session()) {
+      playlistPanelOpen = false;
+      paint("rooms");
+      return;
+    }
+    // How this works: playlist controls — owner play/remove/next; mute; gesture unlock for autoplay.
+    if (ev.target.closest("[data-music-gesture]") && session()) {
+      musicGestureNeeded = false;
+      syncRoomAudio();
+      var gbtn = document.getElementById("music-gesture-btn");
+      if (gbtn) gbtn.hidden = true;
+      return;
+    }
+    if (ev.target.closest("[data-room-mute]") && session()) {
+      roomAudioMuted = !roomAudioMuted;
+      var aMute = document.getElementById("room-audio");
+      if (aMute) aMute.muted = roomAudioMuted;
+      if (playlistPanelOpen && inRoom) paint("rooms");
+      return;
+    }
+    if (ev.target.closest("[data-playlist-next]") && session() && isLoftOwner()) {
+      playlistNext(false);
+      if (playlistPanelOpen) paint("rooms");
+      else syncRoomAudio();
+      return;
+    }
+    var plPlay = ev.target.closest("[data-playlist-play]");
+    if (plPlay && session() && isLoftOwner()) {
+      var pl = loadPlaylist();
+      pl.currentIndex = Math.max(0, Number(plPlay.getAttribute("data-playlist-play")) || 0);
+      savePlaylist(pl);
+      paint("rooms");
+      syncRoomAudio();
+      return;
+    }
+    var plRem = ev.target.closest("[data-playlist-remove]");
+    if (plRem && session() && isLoftOwner()) {
+      var pl2 = loadPlaylist();
+      var ri = Number(plRem.getAttribute("data-playlist-remove"));
+      if (ri >= 0 && ri < pl2.tracks.length) {
+        pl2.tracks.splice(ri, 1);
+        if (pl2.currentIndex >= pl2.tracks.length) pl2.currentIndex = Math.max(0, pl2.tracks.length - 1);
+        savePlaylist(pl2);
+      }
+      paint("rooms");
+      syncRoomAudio();
       return;
     }
     var roomRateBtn = ev.target.closest("[data-room-rate]");
@@ -3831,6 +4218,12 @@
     }
   });
   app.addEventListener("change", function (ev) {
+    if (ev.target.matches("[data-playlist-owner-only]") && session() && isLoftOwner()) {
+      var plO = loadPlaylist();
+      plO.ownerOnlyAdd = !!ev.target.checked;
+      savePlaylist(plO);
+      return;
+    }
     if (ev.target.id !== "photo-input" || !session()) return;
     var file = ev.target.files && ev.target.files[0];
     if (!file) return;
@@ -3996,11 +4389,14 @@
       var msgEl = document.getElementById("stuff-upload-msg");
       if (!sname) { if (msgEl) msgEl.textContent = "Name required."; return; }
       if (!sud.get("copyright")) { if (msgEl) msgEl.textContent = "Copyright confirmation required."; return; }
-      var file = ev.target.querySelector('input[name="image"]').files[0];
-      function finishSave(thumb) {
+      var isMusicUp = stype === "music";
+      var fileInput = ev.target.querySelector(isMusicUp ? 'input[name="media"]' : 'input[name="image"]');
+      var file = fileInput && fileInput.files && fileInput.files[0];
+      // How this works: finishSave writes whirled2.stuff. Music keeps audio in dataUrl; thumb optional.
+      function finishSave(thumb, dataUrl) {
         var items = loadStuff();
         var nid = "st" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        items.unshift({
+        var row = {
           id: nid,
           name: sname,
           description: sdesc,
@@ -4012,7 +4408,9 @@
           thumb: thumb || "",
           owned: true,
           at: new Date().toISOString()
-        });
+        };
+        if (dataUrl) row.dataUrl = dataUrl;
+        items.unshift(row);
         saveStuff(items);
         stuffItemId = nid;
         stuffMode = "detail";
@@ -4020,7 +4418,38 @@
         pushNotice("green", "Saved “" + sname + "” to Stuff.", { transient: true });
         paint("stuff");
       }
-      if (!file) { finishSave(""); return; }
+      if (isMusicUp) {
+        if (!file) { if (msgEl) msgEl.textContent = "Pick an audio file to upload."; return; }
+        var okAudio = {
+          "audio/mpeg": 1, "audio/mp3": 1, "audio/wav": 1, "audio/x-wav": 1,
+          "audio/ogg": 1, "audio/webm": 1, "audio/mp4": 1
+        };
+        var looksAudio = okAudio[file.type] || /\.(mp3|wav|ogg|webm|m4a)$/i.test(file.name || "");
+        if (!looksAudio) {
+          if (msgEl) msgEl.textContent = "Music uploads need MP3, WAV, OGG, or WebM.";
+          return;
+        }
+        if (file.size > MUSIC_MAX_BYTES) {
+          if (msgEl) msgEl.textContent = "File is over ~4MB — too large for browser storage on this mock. Please use a shorter/smaller track.";
+          return;
+        }
+        if (file.size > MUSIC_WARN_BYTES) {
+          if (msgEl) msgEl.textContent = "Large file (~" + Math.round(file.size / 1048576 * 10) / 10 + "MB). Saving may strain localStorage…";
+        }
+        var areader = new FileReader();
+        areader.onload = function () {
+          var dataUrl = String(areader.result || "");
+          if (dataUrl.length > MUSIC_MAX_BYTES * 1.4) {
+            if (msgEl) msgEl.textContent = "Encoded audio too large for localStorage — try a smaller file.";
+            return;
+          }
+          finishSave("", dataUrl);
+        };
+        areader.onerror = function () { if (msgEl) msgEl.textContent = "Could not read audio file."; };
+        areader.readAsDataURL(file);
+        return;
+      }
+      if (!file) { finishSave("", ""); return; }
       var okTypes = { "image/png":1, "image/jpeg":1, "image/jpg":1, "image/gif":1, "image/webp":1 };
       if (!okTypes[file.type]) {
         if (msgEl) msgEl.textContent = "Images only for this mock (png/jpg/gif/webp). SWF comes later with the engine.";
@@ -4038,7 +4467,7 @@
           if (msgEl) msgEl.textContent = "Encoded image too large for localStorage — try a smaller file.";
           return;
         }
-        finishSave(dataUrl);
+        finishSave(dataUrl, "");
       };
       reader.onerror = function () { if (msgEl) msgEl.textContent = "Could not read file."; };
       reader.readAsDataURL(file);
@@ -4317,6 +4746,63 @@
       paint("rooms");
       return;
     }
+    if (ev.target.id === "playlist-add-form" && session()) {
+      var plAdd = new FormData(ev.target);
+      var stuffId = String(plAdd.get("stuffId") || "");
+      var item = findStuff(stuffId);
+      if (!item) return;
+      var plA = loadPlaylist();
+      if (!isLoftOwner() && plA.ownerOnlyAdd) {
+        pushNotice("orange", "Only the loft owner may add tracks right now.");
+        return;
+      }
+      if (plA.tracks.length >= 99) {
+        pushNotice("orange", "Playlist is full (99 max).");
+        return;
+      }
+      var dataUrl = item.dataUrl || item.audio || "";
+      if (!dataUrl) {
+        pushNotice("orange", "That Music item has no audio data. Re-upload under Stuff → Music.");
+        return;
+      }
+      plA.tracks.push({
+        id: "trk" + Date.now().toString(36),
+        stuffId: item.id,
+        name: item.name || "Track",
+        by: session().user.name,
+        at: new Date().toISOString(),
+        dataUrl: dataUrl
+      });
+      if (plA.tracks.length === 1) plA.currentIndex = 0;
+      savePlaylist(plA);
+      playlistPanelOpen = true;
+      paint("rooms");
+      syncRoomAudio();
+      return;
+    }
+    if (ev.target.id === "group-theme-form" && session()) {
+      var gtf = new FormData(ev.target);
+      var gidT = ev.target.getAttribute("data-group-theme");
+      var hex = String(gtf.get("hex") || "").trim();
+      if (!gidT || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+      saveGroupTheme(gidT, hex);
+      groupViewId = gidT;
+      pushNotice("green", "Saved local group theme draft (header tint only).", { transient: true });
+      paint("groups");
+      return;
+    }
+    // How this works (chat send + radio pitfall):
+    // #chat-opts-menu lives INSIDE #chat-form and injects <input type="radio"> rows.
+    // A bare querySelector("input") hits the first radio (empty value) → early return → Send does nothing.
+    // Always read #chat-input for the chat form, before the generic input path below.
+    if (ev.target.id === "chat-form") {
+      var chatInput = document.getElementById("chat-input") || ev.target.querySelector("#chat-input");
+      var chatText = chatInput && chatInput.value.trim();
+      if (!chatText) return;
+      pushChat(chatText); // offline OK via WhirledApi.postChat → localStorage whirled2.chat.loft
+      if (chatInput) chatInput.value = "";
+      return;
+    }
     var input = ev.target.querySelector("input");
     var text = input && input.value.trim();
     if (!text) return;
@@ -4336,7 +4822,6 @@
         : "Interest cleared on this browser.";
       return;
     }
-    if (ev.target.id === "chat-form") { pushChat(text); input.value = ""; }
   });
   document.addEventListener("keydown", function (ev) {
     if (ev.key === "F9") {

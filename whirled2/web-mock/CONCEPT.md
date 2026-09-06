@@ -42,3 +42,16 @@ Staff vibe without purple/gold chrome: **Admin** (deeper blue + optional Agent l
 ## Beginner comments
 
 Source files carry short `// Information` / `// How this works` notes so new contributors can follow tabs, localStorage keys, chat modes, and the engine bridge without reverse-engineering every line.
+
+## Themes (browser + themed Whirleds)
+
+- **Browser themes** (Me → Themes): CSS variable presets on `#app[data-theme]` stored as `whirled2.browserTheme` (Classic Blue / Night Loft / Soft Sky). Extra “premium” cards are Coming Soon labels only — no payments.
+- **Group world themes** (wiki [Whirleds FAQ](https://wiki.whirled.club/wiki/Whirleds_FAQ) / Create Whirleds): classic managers reskin the top bar (hex + images), mark allowed items, and mark rooms. Whirled2 ships an **Edit Whirled theme** Coming Soon shell on group detail for creators/managers, plus an optional local header hex draft in `whirled2.groupTheme.{groupId}` (prototype tint only).
+
+## Room music / playlist
+
+Stuff → Music accepts audio (MP3/WAV/OGG/WebM) as data URLs in `whirled2.stuff` (copyright checkbox required). Room menu → View room playlist uses `whirled2.playlist.loft`. HTML5 `#room-audio` plays the queue; soft autoplay with Click-to-play if blocked. Owner (first user on this browser) can remove/next and toggle “Only owner may add”. Max 99 tracks. Offline Pages-safe.
+
+## Legal
+
+Help / gate / Club point to **Legal / Disclaimer**: no unauthorized copyrighted uploads; Whirled2 is inspired by public research / open-source references — not a redistribution of whirled.club / Three Rings proprietary assets; logos/UI are Whirled2 originals or user-supplied; prototypes subject to change; coins labels only.
