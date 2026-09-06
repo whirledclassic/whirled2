@@ -162,7 +162,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Meta app setup**: developers.facebook.com → Facebook Login for Web → App Domains / Valid OAuth Redirect URIs include `https://whirledclassic.github.io/`.
 - **Safety**: never invent FB users without SDK success; no payments; Discord/Google Coming Soon only.
 - **Engine**: auth is chrome; session only — do not break `#stage-slot` / `syncRoomAudio` / ♪ Music.
-- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906y`.
+- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship was `?v=20260906y`; theme polish is `?v=20260906z`.
 
 ## Room music embeds + Profile BG (20260906t)
 
@@ -188,7 +188,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Bug A**: narrow fixed side panel (`min(320px,92vw)`) — most of the phone is outside; taps look like "close"; focus blur + deferred `playlistPanelDirty` remount wiped paste; `data-tab==="rooms"` strictness could unmount.
 - **Bug B**: Set embed unreliable — blur/keyboard → miss button / hit stage; `isLoftOwner()` false for FB users ≠ `FIRST_USER_KEY` → orange "Owner controls" only; submit-only path flaky on mobile.
 - **Fix**: `#room-playlist-panel.room-music-modal` full-screen dim (z=120) + `.room-music-card` (z=121); backdrop/Close/leave/`clearStrayUI` only; `ensurePlaylistPanel` keeps modal while `inRoom && playlistPanelOpen` (ignore flaky tab attr); clear dirty without remount when focused; `canControlRoomMusic()` + `playlist.ownerId` claim; `data-playlist-set-embed` type=button + `applyPlaylistEmbedFromUi` (querySelector URL) + `#playlist-embed-msg`; document capture once.
-- **Cache**: `LOGO_V` / `?v=20260906y`. Do not push unless instructed.
+- **Cache**: superseded by `?v=20260906z`.
 
 
 ## Room music background + loop (20260906y)
@@ -196,4 +196,13 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Hard rule**: modal Close / backdrop / Done ≠ stop audio. Only leave-room / local-source switch / `removeRoomEmbedDock` tears down the iframe.
 - **Loop**: `roomEmbedSrcForIframe(pl)` — YT single `loop=1&playlist=VIDEO_ID`; playlist `loop=1`; `playsinline=1`. Spotify: UI note only.
 - **Local**: `audio.loop = true` when one track; multi uses `playlistNext` wrap.
-- **UI**: SVG ♪ chip + dock now-playing mini bar; Set embed → Done. Cache `?v=20260906y`. Do not push unless instructed.
+- **UI**: SVG ♪ chip + dock now-playing mini bar; Set embed → Done. Cache superseded by `?v=20260906z`.
+
+## Classic visual theme polish (20260906z)
+
+- **Colors**: `:root` `--paper` `#e8f4fb`, `--paper-2` `#cfe6f5`, `--ink` `#16324a`, `--accent` `#1e6fa8`, `--muted` `#4a6a80`, `--border` `#b7d3e8`, `--card` white.
+- **Type**: `--ui` system/Trebuchet stack; body 14px; mobile inputs 16px; long text `line-height: 1.45`.
+- **Flash fix**: `#main`/`#app` background `--paper`; `applyBrowserTheme` pins `#app[data-theme=classic|night|soft]`; `clearProfileSkinDom()` when leaving profile.
+- **Fidelity crumbs**: Stuff “Your Stuff” blurb; status-panel link vs wallet colors; tab 76×32 selected wash; busy-friend orange class; dotted list rules.
+- **Keep**: room stage dark, Overlay chat, music y dock/modal, Profile look on profile only.
+- **Cache**: `LOGO_V` / `?v=20260906z`. Do not push unless instructed.

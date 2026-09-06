@@ -2,19 +2,18 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906y)
+## What shipped (?v=20260906z)
 
-- **Room music background play**: Closing the Room music modal (Close / backdrop / Done) only removes the sheet — never `removeRoomEmbedDock()` / never clears the live iframe. Compact dock “now playing” mini bar (title + Open player / Room music / Mute) stays mounted under the shell.
-- **YouTube loop**: `roomEmbedSrcForIframe` appends `playsinline=1`; single videos get `loop=1&playlist=VIDEO_ID`; playlists get `loop=1`. Spotify note: loops via its own player. Local single-track `audio.loop = true`; queue still wraps via `playlistNext`.
-- **Simpler mobile setup**: paste URL (auto-detect) OR pick tab → full-width Set embed → big **Done — keep playing** (closes modal only). No competing preview iframe in the modal.
-- **♪ icon polish**: `.tb.tb-music` circular pale-blue chip with inline SVG note; `.is-playing` pulse when dock/local audio is live. Dock + modal CTAs cleaned up.
+- **Classic visual theme polish**: one pale-blue color system (`--paper` `#e8f4fb`, `--ink` `#16324a`, `--accent` `#1e6fa8`, `--muted` `#4a6a80`, `--border` `#b7d3e8`) + one `--ui` type stack across Me / Stuff / Shop / Games / Groups / Help / Legal / gate.
+- **Readable long-term**: body ≥14px, inputs ≥16px on mobile, meta/help line-height ~1.45, links accent + underline on hover.
+- **Page-switch flash fix**: `#main` stays on `--paper`; `applyBrowserTheme` pins `#app[data-theme=classic]` vars; `clearProfileSkinDom` runs when leaving Profile look so custom BG does not leak onto Rooms/Stuff.
+- **Keep intact**: room stage dark chrome, Overlay chat, room music modal/dock from **y**, Profile look custom BG (profile only).
+- Prior **?v=20260906y**: Room music background play + YouTube loop + Done CTA + ♪ chip.
 - Prior **?v=20260906x**: Room music modal sheet + `canControlRoomMusic` for FB users.
-- Prior **?v=20260906w**: paste-URL / dirty-gate / focus-safe remount.
-- Prior **?v=20260906v**: room music dock outside `#main`.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906y
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906z
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope

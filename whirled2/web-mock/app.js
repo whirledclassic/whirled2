@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906y";
+  var LOGO_V = "20260906z";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -76,10 +76,75 @@
     applyBrowserTheme(id);
   }
   function applyBrowserTheme(id) {
+    // What: paint the saved browser theme (Classic / Night / Soft) onto #app.
+    // How: set data-theme so CSS variables swap; pin body class for debugging.
+    // Why: tab switches (Me→Rooms→Stuff) must not leave Night ink/paper on Classic pages.
+    // ENGINE DEV: themes only retint chrome CSS vars — never #stage-slot / Pixi.
     id = id || loadBrowserTheme();
     if (!BROWSER_THEMES[id]) id = "classic";
     var el = document.getElementById("app");
-    if (el) el.setAttribute("data-theme", id);
+    if (el) {
+      el.setAttribute("data-theme", id);
+      // How this works: wipe any accidental inline theme leftovers on the shell host.
+      try {
+        el.style.removeProperty("background");
+        el.style.removeProperty("background-color");
+        el.style.removeProperty("color");
+      } catch (eClr) {}
+    }
+    try {
+      var b = document.body;
+      if (b) {
+        b.classList.remove("theme-classic", "theme-night", "theme-soft");
+        b.classList.add("theme-" + id);
+      }
+    } catch (eBody) {}
+    // How this works: keep #main on paper so empty frames between paints do not flash --sky.
+    try {
+      var main = document.getElementById("main");
+      if (main) {
+        main.style.removeProperty("background");
+        main.style.removeProperty("background-image");
+        main.style.removeProperty("color");
+      }
+    } catch (eMain) {}
+  }
+  function clearProfileSkinDom() {
+    // What: remove Profile look (custom BG / text / modules) from the DOM.
+    // How: strip inline background + --profile-* vars and skin classes from profile nodes.
+    // Why: leaving My Profile for Stuff/Rooms must not flash the old skin on the next page.
+    // ENGINE DEV: profile page chrome only — never touches #stage-slot or room music dock.
+    var nodes = document.querySelectorAll(".page.profile-page, .profile-skin, .has-profile-skin");
+    nodes.forEach(function (el) {
+      try {
+        el.style.background = "";
+        el.style.backgroundColor = "";
+        el.style.backgroundImage = "";
+        el.style.backgroundSize = "";
+        el.style.backgroundRepeat = "";
+        el.style.backgroundAttachment = "";
+        el.style.backgroundPosition = "";
+        el.style.removeProperty("--profile-accent");
+        el.style.removeProperty("--profile-panel");
+        el.style.removeProperty("--profile-text");
+        el.style.removeProperty("--profile-link");
+        el.style.removeProperty("--profile-font-scale");
+        el.style.removeProperty("--profile-radius");
+        el.classList.remove(
+          "has-profile-skin",
+          "profile-radius-sharp", "profile-radius-soft", "profile-radius-round",
+          "profile-mod-frosted", "profile-mod-solid", "profile-mod-outline",
+          "profile-header-band", "profile-header-minimal", "profile-header-accent-bar"
+        );
+      } catch (eN) {}
+    });
+    var banner = document.getElementById("profile-banner");
+    if (banner) {
+      try {
+        banner.hidden = true;
+        banner.style.backgroundImage = "";
+      } catch (eB) {}
+    }
   }
   function loadGroupTheme(gid) {
     try { return JSON.parse(localStorage.getItem("whirled2.groupTheme." + gid) || "null"); }
@@ -3036,7 +3101,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906y";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906z";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3247,6 +3312,9 @@
       + '</div>';
   }
   function stuffPage() {
+    // What: Stuff tab inventory by category (Avatars, Furniture, …).
+    // How: left teal rail picks category; main shows Your Stuff grid or upload/detail.
+    // Why: matches classic Stuff tab — empty until the player uploads; nothing invented.
     var meta = catMeta(stuffCat);
     var all = loadStuff();
     var items = filterByCat(all, stuffCat);
@@ -3265,7 +3333,7 @@
     } else {
       body = how + '<div class="grid">' + items.map(card).join("") + '</div>';
     }
-    return '<section class="page stuff-page"><div class="page-head"><div><h1>Stuff</h1><p>What you already own.</p></div></div>'
+    return '<section class="page stuff-page"><div class="page-head"><div><h1>Stuff</h1><p class="meta">Your Stuff — what you already own (wiki Stuff tab).</p></div></div>'
       + '<div class="stuff-layout">' + catRail("stuff", stuffCat)
       + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + body + '</div></div></section>';
   }
@@ -3882,7 +3950,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Room music keeps playing after Close (dock + YouTube loop); simpler Set embed → Done; ♪ icon chip. Cache <code>?v=20260906y</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Classic pale-blue theme polish (one type + color system, clearer meta contrast, no page-switch flash when leaving Profile look). Music from y still in tree. Cache <code>?v=20260906z</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -4193,8 +4261,10 @@ function helpPage() {
     return out;
   }
   function applyProfileSkinDom(userId, draftSkin) {
-    // How this works: set full background shorthand + CSS vars on .page.profile-page (and .profile-skin).
-    // ENGINE DEV: profile page chrome only; not #stage-slot.
+    // What: paint a player's Profile look (BG, colors, font scale, corners) onto their profile page.
+    // How: set CSS vars + full background shorthand on .page.profile-page / .profile-skin only.
+    // Why: visitors see skins on profiles; other tabs must call clearProfileSkinDom so nothing leaks.
+    // ENGINE DEV: profile page chrome only; not #stage-slot; not room music dock.
     var skin = draftSkin ? normalizeProfileSkin(draftSkin) : loadProfileSkin(userId);
     var page = document.querySelector(".page.profile-page");
     var wrap = document.querySelector(".profile-skin");
@@ -6041,8 +6111,13 @@ function helpPage() {
       + '</form>';
   }
   function paint(tab) {
+    // What: redraw the logged-in shell's #main (or gate) for the chosen tab.
+    // How: set data-tab, applyBrowserTheme, replace main HTML, then profile skin or clearProfileSkinDom.
+    // Why: one paint path keeps Me→Rooms→Stuff from flashing wrong theme/skin vars.
+    // ENGINE DEV: #room-embed-dock stays outside #main; #stage-slot only appears in rooms().
     if (!session()) {
       applyBrowserTheme();
+      try { clearProfileSkinDom(); } catch (eGateSkin) {}
       // How this works: Legal page is readable from the gate (logged out) too.
       if (legalOpen || tab === "legal") {
         legalOpen = true;
@@ -6115,22 +6190,28 @@ function helpPage() {
     try { if (decorateMode) bindDecorateDrag(); } catch (e) {}
     try { syncRoomAudio(); } catch (e) {}
     try { ensurePlaylistPanel(); } catch (ePl) {}
-    // How this works: after paint, apply profile skin on .page.profile-page via DOM styles.
-    // ENGINE DEV: profile page chrome only; not #stage-slot.
+    // What/How/Why: Profile look only on profile views; every other tab clears leftover skin styles
+    // so Me→Rooms→Stuff never flashes a custom BG. ENGINE DEV: chrome only — not #stage-slot.
     try {
+      var skinUid = null;
       if (tab === "me" && session()) {
-        var skinUid = null;
         if (viewingId && viewingId !== session().user.id) skinUid = viewingId;
         else if (meSub === "profile") skinUid = session().user.id;
-        if (skinUid) {
-          applyProfileSkinDom(skinUid);
-          // How this works: double rAF re-apply beats layout flash / competing CSS.
+      }
+      if (skinUid) {
+        applyProfileSkinDom(skinUid);
+        // How this works: double rAF re-apply beats layout flash / competing CSS.
+        requestAnimationFrame(function () {
           requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-              try { applyProfileSkinDom(skinUid); } catch (e2) {}
-            });
+            try {
+              // Bail if user already left profile (avoids painting skin onto a gone node).
+              if (!document.querySelector(".page.profile-page")) return;
+              applyProfileSkinDom(skinUid);
+            } catch (e2) {}
           });
-        }
+        });
+      } else {
+        clearProfileSkinDom();
       }
     } catch (eSkin) {}
     try { syncHashRoute(tab); } catch (eHash) {}
