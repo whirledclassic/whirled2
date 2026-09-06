@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ao";
+  var LOGO_V = "20260906ap";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1416,9 +1416,11 @@
 
   function loadWornAvatar() {
     // How this works: Wear writes a small JSON { stuffId, name, thumb, preview, frames, source }.
+    // Beginner (?v=20260906ap): normalize relative PNG paths so Cyan Hair always shows in the loft.
     try {
       var raw = JSON.parse(localStorage.getItem(WORN_AVATAR_KEY) || "null");
-      return raw && typeof raw === "object" ? raw : null;
+      if (!raw || typeof raw !== "object") return null;
+      return normalizeWornAvatar(raw);
     } catch (e) { return null; }
   }
   function saveWornAvatar(row) {
@@ -1428,6 +1430,52 @@
     }
     localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(row));
   }
+  function absolutizeMediaUrl(url, packPath) {
+    // How this works (?v=20260906ap): pack.json uses relative paths like frames/idle/frame_00.png.
+    // Beginner: the loft page is /web-mock/ — relative frames 404 and the avatar looks "missing".
+    // Always make Stuff/Wear URLs start with ./assets… (or keep http/data).
+    // ENGINE DEV: Pixi should receive the same absolute-ish asset URLs from getWornAvatar().
+    var u = String(url || "").trim();
+    if (!u) return "";
+    if (/^(https?:|data:|blob:)/i.test(u)) return u;
+    if (u.indexOf("./") === 0 || u.indexOf("/") === 0) {
+      return u.indexOf("?") >= 0 ? u : (u + "?v=" + LOGO_V);
+    }
+    var base = String(packPath || "").replace(/^\.\//, "");
+    if (base && base.slice(-1) !== "/") base += "/";
+    var full = "./" + base + u.replace(/^\.\//, "");
+    return full.indexOf("?") >= 0 ? full : (full + "?v=" + LOGO_V);
+  }
+  function absolutizeStateMap(states, packPath) {
+    if (!states || typeof states !== "object") return null;
+    var out = {};
+    Object.keys(states).forEach(function (k) {
+      var st = states[k] || {};
+      out[k] = {
+        frames: (st.frames || []).map(function (f) { return absolutizeMediaUrl(f, packPath); }).filter(Boolean),
+        frameDurationsMs: (st.frameDurationsMs || []).slice()
+      };
+    });
+    return out;
+  }
+  function normalizeWornAvatar(raw) {
+    // Repair older Wear rows that stored relative frame paths (invisible in loft).
+    if (!raw || typeof raw !== "object") return raw;
+    var path = raw.packPath || "";
+    if (raw.slug && !path) path = "assets/avatars/user-pack/" + raw.slug + "/";
+    if (raw.preview) raw.preview = absolutizeMediaUrl(raw.preview, path);
+    if (raw.thumb) raw.thumb = absolutizeMediaUrl(raw.thumb, path);
+    if (raw.frames && raw.frames.length) {
+      raw.frames = raw.frames.map(function (f) { return absolutizeMediaUrl(f, path); }).filter(Boolean);
+    }
+    if (raw.states) raw.states = absolutizeStateMap(raw.states, path);
+    // If frames still empty, fall back to preview so loft always shows something.
+    if (!(raw.frames && raw.frames.length) && raw.preview) raw.frames = [raw.preview];
+    if (raw.states && raw.states.idle && !(raw.states.idle.frames && raw.states.idle.frames.length) && raw.preview) {
+      raw.states.idle.frames = [raw.preview];
+    }
+    return raw;
+  }
   function resolveAvatarStates(item) {
     // How this works: unified packs expose states{idle,walk,...}; legacy packs = idle-only from frames.
     // Beginner: Cyan Hair has idle + walk so click-to-walk can animate. Parts stay optional.
@@ -1435,22 +1483,16 @@
     var states = null;
     if (item && item.states && typeof item.states === "object") states = item.states;
     else if (item && item.pack && item.pack.states) states = item.pack.states;
+    var packPath = (item && (item.packPath || (item.slug ? ("assets/avatars/user-pack/" + item.slug + "/") : ""))) || "";
     if (states) {
-      var out = {};
-      Object.keys(states).forEach(function (k) {
-        var st = states[k] || {};
-        out[k] = {
-          frames: (st.frames || []).slice(),
-          frameDurationsMs: (st.frameDurationsMs || []).slice()
-        };
-      });
-      return out;
+      return absolutizeStateMap(states, packPath) || { idle: { frames: [], frameDurationsMs: [] } };
     }
     var frames = [];
     if (item && item.frames && item.frames.length) frames = item.frames.slice();
     else if (item && item.pack && item.pack.displayFrames) frames = item.pack.displayFrames.slice();
     else if (item && item.pack && item.pack.frames) frames = item.pack.frames.slice();
     else if (item && (item.preview || item.thumb)) frames = [item.preview || item.thumb];
+    frames = frames.map(function (f) { return absolutizeMediaUrl(f, packPath); }).filter(Boolean);
     var durs = (item && item.pack && item.pack.frameDurationsMs) || (item && item.frameDurationsMs) || [];
     return { idle: { frames: frames, frameDurationsMs: durs.slice() } };
   }
@@ -1468,23 +1510,25 @@
     else if (item.pack && item.pack.displayFrames) frames = item.pack.displayFrames.slice();
     else if (item.pack && item.pack.frames) frames = item.pack.frames.slice();
     else if (preview) frames = [preview];
+    var packPath = item.packPath || (item.slug ? ("assets/avatars/user-pack/" + item.slug + "/") : "");
     var row = {
       stuffId: item.id,
       name: item.name || "Avatar",
-      thumb: item.thumb || preview || "",
-      preview: preview || item.thumb || "",
-      frames: frames,
+      thumb: absolutizeMediaUrl(item.thumb || preview || "", packPath),
+      preview: absolutizeMediaUrl(preview || item.thumb || "", packPath),
+      frames: (frames || []).map(function (f) { return absolutizeMediaUrl(f, packPath); }).filter(Boolean),
       frameDurationsMs: (idle.frameDurationsMs && idle.frameDurationsMs.length)
         ? idle.frameDurationsMs.slice()
         : ((item.pack && item.pack.frameDurationsMs) || item.frameDurationsMs || []),
-      states: states,
+      states: absolutizeStateMap(states, packPath) || states,
       state: "idle",
       source: item.source || (item.pack && item.pack.source) || "png",
-      packPath: item.packPath || "",
+      packPath: packPath,
       slug: item.slug || (item.pack && item.pack.slug) || "",
       at: new Date().toISOString()
     };
-    saveWornAvatar(row);
+    if (!(row.frames && row.frames.length) && row.preview) row.frames = [row.preview];
+    saveWornAvatar(normalizeWornAvatar(row));
     pushRecentAvatarId(item.id);
     return true;
   }
@@ -1511,15 +1555,23 @@
         +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Tofu") + '</div>'
         + '</div></div>';
     }
-    if (!(worn.preview || (worn.frames && worn.frames.length) || (worn.states && worn.states.idle))) {
-      return '<div id="avatar-wear-layer" class="avatar-wear-layer" aria-hidden="true"></div>';
-    }
+    worn = normalizeWornAvatar(worn) || worn;
     var stateName = worn.state || "idle";
     var st = (worn.states && (worn.states[stateName] || worn.states.idle)) || null;
     var frames = (st && st.frames && st.frames.length)
       ? st.frames
-      : ((worn.frames && worn.frames.length) ? worn.frames : [worn.preview]);
-    var src0 = frames[0] || worn.preview;
+      : ((worn.frames && worn.frames.length) ? worn.frames : []);
+    if (!frames.length && worn.preview) frames = [worn.preview];
+    if (!frames.length && worn.thumb) frames = [worn.thumb];
+    if (!frames.length) {
+      // Last resort: show tofu instead of an empty invisible layer.
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Avatar missing frames">'
+        + '<div class="avatar-wear-billboard" style="' + posStyle + '">'
+        +   tofuSvgHtml("tofu-avatar tofu-wear")
+        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + '</div>'
+        + '</div></div>';
+    }
+    var src0 = frames[0];
     var durs = (st && st.frameDurationsMs) || worn.frameDurationsMs || [];
     var meta = ' data-wear-frames="' + esc(JSON.stringify(frames)) + '"'
       + ' data-wear-durs="' + esc(JSON.stringify(durs)) + '"'

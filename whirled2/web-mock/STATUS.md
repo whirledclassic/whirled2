@@ -1,8 +1,12 @@
+## What shipped (?v=20260906ap)
+
+- **Hotfix:** Cyan Hair invisible in loft — Wear stored relative `frames/…` URLs that 404. `absolutizeMediaUrl` / `normalizeWornAvatar` on load+Wear; loft always shows sprite or tofu fallback.
+
 # Whirled2 Chrome — STATUS
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906ao)
+## Prior (?v=20260906ao)
 
 **Unified Cyan Hair avatar + chrome click-to-walk:**
 
