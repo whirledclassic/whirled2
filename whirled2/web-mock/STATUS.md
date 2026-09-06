@@ -4,15 +4,15 @@ Date: 2026-09-05
 
 ## What shipped (this pass)
 
-- **Stuff upload stub** (wiki Upload / Create furniture): per-category “How do I get stuff?” + Upload… form (name, description, type=category, optional png/jpg/gif/webp thumbnail as data URL in `whirled2.stuff`, ~200KB warn, copyright checkbox). Detail: Send as Gift (mail note to friend), Edit name/desc, Delete. No invented demo items.
-- **Invite Them** (wiki Friend): Me→Friends button opens share panel (copy live Pages / `location.href` link + optional mailto). No Hotmail-style email import. Occupant “Invite to be your friend” → optional message popup (default “Let’s be buddies!”) as mail note.
-- **Occupant menu**: click occupant row → View Profile / Invite / Send Mail / Visit Home; self → View Profile / Edit profile. Tiny glow legend (Green door / White game / Blue player) — text meta only.
-- Light mobile CSS for new panels/menus (overflow, stuff rail chips, modals).
-- Cache bust `?v=20260905s`. Coins labels only. No gold/purple. No private engine. Keep `WhirledChrome` + `#stage-slot`.
+- **List Item → Shop** (creator loop): Stuff detail “List Item” form (coins label price, tags, copyright) copies listing into `whirled2.shop` with seller id/name, type, thumb. **Delist** when already listed. Shop category + popular panels show real user listings only — no invented demos. Buy disabled: “Coins are labels only — no payments”.
+- **Decorate Room** shell (wiki Room/Furniture): Room menu enables decorate mode (not Pixi). Side panel lists owned furniture/backdrops/toys/images; Add to room places absolute chips on `#decorate-layer` (sibling of `#stage-slot` inside `.stage-host`). Drag to move; Save → `whirled2.roomLayout.loft`; Take from room removes. `getStageEl()` still returns `#stage-slot`. View items lists layout.
+- **Help** (header): Starting Out tips (Me, Rooms, Stuff upload, Mail, Groups, Games lobby, coins labels) + in-page CONCEPT/STATUS spirit. No external secrets.
+- **Parties** stub (wiki Party): `tb-party` opens party board from `whirled2.parties`; Create (name, open/friends); Join/Leave local; party name in notice bar; follow-leader meta only.
+- Cache bust `?v=20260905t`. Coins labels only. No gold/purple. No private engine. Keep `WhirledChrome` + `#stage-slot`.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905s
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905t
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
