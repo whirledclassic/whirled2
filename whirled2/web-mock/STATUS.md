@@ -1,3 +1,19 @@
+## What shipped (?v=20260906bl)
+
+- **Combined ship (bk club + Flash loft interactivity):**
+  - **Club (from bk):** local idle **Zzz** (~2 min); wiki **/e /em**; **/state** stub; **Boot…** Coming Soon; away whisper auto-reply; pet **white** legend; Invite-to-Join blurb
+  - **Flash/Ruffle:** Classic Flash Wear → loft floor click-to-walk (billboard move + bob); nameplate/hitbox emotes (chrome bubble + EI try); minimal `WhirledAvatarHost` shim (`allowScriptAccess` loft; `?avatarDebug=1`); Ruffle canvas PE-none; **Smooth PNG dual Wear intact**
+- **Preserve:** bg dual Wear cards, bj /dnd /bleepall / Show-Hide occupants, bi/bh/bf/bc, Whirl, visit-since
+- Docs: HOW-CLASSIC + QA-FLASH honest Ruffle what-works
+- Cache: **`?v=20260906bl`**. Push: `/tmp/push-bl.js` (dry-run default; parent pushes combined).
+
+## What shipped (?v=20260906bk)
+
+- **Club gaps + polish (after bj):** local idle **Zzz** (~2 min activity clock → gray name); wiki **/e /em** aliases for /me; **/state** Coming Soon stub; **Boot…** Coming Soon on occupant + chat name menus; away whisper auto-reply uses /away note; pet **white** name legend; Invite friends to Join Whirled2 blurb
+- **Preserve:** bg Flash dual Wear modes (`classic-avatar.js` UNTOUCHED — Flash/Ruffle interactivity owned by parallel **bl**), bj /dnd /bleepall / Show-Hide occupants, bi halls/presence/Bleep, bh glow/name colors, bf Go/Friends, be Music/Parties, bd badges, bc Groups/Admin, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bk`**. Push: `/tmp/push-bk.js` (dry-run default).
+
 ## What shipped (?v=20260906bj)
 
 - **Club gaps + polish (after bi):** `/dnd` toggle (wiki default away message); `/bleepall` session hide-all room items; Chat options **Show/Hide occupants**; chat filtering Coming Soon stub; `/away` empty → classic default copy; Room menu **Lock** section label

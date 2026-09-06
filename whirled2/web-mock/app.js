@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bj";
+  var LOGO_V = "20260906bl";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1906,10 +1906,12 @@
     // SWF-only (no real PNG walk): transparent Ruffle host; pointer-events none; chrome moves + bob.
     if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && !hasPngFrames) {
       var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
+      // How this works (?v=20260906bl): Ruffle canvas PE-none; hitbox+nameplate for emotes so floor clicks pass through SWF.
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle" data-playback="ruffle">'
-        + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
-        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" title="Ruffle experimental — transparent; floor click moves you"></div>'
-        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar")
+        + '<div class="avatar-wear-billboard is-ruffle-billboard" style="' + posStyle + '">'
+        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" title="Ruffle — transparent; floor click moves you; PE none"></div>'
+        +   '<button type="button" class="avatar-hitbox" data-avatar-hit="1" aria-label="Open avatar emotes" title="Click for emotes"></button>'
+        +   '<div class="avatar-wear-nameplate" data-avatar-hit="1">' + esc(worn.name || "SWF avatar")
         +   ' <span class="classic-exp-badge">Experimental</span> '
         +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
         + '</div></div>';
@@ -1935,9 +1937,10 @@
       if ((worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && (isSwf || wantsClassic || worn.classicFlashOptIn)) {
         var swfAttr2 = esc(worn.swfUrl || worn.swfDataUrl || "");
         return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr2 + '" data-loft-mode="ruffle" data-playback="ruffle">'
-          + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
-          +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr2 + '" title="Ruffle experimental — transparent; floor click moves you"></div>'
-          +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar")
+          + '<div class="avatar-wear-billboard is-ruffle-billboard" style="' + posStyle + '">'
+          +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr2 + '" title="Ruffle — transparent; floor click moves you; PE none"></div>'
+          +   '<button type="button" class="avatar-hitbox" data-avatar-hit="1" aria-label="Open avatar emotes" title="Click for emotes"></button>'
+          +   '<div class="avatar-wear-nameplate" data-avatar-hit="1">' + esc(worn.name || "SWF avatar")
           +   ' <span class="classic-exp-badge">Experimental</span> '
           +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
           + '</div></div>';
@@ -2119,7 +2122,10 @@
     var bill = layer && layer.querySelector(".avatar-wear-billboard");
     if (!bill || !layer.classList.contains("is-on")) return;
     var worn = loadWornAvatar();
-    if (!worn || worn.isTofu) return;
+    // How this works (?v=20260906bl): SWF/Ruffle loft must walk even if tofu flag wrongly set.
+    var layerIsSwf = !!(layer.classList.contains("is-swf") || layer.getAttribute("data-playback") === "ruffle");
+    if (!worn) return;
+    if (worn.isTofu && !layerIsSwf && !(worn.swfUrl || worn.swfSha1 || worn.swfDataUrl)) return;
     xPct = Math.max(8, Math.min(92, xPct));
     yPct = Math.max(55, Math.min(92, yPct)); // floor band
     chromeWalkTarget = { xPct: xPct, yPct: yPct, at: new Date().toISOString() };
@@ -2143,8 +2149,13 @@
     // SWF-only / no walk PNGs: bob the Ruffle host while moving (classic-avatar helper).
     var useSwfMotion = !hasWalkPng && !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || layer.classList.contains("is-swf"));
     try {
-      if (useSwfMotion && window.WhirledClassicAvatar && WhirledClassicAvatar.setLoftWalkMotion) {
-        WhirledClassicAvatar.setLoftWalkMotion(true);
+      if (useSwfMotion && window.WhirledClassicAvatar) {
+        // How this works (?v=20260906bl): bob + try EI appearanceChanged / setBodyState(walk).
+        if (WhirledClassicAvatar.notifyLoftWalk) {
+          WhirledClassicAvatar.notifyLoftWalk(true, face);
+        } else if (WhirledClassicAvatar.setLoftWalkMotion) {
+          WhirledClassicAvatar.setLoftWalkMotion(true);
+        }
       }
     } catch (eMot) {}
     if (chromeWalkRaf) { try { cancelAnimationFrame(chromeWalkRaf); } catch (e) {} chromeWalkRaf = 0; }
@@ -2154,8 +2165,12 @@
     var t0 = performance.now();
     function clearSwfMotion() {
       try {
-        if (window.WhirledClassicAvatar && WhirledClassicAvatar.setLoftWalkMotion) {
-          WhirledClassicAvatar.setLoftWalkMotion(false);
+        if (window.WhirledClassicAvatar) {
+          if (WhirledClassicAvatar.notifyLoftWalk) {
+            WhirledClassicAvatar.notifyLoftWalk(false, face);
+          } else if (WhirledClassicAvatar.setLoftWalkMotion) {
+            WhirledClassicAvatar.setLoftWalkMotion(false);
+          }
         }
       } catch (eCl) {}
     }
@@ -2267,19 +2282,24 @@
   }
   function openAvatarEmoteMenu(anchorEl) {
     // Classic pale-blue action menu near the avatar billboard.
-    // (?v=20260906bb): Hybrid with frames → real emotes; SWF/hybrid missing frames → Coming Soon stubs (do not break walk).
+    // (?v=20260906bl): PNG frames → real emotes; Ruffle/classic without frames → chrome bubble + EI try (never dead UI).
     closeAvatarEmoteMenu();
     var worn = loadWornAvatar();
     var emotes = listAvatarEmotes(worn);
     var stubs = [];
     if (!emotes.length) {
       var isClassic = !!(worn && (worn.classicFlashOptIn || worn.mediaKind === "swf" || worn.swfSha1 || worn.swfUrl
+        || worn.playbackMode === "ruffle"
         || (worn.source && String(worn.source).indexOf("classic") === 0)));
-      if (isClassic || (worn && !worn.isTofu)) {
+      var layerEm = document.getElementById("avatar-wear-layer");
+      var isRuffleLoft = !!(layerEm && (layerEm.getAttribute("data-playback") === "ruffle" || layerEm.classList.contains("is-swf")));
+      if (isClassic || isRuffleLoft || (worn && !worn.isTofu)) {
         stubs = [
-          { key: "_soon_wave", label: "Wave (Coming Soon)", soon: true },
-          { key: "_soon_sit", label: "Sit (Coming Soon)", soon: true },
-          { key: "_soon_pose", label: "Pose (Coming Soon)", soon: true }
+          { key: "wave", label: "Wave", chrome: true },
+          { key: "sit", label: "Sit", chrome: true },
+          { key: "dance", label: "Dance", chrome: true },
+          { key: "happy", label: "Happy", chrome: true },
+          { key: "pose", label: "Pose", chrome: true }
         ];
       } else {
         try { pushSystemChat("This avatar has no emotes yet."); } catch (e) {}
@@ -2299,6 +2319,10 @@
           if (e.soon) {
             return '<button type="button" class="avatar-emote-btn is-soon" role="menuitem" data-avatar-emote-soon="1">'
               + esc(e.label) + '</button>';
+          }
+          if (e.chrome) {
+            return '<button type="button" class="avatar-emote-btn" role="menuitem" data-avatar-emote-chrome="'
+              + esc(e.key) + '">' + esc(e.label) + '</button>';
           }
           return '<button type="button" class="avatar-emote-btn" role="menuitem" data-avatar-emote="'
             + esc(e.key) + '">' + esc(e.label) + '</button>';
@@ -2373,6 +2397,32 @@
     bill.appendChild(b);
     setTimeout(function () { try { b.remove(); } catch (e) {} }, 1400);
   }
+  function playClassicChromeEmote(actionKey) {
+    // How this works (?v=20260906bl): Ruffle/classic without PNG emote frames.
+    // Beginner: always shows a bubble + brief bob; tries SWF EI if callbacks exist.
+    // ENGINE DEV: never leave dead "Coming Soon" — Smooth PNG still uses playAvatarEmote.
+    var key = String(actionKey || "wave").toLowerCase();
+    var labels = { wave: "Wave", sit: "Sit", dance: "Dance", happy: "Happy", pose: "Pose" };
+    var label = labels[key] || (key.charAt(0).toUpperCase() + key.slice(1));
+    if (chromeWalkRaf) {
+      try { cancelAnimationFrame(chromeWalkRaf); } catch (eW) {}
+      chromeWalkRaf = 0;
+    }
+    cancelAvatarEmoteTimer();
+    closeAvatarEmoteMenu();
+    try { showAvatarEmoteBubble(label); } catch (eB) {}
+    var ei = null;
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.notifyLoftEmote) {
+        ei = WhirledClassicAvatar.notifyLoftEmote(key);
+      }
+    } catch (eEi) {}
+    try {
+      if (ei && ei.ok) pushNotice("status", "Emote: " + label + " (SWF callback ok)", { transient: true });
+      else pushNotice("status", "Emote: " + label, { transient: true });
+    } catch (eN) {}
+    return true;
+  }
   function onAvatarHitClick(ev) {
     // Beginner: tap character → emote menu. Must not trigger floor walk.
     if (isEngineMountedOnStage()) return;
@@ -2395,6 +2445,14 @@
     if (!bill._emoteBound) {
       bill.addEventListener("click", onAvatarHitClick);
       bill._emoteBound = true;
+    }
+    // Ruffle loft: hitbox + nameplate carry data-avatar-hit (billboard itself is PE-none).
+    var hits = layer.querySelectorAll("[data-avatar-hit]");
+    for (var hi = 0; hi < hits.length; hi++) {
+      if (!hits[hi]._emoteBound) {
+        hits[hi].addEventListener("click", onAvatarHitClick);
+        hits[hi]._emoteBound = true;
+      }
     }
   }
 
@@ -4793,7 +4851,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi + bj) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj + bk) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4822,6 +4880,11 @@
       "• bj: /dnd toggle (wiki default away msg), /bleepall (session hide all room items),",
       "  Chat options Show/Hide occupants, chat filtering Coming Soon stub, /away default copy,",
       "  Room menu Lock section label — classic-avatar.js dual Wear UNTOUCHED",
+      "• bk: local idle Zzz (~2 min activity), /e /em aliases, /state stub, Boot Coming Soon,",
+      "  away whisper auto-reply uses /away note, pet white legend, Invite-to-Join wiki blurb —",
+      "  classic-avatar.js dual Wear UNTOUCHED (Flash/Ruffle parallel bl)",
+      "• bl: Classic Flash loft interactivity — floor click-to-walk + bob, nameplate/hitbox emotes",
+      "  (chrome bubble + EI try), minimal WhirledAvatarHost shim (?avatarDebug=1), Smooth PNG intact",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -4837,7 +4900,8 @@
       "   chrome walks the billboard on #avatar-wear-layer; emotes swap frames.",
       "2) Dual Wear modes (bg): pick Whirled2 Smooth (png-hybrid) OR Classic Flash (Ruffle)",
       "   before Wear — Ruffle is optional WASM, never an Adobe Flash plugin.",
-      "3) SWF-only packs move as a billboard; full AvatarControl states need the engine later.",
+      "3) Classic Flash (Ruffle): chrome moves billboard + bob; emote hitbox; EI host shim tries walk/actions.",
+      "4) Stock SDK SWFs need Phase-2 sharedEvents host for true in-SWF walk — Smooth PNG is best feel today.",
       "",
       "Doc: HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md (web-mock root).",
       "QA: QA-FLASH.md · scripts/qa-flash-check.cjs",
@@ -4953,11 +5017,10 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• /dnd — wiki toggle away (default “I'm away from the keyboard.”) / clear if already away\n"
-        + "• /bleepall — session-toggle hide all View-items / decorate chips for you\n"
-        + "• Chat options: Show/Hide occupants (left rail); chat filtering Coming Soon stub\n"
-        + "• /away empty → classic default message; Room menu Lock section label\n"
-        + "Preserve: bg Flash dual Wear (classic-avatar.js UNTOUCHED), bi/bh/bf/bc, Whirl, visit-since.",
+        + "• Classic Flash loft: floor click moves avatar; nameplate/hitbox opens emotes (bubble + EI try)\n"
+        + "• Minimal WhirledAvatarHost EI shim (allowScriptAccess loft; ?avatarDebug=1)\n"
+        + "• Smooth PNG dual Wear intact; stock SWFs still need Phase-2 sharedEvents for true walk anim\n"
+        + "Preserve: bg dual Wear cards, bk idle Zzz, bj /dnd /bleepall, bi/bh/bf/bc, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -5455,6 +5518,42 @@
   var CHAT_REACTIONS_KEY = "whirled2.chatReactions";
   var RECENT_ROOMS_KEY = "whirled2.recentRooms";
   var AWAY_KEY = "whirled2.away.";
+  // How this works (?v=20260906bk): wiki Room gray Zzz — local idle after ~2 min without pointer/key/chat.
+  // Beginner: move mouse, type, or chat to clear Idle; /away still wins (yellow). classic-avatar.js untouched.
+  var LAST_ACTIVITY_KEY = "whirled2.lastActivity.";
+  var IDLE_MS = 120000;
+  var lastActivityAt = Date.now();
+  var _activityBound = false;
+  function touchActivity() {
+    lastActivityAt = Date.now();
+    try {
+      var s = session();
+      if (s && s.user) localStorage.setItem(LAST_ACTIVITY_KEY + s.user.id, String(lastActivityAt));
+    } catch (eTa) {}
+  }
+  function isIdleUser(userId) {
+    if (!userId) return false;
+    try { if (typeof isAway === "function" && isAway(userId)) return false; } catch (eAw) {}
+    try {
+      var s = session();
+      if (s && s.user && String(s.user.id) === String(userId)) {
+        return (Date.now() - lastActivityAt) >= IDLE_MS;
+      }
+    } catch (eSelf) {}
+    try {
+      var t = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY + userId) || "0", 10);
+      if (!t) return false;
+      return (Date.now() - t) >= IDLE_MS;
+    } catch (e2) { return false; }
+  }
+  function ensureActivityTracking() {
+    if (_activityBound) return;
+    _activityBound = true;
+    try {
+      document.addEventListener("pointerdown", touchActivity, true);
+      document.addEventListener("keydown", touchActivity, true);
+    } catch (eBind) {}
+  }
   var PRESENCE_SNAP_KEY = "whirled2.presenceSnap";
   // How this works (?v=20260906bf): wiki Chat login/logout grey list — local corner feed (occupant-diff heuristic).
   // Beginner: friends entering/leaving the loft show in the lower-right presence corner; tap ▾ to expand.
@@ -6093,14 +6192,14 @@
       +     '<li><b>Esc</b> — Close menus / palette</li>'
       +     '<li><b>Ctrl/Cmd+K</b> — Command palette</li>'
       +     '<li><b>?</b> — This shortcuts overlay</li>'
-      +     '<li><b>/think</b> <b>/shout</b> <b>/me</b> <b>/speak</b> — chat modes (or Speak button)</li>'
+      +     '<li><b>/think</b> <b>/shout</b> <b>/me</b> <b>/e</b> <b>/speak</b> — chat modes (or Speak button)</li>'
       + '<li><b>/broadcast</b> <i>msg</i> — highlighted room broadcast (escalating coins)</li>'
       +     '<li><b>/clear</b> — clear active chat tab</li>'
       +     '<li><b>/help</b> — chat command list</li>'
       +     '<li><b>/away</b> [msg] <b>/back</b> — yellow name + optional away note</li>'
       +     '<li><b>/dnd</b> [msg] — do-not-disturb toggle (wiki Chat)</li>'
       +     '<li><b>/bleepall</b> — hide/unhide all room items for you (session)</li>'
-      +     '<li><b>/action</b> <i>name</i> — avatar action stub (Coming Soon)</li>'
+      +     '<li><b>/action</b> <i>name</i> · <b>/state</b> <i>name</i> — avatar stubs (Coming Soon)</li>'
       +   '</ul></div></div>';
   }
   function runCommand(cmd) {
@@ -6407,6 +6506,7 @@
         + (currentParty() ? ('<button type="button" class="occ-menu-item" data-party-invite="' + esc(id) + '" data-party-invite-name="' + esc(niceName || p.name || id) + '">Invite to party</button>') : '')
         + '<button type="button" class="occ-menu-item" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(niceName || p.name || id) + '">Send Mail</button>'
         + '<button type="button" class="occ-menu-item" data-block-chat="' + esc(id) + '" data-block-name="' + esc(p.name || id) + '">Block</button>'
+        + '<button type="button" class="occ-menu-item" data-boot-stub="' + esc(id) + '" title="Boot from room — Coming Soon">Boot… <span class="soon-tag">Soon</span></button>'
         + '<button type="button" class="occ-menu-item" data-enter-room="loft">Visit Home</button>'
         + '</div>';
     }
@@ -6416,7 +6516,7 @@
       + (isFriend ? " is-friend" : "")
       + (isOwner ? " is-owner" : "");
     var awayOn = !!(id && isAway(id));
-    var idleOn = !!(p && p.idle) && !awayOn && !p.you;
+    var idleOn = !!(p && p.idle) && !awayOn;
     var nameColorCls = "person-name"
       + (awayOn ? " name-away" : "")
       + (idleOn ? " name-idle" : "")
@@ -6443,12 +6543,14 @@
   function occLegend() {
     // How this works (?v=20260906bi): wiki Room name colors — blue here, yellow /away, gray Zzz, peach clone stub.
     // How this works (?v=20260906bj): /dnd and /away both drive yellow; rail can be hidden via Chat options.
+    // How this works (?v=20260906bk): local idle (~2 min) drives gray Zzz; white = pets (Coming Soon).
     // Beginner: peach = logged-out greeting clone (classic under development) — Coming Soon here.
     return '<div class="occ-legend" title="Presence + classic name colors">'
       + '<span><i class="lg green"></i> Here</span>'
       + '<span><i class="lg yellow"></i> Away</span>'
-      + '<span><i class="lg gray"></i> Idle</span>'
+      + '<span><i class="lg gray"></i> Idle / Zzz</span>'
       + '<span><i class="lg orange"></i> In game</span>'
+      + '<span title="Pets use white names in classic Whirled — Coming Soon"><i class="lg white"></i> Pet <span class="soon-tag">Soon</span></span>'
       + '<span title="Logged-out greeting clone — Coming Soon"><i class="lg peach"></i> Clone <span class="soon-tag">Soon</span></span>'
       + '</div>';
   }
@@ -6594,7 +6696,7 @@
     return '<div class="panel invite-them-panel" id="invite-them-panel">'
       + '<div class="room-side-head"><h2>Invite Them!</h2>'
       +   '<button type="button" class="text-btn" data-invite-close="1">Close</button></div>'
-      + '<p class="meta">Share Whirled2 with a friend. No email-import from Hotmail etc. — just a link or mailto.</p>'
+      + '<p class="meta invite-wiki-blurb">Wiki Friend → Invite friends to Join Whirled — share a link so they create an account and meet you in the loft. No Hotmail/Yahoo import; no payments.</p>'
       + '<label class="invite-link-label">Share link'
       +   '<input id="invite-share-url" readonly value="' + esc(url) + '" />'
       + '</label>'
@@ -6659,9 +6761,9 @@
     var thought = !!msg.thought;
     var shout = !!msg.shout;
     var broadcast = !!msg.broadcast;
-    if (!emote && (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text))) {
+    if (!emote && (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text) || /^\/em\s+/i.test(text) || /^\/e\s+/i.test(text))) {
       emote = true;
-      text = text.replace(/^\/(me|emote)\s+/i, "");
+      text = text.replace(/^\/(me|emote|em|e)\s+/i, "");
     }
     if (!thought && /^\/think\s+/i.test(text)) {
       thought = true;
@@ -10209,8 +10311,8 @@
       }).join("");
     }
     return '<section class="page me-page">' + meSubnav()
-      + '<div class="panel"><div class="friends-head"><h2>Friends</h2>'
-      +   '<button type="button" class="action-btn" data-invite-open="1">Invite Them!</button></div>'
+      + '<div class="panel"><div class="friends-head"><h2>Friends <span class="invite-join-hint">Invite friends to Join Whirled2</span></h2>'
+      +   '<button type="button" class="action-btn" data-invite-open="1" title="Wiki: Invite friends to Join Whirled">Invite Them!</button></div>'
       + (invitePanelOpen ? inviteThemPanel() : '')
       + '<div class="section-label">Search</div>'
       + '<form id="friend-search-form" class="friend-search-form">'
@@ -11615,9 +11717,9 @@
     var raw = String(msg.text || "");
     var kind = "speech";
     var text = raw;
-    if (msg.emote || /^\/me\s+/i.test(raw) || /^\/emote\s+/i.test(raw)) {
+    if (msg.emote || /^\/me\s+/i.test(raw) || /^\/emote\s+/i.test(raw) || /^\/em\s+/i.test(raw) || /^\/e\s+/i.test(raw)) {
       kind = "emote";
-      text = raw.replace(/^\/(me|emote)\s+/i, "");
+      text = raw.replace(/^\/(me|emote|em|e)\s+/i, "");
       text = (msg.who || "?") + " " + text;
     } else if (msg.thought || /^\/think\s+/i.test(raw)) {
       kind = "thought";
@@ -11719,6 +11821,13 @@
       },
       setAvatarState: function (name) { return setAvatarState(name); },
       playAvatarEmote: function (name) { return playAvatarEmote(name); },
+      playClassicChromeEmote: function (name) { return playClassicChromeEmote(name); },
+      getLoftHostDebug: function () {
+        try {
+          return window.WhirledClassicAvatar && WhirledClassicAvatar.getLoftHostDebug
+            ? WhirledClassicAvatar.getLoftHostDebug() : null;
+        } catch (e) { return null; }
+      },
       listAvatarEmotes: function () { return listAvatarEmotes(); },
       getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
       isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); },
@@ -11738,6 +11847,7 @@
   async function pushChat(text) {
     text = String(text || "").trim();
     if (!text) return;
+    try { touchActivity(); } catch (eTch) {}
     if (/^\/clear$/i.test(text)) {
       // Wiki /clear — wipe active tab; Room tab also bumps visit since (?v=20260906ax).
       var tabsClr = loadChatTabs();
@@ -11763,11 +11873,11 @@
       var helpLines = [
         "Chat commands:",
         "/help [cmd] — this list",
-        "/speak /think /shout /me — modes",
+        "/speak /think /shout /me (/e /em) — modes",
         "/broadcast <msg> — highlighted (coins)",
-        "/away [msg] · /dnd [msg] · /back — yellow name",
+        "/away|/afk [msg] · /dnd [msg] · /back — yellow name",
         "/bleepall — hide all room items (you)",
-        "/action <name> — avatar action stub",
+        "/action <name> · /state <name> — avatar stubs",
         "/clear — clear active chat tab"
       ];
       if (helpTopic === "away" || helpTopic === "afk") {
@@ -11780,6 +11890,10 @@
         helpLines = ["/broadcast <msg> — room-wide highlight; escalating coin cost (earn-only)."];
       } else if (helpTopic === "action" || helpTopic === "ac") {
         helpLines = ["/action <name> (/ac) — trigger avatar action. Full AvatarControl Coming Soon."];
+      } else if (helpTopic === "state") {
+        helpLines = ["/state <name> — avatar state change. Full AvatarControl Coming Soon."];
+      } else if (helpTopic === "me" || helpTopic === "emote" || helpTopic === "em" || helpTopic === "e") {
+        helpLines = ["/me <text> (/emote /em /e) — emote line: YourName text"];
       }
       pushSystemChat(helpLines.join(" · "), { ephemeral: true });
       return;
@@ -11853,6 +11967,13 @@
       pushNotice("orange", "Avatar /action — Coming Soon.", { transient: true });
       return;
     }
+    if (/^\/state(?:\s|$)/i.test(text)) {
+      // How this works (?v=20260906bk): wiki Chat /state — AvatarControl states need engine; honest stub.
+      var stName = text.replace(/^\/state\s*/i, "").trim() || "(list)";
+      pushSystemChat("Avatar /state “" + stName + "” — Coming Soon (SWF AvatarControl / engine).", { ephemeral: true });
+      pushNotice("orange", "Avatar /state — Coming Soon.", { transient: true });
+      return;
+    }
     if (/^\/speak\s+/i.test(text) || /^\/sp\s+/i.test(text)) {
       text = text.replace(/^\/(speak|sp)\s+/i, "");
     }
@@ -11871,9 +11992,10 @@
     var thought = false;
     var shout = false;
     var sendText = text;
-    if (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text)) {
+    if (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text) || /^\/em\s+/i.test(text) || /^\/e\s+/i.test(text)) {
+      // How this works (?v=20260906bk): wiki Chat /me /emote /em /e aliases.
       emote = true;
-      sendText = text;
+      sendText = text.replace(/^\/(me|emote|em|e)\s+/i, "/me ");
     } else if (/^\/think\s+/i.test(text) || /^\/th\s+/i.test(text)) {
       thought = true;
       sendText = text.replace(/^\/(think|th)\s+/i, "/think ");
@@ -11906,10 +12028,15 @@
       savePmChat(oid, pmList);
       // Away auto-reply note (stub) when whispering someone who is away.
       if (isAway(oid)) {
+        // How this works (?v=20260906bk): wiki /away note — whisper auto-reply shows their away message when set.
+        var awayNote = "";
+        try { awayNote = getAwayMessage(oid) || ""; } catch (eAn) {}
         pmList.push({
           id: "sys" + Date.now(),
           system: true,
-          text: "(auto-reply) They are away right now.",
+          text: awayNote
+            ? ('(auto-reply) They are away: "' + String(awayNote).slice(0, 120) + '"')
+            : "(auto-reply) They are away right now.",
           at: new Date().toISOString()
         });
         savePmChat(oid, pmList);
@@ -12021,6 +12148,7 @@
       + (self ? '' : '<button type="button" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name || id) + '">Send Mail</button>')
       + partyInviteBtn
       + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>')
+      + (self ? '' : '<button type="button" data-boot-stub="' + esc(id) + '" title="Boot from room — Coming Soon">Boot… <span class="soon-tag">Coming Soon</span></button>')
       + (self ? '' : '<button type="button" data-complain-stub="' + esc(id) + '" title="Report player — Coming Soon">Complain… <span class="soon-tag">Coming Soon</span></button>');
     document.body.appendChild(menu);
   }
@@ -12108,7 +12236,9 @@
           : String(p.initials).slice(0, 2),
         online: true,
         room: p.room || ROOM,
-        you: isYou
+        you: isYou,
+        // How this works (?v=20260906bk): wiki Room idle gray + Zzz from local activity clock.
+        idle: (typeof isIdleUser === "function") ? isIdleUser(p.id) : !!p.idle
       };
     });
     liveOccupants.forEach(function (p) { rememberProfile({ id: p.id, name: p.name }); });
@@ -12319,6 +12449,7 @@
     finishBootAfterSession();
   }
   function finishBootAfterSession() {
+    try { ensureActivityTracking(); touchActivity(); } catch (eAct) {}
     // How this works (?v=20260906ao): after a successful session, wrap shell/paint so a UI throw
     // still shows #gate-err or a recoverable shell — never a stuck gate with an empty error.
     // Beginner: login may succeed in WhirledApi while shell() fails; keep the session and recover.
@@ -12832,9 +12963,16 @@
       return;
     }
     if (ev.target.closest("[data-avatar-emote-soon]")) {
-      // Coming Soon stubs — close menu, do not change walk state / frames.
+      // Legacy Coming Soon — still show chrome bubble so UI is never dead (?v=20260906bl).
       closeAvatarEmoteMenu();
-      try { pushNotice("status", "Emote Coming Soon for this avatar — attach PNG frames (wave/sit/pose) or wait for AvatarControl. Walk still works.", { transient: true }); } catch (eSoon) {}
+      try { playClassicChromeEmote("wave"); } catch (eSoon) {
+        try { pushNotice("status", "Emote — attach PNG frames for Smooth, or use Classic Flash chrome emotes.", { transient: true }); } catch (e2) {}
+      }
+      return;
+    }
+    var chromeEm = ev.target.closest("[data-avatar-emote-chrome]");
+    if (chromeEm) {
+      playClassicChromeEmote(chromeEm.getAttribute("data-avatar-emote-chrome"));
       return;
     }
     var emoteBtn = ev.target.closest("[data-avatar-emote]");
@@ -13775,6 +13913,14 @@
       paint("rooms");
       bindDecorateDrag();
       refreshWalletChrome();
+      return;
+    }
+    if (ev.target.closest("[data-boot-stub]") && session()) {
+      // How this works (?v=20260906bk): wiki Boot — owner/mod kick Coming Soon (no fake mod queue).
+      var cnmB = document.getElementById("chat-name-menu");
+      if (cnmB) cnmB.remove();
+      occMenuId = null;
+      pushNotice("orange", "Boot from room — Coming Soon. No fake mod queue yet.", { transient: true });
       return;
     }
     if (ev.target.closest("[data-complain-stub]") && session()) {

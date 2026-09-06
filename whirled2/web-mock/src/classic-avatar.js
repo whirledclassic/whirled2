@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906bg
+ * Cache: ?v=20260906bl
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906bg";
+  var VERSION = "20260906bl";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -27,7 +27,7 @@
   var THUMB_MAX_BYTES = 1 * 1024 * 1024;
   var RUFFLE_CDN = "https://unpkg.com/@ruffle-rs/ruffle";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906bg): dual Wear modes — png-hybrid | ruffle (playbackMode).
+  // How this works (?v=20260906bl): dual Wear modes + loft EI shim — png-hybrid | ruffle (playbackMode).
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
   // SWF-only: transparent Ruffle + synthesized bob/flip walk — never broken tofu.
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
@@ -375,17 +375,16 @@
   }
 
   function mountRuffle(container, swfUrl, opts) {
-    // How this works (?v=20260906ay): Ruffle player with TRANSPARENT stage so loft shows through.
-    // Beginner: black box was Ruffle default opaque stage — fixed via wmode + backgroundColor null + CSS.
-    // ENGINE DEV: container must be chrome-owned (Stuff viewer or #avatar-wear-layer), never #stage-slot.
-    // Loft mounts use pointer-events:none so floor click-to-walk still works (SWFs ignore room without AvatarControl).
+    // How this works (?v=20260906bl): Ruffle TRANSPARENT stage + loft PE-none canvas.
+    // Beginner: black box was opaque stage — fixed via wmode + backgroundColor null + CSS.
+    // ENGINE DEV: chrome-owned host only (never #stage-slot). Loft enables allowScriptAccess so
+    // user-owned SWFs can talk to our minimal AvatarHost shim (EI only — not full sharedEvents).
     opts = opts || {};
     if (!container || !swfUrl) return Promise.reject(new Error("Missing container or SWF URL."));
     destroyPlayersIn(container);
     var loftMount = !!(opts.loftMount || (container.id === "avatar-ruffle-host")
       || (container.classList && container.classList.contains("classic-wear-swf-slot")));
     return ensureRuffle().then(function (ruffle) {
-      // Global defaults help polyfill path; per-load options below still win for createPlayer.
       try {
         global.RufflePlayer = global.RufflePlayer || {};
         global.RufflePlayer.config = Object.assign({}, global.RufflePlayer.config || {}, {
@@ -404,30 +403,30 @@
       player.style.display = "block";
       player.style.background = "transparent";
       player.style.backgroundColor = "transparent";
-      // How this works: loft Ruffle must NOT eat floor clicks — chrome PNG (or billboard move) handles walk.
+      // How this works: loft Ruffle must NOT eat floor clicks — hitbox/nameplate owns emote clicks.
       if (loftMount || opts.pointerEvents === "none") {
         player.style.pointerEvents = "none";
         try { container.style.pointerEvents = "none"; } catch (ePe) {}
       }
       player.setAttribute("data-classic-ruffle", "1");
       player.setAttribute("data-wmode", "transparent");
+      if (loftMount) player.setAttribute("data-loft-ruffle", "1");
       container.innerHTML = "";
       container.appendChild(player);
       activePlayers.push(player);
+      // Loft: allowScriptAccess so SWF→JS EI can reach our shim. Preview/Stuff stays locked down.
+      var allowScript = loftMount ? true : (opts.allowScriptAccess === true);
       var loadOpts = {
         url: swfUrl,
-        // null = use SWF stage color; with wmode transparent, empty stage areas stay see-through.
         backgroundColor: (opts.backgroundColor === undefined) ? null : opts.backgroundColor,
         wmode: opts.wmode || "transparent",
         autoplay: "on",
         unmuteOverlay: "hidden",
         splashScreen: false,
         letterbox: opts.letterbox || "off",
-        // security: loft appearance-only. Host shim (AvatarControl) needs allowScriptAccess later + careful sandbox.
-        allowScriptAccess: opts.allowScriptAccess === true
+        allowScriptAccess: allowScript
       };
       return player.load(loadOpts).then(function () {
-        // Hardening: some Ruffle builds paint canvas black until CSS/canvas alpha settles.
         try {
           var cvs = player.querySelector && player.querySelector("canvas");
           if (cvs) {
@@ -436,6 +435,11 @@
             if (loftMount) cvs.style.pointerEvents = "none";
           }
         } catch (eCv) {}
+        if (loftMount) {
+          try { attachLoftAvatarHost(player, container); } catch (eHost) {
+            logAvatarDebug("attachLoftAvatarHost failed", eHost && eHost.message);
+          }
+        }
         return player;
       });
     });
@@ -706,23 +710,322 @@
   }
 
   /*
-   * AvatarControl host shim — NEXT STEPS (honest limits, do NOT copy AGPL).
+   * AvatarControl host shim (?v=20260906bl) — architecture study only; do NOT copy AGPL.
    * -----------------------------------------------------------------------
-   * Classic Whirled SWFs call `new AvatarControl(this)` which dispatches
-   * "controlConnect" on loaderInfo.sharedEvents (NOT ExternalInterface).
-   * Host must reply with hostProps that drive appearanceChanged_v1/v2
-   * (location, orient, moving[, sleeping]). Without that handshake the SWF
-   * idles forever — click-to-walk in chrome cannot magically animate it.
-   * Study: whirled.club AvatarControl ASdocs + Grey Havens whirled-sdk;
-   * community whirled-host.swf pattern (cite only; AGPL — do not paste).
-   * Practical path today = Hybrid (PNG walk). Full host = Phase 2 policy bump.
+   * Research: Grey Havens whirled-sdk AvatarControl / ActorControl:
+   *   - Stock Whirled SWFs dispatch "controlConnect" on loaderInfo.sharedEvents
+   *     (NOT ExternalInterface). Host replies with hostProps; motion is driven by
+   *     appearanceChanged_v1(location, orient, moving) / v2(+sleeping).
+   *   - registerStates / registerActions / setState / triggerAction / setLogicalLocation
+   *     are the public AS API (wiki.whirled.club + whirled.club ASdocs).
+   * Ruffle: allowScriptAccess on player.load enables ExternalInterface both ways.
+   *   - JS→SWF: player.callbackName(...) or player.ruffle().call(...) when SWF used addCallback.
+   *   - SWF→JS: ExternalInterface.call("fn") hits window.fn when we expose stubs.
+   * Honest: stock SDK avatars have ZERO EI — they need a Flash-side host SWF for
+   * sharedEvents. This JS shim still helps hand-patched / community EI avatars and
+   * logs what the SWF tries (?avatarDebug=1). Chrome always moves the billboard + bob.
    */
+  var loftActivePlayer = null;
+  var loftHostState = {
+    connected: false,
+    moving: false,
+    orient: 180,
+    state: "Default",
+    sleeping: false,
+    location: [0.5, 0, 0.5],
+    lastEiCalls: [],
+    lastJsToSwf: []
+  };
+
+  function avatarDebugEnabled() {
+    try {
+      var q = String(global.location && global.location.search || "");
+      return /(?:\?|&)avatarDebug=1(?:&|$)/.test(q);
+    } catch (e) { return false; }
+  }
+  function logAvatarDebug() {
+    if (!avatarDebugEnabled()) return;
+    try {
+      var args = ["[WhirledAvatarHost]"].concat([].slice.call(arguments));
+      (global.console && console.log && console.log.apply(console, args));
+    } catch (eL) {}
+  }
+
+  function rememberEi(dir, name, args) {
+    var row = { at: Date.now(), dir: dir, name: String(name || ""), args: args };
+    var bag = dir === "swf→js" ? loftHostState.lastEiCalls : loftHostState.lastJsToSwf;
+    bag.unshift(row);
+    if (bag.length > 40) bag.length = 40;
+    logAvatarDebug(dir, name, args);
+  }
+
+  /**
+   * Try to invoke a method the SWF registered via ExternalInterface.addCallback.
+   * Ruffle exposes callbacks on the player element; some builds also support ruffle().call.
+   * Beginner: if nothing is registered, this silently fails — chrome bob/bubble still work.
+   */
+  function tryCallIntoSwf(names, args) {
+    args = args || [];
+    var player = loftActivePlayer;
+    if (!player) return { ok: false, reason: "no-player" };
+    var list = Array.isArray(names) ? names : [names];
+    var tried = [];
+    for (var i = 0; i < list.length; i++) {
+      var name = list[i];
+      if (!name) continue;
+      tried.push(name);
+      // 1) Direct property on player (classic Flash embed style)
+      try {
+        if (typeof player[name] === "function") {
+          var r1 = player[name].apply(player, args);
+          rememberEi("js→swf", name, args);
+          return { ok: true, via: "player." + name, result: r1 };
+        }
+      } catch (e1) { logAvatarDebug("player." + name + " threw", e1 && e1.message); }
+      // 2) player.ruffle().call(name, ...args) when available
+      try {
+        var api = player.ruffle && player.ruffle();
+        if (api && typeof api.call === "function") {
+          var r2 = api.call.apply(api, [name].concat(args));
+          rememberEi("js→swf", name + " (ruffle.call)", args);
+          return { ok: true, via: "ruffle.call:" + name, result: r2 };
+        }
+      } catch (e2) { logAvatarDebug("ruffle.call " + name + " threw", e2 && e2.message); }
+    }
+    rememberEi("js→swf", "MISS:" + tried.join("|"), args);
+    return { ok: false, reason: "no-callback", tried: tried };
+  }
+
+  function buildAvatarHostShim(player) {
+    // Minimal stubs a SWF might ExternalInterface.call. Never eval. Log everything.
+    var shim = {
+      version: VERSION,
+      isConnected: function () {
+        rememberEi("swf→js", "isConnected", []);
+        return true;
+      },
+      hasControl: function () {
+        rememberEi("swf→js", "hasControl", []);
+        return true;
+      },
+      getEnvironment: function () {
+        rememberEi("swf→js", "getEnvironment", []);
+        return "room";
+      },
+      controlConnect: function (userProps) {
+        // Some patched avatars poke JS with this name; real SDK uses sharedEvents.
+        rememberEi("swf→js", "controlConnect", [userProps]);
+        loftHostState.connected = true;
+        try {
+          // Nudge appearance after handshake so walk loops may leave idle.
+          setTimeout(function () {
+            notifyLoftAppearance(false, loftHostState.orient);
+          }, 50);
+        } catch (eC) {}
+        return { ok: true, host: "WhirledAvatarHost", version: VERSION };
+      },
+      setHotSpot: function (x, y, h) {
+        rememberEi("swf→js", "setHotSpot", [x, y, h]);
+        return true;
+      },
+      registerActions: function () {
+        rememberEi("swf→js", "registerActions", [].slice.call(arguments));
+        return true;
+      },
+      registerStates: function () {
+        rememberEi("swf→js", "registerStates", [].slice.call(arguments));
+        return true;
+      },
+      setLogicalLocation: function (x, y, z, orient) {
+        rememberEi("swf→js", "setLogicalLocation", [x, y, z, orient]);
+        return true;
+      },
+      setPixelLocation: function (x, y, z, orient) {
+        rememberEi("swf→js", "setPixelLocation", [x, y, z, orient]);
+        return true;
+      },
+      setState: function (state) {
+        rememberEi("swf→js", "setState", [state]);
+        loftHostState.state = String(state || loftHostState.state);
+        return true;
+      },
+      getState: function () {
+        rememberEi("swf→js", "getState", []);
+        return loftHostState.state;
+      },
+      getOrientation: function () {
+        rememberEi("swf→js", "getOrientation", []);
+        return loftHostState.orient;
+      },
+      isMoving: function () {
+        rememberEi("swf→js", "isMoving", []);
+        return !!loftHostState.moving;
+      },
+      isSleeping: function () {
+        rememberEi("swf→js", "isSleeping", []);
+        return !!loftHostState.sleeping;
+      },
+      triggerAction: function (name, arg) {
+        rememberEi("swf→js", "triggerAction", [name, arg]);
+        return true;
+      },
+      // Catch-all used when we install a Proxy-like dispatcher on window
+      _dispatch: function (name, args) {
+        rememberEi("swf→js", name, args);
+        if (name === "controlConnect") return shim.controlConnect(args && args[0]);
+        return null;
+      }
+    };
+    shim._player = player;
+    return shim;
+  }
+
+  function installGlobalEiStubs(shim) {
+    // Expose common names SWFs may ExternalInterface.call. Shim-only; no arbitrary eval.
+    var names = [
+      "WhirledAvatarHost", "whirledAvatarHost", "AvatarHost",
+      "controlConnect", "whirledControlConnect",
+      "isConnected", "hasControl", "getEnvironment",
+      "setHotSpot", "registerActions", "registerStates",
+      "setLogicalLocation", "setPixelLocation",
+      "setState", "getState", "getOrientation", "isMoving", "isSleeping",
+      "triggerAction", "appearanceChanged", "appearanceChanged_v1", "appearanceChanged_v2"
+    ];
+    global.WhirledAvatarHost = shim;
+    names.forEach(function (n) {
+      if (n === "WhirledAvatarHost" || n === "whirledAvatarHost" || n === "AvatarHost") {
+        try { global[n] = shim; } catch (eA) {}
+        return;
+      }
+      if (typeof shim[n] === "function") {
+        try {
+          global[n] = function () {
+            return shim[n].apply(shim, arguments);
+          };
+        } catch (eB) {}
+      } else {
+        // appearanceChanged_* may be called TO the SWF, not from it — stub return for safety
+        try {
+          global[n] = function () {
+            rememberEi("swf→js", n, [].slice.call(arguments));
+            return null;
+          };
+        } catch (eC) {}
+      }
+    });
+  }
+
+  function attachLoftAvatarHost(player, container) {
+    loftActivePlayer = player;
+    loftHostState.connected = false;
+    var shim = buildAvatarHostShim(player);
+    installGlobalEiStubs(shim);
+    try { player._whirledHost = shim; } catch (eP) {}
+    try { if (container) container._whirledHost = shim; } catch (eC) {}
+    logAvatarDebug("loft host attached", { allowScriptAccess: true, debug: avatarDebugEnabled() });
+    // Probe common Whirled / community callback names — most stock SWFs miss; that's OK.
+    setTimeout(function () {
+      var probe = tryCallIntoSwf([
+        "controlConnect", "whirledControlConnect", "connect",
+        "appearanceChanged_v2", "appearanceChanged_v1", "appearanceChanged",
+        "setBodyState", "setState", "bodyState"
+      ], [false, loftHostState.orient, loftHostState.location]);
+      logAvatarDebug("post-mount probe", probe);
+      // Edge-trigger idle appearance so EI-aware bodies leave frozen frame 1 if possible.
+      notifyLoftAppearance(false, loftHostState.orient);
+    }, 120);
+    return shim;
+  }
+
+  function notifyLoftAppearance(moving, orient) {
+    // Host→avatar direction (study): appearanceChanged_v1/v2 — edge-triggered.
+    loftHostState.moving = !!moving;
+    if (typeof orient === "number" && isFinite(orient)) loftHostState.orient = orient;
+    var loc = loftHostState.location;
+    var argsV2 = [loc, loftHostState.orient, loftHostState.moving, loftHostState.sleeping];
+    var argsV1 = [loc, loftHostState.orient, loftHostState.moving];
+    var r = tryCallIntoSwf([
+      "appearanceChanged_v2", "appearanceChanged_v1", "appearanceChanged",
+      "setMoving", "setBodyState", "setState", "bodyState", "setWalk", "walk"
+    ], moving ? argsV2 : argsV1);
+    // Also try body-state strings many custom avatars use
+    if (moving) {
+      tryCallIntoSwf(["setBodyState", "setState", "bodyState", "gotoAndPlay", "playWalk"], ["walk"]);
+      tryCallIntoSwf(["setBodyState", "setState", "bodyState"], ["Walk"]);
+      tryCallIntoSwf(["setBodyState", "setState", "bodyState"], ["Moving"]);
+    } else {
+      tryCallIntoSwf(["setBodyState", "setState", "bodyState", "playIdle"], ["idle"]);
+      tryCallIntoSwf(["setBodyState", "setState", "bodyState"], ["Default"]);
+      tryCallIntoSwf(["setBodyState", "setState", "bodyState"], ["Standing"]);
+    }
+    return r;
+  }
+
+  function notifyLoftWalk(moving, orientHint) {
+    // Called from app.js chromeWalkTo — always bob host; try EI into SWF.
+    setLoftWalkMotion(!!moving);
+    var orient = loftHostState.orient;
+    if (typeof orientHint === "number" && isFinite(orientHint)) orient = orientHint;
+    else if (moving) {
+      // Whirled orient: 0 faces front, clockwise. Map chrome face ±1 → approx left/right.
+      orient = (orientHint === -1) ? 90 : (orientHint === 1 ? 270 : orient);
+    }
+    return notifyLoftAppearance(!!moving, orient);
+  }
+
+  function notifyLoftEmote(actionName) {
+    // Try common action / state names; chrome bubble is always shown by app.js.
+    actionName = String(actionName || "wave");
+    var variants = [
+      actionName,
+      actionName.charAt(0).toUpperCase() + actionName.slice(1),
+      actionName.toLowerCase(),
+      actionName.toUpperCase()
+    ];
+    var r = tryCallIntoSwf([
+      "triggerAction", "doAction", "action", "playAction",
+      "setBodyState", "setState", "bodyState", "playEmote", "emote"
+    ], [variants[0]]);
+    // Second pass with alternate casings if first miss
+    if (!r.ok) {
+      for (var i = 0; i < variants.length; i++) {
+        r = tryCallIntoSwf(["triggerAction", "setBodyState", "setState", "bodyState"], [variants[i]]);
+        if (r.ok) break;
+      }
+    }
+    // Brief bob so something visible always happens even without EI
+    try {
+      setLoftWalkMotion(true);
+      setTimeout(function () { setLoftWalkMotion(false); }, 520);
+    } catch (eB) {}
+    return r;
+  }
+
+  function getLoftHostDebug() {
+    return {
+      version: VERSION,
+      hasPlayer: !!loftActivePlayer,
+      state: {
+        connected: loftHostState.connected,
+        moving: loftHostState.moving,
+        orient: loftHostState.orient,
+        state: loftHostState.state,
+        sleeping: loftHostState.sleeping
+      },
+      lastEiCalls: loftHostState.lastEiCalls.slice(0, 12),
+      lastJsToSwf: loftHostState.lastJsToSwf.slice(0, 12),
+      nextSteps: describeAvatarControlNextSteps()
+    };
+  }
+
   function describeAvatarControlNextSteps() {
     return {
-      whyIdle: "Stock Whirled SWFs speak controlConnect / appearanceChanged — not JS click handlers.",
-      hybrid: "Attach PNG idle+walk → loft uses chrome walk (Hybrid smooth).",
-      hostShim: "Needs Ruffle allowScriptAccess + host SWF or JS bridge implementing appearanceChanged_v1/v2.",
-      docs: ["AVATAR-IMPORT.md §4", "https://www.whirled.club/code/asdocs/com/whirled/AvatarControl.html"]
+      whyIdle: "Stock Whirled SWFs speak controlConnect on loaderInfo.sharedEvents — not JS click handlers / EI.",
+      whatWorksNow: "Chrome moves billboard + bob; nameplate/hitbox emotes show bubble; EI probes try setBodyState/triggerAction/appearanceChanged_*.",
+      hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
+      hostShim: "JS WhirledAvatarHost + loft allowScriptAccess (EI). Full sharedEvents host SWF = Phase 2 (do not copy AGPL).",
+      debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
+      docs: ["AVATAR-IMPORT.md §4", "HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md", "https://www.whirled.club/code/asdocs/com/whirled/AvatarControl.html"]
     };
   }
 
@@ -794,7 +1097,7 @@
       +       '<span class="classic-mode-card-title">Classic Flash (Ruffle)</span>'
       +       '<span class="classic-mode-card-badge">When SWF exists</span>'
       +       '<span class="classic-mode-card-detail">Plays real <code>.swf</code> via Ruffle (transparent, pointer-events none). '
-      +         'Billboard moves + bob/flip. Full AvatarControl walk = Coming Soon. Badge: Appearance: Ruffle (SWF).</span>'
+      +         'Billboard moves + bob/flip; EI host shim tries walk/idle. Badge: Appearance: Ruffle (SWF).</span>'
       +     '</label>'
       +   '</div>'
       +   '<label class="check-row"><input type="checkbox" name="classicOptIn" checked data-auto-classic="1" /> '
@@ -902,7 +1205,7 @@
     }
     var swfU = esc(worn.swfUrl || worn.swfDataUrl || "");
     return '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host classic-wear-swf-slot is-loft" data-swf-url="'
-      + swfU + '" aria-label="Classic Flash avatar overlay" title="Ruffle experimental — pointer-events none">'
+      + swfU + '" aria-label="Classic Flash avatar overlay" title="Ruffle experimental — PE none; click nameplate/hitbox for emotes">'
       + '<span class="classic-exp-badge classic-exp-badge-overlay">Flash</span>'
       + '</div>';
   }
@@ -1632,6 +1935,12 @@
   api.ensureClassicWornStates = ensureClassicWornStates;
   api.classicHybridBadgeHtml = classicHybridBadgeHtml;
   api.describeAvatarControlNextSteps = describeAvatarControlNextSteps;
+  api.notifyLoftWalk = notifyLoftWalk;
+  api.notifyLoftEmote = notifyLoftEmote;
+  api.notifyLoftAppearance = notifyLoftAppearance;
+  api.getLoftHostDebug = getLoftHostDebug;
+  api.tryCallIntoSwf = tryCallIntoSwf;
+  api.avatarDebugEnabled = avatarDebugEnabled;
   api.enrichWornRow = enrichWornRow;
   api.canWearWithoutPng = canWearWithoutPng;
   api.afterPaint = afterPaint;

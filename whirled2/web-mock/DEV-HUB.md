@@ -1,6 +1,6 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906bj` (`LOGO_V`)  
+**Cache:** `?v=20260906bk` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
@@ -9,7 +9,7 @@ Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-onl
 
 ## Classic Whirled avatars — without Adobe Flash
 
-> **Currently: Dual Wear modes — Whirled2 Smooth (PNG hybrid) + Classic Flash (Ruffle). Ruffle optional. Default = Smooth when PNGs exist.**
+> **Currently (?v=20260906bl): Dual Wear modes — Smooth PNG + Classic Flash (Ruffle). Ruffle loft: floor walk + hitbox emotes + EI shim. Default = Smooth when PNGs exist.**
 
 Browsers can’t run Flash Player; we never require it. **Hybrid (smooth)** = PNG/WebP idle+walk for loft click-to-walk. **Ruffle** (WASM, CDN) is optional for real `.swf` preview / SWF-only Wear. Whirl-only users never load Ruffle.
 
@@ -67,7 +67,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bj` — `/dnd` + `/bleepall` + Show/Hide occupants on bi club polish / bg dual Wear (see `STATUS.md`). **Do not regress** `classic-avatar.js` dual Wear modes.
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bk` — local idle Zzz + /e /em + /state + Boot stubs on bj club polish / bg dual Wear (see `STATUS.md`). **Do not edit** `classic-avatar.js` (Flash/Ruffle = parallel **bl**).
 
 ---
 

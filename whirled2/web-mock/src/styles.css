@@ -6949,3 +6949,52 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 @media (max-width: 700px) {
   .rail.occ-rail.occ-rail-hidden { display: none !important; }
 }
+
+/* ---- ?v=20260906bk: club polish — local idle Zzz, pet legend, Boot stub ---- */
+.person-name.name-pet { color: #f5f8fb !important; text-shadow: 0 0 2px #16324a, 0 1px 0 #16324a; }
+.occ-legend .lg.white { background: #eef3f7; box-shadow: 0 0 0 1px #9ec4de; }
+.invite-them-panel .invite-wiki-blurb { margin: 6px 0 10px; font-size: 12px; color: #3a5a72; }
+.friends-head .invite-join-hint { display: block; font-size: 11px; font-weight: 400; color: #4a6a80; margin-top: 2px; }
+
+
+/* ==========================================================================
+   ?v=20260906bl — Classic Flash loft interactivity (PE split + hitbox)
+   Beginner: floor clicks walk; nameplate / hitbox opens emotes. Ruffle canvas PE none.
+   ENGINE DEV: do not put pointer-events:auto on ruffle-player / canvas.
+   ========================================================================== */
+.avatar-wear-layer.is-swf .avatar-wear-billboard.is-ruffle-billboard,
+.avatar-wear-layer.is-swf .avatar-wear-billboard:not([data-avatar-hit]) {
+  pointer-events: none;
+}
+.avatar-wear-layer.is-swf .avatar-hitbox,
+.avatar-wear-layer.is-swf .avatar-wear-nameplate[data-avatar-hit] {
+  pointer-events: auto !important;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.avatar-hitbox {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  width: 78px;
+  height: 96px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  z-index: 3;
+  border-radius: 10px;
+}
+.avatar-hitbox:focus-visible {
+  outline: 2px solid #3aa3e0;
+  outline-offset: 2px;
+}
+.avatar-wear-layer.is-swf .avatar-wear-nameplate[data-avatar-hit] {
+  position: relative;
+  z-index: 4;
+}
+.avatar-emote-btn[data-avatar-emote-chrome] {
+  font-style: normal;
+  opacity: 1;
+}

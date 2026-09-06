@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bj` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bk` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,22 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bj`)
+## Closed this pass (`?v=20260906bk`)
+
+| Item | Notes |
+|------|--------|
+| Local idle Zzz | ~2 min without pointer/key/chat → gray name + Zzz (wiki Room); /away still yellow |
+| /e /em aliases | Wiki Chat /me /emote /em /e |
+| /state stub | Coming Soon (AvatarControl / engine) — honest, no fake states |
+| Boot… | Occupant + chat name menus Coming Soon (wiki Boot; no fake mod queue) |
+| Away auto-reply | Whisper to away player shows their /away note when set |
+| Pet legend | White swatch Coming Soon (wiki Room pets) |
+| Invite to Join | Friends Invite Them! wiki Friend blurb |
+| Preserve | bg dual Wear (`classic-avatar.js` untouched — parallel **bl** owns Flash); bj/bi/bh/bf/bc; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bj`)
 
 | Item | Notes |
 |------|--------|
@@ -205,7 +220,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Lock / share / embed | Working chrome + pale-blue dock (ax) | Lock triad + preview blurbs `bd`; share/embed `be`; clickable glow legend `bf` |
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
 | Parties | **Improved** (`be`) board create/join/invite; follow-host Coming Soon | Follow-host presence **P1** |
-| Go / Friends toolbar | **Improved** (`bi`) Go sections + Group halls + Friends online/offline | Server presence **P1** |
+| Go / Friends toolbar | **Improved** (`bi`/`bk`) Go halls + Friends + Invite-to-Join blurb | Server presence **P1** |
 | Clickable furniture glow | **Improved** (`bh`) legend + stub clicks; View items Bleep (`bi`) | Full link/game travel later **P2** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |
 
@@ -222,9 +237,9 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Area | web-mock | Gap |
 |------|----------|-----|
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
-| Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors; Show/Hide occupants (`bj`) | Group tabs still limited |
-| Name click menu | **Improved** (`bh`) Invite + Send Mail + party + Complain Coming Soon | Complain moderation **P2** |
-| Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`); `/dnd` + `/bleepall` (`bj`) | — |
+| Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors; Show/Hide occupants (`bj`); /e /em + /state stub (`bk`) | Group tabs still limited |
+| Name click menu | **Improved** (`bh`/`bk`) Invite + Send Mail + party + Boot/Complain Coming Soon | Boot/Complain moderation **P2** |
+| Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`); `/dnd` + `/bleepall` (`bj`); `/e`/`/em` + `/state` stub (`bk`) | — |
 | “Too chatty” throttle | **Working** (`be`) classic wiki copy | — |
 
 ### Me / Profile (wiki)
