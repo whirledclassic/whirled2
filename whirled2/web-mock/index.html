@@ -3,16 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#e8f4fb" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Whirled2 dc</title>
+  <title>Whirled2 dd</title>
   <style>
     .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
     body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; background: #89C6E3; color: #16324a; }
     #app[data-tab]:not([data-tab="rooms"]) .bar { display: none; }
     .person { width: 100%; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer; }
-    #room-enter-curtain, .room-enter-curtain { display: none !important; }
-    .loft-hint-engine-waiting, .avatar-engine-waiting-note { display: none !important; }
+    #room-enter-curtain, .room-enter-curtain, .loft-hint-engine-waiting, .avatar-engine-waiting-note { display: none !important; }
     .stage-host, #stage-slot {
       min-height: 48vh !important;
       background: linear-gradient(180deg,#5fa8cc 0 56%, #c9a36a 56% 100%) !important;
@@ -20,8 +18,8 @@
     }
     #stage-slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906dc" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906dc" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906dd" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906dd" />
 </head>
 <body>
   <div id="app">Loading chrome…</div>
@@ -33,35 +31,26 @@
         if (bad(ls)) localStorage.removeItem("whirled2.engineSrc");
       } catch (e) {}
       window.WHIRLED_API = window.WHIRLED_API || "https://norfolk-approved-discussing-recognised.trycloudflare.com";
-      window.WHIRLED_ENGINE_SRC = new URL("./src/pixi-bridge.js?v=20260906dc", location.href).href;
+      window.WHIRLED_ENGINE_SRC = new URL("./src/pixi-bridge.js?v=20260906dd", location.href).href;
       window.__whirledBoot = false;
     })();
   </script>
-  <script src="./src/api.js?v=20260906dc"></script>
-  <script src="./src/classic-avatar.js?v=20260906dc"></script>
-  <script src="./app.js?v=20260906dc"></script>
+  <script src="./src/api.js?v=20260906dd"></script>
+  <script src="./src/classic-avatar.js?v=20260906dd"></script>
+  <script src="./app.js?v=20260906dd"></script>
   <script>
     (function () {
       var mounting = false;
-      function slot() { return document.getElementById("stage-slot"); }
       function mount() {
-        var host = slot();
+        var host = document.getElementById("stage-slot");
         if (!host || host.querySelector("canvas") || mounting) return;
         var src = window.WHIRLED_ENGINE_SRC;
         if (!src) return;
         mounting = true;
         import(src).then(function (mod) {
           var fn = mod && (mod.mountWhirledEngine || mod.default);
-          if (typeof fn !== "function") { mounting = false; return; }
-          return fn(host);
-        }).then(function () {
-          mounting = false;
-          try {
-            if (window.WhirledChrome && window.WhirledChrome.getRoom) {
-              document.dispatchEvent(new CustomEvent("whirled:roomChanged", { detail: window.WhirledChrome.getRoom() }));
-            }
-          } catch (e) {}
-        }).catch(function () { mounting = false; });
+          if (typeof fn === "function") return fn(host);
+        }).finally(function () { mounting = false; });
       }
       document.addEventListener("whirled:ready", mount);
       setInterval(mount, 500);
