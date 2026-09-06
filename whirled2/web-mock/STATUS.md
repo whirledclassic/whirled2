@@ -4,17 +4,16 @@ Date: 2026-09-05
 
 ## What shipped (this pass)
 
-- **Mail**: `whirled2.mail` localStorage inbox/compose; header ✉ unread count; Me→Mail; Send Mail from profile/friends; friend-add system notes (same browser).
-- **Stuff / Shop**: left category rail (Avatars…Videos + Launchers, Level Packs, Item Packs). Dark teal rail, pale-blue/white selected (no gold/orange). Empty authentic copy per category. Inventory from `loadStuff()` / `loadShop()` only — no demo catalog.
-- **Friends**: online (alpha) then recent; photo, status, location, Send Mail, Visit Home, Remove.
-- **Games / Groups**: classic empty shells (featured + empty lists, no fake players).
-- **Me home**: People Online Now from `liveOccupants`; My Friends Online prefers friended occupants; invite banner (no Get Bars).
-- **Rooms lobby**: Featured/Active Studio Loft tile with thumb, rating stub, player count; My Rooms link; Whirled Tour placeholder meta.
-- Cache bust `?v=20260905o`. Logo `assets/whirled-classic-logo.png`. Coins labels only. `window.WhirledChrome` unchanged; engine only in `#stage-slot`.
+- **Passport** (Me→Passport): classic shell with Mingle / Play / Create / Shop stamp categories (empty “No stamps yet”), disabled Go! (coins labels later), empty Group Medals. Optional `whirled2.passport.{userId}` array.
+- **Account** (Me→Account): permaname, display name, member since, email placeholder (disabled / local-only), password managed by register/login, delete disabled (“not available on Pages”).
+- **Rooms lobby**: Featured / Active / Hot New / My Rooms tiles (Studio Loft enterable); rating stub “Rating: new”; Whirled Tour cycles local Me/Stuff/Rooms/Mail tips.
+- **Toolbar**: Go menu (home, recent loft, friends, games awaiting); Friends → Me→Friends; Room → leave/lobby; volume/party Coming soon.
+- Profile: Send Mail; Browse Items → Stuff; Visit Home → enter loft.
+- Cache bust `?v=20260905p`. Coins labels only. `window.WhirledChrome` unchanged; engine only in `#stage-slot`.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905o
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905p
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope

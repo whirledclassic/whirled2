@@ -42,10 +42,30 @@
   function loadShop() {
     try { return JSON.parse(localStorage.getItem(SHOP_KEY) || "[]"); } catch (e) { return []; }
   }
-  var ROOM = "Studio Loft";
+  var PASSPORT_KEY = "whirled2.passport.";
+  var PASSPORT_CATS = [
+    { id: "mingle", label: "Mingle" },
+    { id: "play", label: "Play" },
+    { id: "create", label: "Create" },
+    { id: "shop", label: "Shop" }
+  ];
+  function loadPassport(userId) {
+    try {
+      var raw = localStorage.getItem(PASSPORT_KEY + userId);
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function savePassport(userId, stamps) {
+    try { localStorage.setItem(PASSPORT_KEY + userId, JSON.stringify((stamps || []).slice(0, 200))); } catch (e) {}
+  }
+    var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
-  var meSub = "home"; // home | profile | friends | mail
+  var meSub = "home"; // home | profile | friends | mail | passport | account
+  var tourTip = 0;
+  var goMenuOpen = false;
   var inRoom = false;
   var viewingId = null; // profile being viewed
   var FRIENDS_KEY = "whirled2.friends";
@@ -231,29 +251,69 @@
       + '<div class="panel"><p class="meta">No discussions yet. Threads appear when groups go live.</p></div>'
       + '</section>';
   }
+  function roomTile(opts) {
+    opts = opts || {};
+    var online = opts.online != null ? opts.online : 0;
+    var enter = opts.enterable !== false;
+    var rating = opts.rating || "Rating: new";
+    var tag = enter ? "button" : "div";
+    var attrs = enter ? ' type="button" class="room-tile" data-enter-room="' + esc(opts.id || "loft") + '"' : ' class="room-tile is-empty"';
+    return '<' + tag + attrs + '>'
+      + '<div class="thumb" aria-hidden="true"></div>'
+      + '<div class="body"><h3>' + esc(opts.name || ROOM) + '</h3>'
+      +   '<p class="meta">' + esc(opts.meta || "") + '</p>'
+      +   '<div class="room-rating">' + esc(rating) + '</div>'
+      +   '<div class="online">' + (online > 0 ? (online + " online now!") : "0 players") + '</div>'
+      +   (enter ? '<span class="enter-label">Enter</span>' : '<span class="meta">—</span>')
+      + '</div></' + tag + '>';
+  }
   function roomsLobby() {
     var me = you();
-    var online = liveOccupants.length || (session() ? 1 : 0);
+    var online = liveOccupants.length || 0;
+    var featured = roomTile({
+      id: "loft",
+      name: ROOM,
+      meta: "owner: " + me.name + " · home",
+      online: online || (session() ? 1 : 0),
+      rating: "Rating: new",
+      enterable: true
+    });
+    var activeBody = online > 0
+      ? roomTile({
+          id: "loft",
+          name: ROOM,
+          meta: "owner: " + me.name + " · active",
+          online: online,
+          rating: "Rating: new",
+          enterable: true
+        })
+      : '<div class="panel"><p class="meta">No active rooms right now. Enter Studio Loft to open one.</p></div>';
+    var tips = [
+      "Me — profile, friends, mail, passport, and account live under the Me tab.",
+      "Stuff — your inventory by category. Empty shelves stay empty until you own items.",
+      "Rooms — decorate and hang out. Studio Loft is your home whirled.",
+      "Mail — send notes to friends from profiles or the Mail sub-tab."
+    ];
+    var tip = tips[tourTip % tips.length];
     return '<section class="page rooms-lobby">'
       + '<div class="featured">Featured Rooms</div>'
       + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Decorate, chat and play — engine mounts inside the loft.</p>'
-      + '<div class="rooms-lobby-links">'
-      +   '<button type="button" class="text-btn" data-enter-room="loft">My Rooms</button>'
-      +   '<span class="sep">·</span>'
-      +   '<span class="meta" title="Tour comes later">Take the Whirled Tour</span>'
-      + '</div>'
-      + '<div class="section-label">Active rooms</div>'
+      + '<div class="room-tiles">' + featured + '</div>'
+      + '<div class="section-label">Active Rooms</div>'
+      + (online > 0 ? '<div class="room-tiles">' + activeBody + '</div>' : activeBody)
+      + '<div class="section-label">Hot New Rooms</div>'
+      + '<div class="panel"><p class="meta">No hot new rooms yet. Public listings arrive when the shared server publishes them.</p></div>'
+      + '<div class="section-label">My Rooms</div>'
       + '<div class="room-tiles">'
-      +   '<button type="button" class="room-tile" data-enter-room="loft">'
-      +     '<div class="thumb" aria-hidden="true"></div>'
-      +     '<div class="body"><h3>Studio Loft</h3>'
-      +       '<p class="meta">owner: ' + esc(me.name) + ' · home</p>'
-      +       '<div class="room-rating" title="Rating">★★★★☆ <span class="meta">new</span></div>'
-      +       '<div class="online">' + online + ' online now!</div>'
-      +       '<span class="enter-label">Enter</span></div>'
-      +   '</button>'
+      +   roomTile({ id: "loft", name: ROOM, meta: "owner: " + me.name + " · home", online: online || (session() ? 1 : 0), rating: "Rating: new", enterable: true })
       + '</div>'
-      + '<p class="meta">More public rooms arrive when the shared server lists them. No placeholder rooms.</p>'
+      + '<div class="rooms-lobby-links">'
+      +   '<button type="button" class="action-btn" data-tour-tip="1">Take the Whirled Tour</button>'
+      + '</div>'
+      + '<div class="panel tour-panel" id="tour-panel">'
+      +   '<p class="tour-tip"><b>Tip ' + ((tourTip % tips.length) + 1) + '/' + tips.length + ':</b> ' + esc(tip) + '</p>'
+      +   '<p class="meta">Local tips only — not a tour of other players.</p>'
+      + '</div>'
       + '</section>';
   }
 
@@ -399,8 +459,8 @@
       : '<button type="button" class="profile-action" data-me="mail"><span class="pa-ico">✉</span><span>Mail</span></button>';
     return '<div class="profile-action-row">'
       + mailBtn
-      + '<button type="button" class="profile-action" data-tab="rooms"><span class="pa-ico">⌂</span><span>Visit Home</span></button>'
-      + '<button type="button" class="profile-action" data-tab="rooms"><span class="pa-ico">▣</span><span>View Rooms</span></button>'
+      + '<button type="button" class="profile-action" data-enter-room="loft"><span class="pa-ico">⌂</span><span>Visit Home</span></button>'
+      + '<button type="button" class="profile-action" data-tab="rooms" data-rooms-lobby="1"><span class="pa-ico">▣</span><span>View Rooms</span></button>'
       + '<button type="button" class="profile-action" data-tab="stuff"><span class="pa-ico">▤</span><span>Browse Items</span></button>'
       + (opts.poke ? '<button type="button" class="profile-action poke" ' + opts.poke + '><span class="pa-ico">☞</span><span>Poke</span></button>' : '')
       + (opts.friend ? '<button type="button" class="profile-action" ' + opts.friend + '><span class="pa-ico">+</span><span>Add Friend</span></button>' : '')
@@ -414,13 +474,15 @@
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "profile" ? " is-on" : "") + '" data-me="profile">My Profile</button>'
       + '<span class="sep">|</span>'
-      + '<button type="button" class="me-link" data-tab="rooms">My Rooms</button>'
+      + '<button type="button" class="me-link" data-enter-room="loft">My Rooms</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "friends" ? " is-on" : "") + '" data-me="friends">Friends</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "mail" ? " is-on" : "") + '" data-me="mail">Mail</button>'
       + '<span class="sep">|</span>'
-      + '<button type="button" class="me-link" disabled title="Coming soon">Account</button>'
+      + '<button type="button" class="me-link' + (meSub === "passport" ? " is-on" : "") + '" data-me="passport">My Passport</button>'
+      + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link' + (meSub === "account" ? " is-on" : "") + '" data-me="account">Account</button>'
       + '</nav></div>';
   }
   function meHome() {
@@ -454,10 +516,10 @@
       +     '<div class="panel links-panel">'
       +       '<div class="online-count">People Online Now: <b>' + peopleNow + '</b></div>'
       +       '<button type="button" class="text-btn" data-me="profile">My Profile</button>'
-      +       '<button type="button" class="text-btn" data-tab="rooms">My Rooms</button>'
-      +       '<button type="button" class="text-btn" data-me="profile">My Passport</button>'
+      +       '<button type="button" class="text-btn" data-enter-room="loft">My Rooms</button>'
+      +       '<button type="button" class="text-btn" data-me="passport">My Passport</button>'
       +       '<button type="button" class="text-btn" data-me="mail">Mail' + (unread ? ' (' + unread + ')' : '') + '</button>'
-      +       '<span class="meta">Passport stamps come later with the engine track.</span>'
+      +       '<button type="button" class="text-btn" data-me="account">Account</button>'
       +     '</div>'
       +     '<div class="panel"><h2>My Friends Online</h2>' + friendBox + '</div>'
       +   '</aside>'
@@ -558,7 +620,7 @@
         + '</div>'
         + '<div class="friend-list-actions">'
         +   '<button type="button" class="action-btn" data-mail-to="' + esc(f.id) + '" data-mail-name="' + esc(f.name) + '">Send Mail</button>'
-        +   '<button type="button" class="action-btn" data-profile="' + esc(f.id) + '">Visit Home</button>'
+        +   '<button type="button" class="action-btn" data-enter-room="loft">Visit Home</button>'
         +   '<button type="button" class="action-btn" data-remove-friend="' + esc(f.id) + '">Remove</button>'
         + '</div></div>';
     }
@@ -614,6 +676,70 @@
       + '</div></section>';
   }
 
+  function mePassport() {
+    var sid = session().user.id;
+    var me = you();
+    var stamps = loadPassport(sid);
+    var byCat = {};
+    PASSPORT_CATS.forEach(function (c) { byCat[c.id] = []; });
+    stamps.forEach(function (s) {
+      var cat = (s && s.cat) || "mingle";
+      if (!byCat[cat]) byCat[cat] = [];
+      byCat[cat].push(s);
+    });
+    var stampSections = PASSPORT_CATS.map(function (c) {
+      var list = byCat[c.id] || [];
+      var grid = list.length
+        ? '<div class="stamp-grid">' + list.map(function (s) {
+            return '<div class="stamp-cell"><span class="stamp-name">' + esc(s.name || "Stamp") + '</span></div>';
+          }).join("") + '</div>'
+        : '<div class="stamp-grid empty"><div class="stamp-cell empty-slot"><span class="meta">No stamps yet</span></div></div>';
+      return '<div class="passport-cat">'
+        + '<div class="passport-cat-head"><h3>' + esc(c.label) + '</h3>'
+        + '<button type="button" class="action-btn" disabled title="Coins rewards later — labels only">Go!</button></div>'
+        + grid + '</div>';
+    }).join("");
+    return '<section class="page me-page passport-page">' + meSubnav()
+      + '<div class="panel passport-shell">'
+      +   '<div class="passport-head"><h1>My Passport</h1>'
+      +     '<p class="meta">Stamps mark achievements across Mingle, Play, Create, and Shop. They arrive with the engine / achievements track — this page stays empty until then.</p>'
+      +     '<p class="meta">Stored optionally as <code>whirled2.passport.' + esc(sid) + '</code> (array) for later.</p>'
+      +   '</div>'
+      +   '<div class="passport-body">' + stampSections + '</div>'
+      +   '<div class="cp-section"><h2>Group Medals</h2>'
+      +     '<p class="meta">No group medals yet. Medals appear when groups and shared whirleds go live.</p>'
+      +     '<button type="button" class="text-btn" data-tab="groups">Browse Groups</button>'
+      +   '</div>'
+      +   '<p class="meta">Player: ' + esc(me.name) + ' · permaname ' + esc(sid) + '</p>'
+      + '</div></section>';
+  }
+  function meAccount() {
+    var me = you();
+    var sid = session().user.id;
+    var member = "";
+    try { member = (session().user.since || localStorage.getItem("whirled2.since." + sid) || ""); } catch (e) {}
+    if (!member) {
+      member = new Date().toISOString().slice(0, 10);
+      try { localStorage.setItem("whirled2.since." + sid, member); } catch (e) {}
+    }
+    var emailNote = "";
+    try { emailNote = localStorage.getItem("whirled2.email." + sid) || ""; } catch (e) {}
+    return '<section class="page me-page account-page">' + meSubnav()
+      + '<div class="panel">'
+      +   '<h2>Account</h2>'
+      +   '<div class="account-grid">'
+      +     '<div><span class="k">Permaname</span><span class="v">' + esc(sid) + '</span></div>'
+      +     '<div><span class="k">Display name</span><span class="v">' + esc(me.name) + '</span></div>'
+      +     '<div><span class="k">Member since</span><span class="v">' + esc(member) + '</span></div>'
+      +     '<div><span class="k">Email</span><span class="v">'
+      +       '<input type="email" disabled placeholder="Not set on Pages" value="' + esc(emailNote) + '" title="Local-only placeholder — email is not required on GitHub Pages" />'
+      +       '<span class="meta"> Local-only note. Not synced.</span></span></div>'
+      +   '</div>'
+      +   '<p class="meta">Password changes are managed by register / login — not required on this chrome.</p>'
+      +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
+      + '</div></section>';
+  }
+
   function otherProfile(id) {
     var occ = liveOccupants.filter(function (p) { return p.id === id; })[0];
     var friend = loadFriends().filter(function (f) { return f.id === id; })[0];
@@ -664,6 +790,8 @@
     if (viewingId && session() && viewingId === session().user.id) { meSub = "profile"; viewingId = null; }
     if (meSub === "friends") return meFriends();
     if (meSub === "mail") return meMail(window.__mailCompose || null);
+    if (meSub === "passport") return mePassport();
+    if (meSub === "account") return meAccount();
     if (meSub === "profile") return meProfile();
     return meHome();
   }
@@ -718,12 +846,20 @@
       +   '<button type="button" class="chat-opts" title="Chat options" aria-label="Chat options">&#9679;</button>'
       +   '<input id="chat-input" maxlength="240" placeholder="Type here to chat!" autocomplete="off" />'
       +   '<button class="send" type="submit">send</button>'
-      +   '<span class="toolbar" aria-hidden="true">'
-      +     '<i class="tb tb-vol" title="Volume"></i>'
-      +     '<i class="tb tb-go" title="Go"></i>'
-      +     '<i class="tb tb-friends" title="Friends"></i>'
-      +     '<i class="tb tb-party" title="Parties"></i>'
-      +     '<i class="tb tb-room" title="Room"></i>'
+      +   '<span class="toolbar">'
+      +     '<button type="button" class="tb tb-vol" title="Coming soon" disabled aria-label="Volume"></button>'
+      +     '<span class="tb-go-wrap">'
+      +       '<button type="button" class="tb tb-go" title="Go" aria-label="Go" data-tb="go"></button>'
+      +       '<div class="go-menu" id="go-menu" hidden>'
+      +         '<button type="button" data-go="home">Go home</button>'
+      +         '<button type="button" data-go="recent">Recent — Studio Loft</button>'
+      +         '<button type="button" data-go="friends">Friends online</button>'
+      +         '<button type="button" data-go="games">View games awaiting players</button>'
+      +       '</div>'
+      +     '</span>'
+      +     '<button type="button" class="tb tb-friends" title="Friends" aria-label="Friends" data-tb="friends"></button>'
+      +     '<button type="button" class="tb tb-party" title="Coming soon" disabled aria-label="Parties"></button>'
+      +     '<button type="button" class="tb tb-room" title="' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '" aria-label="Room" data-tb="room"></button>'
       +   '</span>'
       + '</form>';
   }
@@ -896,9 +1032,13 @@
   var app = document.getElementById("app");
   boot();
   app.addEventListener("click", function (ev) {
+    if (!ev.target.closest(".tb-go-wrap")) {
+      var gm0 = document.getElementById("go-menu");
+      if (gm0 && !gm0.hidden) { gm0.hidden = true; goMenuOpen = false; }
+    }
     if (ev.target.id === "logout-btn") {
       window.WhirledApi.logout();
-      chat = []; liveOccupants = []; inRoom = false; viewingId = null;
+      chat = []; liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
       paint("");
       return;
     }
@@ -913,6 +1053,67 @@
       inRoom = false;
       paint("rooms");
       return;
+    }
+    var roomsLobbyBtn = ev.target.closest("[data-rooms-lobby]");
+    if (roomsLobbyBtn && session()) {
+      inRoom = false;
+      paint("rooms");
+      return;
+    }
+    var tourBtn = ev.target.closest("[data-tour-tip]");
+    if (tourBtn && session()) {
+      tourTip = (tourTip + 1) % 4;
+      paint("rooms");
+      var panel = document.getElementById("tour-panel");
+      if (panel) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
+    }
+    var goItem = ev.target.closest("[data-go]");
+    if (goItem && session()) {
+      var g = goItem.getAttribute("data-go");
+      goMenuOpen = false;
+      var gm = document.getElementById("go-menu");
+      if (gm) gm.hidden = true;
+      if (g === "home" || g === "recent") {
+        inRoom = true;
+        paint("rooms");
+        loadOccupants();
+      } else if (g === "friends") {
+        meSub = "friends";
+        viewingId = null;
+        paint("me");
+      } else if (g === "games") {
+        paint("games");
+      }
+      return;
+    }
+    var tb = ev.target.closest("[data-tb]");
+    if (tb && session()) {
+      var kind = tb.getAttribute("data-tb");
+      if (kind === "go") {
+        var menu = document.getElementById("go-menu");
+        if (menu) {
+          menu.hidden = !menu.hidden;
+          goMenuOpen = !menu.hidden;
+        }
+        return;
+      }
+      if (kind === "friends") {
+        meSub = "friends";
+        viewingId = null;
+        paint("me");
+        return;
+      }
+      if (kind === "room") {
+        if (inRoom) {
+          inRoom = false;
+          paint("rooms");
+        } else {
+          inRoom = false;
+          paint("rooms");
+        }
+        return;
+      }
     }
     var prof = ev.target.closest("[data-profile]");
     if (prof && session()) {
