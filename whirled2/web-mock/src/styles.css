@@ -1648,3 +1648,37 @@ body > .party-panel {
   .theme-grid { grid-template-columns: 1fr 1fr; }
   .music-gesture-fab { bottom: 64px; }
 }
+
+
+/* How this works: logo PNGs use alpha — never put a black plate behind them */
+.brand { background: transparent !important; }
+.brand .logo, img.logo, .gate-logo, img.gate-logo {
+  background: transparent !important;
+  box-shadow: none !important;
+  mix-blend-mode: normal;
+}
+@media (max-width: 700px) {
+  .brand .logo, img.logo {
+    height: 36px !important;
+    width: auto !important;
+    max-width: 120px !important;
+  }
+  .topbar {
+    align-items: flex-start;
+    gap: 4px;
+    padding: 6px 8px 0 !important;
+  }
+  .who { font-size: 10px; max-width: 55%; }
+  .who .row { flex-wrap: wrap; justify-content: flex-end; }
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 7px 10px 8px; font-size: 12px; flex-shrink: 0; }
+  .stage-slot, #stage-slot {
+    min-height: 160px !important;
+    max-height: 42vh;
+  }
+  .room-chrome { font-size: 11px; }
+  .occupants { max-height: 120px; }
+  body { overflow-x: hidden; }
+  #app { overflow-x: hidden; }
+}
