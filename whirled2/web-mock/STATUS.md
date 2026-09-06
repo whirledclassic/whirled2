@@ -2,20 +2,19 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906x)
+## What shipped (?v=20260906y)
 
-- **Room music modal deep fix**: `#room-playlist-panel` is a full-screen modal sheet (dim backdrop z=120 + card z=121), not a 320px side panel. Backdrop / Close / leave / `clearStrayUI` only dismiss — never focus-loss or paint remount. `canControlRoomMusic()` lets loft owner OR claimed `playlist.ownerId` OR empty ownerId (claim on first save) Set embed — fixes FB/`fb_` users blocked by `isLoftOwner()`/`FIRST_USER_KEY`. `data-playlist-set-embed` type=button + shared `applyPlaylistEmbedFromUi` (reads input value); errors in `#playlist-embed-msg`. Document capture for Set embed / Close / backdrop. Collapses Open player; modal above dock.
+- **Room music background play**: Closing the Room music modal (Close / backdrop / Done) only removes the sheet — never `removeRoomEmbedDock()` / never clears the live iframe. Compact dock “now playing” mini bar (title + Open player / Room music / Mute) stays mounted under the shell.
+- **YouTube loop**: `roomEmbedSrcForIframe` appends `playsinline=1`; single videos get `loop=1&playlist=VIDEO_ID`; playlists get `loop=1`. Spotify note: loops via its own player. Local single-track `audio.loop = true`; queue still wraps via `playlistNext`.
+- **Simpler mobile setup**: paste URL (auto-detect) OR pick tab → full-width Set embed → big **Done — keep playing** (closes modal only). No competing preview iframe in the modal.
+- **♪ icon polish**: `.tb.tb-music` circular pale-blue chip with inline SVG note; `.is-playing` pulse when dock/local audio is live. Dock + modal CTAs cleaned up.
+- Prior **?v=20260906x**: Room music modal sheet + `canControlRoomMusic` for FB users.
 - Prior **?v=20260906w**: paste-URL / dirty-gate / focus-safe remount.
-- Prior **?v=20260906v**: room music dock outside `#main` (Open/Close survive paint).
-- Prior **?v=20260906u**: park/reattach attempt (superseded — body reparent broke clicks).
-- Prior **?v=20260906t**: room music embeds (mobile) + Profile look custom BG + Facebook Connect.
-- Prior **?v=20260906s**: Facebook Connect first land.
-- Prior **?v=20260906r**: mobile Room **♪ Music** + Room menu again.
-- Prior **?v=20260906q**: mobile visual overhaul.
+- Prior **?v=20260906v**: room music dock outside `#main`.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906x
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906y
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope

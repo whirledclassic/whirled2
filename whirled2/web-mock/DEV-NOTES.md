@@ -162,7 +162,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Meta app setup**: developers.facebook.com → Facebook Login for Web → App Domains / Valid OAuth Redirect URIs include `https://whirledclassic.github.io/`.
 - **Safety**: never invent FB users without SDK success; no payments; Discord/Google Coming Soon only.
 - **Engine**: auth is chrome; session only — do not break `#stage-slot` / `syncRoomAudio` / ♪ Music.
-- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906x`.
+- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906y`.
 
 ## Room music embeds + Profile BG (20260906t)
 
@@ -181,11 +181,19 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 - **Bug**: `ensurePlaylistPanel()` always `replaceChild`ed on every `paint()` → destroyed `#playlist-embed-form` / `#playlist-smart-embed-form` mid-tap/paste; `type="url"` harsh on mobile; expanded dock (z=100) could cover panel (z=50/5).
 - **Fix**: `playlistPanelDirty` gate; never rebuild while panel form control focused; `type="text"` `inputmode="url"` + 44px/16px; open paths `collapseRoomEmbedSheet()` + `focusPlaylistEmbedUrl()`; panel `#app > #room-playlist-panel` z-index 110; owner paste steps 1–2–3.
-- **Cache**: superseded by `?v=20260906x`.
+- **Cache**: superseded by `?v=20260906y`.
 
 ## Room music modal sheet (20260906x)
 
 - **Bug A**: narrow fixed side panel (`min(320px,92vw)`) — most of the phone is outside; taps look like "close"; focus blur + deferred `playlistPanelDirty` remount wiped paste; `data-tab==="rooms"` strictness could unmount.
 - **Bug B**: Set embed unreliable — blur/keyboard → miss button / hit stage; `isLoftOwner()` false for FB users ≠ `FIRST_USER_KEY` → orange "Owner controls" only; submit-only path flaky on mobile.
 - **Fix**: `#room-playlist-panel.room-music-modal` full-screen dim (z=120) + `.room-music-card` (z=121); backdrop/Close/leave/`clearStrayUI` only; `ensurePlaylistPanel` keeps modal while `inRoom && playlistPanelOpen` (ignore flaky tab attr); clear dirty without remount when focused; `canControlRoomMusic()` + `playlist.ownerId` claim; `data-playlist-set-embed` type=button + `applyPlaylistEmbedFromUi` (querySelector URL) + `#playlist-embed-msg`; document capture once.
-- **Cache**: `LOGO_V` / `?v=20260906x`. Do not push unless instructed.
+- **Cache**: `LOGO_V` / `?v=20260906y`. Do not push unless instructed.
+
+
+## Room music background + loop (20260906y)
+
+- **Hard rule**: modal Close / backdrop / Done ≠ stop audio. Only leave-room / local-source switch / `removeRoomEmbedDock` tears down the iframe.
+- **Loop**: `roomEmbedSrcForIframe(pl)` — YT single `loop=1&playlist=VIDEO_ID`; playlist `loop=1`; `playsinline=1`. Spotify: UI note only.
+- **Local**: `audio.loop = true` when one track; multi uses `playlistNext` wrap.
+- **UI**: SVG ♪ chip + dock now-playing mini bar; Set embed → Done. Cache `?v=20260906y`. Do not push unless instructed.

@@ -546,14 +546,10 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   .toolbar .tb-party,
   .toolbar .tb-vol { display: none !important; }
   .toolbar .tb-room-wrap { display: inline-flex !important; }
-  .tb-music {
+  .tb.tb-music, .tb-music {
     display: inline-grid !important;
     place-items: center;
-    width: 36px; height: 36px; min-width: 36px;
-    border: 0; border-radius: 8px; cursor: pointer;
-    background: linear-gradient(#3aa3e0, #1e6fa8);
-    color: #fff; font: 700 11px/1 var(--ui);
-    padding: 0;
+    width: 38px; height: 38px; min-width: 38px;
   }
   .chat-opts { display: inline-flex !important; min-width: 36px; min-height: 36px; }
   .subtabs { overflow-x: auto; }
@@ -3138,4 +3134,228 @@ body > .party-panel {
   .who-links [data-me="club"] { display: none !important; }
   .who-stats .stat .stat-label { display: none; }
   .who-stats .stat.level { display: none; }
+}
+
+
+/* ---- 20260906y: Room music ♪ chip + dock mini bar + modal CTAs ---- */
+/* How this works: Music is a circular pale-blue chip with an SVG note (not an empty square).
+   Beginner: glowing/pulsing note means music is still on after you close the sheet.
+   ENGINE DEV: .is-playing is toggled from updateRoomMusicChip(); dock iframe must stay mounted. */
+.tb.tb-music,
+button.tb.tb-music,
+.tb-music {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border: 1px solid #8ec4e6;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #1e6fa8;
+  background:
+    radial-gradient(circle at 35% 30%, #ffffff 0 28%, transparent 32%),
+    linear-gradient(180deg, #e8f4fb 0%, #b7dcf0 55%, #7ec8f0 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 1px 2px rgba(20, 60, 90, 0.18);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
+}
+.tb.tb-music .tb-music-icon,
+.tb-music .tb-music-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+.tb.tb-music:hover,
+.tb-music:hover {
+  color: #145a8a;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 6px rgba(30, 111, 168, 0.28);
+}
+.tb.tb-music:active,
+.tb-music:active { transform: scale(0.96); }
+.tb.tb-music.is-playing,
+.tb-music.is-playing {
+  color: #fff;
+  border-color: #2f8fd0;
+  background: linear-gradient(180deg, #6eb8e8 0%, #3aa3e0 55%, #1e6fa8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.45),
+    0 0 0 3px rgba(58, 163, 224, 0.28),
+    0 2px 8px rgba(30, 111, 168, 0.35);
+  animation: tb-music-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tb-music-pulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 0 0 3px rgba(58,163,224,0.22), 0 2px 8px rgba(30,111,168,0.3); }
+  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 0 0 5px rgba(58,163,224,0.38), 0 3px 12px rgba(30,111,168,0.4); }
+}
+
+/* Dock: softer card + compact now-playing mini bar */
+.room-embed-dock {
+  background: linear-gradient(180deg, rgba(14, 28, 42, 0.97), rgba(8, 18, 28, 0.96));
+  border: 1px solid #3a5a78;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  padding: 10px 12px;
+}
+.room-embed-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(159, 208, 240, 0.22);
+}
+.room-embed-now-glyph {
+  flex: 0 0 auto;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #e8f4fb, #7ec8f0);
+  color: #1e6fa8;
+  font: 700 14px/1 var(--ui);
+}
+.room-embed-now-text {
+  flex: 1 1 120px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.room-embed-now-title {
+  color: #e8f4fb;
+  font: 700 13px/1.2 var(--ui);
+}
+.room-embed-now-sub {
+  color: #9fb8c8 !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.room-embed-now-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.room-embed-now-actions .action-btn {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.room-embed-now-actions .text-btn {
+  color: #9fd0f0;
+  font-weight: 700;
+}
+.room-embed-dock:not(.is-expanded) .room-embed-mobile-controls {
+  display: none;
+}
+.room-embed-dock:not(.is-expanded) .room-embed-note {
+  display: none;
+}
+.room-embed-dock:not(.is-expanded) .room-embed-frame-wrap {
+  border-radius: 8px;
+}
+.room-embed-dock:not(.is-expanded)[data-embed-kind="youtube"] .room-embed-frame {
+  min-height: 120px;
+  height: 120px;
+}
+.room-embed-dock:not(.is-expanded)[data-embed-kind="spotify"] .room-embed-frame {
+  min-height: 88px;
+  height: 88px;
+}
+
+/* Modal card + primary CTAs */
+#app > #room-playlist-panel.room-music-modal .room-music-card {
+  border: 1px solid #b7d3e8;
+  background: linear-gradient(180deg, #f7fbfe 0%, #eef6fb 100%);
+}
+#app > #room-playlist-panel.room-music-modal .room-side-head h2 {
+  color: #1e6fa8;
+  letter-spacing: 0.01em;
+}
+#app > #room-playlist-panel.room-music-modal .playlist-set-embed-btn,
+#app > #room-playlist-panel.room-music-modal .playlist-done-btn {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 10px;
+  font: 700 16px/1.1 var(--ui);
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(30, 111, 168, 0.22);
+}
+#app > #room-playlist-panel.room-music-modal .playlist-set-embed-btn {
+  color: #fff;
+  background: linear-gradient(180deg, #6eb8e8, #1e6fa8);
+}
+#app > #room-playlist-panel.room-music-modal .playlist-done-btn {
+  color: #fff;
+  background: linear-gradient(180deg, #5ec27a, #2f8a4a);
+}
+#app > #room-playlist-panel.room-music-modal .playlist-embed-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+#app > #room-playlist-panel.room-music-modal .playlist-embed-url {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #9bbfd8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+}
+#app > #room-playlist-panel.room-music-modal .playlist-source-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+#app > #room-playlist-panel.room-music-modal .playlist-source-tabs .action-btn {
+  flex: 1 1 auto;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #b7d3e8;
+  color: #1e6fa8;
+}
+#app > #room-playlist-panel.room-music-modal .playlist-source-tabs .action-btn.is-on {
+  background: linear-gradient(180deg, #6eb8e8, #3aa3e0);
+  border-color: #2f8fd0;
+  color: #fff;
+}
+#app > #room-playlist-panel.room-music-modal .playlist-embed-success {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #e8f7ee;
+  border: 1px solid #9fd4b0;
+}
+.playlist-flow-hint { margin: 0 0 8px; }
+
+@media (max-width: 900px) {
+  .room-embed-dock:not(.is-expanded)[data-embed-kind="youtube"] .room-embed-frame,
+  .room-embed-dock:not(.is-expanded) .room-embed-frame {
+    min-height: 120px !important;
+    height: 120px !important;
+  }
+  .room-embed-dock:not(.is-expanded)[data-embed-kind="spotify"] .room-embed-frame {
+    min-height: 88px !important;
+    height: 88px !important;
+  }
+  .room-embed-dock.is-expanded .room-embed-mobile-controls {
+    display: flex !important;
+  }
 }

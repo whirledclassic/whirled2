@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906x";
+  var LOGO_V = "20260906y";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -338,6 +338,65 @@
     if (source === "spotify") return parseSpotifyEmbed(raw);
     return { ok: false, error: "Pick YouTube or Spotify." };
   }
+  function roomEmbedSrcForIframe(pl) {
+    // How this works: take stored embedSrc and add YouTube loop + playsinline for the live dock iframe.
+    // Beginner: one video keeps repeating; a playlist loops the list. Spotify uses its own player loop.
+    // ENGINE DEV: YouTube single-video loop REQUIRES loop=1&playlist=VIDEO_ID (same id). Keep playsinline=1.
+    var base = String((pl && pl.embedSrc) || "");
+    if (!base) return "";
+    var kind = normalizePlaylistSource(pl && pl.source);
+    if (kind === "spotify") return base; // cannot force Spotify loop the same way
+    if (kind !== "youtube") return base;
+    try {
+      var u = new URL(base);
+      u.searchParams.set("playsinline", "1");
+      var path = u.pathname || "";
+      var list = u.searchParams.get("list") || "";
+      var vid = "";
+      var parts = path.split("/").filter(Boolean);
+      var embIdx = parts.indexOf("embed");
+      if (embIdx >= 0) {
+        var seg = parts[embIdx + 1] || "";
+        if (seg && seg !== "videoseries") vid = seg;
+      }
+      if (vid && !list) {
+        // Single video → loop forever via playlist=self
+        u.searchParams.set("loop", "1");
+        u.searchParams.set("playlist", vid);
+      } else if (list) {
+        // Playlist / video+list — loop=1 is valid; player advances then wraps
+        u.searchParams.set("loop", "1");
+      } else if (vid) {
+        u.searchParams.set("loop", "1");
+        u.searchParams.set("playlist", vid);
+      }
+      return u.toString();
+    } catch (eLoop) {
+      return base;
+    }
+  }
+  function updateRoomMusicChip() {
+    // How this works: ♪ chip pulses when a yt/spotify dock (or local audio) is live in-room.
+    // Beginner: glowing note = music is still playing even if the modal is closed.
+    // ENGINE DEV: toggle .is-playing on .tb-music; never tear down dock from here.
+    try {
+      var btn = document.querySelector(".tb-music");
+      if (!btn) return;
+      var playing = false;
+      if (inRoom) {
+        var pl = loadPlaylist();
+        var src = normalizePlaylistSource(pl && pl.source);
+        if (src === "youtube" || src === "spotify") {
+          var dock = document.getElementById("room-embed-dock");
+          playing = !!(dock && !dock.hidden && pl.embedSrc);
+        } else if (src === "local") {
+          var a = document.getElementById("room-audio");
+          playing = !!(a && !a.paused && a.src);
+        }
+      }
+      btn.classList.toggle("is-playing", !!playing);
+    } catch (eChip) {}
+  }
 
   function ensureRoomAudioEl() {
     var a = document.getElementById("room-audio");
@@ -432,16 +491,25 @@
       var openBtn = openHref
         ? ('<a class="action-btn room-embed-open room-embed-open-btn" href="' + esc(openHref) + '" target="_blank" rel="noopener noreferrer">' + openLabel + '</a>')
         : "";
+      var muteLbl = roomAudioMuted ? "Unmute" : "Mute";
+      var loopNote = kind === "spotify"
+        ? "Spotify loops via its own player."
+        : "YouTube loops in the background.";
       dock.innerHTML = ''
-        + '<div class="room-embed-head">'
-        +   '<span class="meta">Room music · ' + title + '</span>'
-        +   '<span class="room-embed-head-actions">'
+        + '<div class="room-embed-now" role="status" aria-live="polite">'
+        +   '<span class="room-embed-now-glyph" aria-hidden="true">♪</span>'
+        +   '<div class="room-embed-now-text">'
+        +     '<strong class="room-embed-now-title">Now playing</strong>'
+        +     '<span class="room-embed-now-sub meta">' + title + ' · ' + loopNote + '</span>'
+        +   '</div>'
+        +   '<div class="room-embed-now-actions">'
+        +     '<button type="button" class="action-btn room-embed-play-btn" data-embed-expand="1">Open player</button>'
         +     '<button type="button" class="text-btn" data-playlist-open-panel="1">Room music</button>'
+        +     '<button type="button" class="text-btn" data-room-mute="1">' + muteLbl + '</button>'
         +     '<button type="button" class="text-btn room-embed-collapse" data-embed-collapse="1" hidden>Close player</button>'
-        +   '</span>'
+        +   '</div>'
         + '</div>'
         + '<div class="room-embed-mobile-controls" role="group" aria-label="Room music controls">'
-        +   '<button type="button" class="action-btn room-embed-play-btn" data-embed-expand="1">Open player</button>'
         +   '<button type="button" class="action-btn" data-embed-focus="1">Tap play in embed</button>'
         +   openBtn
         + '</div>'
@@ -450,11 +518,21 @@
         +   'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" '
         +   'allowfullscreen playsinline referrerpolicy="strict-origin-when-cross-origin"></iframe>'
         + '</div>'
-        + '<p class="meta room-embed-note">Phone tip: use <b>Open player</b> for a bigger tap target, or <b>' + openLabel + '</b> in your browser. Spotify playlists must be public; YouTube must allow embedding.</p>';
+        + '<p class="meta room-embed-note">Closing Room music does <b>not</b> stop playback. Use <b>Open player</b> or <b>' + openLabel + '</b> if the embed is hard to tap.</p>';
     } else {
       dock.setAttribute("data-embed-kind", kind);
+      // Refresh mute label / title without remounting the live iframe.
+      try {
+        var muteBtn = dock.querySelector('.room-embed-now-actions [data-room-mute]');
+        if (muteBtn) muteBtn.textContent = roomAudioMuted ? "Unmute" : "Mute";
+        var sub = dock.querySelector(".room-embed-now-sub");
+        if (sub) {
+          sub.textContent = title + (kind === "spotify" ? " · Spotify loops via its own player." : " · YouTube loops in the background.");
+        }
+      } catch (eRefresh) {}
     }
     applyRoomEmbedExpanded(dock);
+    try { updateRoomMusicChip(); } catch (eChipDock) {}
     return dock;
   }
   function playlistPanelHasFocus() {
@@ -493,14 +571,16 @@
     } catch (eCol) {}
   }
   function closePlaylistPanel() {
-    // How this works: explicit Close / backdrop / leave / clearStrayUI only — never focus-loss dismiss.
-    // Beginner: tapping the dim area or Close closes Room music; tapping inside the card never does.
+    // How this works: Close / backdrop / Done ONLY remove the modal — never stop audio / never clear the dock.
+    // Beginner: music (and YouTube loop) keeps playing in the dock after you close the sheet.
+    // ENGINE DEV: never call removeRoomEmbedDock() here; leave iframe + local <audio> alone.
     playlistPanelOpen = false;
     playlistPanelDirty = false;
     try {
       var el = document.getElementById("room-playlist-panel");
       if (el) el.remove();
     } catch (eClose) {}
+    try { updateRoomMusicChip(); } catch (eChipClose) {}
   }
   function setPlaylistEmbedMsg(kind, msg) {
     // How this works: show success/error inside the modal so phones do not miss the notice bar.
@@ -515,9 +595,9 @@
   }
   function applyPlaylistEmbedFromUi(ev) {
     // How this works: Set embed path — button click OR form submit. Read URL from input value
-    // (querySelector), not only FormData. Keep modal open on success + error.
-    // Beginner: paste link → tap Set embed → music docks; modal stays until you Close.
-    // ENGINE DEV: claim ownerId; clear data-embed-src so ensureRoomEmbedDock rewrites iframe.
+    // (querySelector), not only FormData. Success shows Done (close modal only; dock keeps playing).
+    // Beginner: paste link → Set embed → Done — keep playing.
+    // ENGINE DEV: claim ownerId; clear data-embed-src once so dock rewrites; never remove dock on Done.
     if (ev && ev.preventDefault) ev.preventDefault();
     if (!session()) return false;
     if (!canControlRoomMusic()) {
@@ -575,11 +655,14 @@
       if (dockForce) dockForce.removeAttribute("data-embed-src");
     } catch (eForce) {}
     playlistPanelOpen = true;
-    playlistPanelDirty = true; // after Set embed: OK to remount panel once with preview
+    playlistPanelDirty = true; // remount once to show Done success (modal only — dock iframe stays)
     paint("rooms");
     try { syncRoomAudio(); } catch (eSync) {}
-    setPlaylistEmbedMsg("ok", "Embed set — press play in the player below (or Open player in the dock).");
-    pushNotice("green", "Room embed set — press play in the player. " + (srcE === "spotify" ? "Open on Spotify" : "Open on YouTube") + " is in the dock.", { transient: true });
+    var okMsg = srcE === "spotify"
+      ? "Embed set — press play in the dock. Spotify loops via its own player."
+      : "Embed set — press play in the dock. YouTube will loop.";
+    setPlaylistEmbedMsg("ok", okMsg);
+    pushNotice("green", "Room music set — playing in the dock. Tap Done to keep listening.", { transient: true });
     return true;
   }
   function ensurePlaylistPanel() {
@@ -639,6 +722,8 @@
 
   function syncRoomAudio() {
     // How this works: local → <audio>; youtube/spotify → #room-embed-dock iframe; pause local when not local.
+    // Beginner: closing the Room music modal does NOT call this teardown — only leave/local-switch does.
+    // ENGINE DEV: single-track sets audio.loop=true; multi-track uses playlistNext on ended for continuous play.
     var a = ensureRoomAudioEl();
     a.muted = !!roomAudioMuted;
     var pl = loadPlaylist();
@@ -646,24 +731,29 @@
     if (!inRoom) {
       try { a.pause(); } catch (e) {}
       removeRoomEmbedDock();
+      try { updateRoomMusicChip(); } catch (eOut) {}
       return;
     }
     if (src !== "local") {
-      try { a.pause(); a.removeAttribute("src"); a.removeAttribute("data-track-id"); } catch (eHide) {}
+      try { a.pause(); a.removeAttribute("src"); a.removeAttribute("data-track-id"); a.loop = false; } catch (eHide) {}
       a.style.display = "none";
       ensureRoomEmbedDock(pl);
       musicGestureNeeded = false;
       var btnHide = document.getElementById("music-gesture-btn");
       if (btnHide) btnHide.hidden = true;
+      try { updateRoomMusicChip(); } catch (eEmb) {}
       return;
     }
     removeRoomEmbedDock();
     a.style.display = "none";
     var track = pl.tracks[pl.current];
     if (!track || !track.dataUrl) {
-      try { a.pause(); a.removeAttribute("src"); } catch (e2) {}
+      try { a.pause(); a.removeAttribute("src"); a.loop = false; } catch (e2) {}
+      try { updateRoomMusicChip(); } catch (eEmpty) {}
       return;
     }
+    // Single track → native loop; queue → playlistNext wraps (already continuous).
+    a.loop = pl.tracks.length === 1;
     if (a.getAttribute("data-track-id") !== track.id) {
       a.setAttribute("data-track-id", track.id);
       a.src = track.dataUrl;
@@ -674,11 +764,15 @@
         musicGestureNeeded = false;
         var btn = document.getElementById("music-gesture-btn");
         if (btn) btn.hidden = true;
+        try { updateRoomMusicChip(); } catch (eOk) {}
       }).catch(function () {
         musicGestureNeeded = true;
         var btn2 = document.getElementById("music-gesture-btn");
         if (btn2) btn2.hidden = false;
+        try { updateRoomMusicChip(); } catch (eNeed) {}
       });
+    } else {
+      try { updateRoomMusicChip(); } catch (eSyncChip) {}
     }
   }
   function playlistNext(fromEnded) {
@@ -695,11 +789,9 @@
     else syncRoomAudio();
   }
   function playlistPanel() {
-    // How this works: Room music modal sheet — My uploads / YouTube / Spotify.
-    // Hard rule: canControlRoomMusic() gates source / pastes / locks. Guests may listen;
-    // optional guest local-track adds when ownerOnlyAdd is false. Never guest yt/spotify edits.
-    // Beginner: full-screen dim + card; Set embed is a big type=button so phone taps always fire.
-    // ENGINE DEV: #room-playlist-panel.room-music-modal backdrop + .room-music-card stopPropagation.
+    // How this works: one clear mobile path — paste URL (auto-detect) OR pick tab → Set embed → Done.
+    // Beginner: Done / Close only hide this sheet; the dock keeps playing (and YouTube loops).
+    // ENGINE DEV: no second preview iframe here (that remounted a competing player). Dock owns the live iframe.
     var pl = loadPlaylist();
     var canCtrl = canControlRoomMusic();
     var canAddLocal = canCtrl || !pl.ownerOnlyAdd;
@@ -728,12 +820,12 @@
       +   '<button type="button" class="action-btn' + (src === "spotify" ? " is-on" : "") + '" data-playlist-source="spotify"' + (canCtrl ? "" : " disabled") + '>Spotify</button>'
       + '</div>'
       + (canCtrl
-          ? ""
+          ? '<p class="meta playlist-flow-hint">Paste a link (auto-detects YouTube / Spotify) or pick a tab, then tap <b>Set embed</b>.</p>'
           : '<p class="meta owner-music-note">Owner controls room music — you can listen, but only the loft owner changes source or embeds.</p>');
     var localBody = ''
       +   '<div class="playlist-now">'
       +     (pl.tracks[pl.current]
-            ? ('Now playing: <b>' + esc(pl.tracks[pl.current].name || "Track") + '</b>')
+            ? ('Now playing: <b>' + esc(pl.tracks[pl.current].name || "Track") + '</b> <span class="meta">(loops)</span>')
             : "Nothing playing.")
       +   '</div>'
       +   '<div class="playlist-controls">'
@@ -744,8 +836,7 @@
       +   '<div class="section-label">Queue (' + pl.tracks.length + '/99)</div>'
       +   '<div class="playlist-list">' + rows + '</div>'
       +   (canCtrl
-          ? ('<label class="check-row"><input type="checkbox" data-playlist-owner-only="1"' + (pl.ownerOnlyAdd ? " checked" : "") + ' /> Only owner may add local tracks</label>'
-            + '<p class="meta">YouTube / Spotify source &amp; URLs stay owner-only even if guests may add uploads.</p>')
+          ? ('<label class="check-row"><input type="checkbox" data-playlist-owner-only="1"' + (pl.ownerOnlyAdd ? " checked" : "") + ' /> Only owner may add local tracks</label>')
           : ('<p class="meta">' + (pl.ownerOnlyAdd ? "Owner locked local adds." : "Guests may add local tracks (uploads only).") + '</p>'))
       +   (canAddLocal && src === "local"
           ? ('<div class="section-label">Add from My Music</div>'
@@ -757,54 +848,48 @@
           : (src === "local" ? '<p class="meta">Local adds locked to loft owner.</p>' : ""))
       + (canCtrl && src === "local"
           ? ('<div class="section-label">Or paste YouTube / Spotify</div>'
-            + '<ol class="playlist-paste-steps">'
-            + '<li>Pick <b>YouTube</b> or <b>Spotify</b> (or paste below to auto-pick)</li>'
-            + '<li>Paste the share link</li>'
-            + '<li>Tap <b>Set embed</b></li>'
-            + '</ol>'
             + '<form id="playlist-smart-embed-form" class="playlist-embed-form">'
-            + '<input name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="Paste YouTube or Spotify link here" />'
+            + '<input name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="Paste YouTube or Spotify link" />'
             + '<button type="button" class="action-btn playlist-set-embed-btn" data-playlist-set-embed="1">Set embed</button></form>'
             + '<p id="playlist-embed-msg" class="playlist-embed-msg" role="status" aria-live="polite"></p>')
-          : "");
+          : "")
+      + '<button type="button" class="action-btn playlist-done-btn" data-playlist-close="1">Done — keep playing</button>';
     var embedOpen = pl.embedUrl
       ? ('<a class="text-btn room-embed-open" href="' + esc(pl.embedUrl) + '" target="_blank" rel="noopener noreferrer">'
         + (src === "spotify" ? "Open on Spotify" : "Open on YouTube") + '</a>')
       : "";
+    var hasEmbed = !!pl.embedSrc;
     var embedBody = ''
       + (canCtrl
-          ? ('<ol class="playlist-paste-steps">'
-            + '<li>Pick <b>YouTube</b> or <b>Spotify</b> above</li>'
-            + '<li>Paste the share link in the box</li>'
-            + '<li>Tap <b>Set embed</b></li>'
-            + '</ol>')
-          : "")
-      + '<p class="meta">' + (src === "youtube"
-          ? "Accepts youtube.com / music.youtube.com / youtu.be / Shorts / Live / playlist (si= share links OK). Embeds use youtube-nocookie. Video must allow embedding."
-          : "Accepts open.spotify.com (intl- paths OK) track / album / playlist / episode. Playlists must be <b>public</b>. Prefer Copy link over spotify.link shorts.") + '</p>'
-      + (canCtrl
           ? ('<form id="playlist-embed-form" class="playlist-embed-form">'
-            + '<input name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="' + (src === "youtube" ? "Paste YouTube link here" : "Paste Spotify link here") + '" value="' + esc(pl.embedUrl || "") + '" />'
+            + '<label class="section-label" for="playlist-embed-url-input">Paste link</label>'
+            + '<input id="playlist-embed-url-input" name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="' + (src === "youtube" ? "Paste YouTube link" : "Paste Spotify link") + '" value="' + esc(pl.embedUrl || "") + '" />'
             + '<button type="button" class="action-btn playlist-set-embed-btn" data-playlist-set-embed="1">Set embed</button></form>'
             + '<p id="playlist-embed-msg" class="playlist-embed-msg" role="status" aria-live="polite"></p>')
           : '<p class="meta">Owner controls room music — embed URL is read-only for guests.</p>')
-      + (pl.embedSrc
-          ? ('<div class="playlist-embed-preview" data-embed-kind="' + esc(src) + '">'
-            + '<p class="meta">Preview · ' + esc(pl.embedTitle || src) + ' — press play in the player. ' + embedOpen + '</p>'
-            + '<iframe class="room-embed-frame" title="' + esc(pl.embedTitle || "embed") + '" src="' + esc(pl.embedSrc) + '" '
-            + 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" '
-            + 'allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>')
-          : '<p class="meta">No embed set yet.</p>')
-      + '<p class="meta legal-embed-note">Embedded players use YouTube/Spotify’s own embeds. Respect their ToS; Whirled2 does not host that audio. Local uploads still require you own the rights.</p>';
+      + (hasEmbed
+          ? ('<div class="playlist-embed-success">'
+            + '<p class="meta"><b>Playing in the dock</b> · ' + esc(pl.embedTitle || src) + (embedOpen ? (' · ' + embedOpen) : "") + '</p>'
+            + '<p class="meta">' + (src === "spotify"
+                ? "Spotify loops via its own player."
+                : "YouTube loops in the background after you press play.") + '</p>'
+            + '<button type="button" class="action-btn playlist-done-btn" data-playlist-close="1">Done — keep playing</button>'
+            + '</div>')
+          : '<p class="meta">No embed set yet — paste a link and tap Set embed.</p>')
+      + '<div class="playlist-controls playlist-embed-mute-row">'
+      +   '<button type="button" class="action-btn" data-room-mute="1">' + (roomAudioMuted ? "Unmute" : "Mute") + '</button>'
+      + '</div>'
+      + '<p class="meta legal-embed-note">Embedded players use YouTube/Spotify’s own embeds. Respect their ToS; Whirled2 does not host that audio. Local uploads still require you own the rights. Closing this sheet does not stop music.</p>';
     return '<div class="room-music-modal" id="room-playlist-panel" data-playlist-backdrop="1" role="dialog" aria-modal="true" aria-label="Room music">'
       + '<div class="room-music-card panel" data-playlist-card="1">'
       +   '<div class="room-side-head"><h2>Room music</h2>'
       +     '<button type="button" class="text-btn" data-playlist-close="1">Close</button></div>'
-      +   '<p class="meta">Classic wiki Music vibe, plus optional YouTube / Spotify embeds. Offline localStorage — no shared server yet.</p>'
+      +   '<p class="meta">Music keeps playing after Close — the dock under the room holds the player.</p>'
       +   sourceTabs
       +   (src === "local" ? localBody : embedBody)
       + '</div></div>';
   }
+
   var STUFF_CATS = [
     // How this works: wiki Stuff rail categories. howBlurb = empty-state “How do I get stuff?”
     { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload a stub avatar thumbnail here, or earn/list later — never invent demo avatars." },
@@ -2951,7 +3036,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906x";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906y";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3783,7 +3868,7 @@ function helpPage() {
       + '<li><b>Facebook Connect</b> — gate <b>Continue with Facebook</b>, or Me → Account to link/unlink + set Facebook App ID (local <code>whirled2.facebookAppId</code>). Create app at developers.facebook.com; add Facebook Login for Web; App Domains / OAuth redirect include <code>https://whirledclassic.github.io/</code>. Discord / Google Coming Soon.</li>'
       + '<li><b>Rooms</b> — enter Studio Loft; chat in the bar; Room menu for comment/rate, decorate, lock (visual).</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
-      + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Owner picks My uploads / YouTube / Spotify. On phones use <b>Open player</b> or <b>Open on YouTube/Spotify</b> if the embed is hard to tap.</li>'
+      + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Paste a YouTube/Spotify link → <b>Set embed</b> → <b>Done</b>. Closing the sheet does <b>not</b> stop playback (dock keeps looping). On phones use <b>Open player</b> if the embed is hard to tap.</li>'
       + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
       + '<li><b>Profile look</b> — Me → My Profile → presets publish instantly; <b>Upload custom background</b> (image behind everything) or Edit look for font/corners/modules/banner.</li>'
       + '<li><b>Ctrl+K</b> — command palette to jump Me / Mail / Rooms / … Press <b>?</b> for shortcuts.</li>'
@@ -3797,7 +3882,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Room music modal sheet (full-screen dim + card; Set embed type=button; canControlRoomMusic for FB users). Cache <code>?v=20260906x</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Room music keeps playing after Close (dock + YouTube loop); simpler Set embed → Done; ♪ icon chip. Cache <code>?v=20260906y</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5947,7 +6032,11 @@ function helpPage() {
       +         '<button type="button" data-room-menu="lobby">' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '</button>'
       +       '</div>'
       +     '</span>'
-      +     '<button type="button" class="tb-music" data-open-room-music="1" title="Room music" aria-label="Room music"></button>'
+      +     '<button type="button" class="tb tb-music" data-open-room-music="1" title="Room music" aria-label="Room music">'
+      +       '<svg class="tb-music-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">'
+      +         '<path fill="currentColor" d="M9.5 3v11.05A3.5 3.5 0 1 0 12 17.5V8h5V3h-7.5z"/>'
+      +       '</svg>'
+      +     '</button>'
       +   '</span>'
       + '</form>';
   }
@@ -8012,10 +8101,17 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-room-mute]") && session()) {
+      // How this works: toggle mute for local <audio>; refresh dock/modal labels without killing the live iframe.
+      // Beginner: Mute on the mini bar does not stop or remount YouTube/Spotify.
+      // ENGINE DEV: when modal closed, patch dock button text only — never clear data-embed-src.
       roomAudioMuted = !roomAudioMuted;
       var aMute = document.getElementById("room-audio");
       if (aMute) aMute.muted = roomAudioMuted;
-      // Mute label refresh: dirty so panel can remount once — skipped while paste field focused.
+      try {
+        document.querySelectorAll("#room-embed-dock [data-room-mute], #room-playlist-panel [data-room-mute]").forEach(function (b) {
+          b.textContent = roomAudioMuted ? "Unmute" : "Mute";
+        });
+      } catch (eMuteLbl) {}
       if (playlistPanelOpen && inRoom) {
         playlistPanelDirty = true;
         paint("rooms");
