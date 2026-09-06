@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-flash-check.cjs — headless smoke for ?v=20260906bi (preserve bg dual Wear modes) + Flash loft.
+ * qa-flash-check.cjs — headless smoke for ?v=20260906bj (preserve bg dual Wear modes) + Flash loft.
  * Beginner: run `node scripts/qa-flash-check.cjs` — no browser needed.
  * ENGINE DEV: asserts playbackMode dual cards, Hybrid gate, SWF bob, optional Ruffle docs, no tofu-on-SWF.
  */
@@ -17,10 +17,10 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
-console.log("QA-FLASH check (?v=20260906bi — dual modes preserved)");
+console.log("QA-FLASH check (?v=20260906bj — dual modes preserved)");
 
 const classic = read("src/classic-avatar.js");
-ok(classic.includes('VERSION = "20260906bg"') || classic.includes('VERSION = "20260906bh"') || classic.includes('VERSION = "20260906bi"'), "classic-avatar VERSION bg|bh|bi (dual-mode preserved)");
+ok(classic.includes('VERSION = "20260906bg"') || classic.includes('VERSION = "20260906bh"') || classic.includes('VERSION = "20260906bi"') || classic.includes('VERSION = "20260906bj"'), "classic-avatar VERSION bg|bh|bi|bj (dual-mode preserved)");
 ok(classic.includes('wmode: opts.wmode || "transparent"'), "mountRuffle wmode transparent");
 ok(classic.includes("shouldMountRuffleInLoft"), "hybrid gate shouldMountRuffleInLoft");
 ok(classic.includes("setLoftWalkMotion"), "SWF bob walk helper");
@@ -40,7 +40,7 @@ ok(classic.includes("pointerEvents") || classic.includes("pointer-events"), "lof
 ok(classic.includes('name="playbackMode"') || classic.includes("data-playback-mode-item"), "Wear mode radios");
 
 const app = read("app.js");
-ok(app.includes('LOGO_V = "20260906bi"'), "app LOGO_V bi");
+ok(app.includes('LOGO_V = "20260906bj"'), "app LOGO_V bj");
 ok(app.includes("data-go-group") || app.includes("Group halls"), "Go Group halls bi");
 ok(app.includes("roomItemBleep") || app.includes("data-room-item-bleep"), "View items Bleep bi");
 ok(app.includes("successfully mailed"), "wiki friend mailed toast bi");
@@ -57,7 +57,7 @@ ok(app.includes("getPlaybackMode"), "app honors getPlaybackMode");
 ok(app.includes("storage full") || app.includes("120000"), "Wear persist harden vs blown localStorage");
 
 const css = read("src/styles.css");
-ok(css.includes("classic-mode-cards") || css.includes("20260906bg") || css.includes("20260906bh") || css.includes("20260906bi"), "styles.css dual-mode cards / bi");
+ok(css.includes("classic-mode-cards") || css.includes("20260906bg") || css.includes("20260906bh") || css.includes("20260906bi") || css.includes("20260906bj"), "styles.css dual-mode cards / bj");
 ok(css.includes("whirled-swf-walk-bob") || css.includes("is-swf-walking"), "SWF bob keyframes/class");
 ok(css.includes("pointer-events: none !important"), "CSS PE none on loft ruffle");
 ok(css.includes("classic-ruffle-callout") || css.includes("classic-hybrid-badge") || css.includes("classic-mode-card"), "hybrid/callout/mode styles");
@@ -66,7 +66,7 @@ const brownActive = (cssNoComments.match(/#5c4030/g) || []).length + (cssNoComme
 ok(brownActive === 0, "no active brown band hexes outside comments (count=" + brownActive + ")");
 
 const index = read("index.html");
-ok(index.includes("20260906bi"), "index.html cache bh");
+ok(index.includes("20260906bj"), "index.html cache bj");
 ok(index.includes("classic-avatar.js"), "index loads classic-avatar.js");
 ok(classic.includes("playbackMode") && classic.includes("classicWearModePickerHtml"), "dual Wear modes still in classic-avatar.js");
 
@@ -84,6 +84,10 @@ ok(how.includes("Ruffle never loads"), "how-doc Whirl-only never loads Ruffle");
 ok(how.includes("dual modes") || how.includes("Dual modes") || how.includes("Why dual modes"), "how-doc dual modes why");
 ok(how.includes("playbackMode"), "how-doc playbackMode");
 
+ok(app.includes("/dnd") || app.includes("\\/dnd"), "bj /dnd command");
+ok(app.includes("bleepall") || app.includes("/bleepall"), "bj /bleepall command");
+ok(app.includes("showOccupants") || app.includes("data-chat-show-occ"), "bj Show/Hide occupants");
+ok(app.includes("I'm away from the keyboard."), "bj default away message");
 ok(app.includes("furnitureGlowLegendHtml"), "bh furniture glow legend");
 ok(app.includes("/help") || app.includes("\\/help"), "bh /help command");
 ok(app.includes("data-glow-kind"), "bh glow kind attrs");

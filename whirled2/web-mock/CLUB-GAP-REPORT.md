@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bi` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bj` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,21 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bi`)
+## Closed this pass (`?v=20260906bj`)
+
+| Item | Notes |
+|------|--------|
+| /dnd | Wiki Chat Do Not Disturb — toggle away (default msg) / clear if already away |
+| /bleepall | Session toggle hide-all room decorate items (wiki Bleep) |
+| Show/Hide occupants | Chat options checkbox → hide left In this room rail |
+| Chat filtering stub | Chat settings Coming Soon (no fake moderation queue) |
+| /away default | Empty /away → “I'm away from the keyboard.” |
+| Room menu Lock | Section label + beginner lock hint |
+| Preserve | bg dual Wear (`classic-avatar.js` untouched); bi/bh/bf/be/bd/bc; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bi`)
 
 | Item | Notes |
 |------|--------|
@@ -208,9 +222,9 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Area | web-mock | Gap |
 |------|----------|-----|
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
-| Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors | Group tabs still limited |
+| Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors; Show/Hide occupants (`bj`) | Group tabs still limited |
 | Name click menu | **Improved** (`bh`) Invite + Send Mail + party + Complain Coming Soon | Complain moderation **P2** |
-| Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`) | — |
+| Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`); `/dnd` + `/bleepall` (`bj`) | — |
 | “Too chatty” throttle | **Working** (`be`) classic wiki copy | — |
 
 ### Me / Profile (wiki)

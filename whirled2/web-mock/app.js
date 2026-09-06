@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bi";
+  var LOGO_V = "20260906bj";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -4793,7 +4793,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh + bi) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi + bj) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4819,6 +4819,9 @@
       "• bi: Go menu Group halls, presence status/mail/friend notices, View items Bleep stubs,",
       "  peach logout-clone name legend, room-avatar friend invite wiki toast, room menu sections,",
       "  chat-opts Groups reopen blurb — classic-avatar.js dual Wear UNTOUCHED",
+      "• bj: /dnd toggle (wiki default away msg), /bleepall (session hide all room items),",
+      "  Chat options Show/Hide occupants, chat filtering Coming Soon stub, /away default copy,",
+      "  Room menu Lock section label — classic-avatar.js dual Wear UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -4950,12 +4953,11 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Go menu Group halls (joined groups → Groups home)\n"
-        + "• Presence feed: status changes + new mail + friend-request notices (wiki Chat corner)\n"
-        + "• View items: per-item Bleep stub + View in shop Coming Soon\n"
-        + "• Name colors: peach logout-clone legend (Coming Soon); room-avatar invite → mailed toast\n"
-        + "• Room menu section labels + chat-opts Groups reopen beginner blurb\n"
-        + "Preserve: bg Flash dual Wear (classic-avatar.js UNTOUCHED), bh/bf/be/bd/bc, Whirl, visit-since.",
+        + "• /dnd — wiki toggle away (default “I'm away from the keyboard.”) / clear if already away\n"
+        + "• /bleepall — session-toggle hide all View-items / decorate chips for you\n"
+        + "• Chat options: Show/Hide occupants (left rail); chat filtering Coming Soon stub\n"
+        + "• /away empty → classic default message; Room menu Lock section label\n"
+        + "Preserve: bg Flash dual Wear (classic-avatar.js UNTOUCHED), bi/bh/bf/bc, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -4979,11 +4981,14 @@
           // How this works: wiki Chat Settings — how long stage speech/thought bubbles stay up.
           bubbleDuration: dur,
           // How this works (?v=20260906ax): Speak / Think / Shout compose mode (wiki Chat commands).
-          speakMode: sm
+          speakMode: sm,
+          // How this works (?v=20260906bj): wiki Chat options Show/Hide occupants — left rail in room.
+          // Beginner: uncheck to hide the In this room list; chat still works.
+          showOccupants: raw.showOccupants !== false
         };
       }
     } catch (e) {}
-    return { mode: "overlay", hideHistory: false, textSize: "md", bubbleDuration: "medium", speakMode: "speak" };
+    return { mode: "overlay", hideHistory: false, textSize: "md", bubbleDuration: "medium", speakMode: "speak", showOccupants: true };
   }
   function saveChatUi(cfg) {
     try { localStorage.setItem(CHAT_UI_KEY, JSON.stringify(cfg || loadChatUi())); } catch (e) {}
@@ -6001,6 +6006,8 @@
   }
   function setAway(on, msg) {
     // How this works (?v=20260906bh): wiki /away <message> — yellow name + optional PM auto-reply note.
+    // How this works (?v=20260906bj): empty msg uses classic default “I'm away from the keyboard.”
+    // Beginner: /away, /afk, and /dnd all share this helper; /back clears it.
     var s = session();
     if (!s || !s.user) return;
     awayMode = !!on;
@@ -6008,8 +6015,8 @@
       if (on) {
         localStorage.setItem(AWAY_KEY + s.user.id, "1");
         var note = String(msg || "").trim().slice(0, 120);
-        if (note) localStorage.setItem(AWAY_KEY + s.user.id + ".msg", note);
-        else localStorage.removeItem(AWAY_KEY + s.user.id + ".msg");
+        if (!note) note = "I'm away from the keyboard.";
+        localStorage.setItem(AWAY_KEY + s.user.id + ".msg", note);
       } else {
         localStorage.removeItem(AWAY_KEY + s.user.id);
         localStorage.removeItem(AWAY_KEY + s.user.id + ".msg");
@@ -6091,6 +6098,8 @@
       +     '<li><b>/clear</b> — clear active chat tab</li>'
       +     '<li><b>/help</b> — chat command list</li>'
       +     '<li><b>/away</b> [msg] <b>/back</b> — yellow name + optional away note</li>'
+      +     '<li><b>/dnd</b> [msg] — do-not-disturb toggle (wiki Chat)</li>'
+      +     '<li><b>/bleepall</b> — hide/unhide all room items for you (session)</li>'
       +     '<li><b>/action</b> <i>name</i> — avatar action stub (Coming Soon)</li>'
       +   '</ul></div></div>';
   }
@@ -6433,6 +6442,7 @@
   }
   function occLegend() {
     // How this works (?v=20260906bi): wiki Room name colors — blue here, yellow /away, gray Zzz, peach clone stub.
+    // How this works (?v=20260906bj): /dnd and /away both drive yellow; rail can be hidden via Chat options.
     // Beginner: peach = logged-out greeting clone (classic under development) — Coming Soon here.
     return '<div class="occ-legend" title="Presence + classic name colors">'
       + '<span><i class="lg green"></i> Here</span>'
@@ -8729,9 +8739,12 @@
       else if (room.ownerId) ownerLabel = String(room.ownerId).slice(0, 12);
     } catch (eOw) {}
     var ratingBadge = rid === "loft" ? loftRatingLabel() : "Rating: new";
+    // How this works (?v=20260906bj): honor Show/Hide occupants from chat options on room paint.
+    var showOccPaint = true;
+    try { showOccPaint = loadChatUi().showOccupants !== false; } catch (eOccP) {}
     return ''
-      + '<div class="workspace">'
-      +   '<aside class="rail occ-rail">'
+      + '<div class="workspace' + (showOccPaint ? '' : ' occ-hidden') + '">'
+      +   '<aside class="rail occ-rail' + (showOccPaint ? '' : ' occ-rail-hidden') + '">'
       +     occupantRailHtml(here)
       +   '</aside>'
       +   '<section class="stage-wrap">'
@@ -11020,10 +11033,13 @@
       // How this works (20260906af): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
       // Beginner: room owner picks who may enter. Guests see the current mode but cannot change it.
       // ENGINE DEV: chrome gate via canEnterRoom; does not touch #stage-slot.
+      +         '<div class="go-menu-section meta">Lock</div>'
+      +         '<p class="meta go-menu-hint room-menu-hint">Wiki Room lock — Unlocked / Friends / Locked (owner). Guests see mode only.</p>'
       +         '<div class="room-lock-row meta">Room lock (owner)' + (canSetRoomLock(currentRoomId) ? "" : " — view only") + '</div>'
       +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock(currentRoomId).mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>🔓 Unlocked</button>'
       +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock(currentRoomId).mode || "") === "friends" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>👥 Friends</button>'
       +         '<button type="button" data-room-lock="locked"' + ((loadRoomLock(currentRoomId).mode || "") === "locked" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>🔒 Locked</button>'
+      +         '<div class="go-menu-section meta">Mobile &amp; lobby</div>'
       +         '<div class="room-lock-row meta">Mobile immersion</div>'
       +         '<button type="button" data-immersive-enter="1" title="Hide top chrome; stage fills phone">Enter immersive</button>'
       +         '<button type="button" data-immersive-exit="1">Exit immersive</button>'
@@ -11749,12 +11765,17 @@
         "/help [cmd] — this list",
         "/speak /think /shout /me — modes",
         "/broadcast <msg> — highlighted (coins)",
-        "/away [msg] · /back — yellow name",
+        "/away [msg] · /dnd [msg] · /back — yellow name",
+        "/bleepall — hide all room items (you)",
         "/action <name> — avatar action stub",
         "/clear — clear active chat tab"
       ];
       if (helpTopic === "away" || helpTopic === "afk") {
-        helpLines = ["/away [message] — mark yourself away (yellow name). /back returns."];
+        helpLines = ["/away [message] — mark yourself away (yellow name). Default: I'm away from the keyboard. /back returns."];
+      } else if (helpTopic === "dnd") {
+        helpLines = ["/dnd [message] — Do Not Disturb toggle. Sets away (default msg) or clears if already away (wiki Chat)."];
+      } else if (helpTopic === "bleepall" || helpTopic === "bleep") {
+        helpLines = ["/bleepall — toggle hiding every room item for you this session (wiki Bleep)."];
       } else if (helpTopic === "broadcast") {
         helpLines = ["/broadcast <msg> — room-wide highlight; escalating coin cost (earn-only)."];
       } else if (helpTopic === "action" || helpTopic === "ac") {
@@ -11766,11 +11787,57 @@
     if (/^\/(away|afk)(?:\s|$)/i.test(text)) {
       var awayMsg = text.replace(/^\/(away|afk)\s*/i, "").trim();
       setAway(true, awayMsg);
-      pushSystemChat(awayMsg
-        ? ('You are now away: "' + awayMsg.slice(0, 80) + '" (Yellow name · PM auto-reply note)')
-        : "You are now away. (Yellow name tint · PM auto-reply note)");
+      var shownAway = awayMsg || "I'm away from the keyboard.";
+      pushSystemChat('You are now away: "' + shownAway.slice(0, 80) + '" (Yellow name · PM auto-reply note)');
       try { refreshOccupantRail(); } catch (eAw) {}
       refreshChatLog();
+      return;
+    }
+    if (/^\/dnd(?:\s|$)/i.test(text)) {
+      // How this works (?v=20260906bj): wiki Chat /dnd — if away, clear; else set away (default msg).
+      // Beginner: Do Not Disturb = yellow name + PM auto-reply, same as /away; second /dnd = /back.
+      var sDnd = session();
+      var alreadyAway = !!(sDnd && sDnd.user && isAway(sDnd.user.id));
+      if (alreadyAway) {
+        setAway(false);
+        pushSystemChat("Do Not Disturb off — you are back. (Blue name)");
+      } else {
+        var dndMsg = text.replace(/^\/dnd\s*/i, "").trim();
+        setAway(true, dndMsg);
+        var shownDnd = dndMsg || "I'm away from the keyboard.";
+        pushSystemChat('Do Not Disturb on: "' + shownDnd.slice(0, 80) + '" (Yellow name · PM auto-reply)');
+      }
+      try { refreshOccupantRail(); } catch (eDn) {}
+      refreshChatLog();
+      return;
+    }
+    if (/^\/bleepall$/i.test(text)) {
+      // How this works (?v=20260906bj): wiki Chat /bleepall — toggle bleeping every room item for you.
+      // Beginner: hides decorate chips this session only; run again to unbleep everything.
+      try {
+        var layoutBa = (typeof loadRoomLayout === "function") ? loadRoomLayout() : { items: [] };
+        var itemsBa = (layoutBa && layoutBa.items) || [];
+        var mapBa = {};
+        try { mapBa = JSON.parse(sessionStorage.getItem("whirled2.roomItemBleep") || "{}") || {}; } catch (eM) { mapBa = {}; }
+        var anyOn = itemsBa.some(function (it) { return it && it.id && mapBa[it.id]; });
+        var flagBa = sessionStorage.getItem("whirled2.bleepAll") === "1";
+        var turnOn = !(anyOn || flagBa);
+        var nextMap = {};
+        if (turnOn) {
+          itemsBa.forEach(function (it) { if (it && it.id) nextMap[it.id] = true; });
+          sessionStorage.setItem("whirled2.bleepAll", "1");
+        } else {
+          sessionStorage.removeItem("whirled2.bleepAll");
+        }
+        sessionStorage.setItem("whirled2.roomItemBleep", JSON.stringify(nextMap));
+        pushSystemChat(turnOn
+          ? "Bleep all on — room items hidden for you (session). /bleepall again to undo."
+          : "Bleep all off — room items visible again.");
+        pushNotice("gray", turnOn ? "Bleep all on." : "Bleep all off.", { transient: true });
+        if (inRoom) paint("rooms");
+      } catch (eBa) {
+        pushSystemChat("Bleep all failed (local only).", { ephemeral: true });
+      }
       return;
     }
     if (/^\/back$/i.test(text)) {
@@ -11895,6 +11962,8 @@
       + '<label class="chat-opts-row" data-chat-mode="overlay"><input type="radio" name="chat-mode" value="overlay"' + (ui.mode === "overlay" ? " checked" : "") + ' /> Overlay chat <span class="meta">(left of room window)</span></label>'
       + '<label class="chat-opts-row" data-chat-mode="slide"><input type="radio" name="chat-mode" value="slide"' + (ui.mode === "slide" ? " checked" : "") + ' /> Slide chat <span class="meta">(own dark panel)</span></label>'
       + '<label class="chat-opts-row' + (ui.mode !== "overlay" ? " is-disabled" : "") + '" data-chat-hide-row="1"><input type="checkbox" data-chat-hide="1"' + (ui.hideHistory ? " checked" : "") + (ui.mode !== "overlay" ? " disabled" : "") + ' /> Hide chat history <span class="meta">(F9)</span></label>'
+      // How this works (?v=20260906bj): wiki Chat options Show/Hide occupants.
+      + '<label class="chat-opts-row" data-chat-occ-row="1"><input type="checkbox" data-chat-show-occ="1"' + (ui.showOccupants !== false ? " checked" : "") + ' /> Show occupants <span class="meta">(In this room rail)</span></label>'
       + '<div class="chat-opts-title">Text size</div>'
       + '<div class="chat-opts-sizes">'
       +   '<button type="button" class="action-btn' + (ui.textSize === "sm" ? " is-on" : "") + '" data-chat-size="sm">S</button>'
@@ -11908,6 +11977,9 @@
       +   '<button type="button" class="action-btn' + (ui.bubbleDuration === "long" ? " is-on" : "") + '" data-chat-bubble-dur="long">Long</button>'
       + '</div>'
       + '<p class="meta" style="margin:4px 8px 8px;font-size:11px">Stage bubble duration (above avatars)</p>'
+      + '<div class="chat-opts-title">Chat filtering</div>'
+      + '<p class="meta chat-opts-hint">Wiki Chat settings — filter banned words locally. <span class="soon-tag">Coming Soon</span> (no fake moderation queue).</p>'
+      + '<button type="button" class="action-btn chat-opts-clear" data-chat-filter-soon="1" disabled title="Coming Soon">Chat filters… <span class="soon-tag">Soon</span></button>'
       + '<div class="chat-opts-title">Groups</div>'
       + '<p class="meta chat-opts-hint">Wiki: closing a Group tab hides it until you reopen here (Chat options → Groups).</p>';
     var joined = myJoinedGroups();
@@ -11988,6 +12060,17 @@
     } catch (e) {}
   }
 
+  function applyOccupantRailVisibility() {
+    // How this works (?v=20260906bj): wiki Chat Show/Hide occupants — CSS hide left rail.
+    // Beginner: preference lives in whirled2.chatUi.showOccupants; default = show.
+    try {
+      var show = loadChatUi().showOccupants !== false;
+      var railV = document.querySelector(".rail.occ-rail") || document.querySelector(".rail");
+      if (railV) railV.classList.toggle("occ-rail-hidden", !show);
+      var ws = document.querySelector(".workspace");
+      if (ws) ws.classList.toggle("occ-hidden", !show);
+    } catch (eVis) {}
+  }
   function refreshOccupantRail() {
     var rail = document.querySelector(".rail");
     if (!rail || !document.querySelector(".workspace")) return;
@@ -12004,6 +12087,7 @@
     here = sortOccupantsYouFirst(here);
     rail.classList.add("occ-rail");
     rail.innerHTML = occupantRailHtml(here);
+    applyOccupantRailVisibility();
     listeners.occupants.forEach(function (fn) { try { fn(here); } catch (e) {} });
   }
   async function loadOccupants() {
@@ -12565,6 +12649,28 @@
       uiB.bubbleDuration = (bd === "short" || bd === "long") ? bd : "medium";
       saveChatUi(uiB);
       renderChatOptsMenu();
+      return;
+    }
+    if (ev.target.closest("[data-chat-occ-row]") || ev.target.closest("[data-chat-show-occ]")) {
+      // How this works (?v=20260906bj): Show/Hide occupants — persist + toggle .occ-rail-hidden on rail.
+      var rowO = ev.target.closest("[data-chat-occ-row]") || ev.target.closest("[data-chat-show-occ]");
+      var boxO = rowO.querySelector ? rowO.querySelector("[data-chat-show-occ]") : rowO;
+      if (!boxO) return;
+      setTimeout(function () {
+        var uiO = loadChatUi();
+        uiO.showOccupants = !!boxO.checked;
+        saveChatUi(uiO);
+        applyOccupantRailVisibility();
+        renderChatOptsMenu();
+        var comO = document.getElementById("chat-opts-menu");
+        if (comO) comO.hidden = false;
+        chatOptsOpen = true;
+        pushNotice("blue", uiO.showOccupants ? "Occupants shown." : "Occupants hidden.", { transient: true });
+      }, 0);
+      return;
+    }
+    if (ev.target.closest("[data-chat-filter-soon]")) {
+      pushNotice("orange", "Chat filtering — Coming Soon (wiki Chat settings).", { transient: true });
       return;
     }
     if (ev.target.closest("[data-chat-clear-view]")) {

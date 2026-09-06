@@ -6939,3 +6939,13 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 .room-menu-hint { margin: 2px 8px 6px; font-size: 10px; }
 .chat-opts-hint { margin: 2px 8px 6px !important; font-size: 10px !important; }
 .go-menu .go-menu-section { margin-top: 4px; }
+
+/* ---- ?v=20260906bj: club polish — Show/Hide occupants, bleepall, chat filter stub ---- */
+.rail.occ-rail.occ-rail-hidden { display: none !important; }
+.workspace.occ-hidden { grid-template-columns: 1fr !important; }
+.workspace.occ-hidden .stage-wrap { grid-column: 1 / -1; }
+.chat-opts-row[data-chat-occ-row] { cursor: pointer; }
+.chat-opts-menu .soon-tag { font-size: 10px; }
+@media (max-width: 700px) {
+  .rail.occ-rail.occ-rail-hidden { display: none !important; }
+}

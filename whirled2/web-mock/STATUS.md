@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bj)
+
+- **Club gaps + polish (after bi):** `/dnd` toggle (wiki default away message); `/bleepall` session hide-all room items; Chat options **Show/Hide occupants**; chat filtering Coming Soon stub; `/away` empty → classic default copy; Room menu **Lock** section label
+- **Preserve:** bg Flash dual Wear modes (`classic-avatar.js` playbackMode UNTOUCHED — still VERSION bg), bi halls/presence/Bleep, bh glow/name colors, bf Go/Friends, be Music/Parties, bd badges, bc Groups/Admin, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bj`**. Push: `/tmp/push-bj.js` (dry-run default).
+
 ## What shipped (?v=20260906bi)
 
 - **Club gaps + polish (after bh):** Go menu **Group halls** (joined groups); presence feed status/mail/friend (blue) notices; View items **Bleep**/Unbleep + View in shop Coming Soon; peach logout-clone name legend; room-avatar Invite → wiki “successfully mailed” toast; Room menu section labels; chat-opts Groups reopen beginner blurb
