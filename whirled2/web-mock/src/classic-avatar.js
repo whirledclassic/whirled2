@@ -7,7 +7,7 @@
  *    We cannot fully parse AvatarControl states inside a SWF in plain JS — we say so honestly.
  * 3) Paths that work today:
  *    (a) Play-as-is in Ruffle (CDN) inside Stuff preview + optional loft overlay (Experimental).
- *    (b) Attach PNG idle/walk so chrome walk works like Cyan Hair until Pixi.
+ *    (b) Attach PNG idle/walk so chrome walk works like Whirl until Pixi.
  *    (c) Hybrid: one Stuff item holds swfUrl + PNG states.
  * 4) ENGINE DEV: Ruffle lives in chrome overlay (#classic-swf-slot / billboard), NOT inside
  *    #stage-slot. Pixi still owns the room. Study community Ruffle+host-shim architecture —
@@ -267,7 +267,7 @@
           : "Zip-based .fla (newer Animate). Still source — publish SWF / export PNGs for the game.";
         report.paths = [
           { id: "publish", label: "Publish SWF from Animate", detail: "File → Publish → SWF, then re-upload here." },
-          { id: "png", label: "Export PNG idle/walk", detail: "Modern Wear path — same as Cyan Hair." }
+          { id: "png", label: "Export PNG idle/walk", detail: "Modern Wear path — same as Whirl." }
         ];
         report.honestLimits.push("Raw .fla is never mounted in the loft or Ruffle.");
       } else if (report.isZip) {
@@ -545,7 +545,7 @@
       +   '<button type="button" class="action-btn" data-classic-preview-swf="' + esc(item.id) + '">Preview in Ruffle…</button>'
       + '</div>'
       + '<div class="classic-ruffle-host classic-ruffle-host-detail" id="classic-ruffle-detail-host" hidden></div>'
-      + '<p class="meta">Loft: if Flash opt-in + Ruffle load, SWF shows on the wear layer; else PNG states; else tofu. Cyan Hair unchanged.</p>'
+      + '<p class="meta">Loft: if Flash opt-in + Ruffle load, SWF shows on the wear layer; else PNG states; else tofu. Whirl (starter) unchanged.</p>'
       + '</div>';
   }
 

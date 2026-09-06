@@ -41,7 +41,7 @@ Full runbook: [ENGINE-BRIDGE.md](./ENGINE-BRIDGE.md).
 
 ## Avatar packs + upload wizard (PNG path)
 
-Stuff → Avatars → wizard (PNG/WebP, folders, zip, .aseprite). Wear → floor walk / avatar emotes. Cyan Hair is the reference pack.
+Stuff → Avatars → wizard (PNG/WebP, folders, zip, .aseprite). Wear → floor walk / avatar emotes. Whirl is the reference pack.
 
 - [AVATAR-CREATOR-GUIDE.md](./AVATAR-CREATOR-GUIDE.md)
 - [STUFF-AVATARS.md](./STUFF-AVATARS.md)

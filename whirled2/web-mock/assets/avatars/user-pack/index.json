@@ -1,12 +1,12 @@
 {
   "name": "User Aseprite avatar packs",
   "source": "aseprite",
-  "version": "20260906aq",
+  "version": "20260906ax",
   "preferred": "cyan-hair",
   "packs": [
     {
       "slug": "cyan-hair",
-      "name": "Cyan Hair",
+      "name": "Whirl",
       "path": "assets/avatars/user-pack/cyan-hair/",
       "thumb": "assets/avatars/user-pack/cyan-hair/thumb.png",
       "preview": "assets/avatars/user-pack/cyan-hair/preview.png",
@@ -28,7 +28,7 @@
     },
     {
       "slug": "char-a-dress-idle",
-      "name": "Cyan Hair Idle (part)",
+      "name": "Whirl Idle (part)",
       "path": "assets/avatars/user-pack/char-a-dress-idle/",
       "thumb": "assets/avatars/user-pack/char-a-dress-idle/thumb.png",
       "preview": "assets/avatars/user-pack/char-a-dress-idle/preview.png",
@@ -41,7 +41,7 @@
     },
     {
       "slug": "char-b-dress-walk",
-      "name": "Cyan Hair Walk (part)",
+      "name": "Whirl Walk (part)",
       "path": "assets/avatars/user-pack/char-b-dress-walk/",
       "thumb": "assets/avatars/user-pack/char-b-dress-walk/thumb.png",
       "preview": "assets/avatars/user-pack/char-b-dress-walk/preview.png",
@@ -54,7 +54,7 @@
     },
     {
       "slug": "char-c-dress-stand",
-      "name": "Cyan Hair Stand (part)",
+      "name": "Whirl Stand (part)",
       "path": "assets/avatars/user-pack/char-c-dress-stand/",
       "thumb": "assets/avatars/user-pack/char-c-dress-stand/thumb.png",
       "preview": "assets/avatars/user-pack/char-c-dress-stand/preview.png",
@@ -67,7 +67,7 @@
     },
     {
       "slug": "char-d-dress-pose",
-      "name": "Cyan Hair Pose (part)",
+      "name": "Whirl Pose (part)",
       "path": "assets/avatars/user-pack/char-d-dress-pose/",
       "thumb": "assets/avatars/user-pack/char-d-dress-pose/thumb.png",
       "preview": "assets/avatars/user-pack/char-d-dress-pose/preview.png",

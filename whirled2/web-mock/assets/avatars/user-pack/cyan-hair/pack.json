@@ -1,5 +1,5 @@
 {
-  "name": "Cyan Hair",
+  "name": "Whirl",
   "slug": "cyan-hair",
   "artFaces": "left",
   "states": {
@@ -50,7 +50,7 @@
     "char-d-dress-pose"
   ],
   "frameCount": 9,
-  "_beginner": "Idle uses calm pose frames (not the wave PNGs in frames/idle/). Click avatar for Wave/Sit/Pose emotes. Walk faces with artFaces:left.",
+  "_beginner": "Whirl (starter avatar). Idle uses calm pose frames (not the wave PNGs in frames/idle/). Click avatar for Wave/Sit/Pose emotes. Walk faces with artFaces:left.",
   "_engineDev": "WhirledChrome.getWornAvatar() exposes states incl. wave/sit/happy; setAvatarState / playAvatarEmote / getAvatarWalkTarget for chrome until mountWhirledEngine. artFaces:'left' → flip when walking right.",
   "_aqNote": "20260906aq: frames/idle/* are actually wave art from Aseprite part char-a; remapped idle→pose, wave→frames/idle."
 }

@@ -287,8 +287,8 @@
         return {
           occupants: [{
             id: session.user.id,
-            name: session.user.name,
-            initials: session.user.initials || String(session.user.name).slice(0, 1).toUpperCase(),
+            name: sanitizeApiName(session.user.name, session.user.id || "Player"),
+            initials: session.user.initials || sanitizeApiName(session.user.name, "P").slice(0, 1).toUpperCase(),
             online: true,
             room: session.user.room || "Studio Loft",
             you: true
@@ -505,7 +505,7 @@
   function publicUser(row) {
     var out = {
       id: row.id,
-      name: row.name,
+      name: sanitizeApiName(row.name, row.id || "Player"),
       initials: initials(row.name),
       bio: row.bio || "",
       room: row.room || "Studio Loft",
@@ -533,7 +533,15 @@
     return "hg" + (h >>> 0).toString(16);
   }
 
+  function sanitizeApiName(name, fallback) {
+    var s = String(name == null ? "" : name).trim();
+    if (!s || /NaN/i.test(s)) s = String(fallback || "Player").trim();
+    s = s.replace(/NaN/gi, "").replace(/\s{2,}/g, " ").trim();
+    if (!s) s = "Player";
+    return s.slice(0, 40);
+  }
   function initials(name) {
+    name = sanitizeApiName(name, "P");
     return String(name).split(/\s+/).map(function (p) { return p[0]; }).join("").slice(0, 2).toUpperCase();
   }
 })(window);

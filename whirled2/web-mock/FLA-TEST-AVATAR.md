@@ -4,7 +4,7 @@
 **Format:** Old Adobe Flash **OLE compound document** (not zip FLA). Metadata: *Saved by Adobe Flash Windows 9.0* (~2010).  
 **Status (?v=20260906aw):** Classic Flash **upload UI is ready** — drop a published `.swf` on Stuff → Classic Flash panel. FLA extracts still not Wearable.
 
-**Prior (?v=20260906aq):** Advanced as far as the file allows — **no SWF / no PNG sprite sequence inside**. Extracted camera JPEGs are **concept sketches** (multi-tail fox on lined paper), not loft-ready frames. Cyan Hair remains the working Wearable.
+**Prior (?v=20260906aq):** Advanced as far as the file allows — **no SWF / no PNG sprite sequence inside**. Extracted camera JPEGs are **concept sketches** (multi-tail fox on lined paper), not loft-ready frames. Whirl remains the working Wearable.
 
 ## What we inspected (aq)
 
@@ -35,7 +35,7 @@
    - `idle/` (calm loop — arms down)
    - `walk/` (4–8 frames)
    - optional `wave/`, `sit/`, `pose/`, `dance/`
-2. Pack JSON = same schema as Cyan Hair (`states.idle` / `states.walk` / emotes…).
+2. Pack JSON = same schema as Whirl (`states.idle` / `states.walk` / emotes…).
 3. Stuff → Add pack / Wear → loft billboard + click-to-walk + click-avatar emotes.
 
 **Best of both:** keep `.fla`/`.swf` as archival + optional Ruffle lab; ship day-to-day play on **Track B**.
@@ -51,4 +51,4 @@ Until then: Stuff shows **FLA Test Avatar — Coming Soon** guidance (see STATUS
 ## Do-nots
 - Don’t drop Ruffle into live Rooms for all users until ENGINE-BRIDGE policy bump.
 - Don’t expect the raw `.fla` to mount in the browser.
-- Don’t replace Cyan Hair with extracted sketch photos.
+- Don’t replace Whirl with extracted sketch photos.

@@ -7,7 +7,7 @@
 **Unlock side work:** URL `?avatarLab=1` (sets `localStorage whirled2.avatarLab = "1"`) or set that storage key manually. Default **OFF**.  
 **Related:** `ENGINE-BRIDGE.md` (Flash/Ruffle still banned for live rooms; Phase 2 deferred), Stuff upload UI in `app.js`, research clones under `/workspace/research/`.
 
-**What normal users see:** Stuff → Avatars → **Classic Flash / Whirled avatars** panel (upload/analyze/Ruffle Experimental) + PNG wizard + Cyan Hair. Legacy lab note remains On hold. Wear can show Ruffle on `#avatar-ruffle-host` when opted in.
+**What normal users see:** Stuff → Avatars → **Classic Flash / Whirled avatars** panel (upload/analyze/Ruffle Experimental) + PNG wizard + Whirl. Legacy lab note remains On hold. Wear can show Ruffle on `#avatar-ruffle-host` when opted in.
 
 ---
 

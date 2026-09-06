@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906av` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906ax` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,18 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906av`)
+## Closed this pass (`?v=20260906ax`)
+
+| Item | Notes |
+|------|--------|
+| Room visual overhaul | Pale-blue Now playing dock; no green grass stage; soft presence dots; toast ≤2s; engine hint hidden when worn |
+| Whirl starter | Rename Cyan Hair→Whirl; auto-seed + auto-Wear default; FLA Test stub in Stuff |
+| Occupant NaN names | sanitizeDisplayName; self prefers session name; pad2 NaN-safe |
+| Chat cleared stuck mid-stage | Clear → transient notice (not sticky overlay system bubble) |
+
+---
+
+## Closed earlier (`?v=20260906av`)
 
 | Item | Notes |
 |------|--------|
@@ -79,7 +90,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Enter loft / multi-room catalog | **Working** (local rooms map) | — |
 | `#stage-slot` + loft placeholder | **Working** | Pixi engine ownership **P0** |
 | Decorate / place | Partial | Full furniture edit **P1** |
-| Lock / share / embed | Partial (share/embed chrome) | Wiki-complete lock UX **P2** |
+| Lock / share / embed | Working chrome + pale-blue dock (ax) | Wiki-complete lock UX **P2** |
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
 | Parties | Toolbar stub / limited | **P1** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |
@@ -99,7 +110,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
 | Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors | Group tabs still limited |
 | Name click menu | **Working** (`at`) Profile / friend / whisper / block / complain stub | Complain moderation **P2** |
-| Speak/thought/shout modes | Limited / chrome bubbles | Full mode table **P2** |
+| Speak/thought/shout modes | Limited / chrome bubbles (/think /me /speak) | Mode picker polish still **P2** |
 | “Too chatty” throttle | Not verified as classic-faithful | **P2** |
 
 ### Me / Profile (wiki)

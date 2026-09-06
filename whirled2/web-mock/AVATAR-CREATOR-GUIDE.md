@@ -34,7 +34,7 @@
 
 ## Pack schema (ENGINE DEV)
 
-Same as Cyan Hair — Pixi can consume later:
+Same as Whirl — Pixi can consume later:
 
 ```json
 {
@@ -54,7 +54,7 @@ Chrome: `WhirledChrome.getWornAvatar()`, `setAvatarState`, `playAvatarEmote`, `a
 
 | Symptom | Fix |
 |---------|-----|
-| Invisible in loft | Bad/relative paths — wizard uses data URLs; Cyan Hair uses absolutized `./assets/…`. Re-Wear. |
+| Invisible in loft | Bad/relative paths — wizard uses data URLs; Whirl uses absolutized `./assets/…`. Re-Wear. |
 | Constant waving | Idle mapped to wave art — Remap idle to calm frames. |
 | Walking backwards | Wrong Art faces — toggle left/right. |
 | Save failed | Too many/large frames for localStorage — shrink PNGs. |

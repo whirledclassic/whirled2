@@ -27,7 +27,7 @@ Whirled2 mock cannot run classic SWF wardrobe in rooms yet (lab locked: `?avatar
 | Wear / Take off | **Yes** — happy-face + Worn badge |
 | Default tofu | **Yes** |
 | Change avatar… (recent 5 + full list) | **Yes** |
-| **One avatar with idle + walk** | **Yes** — unified **Cyan Hair** pack (`states`) |
+| **One avatar with idle + walk** | **Yes** — unified **Whirl** pack (`states`) |
 | **Click floor → walk** | **Yes** — chrome overlay on `#avatar-wear-layer` until Pixi mounts |
 | States / custom actions (SWF) | Partial — sprite `idle/walk/stand/pose`; SWF Coming Soon |
 | Sound / sleep icons in viewer | **Coming Soon** |

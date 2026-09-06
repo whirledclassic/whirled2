@@ -2,7 +2,7 @@
 
 **Audience:** beginners + ENGINE DEV  
 **Cache:** `?v=20260906aw` (`LOGO_V`)  
-**Status:** Unified **Cyan Hair** Wearable (idle+walk+pose) + chrome **click-to-walk**. Classic **Flash upload** is **Experimental** via Stuff panel (`src/classic-avatar.js`, `AVATAR-IMPORT.md`). Legacy wardrobe lab still `?avatarLab=1`.  
+**Status:** Unified **Whirl** Wearable (idle+walk+pose) + chrome **click-to-walk**. Classic **Flash upload** is **Experimental** via Stuff panel (`src/classic-avatar.js`, `AVATAR-IMPORT.md`). Legacy wardrobe lab still `?avatarLab=1`.  
 **Fidelity notes:** [AVATAR-STUFF-FIDELITY.md](./AVATAR-STUFF-FIDELITY.md)
 
 ## Beginner — upload, Wear & walk
@@ -11,7 +11,7 @@ Classic whirled.club avatars were mostly **Flash SWF**. Whirled2’s modern path
 
 1. Open **Stuff → Avatars**.
 2. Either:
-   - **Add Cyan Hair to Stuff** (imports the unified pack from `assets/avatars/user-pack/cyan-hair/`), or
+   - **Add Whirl to Stuff** (imports the unified pack from `assets/avatars/user-pack/cyan-hair/`), or
    - **Upload avatar wizard…** (PNG sequences / folders / zip / .aseprite). Map idle+walk+emotes; Remap later. See `AVATAR-CREATOR-GUIDE.md`.
 3. Open the inventory card → **Avatar viewer** → **Wear avatar** (happy face).
 4. Go to **Rooms → Enter** your loft. Soft loft backdrop + your sprite on `#avatar-wear-layer`.
@@ -39,7 +39,7 @@ No Ruffle, no SWF in the loft for this path. Lab “Wear (lab only)” still onl
 
 ```json
 {
-  "name": "Cyan Hair",
+  "name": "Whirl",
   "slug": "cyan-hair",
   "states": {
     "idle": { "frames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"], "frameDurationsMs": [200, 200] },
@@ -55,7 +55,7 @@ No Ruffle, no SWF in the loft for this path. Lab “Wear (lab only)” still onl
 
 Legacy single-state packs still work (treated as `idle` only).
 
-**Beginner:** Wear Cyan Hair, then click the floor to walk.  
+**Beginner:** Wear Whirl, then click the floor to walk.  
 **ENGINE DEV:** `WhirledChrome.getWornAvatar()` exposes `states`; `setAvatarState` / `getAvatarWalkTarget` for chrome walk. When `mountWhirledEngine(host)` owns `#stage-slot`, chrome walk disables. Pixi Player can later consume the same JSON. Prefer `resizeTo: host`.
 
 ## Scale persistence
@@ -83,7 +83,7 @@ Output: `assets/avatars/user-pack/<slug>/…` + `index.json`. Re-export parts: `
 | Wear + Experimental | `#avatar-ruffle-host` Ruffle overlay; PNG walk if present |
 | No Flash opt-in | PNG / tofu only (safe default) |
 
-Cyan Hair and the PNG wizard are unchanged.
+Whirl and the PNG wizard are unchanged.
 
 ## Coming Soon
 
