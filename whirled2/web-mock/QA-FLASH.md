@@ -1,6 +1,6 @@
 # QA-FLASH — Flash / loft interact checklist (?v=20260906ck)
 
-Dual modes: `playbackMode` png-hybrid|ruffle. **ck** = companion hostWalk + DemoAvatar continuous walk + DIRECT EI fallback. **cj** = tofu CSS walk + chrome floor-click with Pixi canvas.
+Dual modes: `playbackMode` png-hybrid|ruffle. **ck** = companion hostWalk + DemoAvatar continuous walk + DIRECT EI fallback. **cj** = tofu CSS walk + chrome floor-click with Pixi canvas. Deep analysis: `WHY-FLASH-FAILS.md`.
 
 ## Success criteria (?v=20260906ck)
 

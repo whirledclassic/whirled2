@@ -1,5 +1,7 @@
 ## What shipped (?v=20260906ck — companion hostWalk + DemoAvatar continuous walk)
 
+- **Analysis:** `WHY-FLASH-FAILS.md` — hop-by-hop why Flash walk failed + Grey Havens cite-only replication map (no AGPL).
+
 - **Goal:** Classic Flash floor click plays **real walk animation** for the whole trek (not chrome bob only).
 - **DemoAvatar rebuild:** `ConnectBag` public `props` (Ruffle drops dynamic Event props) + ENTER_FRAME leg cycle + EI `hostWalk` for DIRECT fallback.
 - **AvatarHost:** soft `connect_soft_fail` (no remount on no-userProps race); stronger `evt.props` read.
