@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-flash-check.cjs — headless smoke for ?v=20260906ck
+ * qa-flash-check.cjs — headless smoke for ?v=20260906cl
  * Companion hostWalk / Body walk + DemoAvatar continuous walk + DIRECT EI fallback.
  * Preserve cj: tofu CSS walk + chrome floor-click even with Pixi canvas.
  */
@@ -17,10 +17,10 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
-console.log("QA-FLASH check (?v=20260906ck — companion hostWalk + DemoAvatar walk + cj tofu/chrome)");
+console.log("QA-FLASH check (?v=20260906cl — companion hostWalk + DemoAvatar walk + cj tofu/chrome)");
 
 const classic = read("src/classic-avatar.js");
-ok(classic.includes('VERSION = "20260906ck"'), "classic-avatar VERSION ck");
+ok(classic.includes('VERSION = "20260906cl"'), "classic-avatar VERSION cl");
 ok(classic.includes("BODY_DEMO_SWF_ALT") || classic.includes("assets/ruffle/demo-avatar.swf"), "classic body demo alt path");
 ok(classic.includes("standTofuHtml") || classic.includes("classic-swf-stand-tofu"), "standTofuHtml helper");
 ok(classic.includes("connect_soft_fail"), "connect_soft_fail soft bridge");
@@ -45,6 +45,8 @@ ok(classic.includes("WEAR_COMPANION_ONLY = true") || classic.includes("WEAR_COMP
 ok(classic.includes("resolveHostEiPlayer"), "resolveHostEiPlayer");
 ok(classic.includes("awaiting-ready") || classic.includes("hostReady"), "hostLoadBytes ready-gate");
 ok(classic.includes("companion-cover") || classic.includes("mountCompanionOnly"), "companion-only cover mount");
+ok(classic.includes("shouldCompanionOnly"), "shouldCompanionOnly demo→DIRECT");
+ok(classic.includes("hideStandCoverForPaint"), "hideStandCoverForPaint");
 ok(classic.includes("EI silent miss") || classic.includes("silent miss"), "EI silent-miss fix");
 ok(classic.includes("hostWalk"), "hostWalk wiring");
 ok(classic.includes("notifyLoftWalk"), "notifyLoftWalk API");
@@ -70,7 +72,7 @@ ok(demoHx.includes("ExternalInterface.addCallback"), "DemoAvatar EI hostWalk");
 ok(demoHx.includes("eiHostWalk") || demoHx.includes('"hostWalk"'), "DemoAvatar hostWalk callback");
 
 const app = read("app.js");
-ok(app.includes('LOGO_V = "20260906ck"'), "app LOGO_V ck");
+ok(app.includes('LOGO_V = "20260906cl"'), "app LOGO_V cl");
 ok(app.includes("is-tofu-walk") || app.includes("tofu-leg"), "app tofu walk classes");
 ok(app.includes("data-engine-owns-avatar-walk"), "app cj engine-owns opt-out");
 ok(app.includes("notifyLoftWalk"), "app wires notifyLoftWalk");
@@ -81,9 +83,11 @@ ok(css.includes("tofu-leg-l") && css.includes("@keyframes tofu-leg-l"), "CSS tof
 ok(css.includes("is-swf-walking") || css.includes("whirled-swf-walk-bob"), "SWF bob keyframes");
 ok(css.includes("pointer-events: none !important"), "CSS PE none on loft ruffle");
 ok(css.includes("classic-swf-stand-tofu"), "CSS stand tofu");
+ok(css.includes("transform-box"), "CSS transform-box fill-box for tofu legs");
+ok(css.includes(":has(ruffle-player)"), "CSS companion-cover :has(ruffle-player) hide");
 
 const index = read("index.html");
-ok(index.includes("20260906ck"), "index.html cache ck");
+ok(index.includes("20260906cl"), "index.html cache cl");
 ok(index.includes("classic-avatar.js"), "index loads classic-avatar.js");
 
 const docs = [

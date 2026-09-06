@@ -1,3 +1,11 @@
+## What shipped (?v=20260906cl — DemoAvatar DIRECT walk visible; ck cover hid nest)
+
+- **Root cause (ck flashQa):** companion-cover hid DemoAvatar when nest never `"connected"` → no visible green walk.
+- **Fix:** `shouldCompanionOnly` skips nest for demo-avatar/demo-qa → **DIRECT** Ruffle + EI `hostWalk` continuous legs. Stock Body still COMPANION-ONLY.
+- Preserve ck: AvatarHost soft connect / ConnectBag props; cj tofu CSS + chrome floor-click.
+- Docs: `WHY-FLASH-FAILS.md`, `GREY-HAVENS-RUFFLE-REPLICATE.md` (cite only).
+- Cache: **`?v=20260906cl`**. Push: `/tmp/push-cl.js` (`WHIRLED_DO_PUSH=1`).
+
 ## What shipped (?v=20260906ck — companion hostWalk + DemoAvatar continuous walk)
 
 - **Analysis:** `WHY-FLASH-FAILS.md` — hop-by-hop why Flash walk failed + Grey Havens cite-only replication map (no AGPL).

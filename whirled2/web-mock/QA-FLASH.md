@@ -1,8 +1,8 @@
-# QA-FLASH — Flash / loft interact checklist (?v=20260906ck)
+# QA-FLASH — Flash / loft interact checklist (?v=20260906cl)
 
-Dual modes: `playbackMode` png-hybrid|ruffle. **ck** = companion hostWalk + DemoAvatar continuous walk + DIRECT EI fallback. **cj** = tofu CSS walk + chrome floor-click with Pixi canvas. Deep analysis: `WHY-FLASH-FAILS.md`.
+**cl:** cover was hiding walk — demo DIRECT; stand opacity 0 when player/walking.\n\nDual modes: `playbackMode` png-hybrid|ruffle. **ck** = companion hostWalk + DemoAvatar continuous walk + DIRECT EI fallback. **cj** = tofu CSS walk + chrome floor-click with Pixi canvas. Deep analysis: `WHY-FLASH-FAILS.md`.
 
-## Success criteria (?v=20260906ck)
+## Success criteria (?v=20260906cl)
 
 0. Loft NEVER shows grey letter "T" (or any initial glyph) as the avatar.
 1. Worn Classic Flash never blank loft — stand PNG/tofu-SVG cover until connected, or DIRECT outer SWF.
@@ -23,4 +23,4 @@ curl -sI https://whirledclassic.github.io/whirled2/whirled2/web-mock/assets/avat
 WHIRLED_DO_PUSH=1 node /tmp/push-ck.js
 ```
 
-Live: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ck&flashQa=1&avatarDebug=1
+Live: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906cl&flashQa=1&avatarDebug=1

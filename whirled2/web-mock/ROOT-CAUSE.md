@@ -1,3 +1,11 @@
+# ROOT-CAUSE — Classic Flash walk invisible (?v=20260906cl)
+
+## Latest (cl)
+**Cover was hiding walk.** `data-mount-mode=companion-cover` CSS kept `.classic-swf-stand-tofu` / thumb at `opacity:1 !important; z-index:6` above `ruffle-player`. DemoAvatar continuous green walk ran under the cover. flashQa also preferred companion-only nest, so failed/lagged nest left the cover up.
+
+**Fix:** hide stand when `:has(ruffle-player)` / `.is-playing` / billboard `.is-walking`; `shouldCompanionOnly` false for demo-avatar/flashQa → DIRECT + EI `hostWalk`; JS `hideStandCoverForPaint`.
+
+---
 # ROOT-CAUSE — Classic Flash loft tofu + grey "T" (?v=20260906ci)
 
 ## Short note (ci)

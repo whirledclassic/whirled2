@@ -7328,17 +7328,28 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
    Beginner: stand/thumb hides empty host.swf; never blank loft (ce wipe).
    ENGINE DEV: z-index above ruffle-player while data-mount-mode=companion-cover.
    ========================================================================== */
-.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-stand-thumb,
-.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-stand-tofu,
-.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-placeholder {
+/* (?v=20260906cl) companion-cover: stand ONLY until a player exists — was z-index:6 forever → hid walk. */
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:not(:has(ruffle-player)):not(:has(ruffle-embed)) .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:not(:has(ruffle-player)):not(:has(ruffle-embed)) .classic-swf-stand-tofu,
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:not(:has(ruffle-player)):not(:has(ruffle-embed)) .classic-swf-placeholder {
   opacity: 1 !important;
   z-index: 6 !important;
+}
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:has(ruffle-player) .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:has(ruffle-player) .classic-swf-stand-tofu,
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:has(ruffle-embed) .classic-swf-stand-thumb,
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:has(ruffle-embed) .classic-swf-stand-tofu,
+.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-placeholder {
+  opacity: 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
 }
 .avatar-ruffle-host[data-mount-mode="companion-cover"] ruffle-player,
 .avatar-ruffle-host[data-mount-mode="companion-cover"] ruffle-embed,
 .avatar-ruffle-host[data-mount-mode="companion-cover"] canvas {
-  /* Host may be transparent empty until nest paints — stand covers it */
-  z-index: 1;
+  /* Visible Flash on top — walk animation must not hide under tofu stand */
+  z-index: 4 !important;
+  opacity: 1 !important;
 }
 
 
@@ -7380,7 +7391,8 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   z-index: 3 !important;
 }
 .avatar-ruffle-host[data-mount-mode="companion-pending"]:not(.is-playing) .classic-swf-stand-tofu,
-.avatar-ruffle-host[data-mount-mode="companion-cover"] .classic-swf-stand-tofu {
+.avatar-ruffle-host[data-mount-mode="companion-cover"]:not(:has(ruffle-player)):not(:has(ruffle-embed)) .classic-swf-stand-tofu {
+  /* (?v=20260906cl) cover ONLY before player exists — old blanket companion-cover hid green walk */
   opacity: 1 !important;
   z-index: 6 !important;
 }
@@ -7402,14 +7414,37 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   transform-origin: 50% 100%;
 }
 .avatar-wear-billboard.is-walking .tofu-leg-l,
-.avatar-wear-billboard.is-tofu-walk .tofu-leg-l {
-  transform-origin: 24px 56px;
+.avatar-wear-billboard.is-tofu-walk .tofu-leg-l,
+.avatar-wear-billboard.is-walking .classic-swf-stand-tofu .tofu-leg-l,
+.avatar-wear-billboard.is-tofu-walk .classic-swf-stand-tofu .tofu-leg-l {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
   animation: tofu-leg-l 0.28s ease-in-out infinite;
 }
 .avatar-wear-billboard.is-walking .tofu-leg-r,
-.avatar-wear-billboard.is-tofu-walk .tofu-leg-r {
-  transform-origin: 40px 56px;
+.avatar-wear-billboard.is-tofu-walk .tofu-leg-r,
+.avatar-wear-billboard.is-walking .classic-swf-stand-tofu .tofu-leg-r,
+.avatar-wear-billboard.is-tofu-walk .classic-swf-stand-tofu .tofu-leg-r {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
   animation: tofu-leg-r 0.28s ease-in-out infinite;
+}
+/* Beginner (?v=20260906cl): stand tofu legs also bob when billboard walks (fallback if SWF cover still up). */
+.avatar-wear-billboard.is-walking .classic-swf-stand-tofu,
+.avatar-wear-billboard.is-tofu-walk .classic-swf-stand-tofu {
+  animation: tofu-walk-bob 0.28s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+/* (?v=20260906cl) never leave stand cover opaque over a playing ruffle-player */
+.avatar-ruffle-host.is-playing > .classic-swf-stand-tofu,
+.avatar-ruffle-host.is-playing > .classic-swf-stand-thumb,
+.avatar-ruffle-host.is-companion-connected > .classic-swf-stand-tofu,
+.avatar-ruffle-host.is-companion-connected > .classic-swf-stand-thumb,
+.avatar-wear-billboard.is-walking .avatar-ruffle-host > .classic-swf-stand-tofu,
+.avatar-wear-billboard.is-walking .avatar-ruffle-host > .classic-swf-stand-thumb {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
 }
 @keyframes tofu-walk-bob {
   0%, 100% { transform: translateY(0); }

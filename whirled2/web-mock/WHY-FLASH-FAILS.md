@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-06 (America/New_York)  
 **Tree:** `/workspace/whirled2-web-mock/`  
-**Ship:** `?v=20260906ck` (companion nest + DemoAvatar continuous walk + DIRECT EI fallback; preserves cj tofu/chrome-walk)  
-**Rule:** Cite Grey Havens / whirled.club architecture only — **NO AGPL msoy/world-client source copied into this tree.** Local study dumps live under `/tmp/whirled-research/` (read-only). Sibling research target: `GREY-HAVENS-RUFFLE-REPLICATE.md` (cite when present); also `GREY-HAVENS-PROTOCOL.md`, `RUFFLE-SOURCE-DEEP.md`, `WALK-E2E-ANALYSIS.md`.
+**Ship:** `?v=20260906cl` (ck taken) (companion nest + DemoAvatar continuous walk + DIRECT EI fallback; preserves cj tofu/chrome-walk)  
+**Rule:** Cite Grey Havens / whirled.club architecture only — **NO AGPL msoy/world-client source copied into this tree.** Local study dumps live under `/tmp/whirled-research/` (read-only). Primary sibling research: **`GREY-HAVENS-RUFFLE-REPLICATE.md`**; also `GREY-HAVENS-PROTOCOL.md`, `RUFFLE-SOURCE-DEEP.md`, `WALK-E2E-ANALYSIS.md`.
 
 ---
 
@@ -164,10 +164,21 @@ If `WhirledClassicAvatar.getLoftHostDebug()` shows `companionConnected: false` b
 
 ---
 
-## 7. Live retest
+## 7. cl fix — DemoAvatar walk was hidden by companion cover
+
+**Evidence (ck):** COMPANION-ONLY mounted empty `avatar-host.swf` with stand cover until `"connected"`. flashQa DemoAvatar often never reached `"connected"` under Ruffle, so users saw **stand cover only** (no green legs) even though EI `hostWalk` existed on a nested/invisible path.
+
+**Fix (?v=20260906cl)** in `classic-avatar.js` `shouldCompanionOnly(worn, url)`:
+- `demo-avatar.swf` / `demo-qa.swf` / flashQa names → **return false** → mount **DIRECT** outer Ruffle.
+- Real Body SWFs still use companion nest (`WEAR_COMPANION_ONLY`).
+- DIRECT + DemoAvatar EI `hostWalk` → visible green ENTER_FRAME walk for whole chrome trek.
+
+Cite: `GREY-HAVENS-RUFFLE-REPLICATE.md` §3–4 (club nest vs Whirled2 Ruffle invent; prove with demo before stock Body); §8 top finding — failure is connect hop, not missing hostWalk math.
+
+## 8. Live retest
 
 ```
-https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ck&flashQa=1&avatarDebug=1
+https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906cl&flashQa=1&avatarDebug=1
 ```
 
 1. Loft: no grey “T”, no blank stage.  
@@ -178,12 +189,12 @@ https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ck&flashQ
 
 ---
 
-## 8. Doc / research index (cite, don’t copy)
+## 9. Doc / research index (cite, don’t copy)
 
 | Doc | Role |
 |-----|------|
 | `GREY-HAVENS-PROTOCOL.md` | Protocol tables (connect, hostProps, userProps, walk) |
-| `GREY-HAVENS-RUFFLE-REPLICATE.md` | Sibling deep Ruffle↔club replicate notes (cite when present) |
+| `GREY-HAVENS-RUFFLE-REPLICATE.md` | Club architecture → Ruffle nest map (cite-only; no AGPL/msoy dump) |
 | `RUFFLE-SOURCE-DEEP.md` | sharedEvents, loadBytes, EI silent miss |
 | `WALK-E2E-ANALYSIS.md` | cg hop trace |
 | `ROOT-CAUSE.md` | tofu/T + companion wipe history |

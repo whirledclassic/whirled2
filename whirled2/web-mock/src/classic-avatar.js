@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906ck
+ * Cache: ?v=20260906cl
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906ck";
+  var VERSION = "20260906cl";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -68,7 +68,7 @@
   var BODY_DEMO_SWF = "./assets/avatars/flash-qa/demo-avatar.swf"; // controlConnect + appearanceChanged_v2
   var BODY_DEMO_SWF_ALT = "./assets/ruffle/demo-avatar.swf"; // (?v=20260906cj) mirror — Pages must 200
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906ck): COMPANION-ONLY nest; hostWalk → Body walk frames; tofu CSS from cj.
+  // How this works (?v=20260906cl): COMPANION-ONLY nest; hostWalk → Body walk frames; tofu CSS from cj.
   // Beginner: we load OUR tiny host.swf first; your avatar is rebuilt inside it from bytes.
   // Stand thumb covers the host (opacity 1) until bridge "connected" — never a blank loft.
   // ENGINE DEV: DemoAvatar ConnectBag + continuous walk; DIRECT remount still EI-hostWalk (demo).
@@ -76,6 +76,17 @@
   // Reject nested blob:/data: — hostLoadBytes only. Gate hostLoadBytes on bridge "ready".
   // Status badge: connected | DIRECT | failed. Preserve cj chrome-walk + tofu leg fixes.
   var WEAR_COMPANION_ONLY = true; // (?v=20260906ch/ck) single-player host nest + stand cover
+  function shouldCompanionOnly(worn, url) {
+    // (?v=20260906cl) DemoAvatar has EI hostWalk — mount DIRECT so walk is VISIBLE (cover hid nest).
+    // Beginner: flashQa stick figure skips empty host nest. Real Body SWFs still use companion.
+    // ENGINE DEV: demo-avatar.swf / demo-qa.swf / source=flashQa → DIRECT; else WEAR_COMPANION_ONLY.
+    var u = String(url || (worn && (worn.swfUrl || worn.swfDataUrl || worn.swfUrlAlt)) || "");
+    if (/demo-avatar\.swf|demo-qa\.swf|flashqa-demo/i.test(u)) return false;
+    if (worn && (worn.source === "flashQa" || worn.flashQa === true)) return false;
+    if (worn && /demo-avatar|flashqa-demo|Flash QA/i.test(String(worn.name || "") + String(worn.id || "") + String(worn.stuffId || ""))) return false;
+    return !!WEAR_COMPANION_ONLY;
+  }
+
   var WEAR_SAFE_COMPANION_UPGRADE = false; // cg Option A dual-layer OFF
   var WEAR_AUTO_COMPANION_UPGRADE = false; // legacy ce flag kept false (dangerous remount-into-host)
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
@@ -405,7 +416,7 @@
   }
   function getRuffleStatus() { return ruffleUiStatus; }
   function ruffleStatusLabel(st) {
-    // (?v=20260906ck) Honest loft badge: connected nest / DIRECT paint / failed.
+    // (?v=20260906cl) Honest loft badge: connected nest / DIRECT paint / failed.
     st = st || ruffleUiStatus.state;
     if (st === "connected") return "Ruffle connected";
     if (st === "direct") return "Ruffle DIRECT";
@@ -539,17 +550,61 @@
     catch (e) { return BODY_DEMO_SWF_ALT; }
   }
   function standTofuHtml() {
-    // (?v=20260906cj) CRITICAL: never paint a lonely letter "T" as the loft avatar.
+    // (?v=20260906cj/cl) CRITICAL: never paint a lonely letter "T" as the loft avatar.
     // Beginner: no stand PNG yet → tiny tofu face cover (NOT grey initial glyph).
+    // ENGINE DEV: tofu-leg-l/r + transform-box:fill-box so CSS walk bob works if cover is still visible.
     return '<div class="classic-swf-stand-tofu" aria-hidden="true" title="Stand cover — waiting for Flash">'
       + '<svg viewBox="0 0 64 80" width="64" height="80" focusable="false">'
       + '<rect x="10" y="4" width="44" height="52" rx="8" fill="#f0e6d2" stroke="#c4a882" stroke-width="2"/>'
-      + '<rect x="18" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
-      + '<rect x="34" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+      + '<g class="tofu-leg-l"><rect x="18" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/></g>'
+      + '<g class="tofu-leg-r"><rect x="34" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/></g>'
       + '<circle cx="24" cy="26" r="3" fill="#8a7048"/>'
       + '<circle cx="40" cy="26" r="3" fill="#8a7048"/>'
       + '<path d="M26 38c2.5 3 9.5 3 12 0" fill="none" stroke="#8a7048" stroke-width="2" stroke-linecap="round"/>'
       + '</svg></div>';
+  }
+
+  function hideStandCoverForPaint(reason) {
+    // (?v=20260906cl) Never leave opaque stand tofu/thumb over a painting or walking ruffle-player.
+    // Beginner: cover is only for empty host; once Flash paints (or you walk), hide it.
+    // ENGINE DEV: belt-and-suspenders with CSS :has(ruffle-player) / .is-playing / .is-walking rules.
+    var slot = document.getElementById("avatar-ruffle-host")
+      || document.getElementById("classic-wear-swf-slot");
+    if (!slot) return;
+    try {
+      var hasPlayer = !!(slot.querySelector("ruffle-player, ruffle-embed, canvas"));
+      var walking = false;
+      try {
+        var bill = document.querySelector(".avatar-wear-billboard");
+        walking = !!(bill && bill.classList.contains("is-walking"))
+          || !!(document.getElementById("avatar-wear-layer")
+            && document.getElementById("avatar-wear-layer").classList.contains("is-walking"));
+      } catch (eW) {}
+      if (!(hasPlayer || slot.classList.contains("is-playing")
+          || slot.classList.contains("is-companion-connected") || walking || loftHostState.connected)) {
+        return;
+      }
+      slot.classList.add("is-playing", "is-on");
+      slot.classList.remove("is-mounting");
+      var mode = slot.getAttribute("data-mount-mode") || "";
+      if (mode === "companion-cover") {
+        if (loftHostState.connected || loftUsesCompanionHost) {
+          slot.setAttribute("data-mount-mode", "companion");
+          slot.classList.add("is-companion-connected");
+        } else if (hasPlayer) {
+          // DIRECT / host-with-player: drop cover mode so stale z-index rules cannot win
+          slot.setAttribute("data-mount-mode", loftUsesCompanionHost ? "companion" : "direct");
+        }
+      }
+      var covers = slot.querySelectorAll(".classic-swf-stand-tofu, .classic-swf-stand-thumb, .classic-swf-placeholder");
+      for (var i = 0; i < covers.length; i++) {
+        covers[i].style.opacity = "0";
+        covers[i].style.zIndex = "0";
+        covers[i].style.pointerEvents = "none";
+        covers[i].setAttribute("aria-hidden", "true");
+      }
+      logAvatarDebug("hideStandCoverForPaint", reason || "", { hasPlayer: hasPlayer, walking: walking, mode: mode });
+    } catch (eH) {}
   }
 
   function preloadRuffle() {
@@ -933,6 +988,7 @@
       layer.classList.add("is-swf-walking");
       if (bill) bill.classList.add("is-swf-walking");
       if (host) host.classList.add("is-swf-walking");
+      try { hideStandCoverForPaint("setLoftWalkMotion"); } catch (eHs) {}
     } else {
       layer.classList.remove("is-swf-walking");
       if (bill) bill.classList.remove("is-swf-walking");
@@ -1035,7 +1091,7 @@
     connected: false,
     gotControl: false,
     hostReady: false, // (?v=20260906ch) AvatarHost ctor registered addCallback + bridge ready
-    directEiWalk: false, // (?v=20260906ck) DemoAvatar (or Body) EI hostWalk on DIRECT player
+    directEiWalk: false, // (?v=20260906cl) DemoAvatar (or Body) EI hostWalk on DIRECT player
     bytesLoading: false,
     moving: false,
     orient: 180,
@@ -1493,10 +1549,11 @@
       loftActivePlayer = player || loftActivePlayer;
       loftFallbackInFlight = false;
       try {
-        slot.classList.remove("is-failed", "is-companion-connected");
+        slot.classList.remove("is-failed", "is-companion-connected", "is-mounting");
         slot.classList.add("is-playing", "is-on");
         slot.setAttribute("data-mount-mode", "direct");
       } catch (eCl) {}
+      try { hideStandCoverForPaint("remount-direct"); } catch (eHd) {}
       loftHostState.directEiWalk = false;
       setRuffleStatus("direct", "DIRECT outer SWF (chrome bob + EI walk if demo)");
       logAvatarDebug("remountDirect OK", { hasPlayer: !!player });
@@ -1604,7 +1661,7 @@
         logAvatarDebug("demo_ei_ready — DIRECT walk EI live");
       }
       if (kind === "connect_soft_fail") {
-        // (?v=20260906ck) no-userProps race — retry flush, do NOT remount DIRECT yet.
+        // (?v=20260906cl) no-userProps race — retry flush, do NOT remount DIRECT yet.
         logAvatarDebug("connect_soft_fail — retry load", payload);
         setTimeout(function () {
           if (loftHostState.connected) return;
@@ -1639,6 +1696,7 @@
             slotC.classList.add("is-companion-connected", "is-playing", "is-on");
             slotC.classList.remove("is-mounting", "is-failed");
             slotC.setAttribute("data-mount-mode", "companion");
+            try { hideStandCoverForPaint("connected"); } catch (eHs2) {}
           }
         } catch (eCc) {}
         logAvatarDebug("companion connected — nest owns walk; re-sync appearance", {
@@ -2157,6 +2215,9 @@
     noteLoftActivity();
     var faceForCss = (orientHint === -1 || orientHint === 1) ? orientHint : undefined;
     setLoftWalkMotion(!!moving, faceForCss);
+    if (moving) {
+      try { hideStandCoverForPaint("notifyLoftWalk"); } catch (eHc) {}
+    }
     var orient = loftHostState.orient;
     if (typeof orientHint === "number" && isFinite(orientHint) && orientHint !== -1 && orientHint !== 1) {
       orient = orientHint;
@@ -2169,7 +2230,7 @@
     if (loftUsesCompanionHost || loftHostState.hostMode) {
       result = callHostWalk(!!moving, orient);
     } else {
-      // (?v=20260906ck) DIRECT fallback: DemoAvatar registers hostWalk via EI — animate without nest.
+      // (?v=20260906cl) DIRECT fallback: DemoAvatar registers hostWalk via EI — animate without nest.
       // Beginner: even if companion failed, flashQa demo still green-walks on floor click.
       // ENGINE DEV: do NOT set loftUsesCompanionHost here (that means nest connected).
       var hr = tryCallHostMethod("hostWalk", [!!moving, orient]);
@@ -2277,7 +2338,7 @@
       whyIdle: "Stock Whirled SWFs dispatch ConnectEvent type controlConnect on loaderInfo.sharedEvents (NOT ExternalInterface).",
       protocol: "Nested host: Ruffle loads avatar-host.swf (http) → hostLoadBytes(base64) → Loader.loadBytes → sharedEvents controlConnect → hostProps → gotControl_v1 → appearanceChanged_v2. http(s) avatars may use hostLoadUrl.",
       liveClub: "whirled.club world-client: ActorSprite floor move → appearanceChanged_v2(loc,orient,moving,sleeping) → Body state_*_walking / towalking / fromwalking. Embed allowScriptAccess sameDomain; nested avatar inside host SWF (same nest as ours).",
-      whatWorksNow: "ck: companion nest hostWalk→Body walk; DemoAvatar ConnectBag+ENTER_FRAME walk; DIRECT EI hostWalk fallback; soft connect_soft_fail; cj tofu/chrome-walk preserved.",
+      whatWorksNow: "cl: cover was hiding walk — hide stand when player/walk; demo-avatar DIRECT+EI hostWalk; companion for real Body; cj tofu/chrome-walk preserved.",
       hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
       hostShim: "assets/avatar-host/avatar-host.swf compiled from tools/avatar-host/AvatarHost.hx (Haxe --swf). No AGPL copy.",
       debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
@@ -3133,7 +3194,7 @@
       // Beginner: host nest drives real walk frames; stand covers until connected; fail → plain SWF + bob.
       // ENGINE DEV: WEAR_COMPANION_ONLY=true. Dual-layer Option A kept off (WEAR_SAFE_COMPANION_UPGRADE=false).
       ensureStandFallback(slot, worn, "strategy-start");
-      if (WEAR_COMPANION_ONLY) {
+      if (shouldCompanionOnly(worn, url)) {
         return prepareCompanionStrategy(url, worn).then(function (prep) {
           if (mountGen !== loftMountGeneration) return null;
           if (!prep || !prep.ok || prep.skipped || (prep.mode !== "bytes" && prep.mode !== "url")) {
@@ -3600,6 +3661,7 @@
   api.classicHybridBadgeHtml = classicHybridBadgeHtml;
   api.describeAvatarControlNextSteps = describeAvatarControlNextSteps;
   api.notifyLoftWalk = notifyLoftWalk;
+  api.hideStandCoverForPaint = hideStandCoverForPaint;
   api.callHostWalk = callHostWalk;
   api.callHostEmote = callHostEmote;
   api.callHostSpoke = callHostSpoke;
