@@ -28,7 +28,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## How to bump cache-bust `?v=`
 
-1. Pick a new token, e.g. `20260906j`.
+1. Pick a new token, e.g. `20260906k`.
 2. Replace in `index.html` (CSS + JS `href`/`src`, and the “reload fresh” links).
 3. Replace `LOGO_V` in `app.js`.
 4. Replace in repo root `index.html` redirect (Pages) if present.
@@ -89,6 +89,18 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - Temporary `#stage-bubbles` for avatar speech/thought until Pixi owns nametags.
 - `window.WhirledChrome` v0.4: `getStageEl`, `getSession`, `getRoom`, `onChat`, `sendChat`, `onOccupants`, `getChatUi`. See `ENGINE-BRIDGE.md`.
 
+## Profile skins
+
+- Key: `whirled2.profileSkin.{userId}` JSON — `{ bgType, bgColor, bgColor2, bgImage, accent, panelAlpha, motto }`.
+- UI: Me → My Profile → Look & background. Wrapper `.profile-skin` around `.classic-profile` (own + other).
+- **No profile music.** Room playlist covers audio.
+- ENGINE DEV: profile skins are Me chrome only — do not apply to `#stage-slot`.
+
+## Room lock (local)
+
+- Key: `whirled2.roomLock.loft` = `{ mode: "unlocked"|"friends"|"locked", ownerId }`.
+- `canEnterLoft(viewerId)` gates enter / Join them / Go home. Owner always enters. Legacy bare-string values migrate on load.
+
 ## LocalStorage keys (common)
 
-`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.notices`, `whirled2.chatUi`, …
+`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.profileSkin.*`, `whirled2.roomLock.loft`, `whirled2.notices`, `whirled2.chatUi`, …

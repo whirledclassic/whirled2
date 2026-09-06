@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906j";
+  var LOGO_V = "20260906k";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -274,6 +274,7 @@
   var FAV_KEY = "whirled2.favorites";
   var SHOP_RATINGS_KEY = "whirled2.shopRatings";
   var ROOM_LOCK_KEY = "whirled2.roomLock.loft";
+  var PROFILE_SKIN_KEY = "whirled2.profileSkin."; // + userId — MySpace-like look (no music)
   var ROOM_RATING_KEY = "whirled2.roomRating.loft";
   var ROOM_COMMENTS_KEY = "whirled2.roomComments.loft";
   var GAMES_KEY = "whirled2.games";
@@ -495,11 +496,89 @@
   function saveGroupThreads(gid, threads) {
     try { localStorage.setItem(groupThreadsKey(gid), JSON.stringify((threads || []).slice(0, 100))); } catch (e) {}
   }
-  function loadRoomLock() {
-    try { return localStorage.getItem(ROOM_LOCK_KEY) || "unlocked"; } catch (e) { return "unlocked"; }
+  // ---------------------------------------------------------------------------
+  // Room lock (wiki Room) — enforced locally on this browser mock
+  // How this works: whirled2.roomLock.loft stores { mode, ownerId }.
+  //   unlocked → anyone may enter Studio Loft
+  //   friends  → lock owner, loft first-user, or mutual friends (loadFriends)
+  //   locked   → only the lock owner (and loft first-user) may enter
+  // ENGINE DEV: lock is chrome/lobby gate only — does not change #stage-slot.
+  // Migrate: old builds stored a bare string ("unlocked"|"friends"|"locked").
+  // ---------------------------------------------------------------------------
+  function defaultRoomLock() {
+    return { mode: "unlocked", ownerId: "" };
   }
-  function saveRoomLock(v) {
-    try { localStorage.setItem(ROOM_LOCK_KEY, v); } catch (e) {}
+  function loadRoomLock() {
+    // How this works: always return { mode, ownerId }; migrate legacy string values.
+    try {
+      var raw = localStorage.getItem(ROOM_LOCK_KEY);
+      if (!raw) return defaultRoomLock();
+      if (raw === "unlocked" || raw === "friends" || raw === "locked") {
+        var migrated = { mode: raw, ownerId: "" };
+        try {
+          migrated.ownerId = localStorage.getItem(FIRST_USER_KEY)
+            || (session() && session().user && session().user.id)
+            || "";
+        } catch (e0) {}
+        try { localStorage.setItem(ROOM_LOCK_KEY, JSON.stringify(migrated)); } catch (e1) {}
+        return migrated;
+      }
+      var obj = JSON.parse(raw);
+      if (!obj || typeof obj !== "object") return defaultRoomLock();
+      var mode = obj.mode || "unlocked";
+      if (mode !== "unlocked" && mode !== "friends" && mode !== "locked") mode = "unlocked";
+      return { mode: mode, ownerId: String(obj.ownerId || "") };
+    } catch (e) { return defaultRoomLock(); }
+  }
+  function saveRoomLock(mode) {
+    // How this works: whoever sets the lock becomes ownerId (session user, else firstUserId).
+    mode = mode || "unlocked";
+    if (mode !== "unlocked" && mode !== "friends" && mode !== "locked") mode = "unlocked";
+    var ownerId = "";
+    try {
+      if (session() && session().user && session().user.id) ownerId = String(session().user.id);
+      else ownerId = localStorage.getItem(FIRST_USER_KEY) || "";
+    } catch (e) {}
+    try {
+      localStorage.setItem(ROOM_LOCK_KEY, JSON.stringify({ mode: mode, ownerId: ownerId }));
+    } catch (e2) {}
+  }
+  function canEnterLoft(viewerId) {
+    // How this works: gate [data-enter-room] / Join them / Go home before setting inRoom.
+    var lock = loadRoomLock();
+    var mode = (lock && lock.mode) || "unlocked";
+    if (mode === "unlocked") return true;
+    viewerId = String(viewerId || "");
+    if (!viewerId) return false;
+    var ownerId = String((lock && lock.ownerId) || "");
+    var first = "";
+    try { first = localStorage.getItem(FIRST_USER_KEY) || ""; } catch (e) {}
+    // Owner of the lock + loft first-user always enter.
+    if (viewerId === ownerId || (first && viewerId === first)) return true;
+    if (mode === "locked") return false;
+    if (mode === "friends") {
+      var friends = loadFriends();
+      // Allow if viewer↔owner friendship appears on this browser's friends list.
+      if (ownerId && friends.some(function (f) { return String(f.id) === ownerId; })) return true;
+      if (viewerId && friends.some(function (f) { return String(f.id) === viewerId; })) return true;
+      return false;
+    }
+    return true;
+  }
+  function tryEnterLoft() {
+    // How this works: shared enter path — block → notice + stay lobby; else enter loft.
+    var sid = session() && session().user && session().user.id;
+    if (!canEnterLoft(sid)) {
+      var mode = (loadRoomLock().mode || "locked");
+      var msg = mode === "friends"
+        ? "Studio Loft is friends-only right now. You cannot enter."
+        : "Studio Loft is locked. Only the room owner can enter.";
+      pushNotice("orange", msg);
+      inRoom = false;
+      return false;
+    }
+    inRoom = true;
+    return true;
   }
   function loadRoomRating() {
     try {
@@ -854,7 +933,7 @@
   var chat = [];
   var liveOccupants = [];
   var meSub = "home"; // home | profile | friends | mail | passport | account | themes | club | blocklist | galleries | transactions | contests | share
-  var profileEditSection = null; // null | status | photo | info
+  var profileEditSection = null; // null | status | photo | info | skin
   var tourTip = 0;
   var goMenuOpen = false;
   var inRoom = false;
@@ -1803,7 +1882,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: chat-send fix, empty notice-bar, themes shells, room music playlist, Legal page. Cache <code>?v=20260906a</code>.</p>'
+      + '<p class="meta">This pass: profile skins (no profile music), room locks enforced locally, stage bubbles. Cache <code>?v=20260906k</code>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -1856,6 +1935,7 @@ function helpPage() {
     }
     var empty = here.length === 0;
     var lock = loadRoomLock();
+    var lockMode = lock.mode || "unlocked";
     return ''
       + '<div class="workspace">'
       +   '<aside class="rail"><h2>In this room</h2>'
@@ -1866,7 +1946,7 @@ function helpPage() {
       +   '<section class="stage-wrap">'
       +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span>'
       +       '<span class="room-owner">owner: ' + esc(me.name) + '</span>'
-      +       '<span class="room-lock-badge" title="Visual only on Pages" data-lock="' + esc(lock) + '">🔒 ' + esc(lockLabel(lock)) + '</span>'
+      +       '<span class="room-lock-badge" title="Enforced on this browser — friends/locked gate entry" data-lock="' + esc(lockMode) + '">🔒 ' + esc(lockLabel(lockMode)) + '</span>'
       +       '<span class="room-rating-badge">' + esc(loftRatingLabel()) + '</span></div>'
       +     '<div class="stage-body chat-mode-' + esc(loadChatUi().mode) + ' text-size-' + esc(loadChatUi().textSize) + (loadChatUi().hideHistory ? ' hide-history' : '') + '">'
       +     '<div class="stage-host">'
@@ -1908,6 +1988,105 @@ function helpPage() {
   }
   function saveStatus(userId, text) {
     localStorage.setItem(STATUS_KEY + userId, String(text || "").slice(0, 140));
+  }
+  // ---------------------------------------------------------------------------
+  // Profile skins (MySpace-like background / accent) — chrome only, NO profile music
+  // How this works: each user stores whirled2.profileSkin.{userId} JSON in localStorage.
+  // Visitors see that skin when opening otherProfile. Room playlists already cover audio.
+  // ENGINE DEV: profile chrome ≠ #stage-slot. The engine ignores profile skins entirely;
+  // do not read these keys from Pixi / WhirledChrome.
+  // ---------------------------------------------------------------------------
+  var PROFILE_SKIN_PRESETS = {
+    classic: { bgType: "gradient", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "", accent: "#1e6fa8", panelAlpha: 0.92, motto: "" },
+    night:   { bgType: "gradient", bgColor: "#1a2433", bgColor2: "#2c3e55", bgImage: "", accent: "#7ec8f0", panelAlpha: 0.88, motto: "" },
+    sunset:  { bgType: "gradient", bgColor: "#ffb347", bgColor2: "#ff6b8a", bgImage: "", accent: "#b33b1e", panelAlpha: 0.90, motto: "" },
+    paper:   { bgType: "color", bgColor: "#f4efe6", bgColor2: "#ffffff", bgImage: "", accent: "#6b5b4a", panelAlpha: 0.95, motto: "" },
+    clear:   { bgType: "none", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "", accent: "#1e6fa8", panelAlpha: 0.92, motto: "" }
+  };
+  var PROFILE_BG_MAX_WARN = 400 * 1024;   // soft warn ~400KB
+  var PROFILE_BG_MAX_HARD = 900 * 1024;   // reject huge uploads
+  function defaultProfileSkin() {
+    return {
+      bgType: "none",
+      bgColor: "#cfe6f5",
+      bgColor2: "#ffffff",
+      bgImage: "",
+      accent: "#1e6fa8",
+      panelAlpha: 0.92,
+      motto: ""
+    };
+  }
+  function loadProfileSkin(userId) {
+    // How this works: missing / bad JSON → default (no custom background).
+    try {
+      var raw = localStorage.getItem(PROFILE_SKIN_KEY + userId);
+      if (!raw) return defaultProfileSkin();
+      var s = JSON.parse(raw);
+      if (!s || typeof s !== "object") return defaultProfileSkin();
+      var d = defaultProfileSkin();
+      var bgType = s.bgType || d.bgType;
+      if (bgType !== "none" && bgType !== "color" && bgType !== "gradient" && bgType !== "image") bgType = "none";
+      var alpha = Number(s.panelAlpha);
+      if (!(alpha >= 0.7 && alpha <= 1)) alpha = d.panelAlpha;
+      return {
+        bgType: bgType,
+        bgColor: String(s.bgColor || d.bgColor).slice(0, 32),
+        bgColor2: String(s.bgColor2 || d.bgColor2).slice(0, 32),
+        bgImage: String(s.bgImage || "").slice(0, 1200000),
+        accent: String(s.accent || d.accent).slice(0, 32),
+        panelAlpha: alpha,
+        motto: String(s.motto || "").slice(0, 80)
+      };
+    } catch (e) { return defaultProfileSkin(); }
+  }
+  function saveProfileSkin(userId, skin) {
+    // How this works: normalize + cap motto; drop huge bgImage if somehow oversized.
+    var d = defaultProfileSkin();
+    skin = skin || d;
+    var bgType = skin.bgType || "none";
+    if (bgType !== "none" && bgType !== "color" && bgType !== "gradient" && bgType !== "image") bgType = "none";
+    var alpha = Number(skin.panelAlpha);
+    if (!(alpha >= 0.7 && alpha <= 1)) alpha = 0.92;
+    var out = {
+      bgType: bgType,
+      bgColor: String(skin.bgColor || d.bgColor).slice(0, 32),
+      bgColor2: String(skin.bgColor2 || d.bgColor2).slice(0, 32),
+      bgImage: bgType === "image" ? String(skin.bgImage || "").slice(0, 1200000) : "",
+      accent: String(skin.accent || d.accent).slice(0, 32),
+      panelAlpha: alpha,
+      motto: String(skin.motto || "").slice(0, 80)
+    };
+    try { localStorage.setItem(PROFILE_SKIN_KEY + userId, JSON.stringify(out)); } catch (e) {
+      // Quota — retry without image
+      try {
+        out.bgImage = "";
+        if (out.bgType === "image") out.bgType = "color";
+        localStorage.setItem(PROFILE_SKIN_KEY + userId, JSON.stringify(out));
+      } catch (e2) {}
+    }
+    return out;
+  }
+  function profileSkinStyleAttr(skin) {
+    // How this works: inline style for .profile-skin wrapper (CSS vars + background).
+    skin = skin || defaultProfileSkin();
+    var alpha = Number(skin.panelAlpha);
+    if (!(alpha >= 0.7 && alpha <= 1)) alpha = 0.92;
+    var parts = [];
+    parts.push("--profile-accent:" + String(skin.accent || "#1e6fa8"));
+    parts.push("--profile-panel:rgba(255,255,255," + alpha + ")");
+    if (skin.bgType === "color") {
+      parts.push("background-color:" + String(skin.bgColor || "#cfe6f5"));
+    } else if (skin.bgType === "gradient") {
+      parts.push("background-image:linear-gradient(160deg," + String(skin.bgColor || "#cfe6f5") + "," + String(skin.bgColor2 || "#ffffff") + ")");
+    } else if (skin.bgType === "image" && skin.bgImage) {
+      // Data URLs are base64 — escape double quotes only for the url("…") form.
+      var url = String(skin.bgImage).replace(/\\/g, "").replace(/"/g, "");
+      parts.push("background-image:url(\"" + url + "\")");
+      parts.push("background-size:cover");
+      parts.push("background-position:center");
+      parts.push("background-repeat:no-repeat");
+    }
+    return parts.join(";");
   }
   function loadPokes() {
     try { return JSON.parse(localStorage.getItem(POKE_KEY) || "{}"); } catch (e) { return {}; }
@@ -2265,7 +2444,7 @@ function helpPage() {
 
   // ---------------------------------------------------------------------------
   // Me → My Profile (classic edit links: read-only until you click Edit)
-  // profileEditSection: null | "status" | "photo" | "info"
+  // profileEditSection: null | "status" | "photo" | "info" | "skin"
   // ---------------------------------------------------------------------------
   function meProfile() {
     var me = you();
@@ -2276,6 +2455,9 @@ function helpPage() {
     var info = loadInfo(sid);
     if (!info.about && me.bio) info.about = me.bio;
     var pokes = (loadPokes()[sid] || []).slice(0, 8);
+    // How this works: load this user's MySpace-like skin (background / accent / motto).
+    // ENGINE DEV: profile skins stay in Me chrome — never applied to #stage-slot.
+    var skin = loadProfileSkin(sid);
     var photoHtml = photo
       ? '<img class="profile-photo" src="' + photo + '" alt="Profile photo" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(me.initials) + '</span></div>';
@@ -2295,12 +2477,14 @@ function helpPage() {
     var editSt = profileEditSection === "status";
     var editPh = profileEditSection === "photo";
     var editInfo = profileEditSection === "info";
+    var editSkin = profileEditSection === "skin";
     function editToggle(sec, label) {
       var open = profileEditSection === sec;
       return '<button type="button" class="edit-link' + (open ? " is-open" : "") + '" data-profile-edit="' + sec + '">'
         + (open ? "Done" : ("Edit " + label)) + '</button>';
     }
     return '<section class="page me-page profile-page">' + meSubnav()
+      + '<div class="profile-skin" style="' + esc(profileSkinStyleAttr(skin)) + '">'
       + '<div class="classic-profile">'
       +   '<div class="cp-header">'
       +     '<div class="cp-photo">' + photoHtml
@@ -2309,6 +2493,7 @@ function helpPage() {
       +       '<div class="cp-name-row"><span class="cp-name">' + esc(me.name) + '</span>' + roleBadgeHtml(getRole(sid)) + '<span class="level-badge">Level 1</span></div>'
       +       '<div class="cp-status-block">'
       +         '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      +         (skin.motto ? ('<div class="cp-motto">' + esc(skin.motto) + '</div>') : '')
       +         editToggle("status", "status")
       +       '</div>'
       +       profileActionRow({})
@@ -2366,10 +2551,57 @@ function helpPage() {
       +   '<div class="cp-section"><h2>Comments</h2>'
       +     '<form class="wall-form" id="wall-form"><input name="text" maxlength="240" placeholder="Leave a comment" required /><button type="submit">Post</button></form>'
       +     '<div id="wall-list">' + wallHtml + '</div></div>'
+      +   '<div class="cp-section"><div class="cp-section-head"><h2>Look &amp; background</h2>'
+      +     editToggle("skin", "look") + '</div>'
+      +     '<p class="meta">MySpace-style profile background for visitors. No profile music — use room playlists for audio.</p>'
+      +     (skin.motto ? ('<p class="cp-motto-preview"><i>' + esc(skin.motto) + '</i></p>') : '<p class="meta">No motto set.</p>')
+      +     (editSkin
+            ? ('<div class="cp-edit-panel is-open" id="edit-skin-panel">'
+              +   '<div class="cp-edit-head"><b>Edit look &amp; background</b>'
+              +     '<button type="button" class="text-btn" data-profile-edit-cancel="1">Cancel</button></div>'
+              +   '<form class="skin-form" id="skin-form">'
+              +     '<div class="section-label">Presets</div>'
+              +     '<div class="skin-presets">'
+              +       '<button type="button" class="action-btn" data-skin-preset="classic">Classic Blue</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="night">Night</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="sunset">Sunset</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="paper">Soft Paper</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="clear">Clear (none)</button>'
+              +     '</div>'
+              +     '<label>Background type <select name="bgType">'
+              +       '<option value="none"' + (skin.bgType === "none" ? " selected" : "") + '>None</option>'
+              +       '<option value="color"' + (skin.bgType === "color" ? " selected" : "") + '>Solid color</option>'
+              +       '<option value="gradient"' + (skin.bgType === "gradient" ? " selected" : "") + '>Gradient</option>'
+              +       '<option value="image"' + (skin.bgType === "image" ? " selected" : "") + '>Image</option>'
+              +     '</select></label>'
+              +     '<label>Background color <input type="color" name="bgColorPicker" value="' + esc(skin.bgColor || "#cfe6f5") + '" />'
+              +       '<input name="bgColor" maxlength="32" value="' + esc(skin.bgColor || "#cfe6f5") + '" /></label>'
+              +     '<label>Gradient end <input type="color" name="bgColor2Picker" value="' + esc(skin.bgColor2 || "#ffffff") + '" />'
+              +       '<input name="bgColor2" maxlength="32" value="' + esc(skin.bgColor2 || "#ffffff") + '" /></label>'
+              +     '<label>Accent <input type="color" name="accentPicker" value="' + esc(skin.accent || "#1e6fa8") + '" />'
+              +       '<input name="accent" maxlength="32" value="' + esc(skin.accent || "#1e6fa8") + '" /></label>'
+              +     '<label>Panel opacity <select name="panelAlpha">'
+              +       '<option value="1"' + (Number(skin.panelAlpha) >= 0.98 ? " selected" : "") + '>Solid</option>'
+              +       '<option value="0.92"' + (Number(skin.panelAlpha) < 0.98 && Number(skin.panelAlpha) >= 0.85 ? " selected" : "") + '>Soft</option>'
+              +       '<option value="0.78"' + (Number(skin.panelAlpha) < 0.85 ? " selected" : "") + '>Airy</option>'
+              +     '</select></label>'
+              +     '<label>Motto <input name="motto" maxlength="80" placeholder="Short blurb under status" value="' + esc(skin.motto || "") + '" /></label>'
+              +     '<label class="skin-bg-file">Background image (png/jpg/gif/webp)'
+              +       '<input type="file" id="skin-bg-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+              +     '<p class="meta">Only upload images you have rights to (same spirit as Stuff). ~400KB warn; huge files rejected. Stored as a data URL in this browser.</p>'
+              +     (skin.bgImage ? '<p class="meta">Current image saved. Choose Clear preset or Background type → None to remove.</p>' : '')
+              +     '<input type="hidden" name="bgImage" id="skin-bg-data" value="" />'
+              +     '<input type="hidden" name="keepImage" value="' + (skin.bgImage ? "1" : "0") + '" />'
+              +     '<div class="cp-edit-actions"><button type="submit">Save look</button>'
+              +       '<button type="button" class="text-btn" data-profile-edit-cancel="1">Done</button></div>'
+              +     '<p class="meta" id="skin-msg"></p>'
+              +   '</form></div>')
+            : '')
+      +   '</div>'
       +   '<div class="cp-section"><h2>Pokes</h2>' + (pokes.length ? pokes.map(function (p) {
             return '<div class="meta">Poked by <b>' + esc(p.from) + '</b> · ' + esc((p.at || "").slice(0, 16).replace("T", " ")) + '</div>';
           }).join("") : '<p class="meta">No pokes yet.</p>') + '</div>'
-      + '</div></section>';
+      + '</div></div></section>';
   }
 
   function collectSearchablePeople() {
@@ -2641,6 +2873,9 @@ function helpPage() {
     var photo = localStorage.getItem("whirled2.photo." + id) || "";
     var wall = loadWall(id);
     var info = loadInfo(id);
+    // How this works: visitors see this player's saved profile skin immediately.
+    // ENGINE DEV: still Me chrome only — engine ignores profile skins.
+    var skin = loadProfileSkin(id);
     var photoHtml = photo
       ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(initials) + '</span></div>';
@@ -2652,12 +2887,14 @@ function helpPage() {
     var member = "";
     try { member = localStorage.getItem("whirled2.since." + id) || ""; } catch (e) {}
     return '<section class="page me-page profile-page">' + meSubnav()
+      + '<div class="profile-skin" style="' + esc(profileSkinStyleAttr(skin)) + '">'
       + '<div class="classic-profile">'
       +   '<div class="cp-header">'
       +     '<div class="cp-photo">' + photoHtml + '</div>'
       +     '<div class="cp-main">'
       +       '<div class="cp-name-row"><span class="cp-name">' + esc(name) + '</span>' + roleBadgeHtml(getRole(id)) + '<span class="level-badge">Level 1</span></div>'
       +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      +       (skin.motto ? ('<div class="cp-motto">' + esc(skin.motto) + '</div>') : '')
       +       profileActionRow({
             poke: isSelf ? '' : ('data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '"'),
             friend: isSelf ? '' : ('data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '"'),
@@ -2675,7 +2912,7 @@ function helpPage() {
       +   '<div class="cp-section"><h2>Comments</h2>'
       +     '<form class="wall-form" id="wall-form" data-wall-user="' + esc(id) + '"><input name="text" maxlength="240" placeholder="Leave a comment" required /><button type="submit">Post</button></form>'
       +     '<div id="wall-list">' + wallHtml + '</div></div>'
-      + '</div></section>';
+      + '</div></div></section>';
   }
 
 
@@ -2998,10 +3235,10 @@ function helpPage() {
       +         '<button type="button" data-room-menu="comment">Comment or rate</button>'
       +         '<button type="button" data-room-menu="decorate">Decorate Room</button>'
       +         '<button type="button" data-room-menu="playlist">View room playlist</button>'
-      +         '<div class="room-lock-row meta">Lock (visual only)</div>'
-      +         '<button type="button" data-room-lock="unlocked"' + (loadRoomLock() === "unlocked" ? ' class="is-on"' : '') + '>🔓 Unlocked</button>'
-      +         '<button type="button" data-room-lock="friends"' + (loadRoomLock() === "friends" ? ' class="is-on"' : '') + '>👥 Friends</button>'
-      +         '<button type="button" data-room-lock="locked"' + (loadRoomLock() === "locked" ? ' class="is-on"' : '') + '>🔒 Locked</button>'
+      +         '<div class="room-lock-row meta">Lock (enforced locally)</div>'
+      +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock().mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + '>🔓 Unlocked</button>'
+      +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock().mode || "") === "friends" ? ' class="is-on"' : '') + '>👥 Friends</button>'
+      +         '<button type="button" data-room-lock="locked"' + ((loadRoomLock().mode || "") === "locked" ? ' class="is-on"' : '') + '>🔒 Locked</button>'
       +         '<button type="button" data-room-menu="lobby">' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '</button>'
       +       '</div>'
       +     '</span>'
@@ -3067,7 +3304,7 @@ function helpPage() {
       if (nb) nb.remove();
     }
     try {
-      var lk = loadRoomLock();
+      var lk = (loadRoomLock().mode || "unlocked");
       document.querySelectorAll("[data-room-lock]").forEach(function (btn) {
         btn.classList.toggle("is-on", btn.getAttribute("data-room-lock") === lk);
       });
@@ -3667,7 +3904,11 @@ function helpPage() {
     }
     var enter = ev.target.closest("[data-enter-room]");
     if (enter && session()) {
-      inRoom = true;
+      // How this works: room lock gates entry — blocked visitors stay in lobby.
+      if (!tryEnterLoft()) {
+        paint("rooms");
+        return;
+      }
       // Fresh visit: empty room chat (old sessions stay wiped).
       clearRoomChatDisplay(true);
       paint("rooms");
@@ -3708,7 +3949,11 @@ function helpPage() {
       var gm = document.getElementById("go-menu");
       if (gm) gm.hidden = true;
       if (g === "home" || g === "recent") {
-        inRoom = true;
+        // How this works: Go home / Recent also respect room lock.
+        if (!tryEnterLoft()) {
+          paint("rooms");
+          return;
+        }
         clearRoomChatDisplay(true);
         paint("rooms");
         loadOccupants();
@@ -4447,7 +4692,10 @@ function helpPage() {
     if (joinThem && session()) {
       // How this works: Join them! drops you into Studio Loft with your friend (local occupants).
       var jname = joinThem.getAttribute("data-join-name") || "friend";
-      inRoom = true;
+      if (!tryEnterLoft()) {
+        paint("rooms");
+        return;
+      }
       clearRoomChatDisplay(true);
       paint("rooms");
       loadOccupants();
@@ -4507,6 +4755,35 @@ function helpPage() {
       } catch (e) {}
       mailRow.classList.remove("unread");
     }
+    var skinPreset = ev.target.closest("[data-skin-preset]");
+    if (skinPreset && session()) {
+      // How this works: preset buttons fill the Look & background form (Save still required).
+      var pid = skinPreset.getAttribute("data-skin-preset");
+      var preset = PROFILE_SKIN_PRESETS[pid];
+      var formP = document.getElementById("skin-form");
+      if (preset && formP) {
+        formP.bgType.value = preset.bgType;
+        formP.bgColor.value = preset.bgColor;
+        formP.bgColor2.value = preset.bgColor2;
+        formP.accent.value = preset.accent;
+        if (formP.bgColorPicker) formP.bgColorPicker.value = preset.bgColor;
+        if (formP.bgColor2Picker) formP.bgColor2Picker.value = preset.bgColor2;
+        if (formP.accentPicker) formP.accentPicker.value = preset.accent;
+        var a = String(preset.panelAlpha);
+        if (a === "1" || Number(preset.panelAlpha) >= 0.98) formP.panelAlpha.value = "1";
+        else if (Number(preset.panelAlpha) < 0.85) formP.panelAlpha.value = "0.78";
+        else formP.panelAlpha.value = "0.92";
+        if (preset.bgType === "none" || preset.bgType !== "image") {
+          window.__skinBgPending = "";
+          if (formP.keepImage) formP.keepImage.value = "0";
+          var hidP = document.getElementById("skin-bg-data");
+          if (hidP) hidP.value = "";
+        }
+        var smsgP = document.getElementById("skin-msg");
+        if (smsgP) smsgP.textContent = "Preset applied — click Save look.";
+      }
+      return;
+    }
     var ped = ev.target.closest("[data-profile-edit]");
     if (ped && session()) {
       var sec = ped.getAttribute("data-profile-edit");
@@ -4557,6 +4834,49 @@ function helpPage() {
       var plO = loadPlaylist();
       plO.ownerOnlyAdd = !!ev.target.checked;
       savePlaylist(plO);
+      return;
+    }
+    // How this works: color pickers in Look & background sync the text hex fields.
+    if (ev.target.name === "bgColorPicker" || ev.target.name === "bgColor2Picker" || ev.target.name === "accentPicker") {
+      var formSync = ev.target.closest("#skin-form");
+      if (formSync) {
+        var mapName = { bgColorPicker: "bgColor", bgColor2Picker: "bgColor2", accentPicker: "accent" };
+        var field = formSync.querySelector('[name="' + mapName[ev.target.name] + '"]');
+        if (field) field.value = ev.target.value;
+      }
+      return;
+    }
+    // How this works: profile background image → data URL (cap ~400KB warn / reject huge).
+    if (ev.target.id === "skin-bg-input" && session()) {
+      var sfile = ev.target.files && ev.target.files[0];
+      var smsg = document.getElementById("skin-msg");
+      if (!sfile) return;
+      var okType = /image\/(png|jpeg|jpg|gif|webp)/i.test(sfile.type) || /\.(png|jpe?g|gif|webp)$/i.test(sfile.name || "");
+      if (!okType) {
+        if (smsg) smsg.textContent = "Use png, jpg, gif, or webp.";
+        return;
+      }
+      if (sfile.size > PROFILE_BG_MAX_HARD) {
+        if (smsg) smsg.textContent = "Image too large for this demo (keep under ~900KB).";
+        alert("Background image too large. Keep under ~900KB.");
+        return;
+      }
+      if (sfile.size > PROFILE_BG_MAX_WARN) {
+        if (smsg) smsg.textContent = "Warning: large image (~400KB+). Saving may fill browser storage.";
+      }
+      var sreader = new FileReader();
+      sreader.onload = function () {
+        var dataUrl = String(sreader.result || "");
+        window.__skinBgPending = dataUrl;
+        var hid = document.getElementById("skin-bg-data");
+        if (hid) hid.value = "pending";
+        var keep = document.querySelector('#skin-form [name="keepImage"]');
+        if (keep) keep.value = "0";
+        var typeSel = document.querySelector('#skin-form [name="bgType"]');
+        if (typeSel) typeSel.value = "image";
+        if (smsg) smsg.textContent = "Image ready — click Save look.";
+      };
+      sreader.readAsDataURL(sfile);
       return;
     }
     if (ev.target.id !== "photo-input" || !session()) return;
@@ -4613,6 +4933,40 @@ function helpPage() {
         profileEditSection = null;
         paint("me");
       }).catch(function (e) { if (msg) msg.textContent = e.message; });
+      return;
+    }
+    if (ev.target.id === "skin-form" && session()) {
+      // How this works: Save look → whirled2.profileSkin.{userId}, then repaint profile.
+      var sd = new FormData(ev.target);
+      var sidSkin = session().user.id;
+      var prevSkin = loadProfileSkin(sidSkin);
+      var bgType = String(sd.get("bgType") || "none");
+      var bgImage = "";
+      if (bgType === "image") {
+        if (window.__skinBgPending) bgImage = String(window.__skinBgPending);
+        else if (String(sd.get("keepImage") || "") === "1") bgImage = prevSkin.bgImage || "";
+      }
+      var nextSkin = {
+        bgType: bgType,
+        bgColor: String(sd.get("bgColor") || "#cfe6f5").slice(0, 32),
+        bgColor2: String(sd.get("bgColor2") || "#ffffff").slice(0, 32),
+        bgImage: bgImage,
+        accent: String(sd.get("accent") || "#1e6fa8").slice(0, 32),
+        panelAlpha: Number(sd.get("panelAlpha") || 0.92),
+        motto: String(sd.get("motto") || "").trim().slice(0, 80)
+      };
+      if (bgType === "image" && !nextSkin.bgImage) {
+        var sm = document.getElementById("skin-msg");
+        if (sm) sm.textContent = "Pick an image or choose another background type.";
+        return;
+      }
+      saveProfileSkin(sidSkin, nextSkin);
+      window.__skinBgPending = "";
+      meSub = "profile";
+      viewingId = null;
+      profileEditSection = null;
+      pushNotice("green", "Profile look saved.", { transient: true });
+      paint("me");
       return;
     }
     if (ev.target.id === "status-form" && session()) {

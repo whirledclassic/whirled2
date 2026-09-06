@@ -607,6 +607,95 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 
 /* Classic Whirled profile layout */
 /* ---- Classic profile layout ---- */
+/* How this works: .profile-skin wraps .classic-profile for MySpace-like BGs.
+   ENGINE DEV: profile chrome ≠ #stage-slot — engine ignores profile skins.
+   Pale-blue topbar/tabs stay on the outer chrome; only the profile card area skins. */
+.profile-skin {
+  min-height: 420px;
+  border-radius: 10px;
+  padding: 12px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-sizing: border-box;
+}
+.profile-skin .classic-profile {
+  max-width: 920px;
+}
+.profile-skin .cp-header,
+.profile-skin .cp-section,
+.profile-skin .cp-meta-box,
+.profile-skin .cp-edit-panel {
+  background: var(--profile-panel, rgba(255, 255, 255, 0.92));
+  border-color: color-mix(in srgb, var(--profile-accent, #1e6fa8) 35%, #c5deee);
+}
+.profile-skin .cp-header {
+  background: var(--profile-panel, rgba(255, 255, 255, 0.92));
+}
+.profile-skin .cp-name,
+.profile-skin .cp-section h2,
+.profile-skin .cp-edit-head,
+.profile-skin .edit-link {
+  color: var(--profile-accent, #1e6fa8);
+}
+.profile-skin .cp-motto {
+  margin: 2px 0 8px;
+  font-size: 13px;
+  font-style: italic;
+  color: #16324a;
+  opacity: 0.9;
+}
+.skin-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.skin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #4a6a80;
+  font-weight: 700;
+}
+.skin-form input[type="text"],
+.skin-form input:not([type]),
+.skin-form input[name="bgColor"],
+.skin-form input[name="bgColor2"],
+.skin-form input[name="accent"],
+.skin-form input[name="motto"],
+.skin-form select {
+  border: 1px solid #b7d3e8;
+  border-radius: 4px;
+  padding: 7px 8px;
+  font: 13px var(--ui);
+  color: #16324a;
+  font-weight: 400;
+}
+.skin-form input[type="color"] {
+  width: 48px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #b7d3e8;
+  border-radius: 4px;
+  background: #fff;
+}
+.skin-form .skin-presets,
+.skin-form .skin-bg-file,
+.skin-form .cp-edit-actions,
+.skin-form .section-label,
+.skin-form #skin-msg,
+.skin-form > .meta {
+  grid-column: 1 / -1;
+}
+.skin-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.skin-form button[type="submit"] {
+  border: 0; background: #3aa3e0; color: #fff; border-radius: 4px;
+  padding: 8px 14px; font: 700 12px var(--ui); cursor: pointer;
+}
+@media (max-width: 700px) {
+  .skin-form { grid-template-columns: 1fr; }
+}
 .classic-profile { max-width: 920px; }
 .cp-header {
   display: grid;
@@ -1953,4 +2042,12 @@ body > .party-panel {
   font: 700 11px var(--ui);
   color: #e8f4fb;
   text-shadow: 0 1px 2px rgba(0,0,0,0.65);
+}
+
+/* Thought lines in Slide/Overlay history (/think) */
+.chat-bubble.thought {
+  font-style: italic;
+  opacity: 0.92;
+  background: rgba(244, 249, 252, 0.85);
+  border-radius: 16px;
 }

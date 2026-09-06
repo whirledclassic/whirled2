@@ -2,17 +2,15 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906j)
+## What shipped (?v=20260906k)
 
-- **ENGINE-BRIDGE.md** expanded into a full hired-engine-developer runbook (two-repo model, local chrome, Vite standalone, `mountWhirledEngine`, API table, `whirled:ready`, wiring options, do-nots, checklist, z-index, chat vs stage bubbles).
-- **DEV-NOTES.md** + **README.md** top “For the engine developer” sections; comment conventions (`How this works` / `ENGINE DEV`).
-- **Stage avatar bubbles** (`#stage-bubbles`): temporary speech / thought (`/think`) / emote (`/me`) over the stage; duration in Chat Options → Chat settings (`whirled2.chatUi.bubbleDuration`); cleared on leave/clear.
-- **WhirledChrome v0.4** — `exposeBridge` ENGINE DEV contract comments + `getChatUi()`.
-- Prior: passport stamps, mail Reply/Delete, Join them!, Add Friend modal, visit-scoped chat.
+- **Profile skins** (MySpace-like): per-user `whirled2.profileSkin.{userId}` — background color/gradient/image, accent, panel opacity, optional motto. Edit on own profile (Look & background). Visitors see skins on other profiles. **No profile music** (room playlists cover audio). Profile chrome ≠ `#stage-slot`; engine ignores skins.
+- **Room lock enforcement** (local mock): `whirled2.roomLock.loft = { mode, ownerId }` — unlocked / friends / locked gate `[data-enter-room]`, Join them!, Go home/recent via `canEnterLoft`. Owner always enters. Legacy string lock values migrate on load.
+- Prior: ENGINE-BRIDGE runbook, stage bubbles, passport, mail Reply/Delete, Join them!, Add Friend modal, visit-scoped chat.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906j
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906k
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
@@ -20,4 +18,5 @@ Date: 2026-09-06
 - No payments / bars purchase / live Club checkout
 - No fake NPCs or invented catalog
 - No WhirledClassicGame / private engine edits
-- Shared multi-browser room chat still needs the Node API (Pages is localStorage-only)
+- No profile music (use room playlist)
+- Shared multi-browser room chat / cross-browser lock still needs the Node API (Pages is localStorage-only)
