@@ -1,3 +1,13 @@
+## ?v=20260906co — Wear sync into Pixi (push + pull)
+
+- Chrome **`WhirledChrome` v0.6**: `registerEngineHooks`, `getRoomItems`, `whirled:wearChanged` / `whirled:roomItemsChanged`.
+- Every successful `saveWornAvatar` (and clear/unequip) dispatches Wear to a mounted engine; post-mount fires once so late listeners catch up.
+- `getWornAvatar()` returns **page-absolute** PNG frame URLs (tunnel-friendly CORS from Pages).
+- Room decorate layout exposed as real chips via `getRoomItems()` — **no invented furniture catalog**; Pixi furniture remains optional/stub.
+- ENGINE-BRIDGE.md updated: Wear is push+pull; local tunnel proof implements `applyAppearance` (Nabir ports to real repo; **no push to WhirledClassicGame**).
+- Public tree still has **no** private engine source.
+- Cache: **`?v=20260906co`**. Push: `/workspace/push-co.js` (`WHIRLED_DO_PUSH=1`).
+
 ## ?v=20260906cn — ENGINE REPLACEMENT (chrome only)
 
 - **Homemade loft tofu/PNG walk is no longer the default playable room engine.**

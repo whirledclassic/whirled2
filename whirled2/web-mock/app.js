@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906cn";
+  var LOGO_V = "20260906co";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1860,9 +1860,92 @@
       return normalizeWornAvatar(raw);
     } catch (e) { return null; }
   }
+  // ENGINE DEV (?v=20260906co): hooks + wearChanged so Pixi can hot-swap without remount.
+  // Beginner: Stuff → Wear still only writes localStorage; this tells a mounted engine "look again".
+  var _engineHooks = { applyAppearance: null, applyRoomItems: null, onReady: null };
+  function registerEngineHooks(hooks) {
+    // How this works: engine calls WhirledChrome.registerEngineHooks({ applyAppearance, applyRoomItems, onReady }).
+    // Beginner: optional — listening to document "whirled:wearChanged" works the same.
+    hooks = hooks || {};
+    if (typeof hooks.applyAppearance === "function") _engineHooks.applyAppearance = hooks.applyAppearance;
+    if (typeof hooks.applyRoomItems === "function") _engineHooks.applyRoomItems = hooks.applyRoomItems;
+    if (typeof hooks.onReady === "function") _engineHooks.onReady = hooks.onReady;
+    window.__whirledEngine = window.__whirledEngine || {};
+    if (_engineHooks.applyAppearance) window.__whirledEngine.applyAppearance = _engineHooks.applyAppearance;
+    if (_engineHooks.applyRoomItems) window.__whirledEngine.applyRoomItems = _engineHooks.applyRoomItems;
+    return { ok: true, version: "0.6" };
+  }
+  function pageAbsoluteMediaUrl(url) {
+    // How this works (?v=20260906co): Pixi Assets.load needs absolute URLs when engineSrc is cross-origin.
+    // Beginner: ./assets/... is relative to THIS chrome page (Pages), not the Vite engine origin.
+    // ENGINE DEV: resolve against location.href so /whirled2/…/web-mock/ stays correct.
+    var u = String(url || "").trim();
+    if (!u) return "";
+    if (/^(https?:|data:|blob:)/i.test(u)) return u;
+    try { return new URL(u, location.href).href; } catch (eAbs) { return u; }
+  }
+  function absolutizeWornForEngine(worn) {
+    // Clone + absolutize frame/thumb/preview/swf URLs for tunnel-friendly Pixi loads.
+    if (!worn || typeof worn !== "object") return worn;
+    var out;
+    try { out = JSON.parse(JSON.stringify(worn)); } catch (eC) { out = worn; }
+    if (out.preview) out.preview = pageAbsoluteMediaUrl(out.preview);
+    if (out.thumb) out.thumb = pageAbsoluteMediaUrl(out.thumb);
+    if (out.swfUrl && String(out.swfUrl).indexOf("data:") !== 0) out.swfUrl = pageAbsoluteMediaUrl(out.swfUrl);
+    if (out.frames && out.frames.length) {
+      out.frames = out.frames.map(function (f) { return pageAbsoluteMediaUrl(f); }).filter(Boolean);
+    }
+    if (out.states && typeof out.states === "object") {
+      Object.keys(out.states).forEach(function (k) {
+        var st = out.states[k] || {};
+        out.states[k] = {
+          frames: (st.frames || []).map(function (f) { return pageAbsoluteMediaUrl(f); }).filter(Boolean),
+          frameDurationsMs: (st.frameDurationsMs || []).slice()
+        };
+      });
+    }
+    return out;
+  }
+  function notifyWearChanged(wornOrNull) {
+    // Push Wear to engine: CustomEvent + registered hook + window.__whirledEngine.applyAppearance.
+    var detail = wornOrNull ? absolutizeWornForEngine(wornOrNull) : null;
+    try {
+      document.dispatchEvent(new CustomEvent("whirled:wearChanged", { detail: detail }));
+    } catch (eEv) {}
+    try {
+      if (typeof _engineHooks.applyAppearance === "function") _engineHooks.applyAppearance(detail);
+    } catch (eH) {}
+    try {
+      if (window.__whirledEngine && typeof window.__whirledEngine.applyAppearance === "function"
+          && window.__whirledEngine.applyAppearance !== _engineHooks.applyAppearance) {
+        window.__whirledEngine.applyAppearance(detail);
+      }
+    } catch (eG) {}
+  }
+  function notifyRoomItemsChanged(items, roomId) {
+    var payload = {
+      roomId: String(roomId || (typeof currentRoomId !== "undefined" ? currentRoomId : "") || "loft"),
+      items: Array.isArray(items) ? items : []
+    };
+    try {
+      document.dispatchEvent(new CustomEvent("whirled:roomItemsChanged", { detail: payload }));
+    } catch (eEv) {}
+    try {
+      if (typeof _engineHooks.applyRoomItems === "function") _engineHooks.applyRoomItems(payload);
+    } catch (eH) {}
+    try {
+      if (window.__whirledEngine && typeof window.__whirledEngine.applyRoomItems === "function"
+          && window.__whirledEngine.applyRoomItems !== _engineHooks.applyRoomItems) {
+        window.__whirledEngine.applyRoomItems(payload);
+      }
+    } catch (eG) {}
+  }
   function saveWornAvatar(row) {
+    // How this works (?v=20260906co): every successful Wear write/clear notifies the engine.
+    // Beginner: unequip (null) also fires whirled:wearChanged with detail null.
     if (!row) {
       localStorage.removeItem(WORN_AVATAR_KEY);
+      try { notifyWearChanged(null); } catch (eN0) {}
       return;
     }
     // Harden (?v=20260906bg): never blow localStorage with multi-MB SWF data URLs → Wear fails → tofu.
@@ -1872,17 +1955,23 @@
         delete row.swfUrl;
       }
     } catch (eStrip) {}
+    var saved = false;
     try {
       localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(row));
+      saved = true;
     } catch (eQuota) {
       try {
         var slim = Object.assign({}, row);
         delete slim.swfDataUrl;
         if (slim.swfUrl && String(slim.swfUrl).indexOf("data:") === 0) delete slim.swfUrl;
         localStorage.setItem(WORN_AVATAR_KEY, JSON.stringify(slim));
+        saved = true;
       } catch (e2) {
         try { pushNotice("status", "Could not save Wear — storage full. Try smaller PNGs / re-upload SWF."); } catch (e3) {}
       }
+    }
+    if (saved) {
+      try { notifyWearChanged(normalizeWornAvatar(row) || row); } catch (eN1) {}
     }
   }
   function absolutizeMediaUrl(url, packPath) {
@@ -4170,6 +4259,8 @@
   }
   function saveRoomLayout(layout, roomId) {
     // How this works: persist chips for this room (cap 80). Doors keep doorTo/doorLabel.
+    // ENGINE DEV (?v=20260906co): also fire whirled:roomItemsChanged so Pixi can mirror if desired.
+    // Beginner: chrome still draws #decorate-layer chips — engine furniture is optional / stub until you port it.
     roomId = String(roomId || (typeof currentRoomId !== "undefined" ? currentRoomId : "") || "loft");
     try {
       var items = (layout && layout.items) ? layout.items.slice(0, 80) : [];
@@ -4178,6 +4269,7 @@
       if (roomId === "loft") {
         try { localStorage.setItem(ROOM_LAYOUT_KEY, payload); } catch (e0) {}
       }
+      try { notifyRoomItemsChanged(items, roomId); } catch (eNri) {}
     } catch (e) {}
   }
   function loadFavorites() {
@@ -12427,6 +12519,15 @@
           engineMounted = true;
           markStageEngineOwned(host);
           try { pushNotice("green", "Pixi engine mounted in #stage-slot", { transient: true }); } catch (eN) {}
+          // ENGINE DEV (?v=20260906co): late listeners get current Wear once after mount.
+          try { notifyWearChanged(loadWornAvatar()); } catch (eWearM) {}
+          try {
+            var layM = loadRoomLayout();
+            notifyRoomItemsChanged(layM && layM.items ? layM.items : [], currentRoomId || "loft");
+          } catch (eRoomM) {}
+          try {
+            if (typeof _engineHooks.onReady === "function") _engineHooks.onReady(window.WhirledChrome);
+          } catch (eReady) {}
           return true;
         })
         .catch(function (err) {
@@ -12451,6 +12552,15 @@
         engineMounted = true;
         markStageEngineOwned(host);
         try { pushNotice("green", "Pixi engine mounted from engineSrc", { transient: true }); } catch (eN3) {}
+        // ENGINE DEV (?v=20260906co): push current Wear + room layout after engineSrc mount.
+        try { notifyWearChanged(loadWornAvatar()); } catch (eWearM2) {}
+        try {
+          var layM2 = loadRoomLayout();
+          notifyRoomItemsChanged(layM2 && layM2.items ? layM2.items : [], currentRoomId || "loft");
+        } catch (eRoomM2) {}
+        try {
+          if (typeof _engineHooks.onReady === "function") _engineHooks.onReady(window.WhirledChrome);
+        } catch (eReady2) {}
         return true;
       })
       .catch(function (err) {
@@ -12464,18 +12574,19 @@
 
   // WhirledChrome bridge — engine mounts only via getStageEl() → #stage-slot
   // ---------------------------------------------------------------------------
-  // ENGINE DEV (?v=20260906cn / API "0.5"): YOU own room + avatars + walk in Pixi.
+  // ENGINE DEV (?v=20260906co / API "0.6"): YOU own room + avatars + walk in Pixi.
   // Chrome = website shell (login, tabs, Stuff/Wear inventory, chat). Never rebuild login.
   // Mount: mountWhirledEngine(host) where host = WhirledChrome.getStageEl() === #stage-slot
   //   resizeTo: host — canvas ONLY inside that element. Never publish engine into public Pages.
+  // Wear sync (push+pull): listen whirled:wearChanged OR registerEngineHooks({ applyAppearance }).
   // Homemade tofu/PNG loft walk is disabled by default. Classic Flash/Ruffle is experimental only.
-  // Listen for "whirled:ready" / "whirled:floorClick". Prefer canvas pointer events once mounted.
+  // Listen for "whirled:ready" / "whirled:floorClick" / "whirled:roomItemsChanged".
   // ---------------------------------------------------------------------------
   function exposeBridge() {
     // ENGINE DEV: wallet is chrome localStorage; getWallet() is optional read-only for engine.
     // Avatar lab wardrobe APIs are experimental read helpers — activeId is NOT applied to #stage-slot.
     window.WhirledChrome = {
-      version: "0.5",
+      version: "0.6",
       getStageEl: function () { return document.getElementById("stage-slot"); },
       // (?v=20260906cn) Chrome asks an optional external engine to mount — never embeds private game files.
       tryMountEngine: function () { return tryLoadAndMountEngine(); },
@@ -12506,12 +12617,13 @@
       // Appearance for Pixi: worn Stuff row (+ states) and optional wardrobe snapshot.
       // ENGINE DEV: build sprites from getWornAvatar().states in YOUR private repo — do not copy engine here.
       getWornAvatar: function () {
+        // ENGINE DEV (?v=20260906co): returns absolute/resolvable PNG frame URLs for cross-origin Pixi.
         var w = loadWornAvatar();
         if (!w) return null;
         if (!w.states) {
           try { w.states = resolveAvatarStates(w); } catch (e) {}
         }
-        return w;
+        return absolutizeWornForEngine(w);
       },
       getWardrobeAppearance: function () {
         // Beginner: one object with worn + wardrobe for engine boot.
@@ -12520,6 +12632,17 @@
         var wardrobe = null;
         try { wardrobe = loadWardrobe(); } catch (eR) { wardrobe = null; }
         return { worn: worn, wardrobe: wardrobe, activeId: wardrobe && wardrobe.activeId ? wardrobe.activeId : null };
+      },
+      // (?v=20260906co) Engine registers applyAppearance / applyRoomItems / onReady for push sync.
+      registerEngineHooks: function (hooks) { return registerEngineHooks(hooks); },
+      // Real decorate chips for the active room — do not invent catalog furniture.
+      // ENGINE DEV: chrome still draws #decorate-layer; use this only if you mirror items in Pixi.
+      getRoomItems: function (roomId) {
+        var lay = loadRoomLayout(roomId);
+        return {
+          roomId: String(roomId || (typeof currentRoomId !== "undefined" ? currentRoomId : "") || "loft"),
+          items: (lay && Array.isArray(lay.items)) ? lay.items.slice() : []
+        };
       },
       setAvatarState: function (name) {
         // No-op for chrome loft animation once engine owns avatars; still updates Wear snapshot for engine reads.
@@ -12566,7 +12689,7 @@
         if (!chromeHomemadeWalkEnabled()) return "waiting";
         return getAvatarPlaybackMode();
       },
-      // (?v=20260906cn) Helpers for engine / QA
+      // (?v=20260906co) Helpers for engine / QA
       engineOwnsAvatarWalk: function () { return engineOwnsAvatarPlayback(); },
       chromeHomemadeWalkEnabled: function () { return chromeHomemadeWalkEnabled(); }
     };

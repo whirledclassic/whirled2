@@ -5,17 +5,33 @@ This public **web-mock** folder is only the **website chrome** (login, tabs, Stu
 
 One site, classic whirled.club feel: chrome around the middle, **your Pixi stage in the center** (`#stage-slot`). Not an “iframe game product” — just mount into the stage slot.
 
-Cache stamp for this chrome: **`?v=20260906cn`**. Bridge API version: **`0.5`**.
+Cache stamp for this chrome: **`?v=20260906co`**. Bridge API version: **`0.6`**.
 
 ---
 
-## What changed (?v=20260906cn)
+## What changed (?v=20260906co) — Wear sync push + pull
+
+Chrome **pushes** Wear into a mounted engine (and you still **pull** on boot):
+
+1. After every successful `saveWornAvatar` (Wear / unequip / clear), chrome dispatches  
+   `document` **`whirled:wearChanged`** with `detail` = worn row (**absolute PNG URLs**) or `null`.
+2. Same moment chrome calls any registered hook:  
+   `WhirledChrome.registerEngineHooks({ applyAppearance, applyRoomItems, onReady })`  
+   and/or `window.__whirledEngine.applyAppearance?.(worn)`.
+3. Right after a successful `tryMountEngine` / mount, chrome fires **`whirled:wearChanged`** once more so late listeners get the current Wear.
+4. **`getWornAvatar()`** returns frame/thumb/preview URLs resolved against the **chrome page** (`location.href`) so tunnel Pixi can `Assets.load` cross-origin Pages PNGs (GitHub Pages sends `Access-Control-Allow-Origin: *`).
+5. **Room items:** `getRoomItems()` returns real decorate-chip layout from `whirled2.roomLayout.*` (no invented catalog). Saves fire **`whirled:roomItemsChanged`**. Chrome still draws `#decorate-layer` — Pixi furniture is optional until you port it.
+
+Local tunnel proof (not your GitHub): engine `applyAppearance` loads Wear PNG idle/walk into AnimatedSprite; bunny stays fallback for empty / SWF-only Wear.
+
+---
+
+## What changed earlier (?v=20260906cn)
 
 - Homemade loft **tofu / PNG click-to-walk is no longer the default playable room engine**.
 - Without `engineSrc`, the loft shows a soft placeholder: *Pixi engine mounts here*.
-- When `mountWhirledEngine` succeeds (or `#stage-slot` has `data-engine-owns-avatar-walk="1"` / `data-whirled-engine="1"`), chrome **does not** animate loft avatars.
-- Classic Flash / Ruffle stays **experimental / opt-in** (`?flashQa=1`, Stuff Classic Flash). Never put Ruffle in `#stage-slot`.
-- Legacy chrome loft walk only if someone sets `?chromeWalk=1` (QA) — not the live default.
+- When `mountWhirledEngine` succeeds, chrome **does not** animate loft avatars.
+- Classic Flash / Ruffle stays **experimental / opt-in**. Never put Ruffle in `#stage-slot`.
 
 **You own avatars now.** Chrome keeps Wear inventory data; you draw sprites in Pixi.
 
@@ -32,20 +48,21 @@ Cache stamp for this chrome: **`?v=20260906cn`**. Bridge API version: **`0.5`**.
 
 ## How to mount (checklist)
 
-1. Run chrome (`web-mock/index.html` or a static server).
+1. Run chrome (`web-mock/index.html` or Pages).
 2. Run your Vite engine with CORS so the chrome page can `import()` it.
 3. Open chrome with  
-   `?engineSrc=http://127.0.0.1:5173/src/chrome-bridge.js`  
+   `?engineSrc=https://YOUR-TUNNEL/src/chrome-bridge.js`  
    (or `localStorage.whirled2.engineSrc`, or `window.WHIRLED_ENGINE_SRC`).
-4. Export **`mountWhirledEngine(host)`** from that module (your repo already has this shape).
+4. Export **`mountWhirledEngine(host)`** from that module.
 5. Inside mount:
    - `resizeTo: host` (not `window`)
    - `host.replaceChildren(app.canvas)` — canvas **only** in `#stage-slot`
-   - set `data-whirled-engine="1"` and `data-engine-owns-avatar-walk="1"` on the host (chrome also marks these after a successful mount)
-6. Read session / worn avatar from `window.WhirledChrome` (see below).
-7. Prefer **pointer events on your canvas** for walk. Chrome may also fire `whirled:floorClick` / `onFloorClick` as a fallback.
-
-Phone test already proved `engineSrc` mount works — keep that path.
+   - set `data-whirled-engine="1"` and `data-engine-owns-avatar-walk="1"`
+6. **Wear sync (required for avatar look):**
+   - On mount: `const worn = WhirledChrome.getWornAvatar()` → build sprites from `states.idle` / `states.walk` PNG frames.
+   - `WhirledChrome.registerEngineHooks({ applyAppearance })` **and/or** listen to `whirled:wearChanged`.
+   - Resolve relative `./assets/...` against **chrome** origin (page URL), not the Vite origin.
+7. Prefer **pointer events on your canvas** for walk. Optional: `whirled:floorClick` / `onFloorClick`.
 
 ---
 
@@ -58,68 +75,66 @@ export async function mountWhirledEngine(host) {
   host.replaceChildren(app.canvas)
   host.setAttribute("data-whirled-engine", "1")
   host.setAttribute("data-engine-owns-avatar-walk", "1")
-  // Build room + avatars + walk here. Use WhirledChrome.getWornAvatar() for Wear appearance.
+
+  // Build room + player…
+  function applyAppearance(worn) {
+    // Load worn?.states?.idle?.frames / walk into AnimatedSprite.
+    // If no PNG frames (SWF-only / empty), keep your fallback sprite.
+  }
+
+  const chrome = window.WhirledChrome
+  chrome?.registerEngineHooks?.({ applyAppearance })
+  applyAppearance(chrome?.getWornAvatar?.() || null)
+  document.addEventListener("whirled:wearChanged", (ev) => applyAppearance(ev.detail))
+
   return app
 }
-
-function boot() {
-  const chrome = window.WhirledChrome
-  if (chrome && chrome.getStageEl) {
-    chrome.tryMountEngine?.() || mountWhirledEngine(chrome.getStageEl())
-    return
-  }
-  document.addEventListener("whirled:ready", (ev) => {
-    mountWhirledEngine(ev.detail.getStageEl())
-  }, { once: true })
-}
-boot()
 ```
 
 Chrome also auto-calls `tryMountEngine()` after `exposeBridge()` when `engineSrc` is set.
 
 ---
 
-## `window.WhirledChrome` (v0.5) — what you need
+## `window.WhirledChrome` (v0.6) — what you need
 
 | Member | Role |
 |--------|------|
-| `version` | `"0.5"` |
+| `version` | `"0.6"` |
 | `getStageEl()` | `#stage-slot` — your only draw host |
 | `tryMountEngine()` | Chrome loads `engineSrc` and calls `mountWhirledEngine` |
 | `isEngineMounted()` | True after successful mount / stage marks |
 | `getEngineSrc()` | Resolved engine URL |
-| `getSession()` | Logged-in user (`user.id`, `user.name`, …) |
-| `getRoom()` | `{ id, name }` for the active room |
-| `onChat(fn)` / `sendChat(text)` | Chat already accepted by chrome |
+| `getSession()` | Logged-in user |
+| `getRoom()` | `{ id, name }` |
+| `onChat(fn)` / `sendChat(text)` | Chat |
 | `onOccupants(fn)` | Occupant list |
-| `getChatUi()` | Chat prefs |
-| `getWallet()` | Read-only coins/bars (earn-only; no payments) |
-| **`getWornAvatar()`** | **Stuff Wear row** — may include `states` (`idle`/`walk`/…), frames, `artFaces`, scale fields |
-| **`getWardrobeAppearance()`** | `{ worn, wardrobe, activeId }` for boot |
-| `getWardrobe()` / `getActiveAvatarId()` | Lab wardrobe (experimental; not Flash stage) |
-| `getAvatarWalkTarget()` | Last floor target `{ xPct, yPct, at }` if chrome forwarded a click |
-| **`onFloorClick(fn)`** | Subscribe to chrome-forwarded floor clicks (also event `whirled:floorClick`) |
-| `isChromeWalkActive()` | `false` once you own the stage / default mode |
-| `engineOwnsAvatarWalk()` | `true` when chrome has yielded loft avatar animation |
-| `chromeWalkTo` | Legacy QA only — no-op when you own the stage |
+| `getWallet()` | Read-only coins/bars |
+| **`getWornAvatar()`** | **Stuff Wear row** with **absolute** `states` frame URLs |
+| **`getWardrobeAppearance()`** | `{ worn, wardrobe, activeId }` |
+| **`registerEngineHooks({ applyAppearance, applyRoomItems, onReady })`** | Push sync from chrome |
+| **`getRoomItems(roomId?)`** | `{ roomId, items }` real decorate chips — no fake catalog |
+| `getAvatarWalkTarget()` | Last floor target `{ xPct, yPct, at }` |
+| **`onFloorClick(fn)`** | Chrome-forwarded floor clicks (also `whirled:floorClick`) |
+| `engineOwnsAvatarWalk()` | `true` when chrome yielded loft avatar animation |
 
 Events:
 
 - `whirled:ready` — bridge object in `detail`
+- **`whirled:wearChanged`** — worn row or `null`
+- **`whirled:roomItemsChanged`** — `{ roomId, items }`
 - `whirled:floorClick` — `{ xPct, yPct, clientX, clientY, source }`
 
 ---
 
-## Wear → Pixi (your remaining work)
+## Wear → Pixi (your remaining work in the real repo)
 
-Chrome **does not** turn Wear PNG packs into Pixi sprites for you. Remaining gap in **your** repo:
+Local tunnel proof already demos `applyAppearance`. **Port it into WhirledClassicGame yourself** — we never push to your GitHub.
 
-1. On mount / Wear change, call `getWornAvatar()` (or `getWardrobeAppearance()`).
-2. Load `states.idle` / `states.walk` (and emotes) into Pixi textures / AnimatedSprite.
-3. Implement click-to-walk on the canvas with stage-local coords.
-4. Nametags / speech bubbles can move from chrome `#stage-bubbles` later — optional.
-
-Until that pipeline exists in your repo, mount still shows your current DemoRoom / player — that is fine.
+1. On mount / `whirled:wearChanged`, call `getWornAvatar()` or use event `detail`.
+2. `Assets.load` each PNG in `states.idle` / `states.walk` (chrome-absolute URLs).
+3. Click-to-walk on the canvas (stage-local coords). Optional: `onFloorClick`.
+4. SWF-only Wear: keep fallback sprite (no Ruffle in `#stage-slot`).
+5. Furniture: optional — chrome chips remain until you mirror `getRoomItems()`.
 
 ---
 
@@ -135,27 +150,15 @@ bottom chat bar (chrome)
 Siblings of `#stage-slot` (chrome): `#decorate-layer`, `#avatar-wear-layer` (empty/hidden when you own avatars), `#stage-bubbles`, `#chat-overlay`.  
 Do not raise your canvas above those. Do not put Ruffle in `#stage-slot`.
 
-Music / embeds use `#room-embed-dock` outside `#main` — keep media out of the stage slot.
-
----
-
-## Wiring without merging repos
-
-1. **Local:** chrome static server + Vite `?engineSrc=…` (preferred while iterating).
-2. **Same origin later:** proxy / carefully shared host — still do not commit private engine sources into public Pages.
-3. Never treat a copied `engine.js` on Pages as the long-term home of the private game.
-
 ---
 
 ## Quick checklist
 
-- [ ] Chrome opens; register / login works (do not rebuild auth).
-- [ ] `WhirledChrome.version === "0.5"`.
-- [ ] `getStageEl()` is `#stage-slot`.
-- [ ] `mountWhirledEngine` exports and mounts with `resizeTo: host`.
-- [ ] After mount, chrome loft tofu/PNG walk is gone; stage shows your canvas.
-- [ ] `getWornAvatar()` returns Wear data for your sprite pipeline.
-- [ ] Floor walk works from **your** canvas (optional: listen to `onFloorClick`).
+- [ ] `WhirledChrome.version === "0.6"`.
+- [ ] `getWornAvatar()` returns https absolute frame URLs on Pages.
+- [ ] Listen `whirled:wearChanged` **or** `registerEngineHooks({ applyAppearance })`.
+- [ ] Re-Wear updates sprite without full remount.
+- [ ] Bunny/fallback when no PNG Wear.
 - [ ] No private engine files in the public tree.
 
 Welcome — chrome is the shell; **you are the room**.
