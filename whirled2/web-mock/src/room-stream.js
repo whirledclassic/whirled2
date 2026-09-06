@@ -1,15 +1,11 @@
 /* whirled2/web-mock/src/room-stream.js
- * ?v=20260906cr
- *
- * Parks live #stage-slot across chrome paint.
- * Join / rooms / mobile chat tap-through.
- * Friend search: harvest chat + occupants + permaname; try API directory.
+ * ?v=20260906cy
+ * Park disabled — it left iPhone with an empty stage-host.
+ * Join / search / home icon still here. Chrome only.
  */
 (function () {
   "use strict";
 
-  var PARK_ID = "whirled-stage-park";
-  var parked = null;
   var lastRoomId = "";
   var patched = false;
   var apiWrapped = false;
@@ -27,10 +23,9 @@
     var s = document.createElement("style");
     s.id = "whirled-room-stream-css";
     s.textContent =
-      "#whirled-stage-park{position:fixed!important;left:-9999px!important;top:0;width:1px;height:1px;overflow:hidden;}" +
-      ".room-enter-curtain.is-stream{background:rgba(14,40,64,.22);transition:opacity 70ms linear;}" +
-      ".whirled-home-svg{display:inline-block;vertical-align:-2px;flex:0 0 auto;color:#1e6fa8;}" +
-      ".pa-ico .whirled-home-svg{width:18px;height:18px;}" +
+      ".stage-host,#stage-slot{min-height:46vh!important;background:linear-gradient(#6eb7d8 58%,#c9a36a 58%)!important;}" +
+      "#stage-slot canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}" +
+      ".whirled-home-svg{display:inline-block;vertical-align:-2px;color:#1e6fa8;}" +
       "@media (max-width:900px){" +
       ".chat-overlay{top:6px!important;bottom:auto!important;max-height:28vh!important;width:min(70%,260px)!important;pointer-events:none!important;}" +
       ".chat-overlay .chat-row{pointer-events:none!important;}" +
@@ -87,60 +82,36 @@
         if (name && name.length < 40) rememberPerson(id || name.toLowerCase(), name);
       });
     } catch (e2) {}
-    try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (!k || k.indexOf("whirled2.chat.") !== 0) continue;
-        var rows = [];
-        try { rows = JSON.parse(localStorage.getItem(k) || "[]"); } catch (e3) { rows = []; }
-        (rows || []).forEach(function (m) {
-          if (!m) return;
-          rememberPerson(m.userId || m.who, m.who);
-        });
-      }
-    } catch (e4) {}
   }
 
   function searchRemote(q) {
     q = String(q || "").trim();
     if (!q) return Promise.resolve([]);
-    var paths = [
-      "/api/users?q=" + encodeURIComponent(q),
-      "/api/search?q=" + encodeURIComponent(q),
-      "/api/people?q=" + encodeURIComponent(q)
-    ];
     var base = (window.WHIRLED_API || "").replace(/\/$/, "");
     if (!base) return Promise.resolve([]);
-    return Promise.all(paths.map(function (p) {
-      return fetch(base + p).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
-    })).then(function (bodies) {
-      var out = [];
-      bodies.forEach(function (body) {
-        var rows = (body && (body.users || body.people || body.results || body)) || [];
-        if (!Array.isArray(rows)) return;
-        rows.forEach(function (u) {
-          if (!u) return;
-          var id = u.id || u.userId || u.name;
-          var name = u.name || u.who || id;
-          if (id) {
-            rememberPerson(id, name);
-            out.push({ id: id, name: name });
-          }
-        });
-      });
-      return out;
-    }).catch(function () { return []; });
+    return fetch(base + "/api/users?q=" + encodeURIComponent(q)).then(function (r) {
+      return r.ok ? r.json() : null;
+    }).catch(function () { return null; }).then(function (body) {
+      var rows = (body && (body.users || body.people || body.results || body)) || [];
+      if (!Array.isArray(rows)) return [];
+      return rows.map(function (u) {
+        var id = u && (u.id || u.userId || u.name);
+        var name = u && (u.name || u.who || id);
+        if (id) rememberPerson(id, name);
+        return id ? { id: id, name: name } : null;
+      }).filter(Boolean);
+    });
   }
 
-  function ensureRoomInCatalog(id, name, extra) {
+  function ensureRoomInCatalog(id, name) {
     id = String(id || "").trim();
-    if (!id) return null;
+    if (!id) return;
     var map = loadMap(ROOMS_KEY);
     var prev = map[id] || {};
     map[id] = {
       id: id,
       name: String(name || prev.name || id),
-      ownerId: (extra && extra.ownerId) || prev.ownerId || "",
+      ownerId: prev.ownerId || "",
       lock: prev.lock || { mode: "unlocked", ownerId: "" },
       createdAt: prev.createdAt || new Date().toISOString(),
       blurb: prev.blurb || "seen live",
@@ -148,10 +119,6 @@
       seenRemote: true
     };
     saveMap(ROOMS_KEY, map);
-    var seen = loadMap(SEEN_KEY);
-    seen[id] = { id: id, name: map[id].name, at: Date.now() };
-    saveMap(SEEN_KEY, seen);
-    return map[id];
   }
 
   function enterRoom(id, name) {
@@ -185,52 +152,18 @@
     });
   }
 
-  function rememberOccupantRooms() {
+  function remountStage() {
+    var host = document.getElementById("stage-slot");
+    if (!host) return;
+    if (host.querySelector("canvas")) return;
     try {
-      var list = (window.WhirledChrome && window.WhirledChrome.getOccupants)
-        ? window.WhirledChrome.getOccupants()
-        : [];
-      (list || []).forEach(function (p) {
-        if (!p) return;
-        rememberPerson(p.id, p.name);
-        var rid = p.roomId || p.room;
-        if (!rid || rid === "Studio Loft") rid = "loft";
-        ensureRoomInCatalog(String(rid), p.roomName || (rid === "loft" ? "Studio Loft" : String(rid)));
-      });
+      if (typeof window.mountWhirledEngine === "function") window.mountWhirledEngine(host);
     } catch (e) {}
-  }
-
-  function paintSeenRoomsLobby() {
-    var host = document.querySelector(".rooms-lobby");
-    if (!host || document.getElementById("seen-rooms-strip")) return;
-    var seen = loadMap(SEEN_KEY);
-    var ids = Object.keys(seen).filter(function (id) { return id && id !== "loft"; });
-    if (!ids.length) return;
-    var wrap = document.createElement("div");
-    wrap.id = "seen-rooms-strip";
-    wrap.innerHTML = '<div class="section-label">Rooms people are in</div><div class="room-tiles"></div>';
-    var tiles = wrap.querySelector(".room-tiles");
-    ids.sort(function (a, b) { return (seen[b].at || 0) - (seen[a].at || 0); }).slice(0, 8).forEach(function (id) {
-      var r = seen[id];
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "room-tile";
-      btn.setAttribute("data-go-room", id);
-      btn.innerHTML = "<b>" + String(r.name || id).replace(/[<>]/g, "") + "</b><span class=\"meta\">unlocked \u00b7 tap to join</span>";
-      tiles.appendChild(btn);
-    });
-    var active = host.querySelector(".section-label");
-    if (active && active.parentNode) active.parentNode.insertBefore(wrap, active);
-    else host.appendChild(wrap);
-  }
-
-  function retargetJoinButtons() {
-    document.querySelectorAll("[data-join-them]").forEach(function (btn) {
-      if (btn.getAttribute("data-join-bound") === "1") return;
-      btn.setAttribute("data-join-bound", "1");
-      var rid = btn.getAttribute("data-join-room") || activeRoomId() || "loft";
-      btn.setAttribute("data-join-room", rid);
-    });
+    try {
+      if (window.WhirledChrome && typeof window.WhirledChrome.tryMountEngine === "function") {
+        window.WhirledChrome.tryMountEngine();
+      }
+    } catch (e2) {}
   }
 
   function bindJoinCapture() {
@@ -238,24 +171,11 @@
       var join = ev.target.closest && ev.target.closest("[data-join-them]");
       if (!join) return;
       var rid = join.getAttribute("data-join-room") || activeRoomId() || "loft";
-      var name = join.getAttribute("data-join-name") || "friend";
       ev.preventDefault();
       ev.stopPropagation();
-      ensureRoomInCatalog(rid, rid === "loft" ? "Studio Loft" : name + "'s room");
-      enterRoom(rid, name);
+      ensureRoomInCatalog(rid, rid === "loft" ? "Studio Loft" : "room");
+      enterRoom(rid);
     }, true);
-  }
-
-  function bindHashRoom() {
-    function fromHash() {
-      var raw = String(location.hash || "").replace(/^#/, "");
-      var parts = raw.split("/").filter(Boolean);
-      if (parts[0] !== "rooms" || !parts[1] || parts[1] === "loft") return;
-      ensureRoomInCatalog(parts[1], decodeURIComponent(parts[1]));
-      enterRoom(parts[1]);
-    }
-    window.addEventListener("hashchange", fromHash);
-    setTimeout(fromHash, 400);
   }
 
   function bindFriendSearch() {
@@ -270,12 +190,8 @@
       ev.stopPropagation();
       var q = "";
       try {
-        var fd = new FormData(form);
-        q = String(fd.get("q") || "").trim();
-      } catch (e) {
-        var inp = form.querySelector("input[name='q'], input[type='search']");
-        q = inp ? String(inp.value || "").trim() : "";
-      }
+        q = String(new FormData(form).get("q") || "").trim();
+      } catch (e) {}
       harvestPeople();
       if (q) rememberPerson(q.toLowerCase(), q);
       searchRemote(q).then(function () {
@@ -286,28 +202,12 @@
     }, true);
   }
 
-  function hintEmptySearch() {
-    var box = document.querySelector(".friend-search-results");
-    if (!box || box.getAttribute("data-hinted") === "1") return;
-    if (!/No matches/i.test(box.textContent || "")) return;
-    box.setAttribute("data-hinted", "1");
-    var p = document.createElement("p");
-    p.className = "meta";
-    p.textContent = "Tip: type their exact Sign Up name. Search now also matches permaname, chat names, and people who shared a room with you.";
-    box.appendChild(p);
-  }
-
-  function isTofuHomeText(txt) {
-    txt = String(txt || "").trim();
-    return txt === "\u2302" || txt === "\u2302\uFE0E" || txt === "\u2302\uFE0F";
-  }
-
-  function fixHomeIcons(root) {
-    root = root || document;
+  function fixHomeIcons() {
     try {
-      root.querySelectorAll(".pa-ico").forEach(function (el) {
+      document.querySelectorAll(".pa-ico").forEach(function (el) {
         if (el.getAttribute("data-home-svg") === "1") return;
-        if (isTofuHomeText(el.textContent)) {
+        var t = String(el.textContent || "").trim();
+        if (t === "\u2302" || t === "\u2302\uFE0E" || t === "\u2302\uFE0F") {
           el.innerHTML = HOME_SVG;
           el.setAttribute("data-home-svg", "1");
         }
@@ -315,83 +215,18 @@
     } catch (e) {}
   }
 
-  function hold() {
-    var el = document.getElementById(PARK_ID);
-    if (el) return el;
-    el = document.createElement("div");
-    el.id = PARK_ID;
-    el.hidden = true;
-    document.body.appendChild(el);
-    return el;
-  }
-
-  function looksLikeEngine(slot) {
-    if (!slot) return false;
-    return !!(slot.querySelector("canvas") || slot.getAttribute("data-whirled-engine") === "1");
-  }
-
-  function park() {
-    var slot = document.getElementById("stage-slot");
-    if (!slot || (slot.parentNode && slot.parentNode.id === PARK_ID)) {
-      if (slot) parked = slot;
-      return !!parked;
-    }
-    if (!looksLikeEngine(slot)) return false;
-    try { hold().appendChild(slot); parked = slot; return true; } catch (e) { return false; }
-  }
-
-  function restore() {
-    if (!parked || !parked.isConnected) { parked = null; return false; }
-    var fresh = document.getElementById("stage-slot");
-    if (!fresh) return false;
-    if (fresh === parked) return true;
-    try { fresh.replaceWith(parked); } catch (e) {
-      try { fresh.parentNode.insertBefore(parked, fresh); fresh.remove(); } catch (e2) { return false; }
-    }
-    try {
-      parked.setAttribute("data-whirled-engine", "1");
-      parked.setAttribute("data-engine-owns-avatar-walk", "1");
-    } catch (e3) {}
-    return true;
-  }
-
-  function currentRoomPayload() {
-    var id = activeRoomId();
-    var name = "";
-    try {
-      var r = window.WhirledChrome && window.WhirledChrome.getRoom && window.WhirledChrome.getRoom();
-      name = r && r.name ? r.name : "";
-    } catch (e) {}
-    return { id: id, name: name || id, items: [] };
-  }
-
-  function notifyRoom(force) {
-    var payload = currentRoomPayload();
-    if (!force && payload.id === lastRoomId) return payload;
-    lastRoomId = payload.id;
-    try { document.dispatchEvent(new CustomEvent("whirled:roomChanged", { detail: payload })); } catch (e) {}
-    try {
-      if (window.__whirledEngine && window.__whirledEngine.applyRoom) window.__whirledEngine.applyRoom(payload);
-    } catch (e2) {}
-    return payload;
-  }
-
   function afterChromePaint() {
     wrapApi();
-    var inRoom = !!(document.getElementById("stage-slot") || document.querySelector(".stage-host"));
-    if (inRoom) {
-      restore();
-      notifyRoom(false);
-      try { ensureRoomInCatalog(activeRoomId(), currentRoomPayload().name); } catch (eR) {}
-    }
-    var curtain = document.getElementById("room-enter-curtain");
-    if (curtain && looksLikeEngine(parked || document.getElementById("stage-slot"))) curtain.classList.add("is-stream");
-    try { fixHomeIcons(document); } catch (eH) {}
-    try { rememberOccupantRooms(); } catch (eO) {}
+    try { fixHomeIcons(); } catch (eH) {}
     try { harvestPeople(); } catch (eP) {}
-    try { retargetJoinButtons(); } catch (eJ) {}
-    try { paintSeenRoomsLobby(); } catch (eS) {}
-    try { hintEmptySearch(); } catch (eT) {}
+    remountStage();
+    try {
+      var id = activeRoomId();
+      if (id && id !== lastRoomId) {
+        lastRoomId = id;
+        document.dispatchEvent(new CustomEvent("whirled:roomChanged", { detail: { id: id, name: id, items: [] } }));
+      }
+    } catch (eR) {}
   }
 
   function patchInnerHtml() {
@@ -406,11 +241,10 @@
       enumerable: desc.enumerable,
       get: origGet,
       set: function (html) {
-        var id = this && this.id;
-        if (id === "main" || id === "app") { try { park(); } catch (eP) {}
-        }
         origSet.call(this, html);
-        if (id === "main" || id === "app") { try { afterChromePaint(); } catch (eA) {}
+        var id = this && this.id;
+        if (id === "main" || id === "app") {
+          try { afterChromePaint(); } catch (eA) {}
         }
       }
     });
@@ -419,17 +253,6 @@
   injectCss();
   patchInnerHtml();
   bindJoinCapture();
-  bindHashRoom();
   bindFriendSearch();
-
-  document.addEventListener("whirled:ready", function () {
-    wrapApi();
-    afterChromePaint();
-  });
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { wrapApi(); afterChromePaint(); });
-  } else {
-    wrapApi();
-    afterChromePaint();
-  }
+  document.addEventListener("whirled:ready", afterChromePaint);
 })();
