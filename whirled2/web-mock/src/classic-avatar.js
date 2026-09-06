@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906cl
+ * Cache: ?v=20260906cm
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906cl";
+  var VERSION = "20260906cm";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -68,7 +68,7 @@
   var BODY_DEMO_SWF = "./assets/avatars/flash-qa/demo-avatar.swf"; // controlConnect + appearanceChanged_v2
   var BODY_DEMO_SWF_ALT = "./assets/ruffle/demo-avatar.swf"; // (?v=20260906cj) mirror — Pages must 200
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906cl): COMPANION-ONLY nest; hostWalk → Body walk frames; tofu CSS from cj.
+  // How this works (?v=20260906cm): COMPANION-ONLY nest; hostWalk → Body walk frames; tofu CSS from cj.
   // Beginner: we load OUR tiny host.swf first; your avatar is rebuilt inside it from bytes.
   // Stand thumb covers the host (opacity 1) until bridge "connected" — never a blank loft.
   // ENGINE DEV: DemoAvatar ConnectBag + continuous walk; DIRECT remount still EI-hostWalk (demo).
@@ -77,7 +77,7 @@
   // Status badge: connected | DIRECT | failed. Preserve cj chrome-walk + tofu leg fixes.
   var WEAR_COMPANION_ONLY = true; // (?v=20260906ch/ck) single-player host nest + stand cover
   function shouldCompanionOnly(worn, url) {
-    // (?v=20260906cl) DemoAvatar has EI hostWalk — mount DIRECT so walk is VISIBLE (cover hid nest).
+    // (?v=20260906cm) DemoAvatar has EI hostWalk — mount DIRECT so walk is VISIBLE (cover hid nest).
     // Beginner: flashQa stick figure skips empty host nest. Real Body SWFs still use companion.
     // ENGINE DEV: demo-avatar.swf / demo-qa.swf / source=flashQa → DIRECT; else WEAR_COMPANION_ONLY.
     var u = String(url || (worn && (worn.swfUrl || worn.swfDataUrl || worn.swfUrlAlt)) || "");
@@ -416,7 +416,7 @@
   }
   function getRuffleStatus() { return ruffleUiStatus; }
   function ruffleStatusLabel(st) {
-    // (?v=20260906cl) Honest loft badge: connected nest / DIRECT paint / failed.
+    // (?v=20260906cm) Honest loft badge: connected nest / DIRECT paint / failed.
     st = st || ruffleUiStatus.state;
     if (st === "connected") return "Ruffle connected";
     if (st === "direct") return "Ruffle DIRECT";
@@ -565,7 +565,7 @@
   }
 
   function hideStandCoverForPaint(reason) {
-    // (?v=20260906cl) Never leave opaque stand tofu/thumb over a painting or walking ruffle-player.
+    // (?v=20260906cm) Never leave opaque stand tofu/thumb over a painting or walking ruffle-player.
     // Beginner: cover is only for empty host; once Flash paints (or you walk), hide it.
     // ENGINE DEV: belt-and-suspenders with CSS :has(ruffle-player) / .is-playing / .is-walking rules.
     var slot = document.getElementById("avatar-ruffle-host")
@@ -1091,7 +1091,7 @@
     connected: false,
     gotControl: false,
     hostReady: false, // (?v=20260906ch) AvatarHost ctor registered addCallback + bridge ready
-    directEiWalk: false, // (?v=20260906cl) DemoAvatar (or Body) EI hostWalk on DIRECT player
+    directEiWalk: false, // (?v=20260906cm) DemoAvatar (or Body) EI hostWalk on DIRECT player
     bytesLoading: false,
     moving: false,
     orient: 180,
@@ -1661,7 +1661,7 @@
         logAvatarDebug("demo_ei_ready — DIRECT walk EI live");
       }
       if (kind === "connect_soft_fail") {
-        // (?v=20260906cl) no-userProps race — retry flush, do NOT remount DIRECT yet.
+        // (?v=20260906cm) no-userProps race — retry flush, do NOT remount DIRECT yet.
         logAvatarDebug("connect_soft_fail — retry load", payload);
         setTimeout(function () {
           if (loftHostState.connected) return;
@@ -2230,7 +2230,7 @@
     if (loftUsesCompanionHost || loftHostState.hostMode) {
       result = callHostWalk(!!moving, orient);
     } else {
-      // (?v=20260906cl) DIRECT fallback: DemoAvatar registers hostWalk via EI — animate without nest.
+      // (?v=20260906cm) DIRECT fallback: DemoAvatar registers hostWalk via EI — animate without nest.
       // Beginner: even if companion failed, flashQa demo still green-walks on floor click.
       // ENGINE DEV: do NOT set loftUsesCompanionHost here (that means nest connected).
       var hr = tryCallHostMethod("hostWalk", [!!moving, orient]);

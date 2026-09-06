@@ -353,3 +353,8 @@ Creators build Stuff packs in chrome (data URLs / absolutized paths) with the sa
 - When your canvas mounts in `#stage-slot`, prefer consuming PNG `states` first; coordinate before owning Ruffle yourself.
 - Study community Ruffle + host-shim architecture — **do not copy AGPL code**.
 - Chat visit-scope (?v=20260906av) is unrelated — do not regress `roomChatVisitSince`.
+
+
+## Chrome auto-mount (?v=20260906cm)
+
+Public web-mock never embeds the private Pixi engine. Use ?engineSrc=http://127.0.0.1:8080/src/chrome-bridge.js with local Vite cors. Never push engine files to Pages. Never edit Nabir WhirledClassicGame.

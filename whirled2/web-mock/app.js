@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906cl";
+  var LOGO_V = "20260906cm";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2503,7 +2503,7 @@
     } catch (eAct0) {}
     try {
       try {
-        // (?v=20260906cl) ALWAYS add is-walking (tofu + ruffle loft) so CSS cover/legs clear.
+        // (?v=20260906cm) ALWAYS add is-walking (tofu + ruffle loft) so CSS cover/legs clear.
         bill.classList.add("is-walking");
         layer.classList.add("is-walking");
         if (tofuWalkOnly) bill.classList.add("is-tofu-walk");
@@ -12239,6 +12239,91 @@
   }
 
   // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Engine mount (chrome-side ONLY) — ?v=20260906cm
+  // Beginner: optional Pixi engine loads from engineSrc URL into #stage-slot.
+  // ENGINE DEV: NEVER ship private WhirledClassicGame files in this public mock.
+  // Use ?engineSrc=http://127.0.0.1:8080/src/chrome-bridge.js (local Vite) or
+  // localStorage whirled2.engineSrc. Repos stay separate; do not edit Nabir's GitHub.
+  // ---------------------------------------------------------------------------
+  var engineMountPromise = null;
+  var engineMounted = false;
+
+  function getEngineSrc() {
+    try {
+      var q = (globalThis.location && location.search) || "";
+      var m = /(?:\?|&)engineSrc=([^&]+)/.exec(q);
+      if (m && m[1]) return decodeURIComponent(m[1].replace(/\+/g, " "));
+    } catch (eQ) {}
+    try {
+      var ls = localStorage.getItem("whirled2.engineSrc");
+      if (ls) return String(ls);
+    } catch (eL) {}
+    try {
+      if (globalThis.WHIRLED_ENGINE_SRC) return String(globalThis.WHIRLED_ENGINE_SRC);
+    } catch (eW) {}
+    return "";
+  }
+
+  function markStageEngineOwned(host) {
+    if (!host) return;
+    try {
+      host.setAttribute("data-whirled-engine", "1");
+      host.setAttribute("data-engine-owns-avatar-walk", "1");
+    } catch (eM) {}
+    try { bindChromeClickToWalk(); } catch (eB) {}
+  }
+
+  function tryLoadAndMountEngine() {
+    if (engineMounted) return Promise.resolve(true);
+    if (engineMountPromise) return engineMountPromise;
+    var src = getEngineSrc();
+    var host = document.getElementById("stage-slot");
+    if (!host) return Promise.resolve(false);
+
+    if (typeof globalThis.mountWhirledEngine === "function") {
+      engineMountPromise = Promise.resolve()
+        .then(function () { return globalThis.mountWhirledEngine(host); })
+        .then(function () {
+          engineMounted = true;
+          markStageEngineOwned(host);
+          try { pushNotice("green", "Pixi engine mounted in #stage-slot", { transient: true }); } catch (eN) {}
+          return true;
+        })
+        .catch(function (err) {
+          engineMountPromise = null;
+          console.warn("[WhirledChrome] mountWhirledEngine failed", err);
+          try { pushNotice("status", "Engine mount failed — see console", { transient: true }); } catch (eN2) {}
+          return false;
+        });
+      return engineMountPromise;
+    }
+
+    if (!src) return Promise.resolve(false);
+
+    engineMountPromise = import(src)
+      .then(function (mod) {
+        var mount = (mod && (mod.mountWhirledEngine || mod.default)) || globalThis.mountWhirledEngine;
+        if (typeof mount !== "function") throw new Error("engineSrc has no mountWhirledEngine export");
+        globalThis.mountWhirledEngine = mount;
+        return mount(host);
+      })
+      .then(function () {
+        engineMounted = true;
+        markStageEngineOwned(host);
+        try { pushNotice("green", "Pixi engine mounted from engineSrc", { transient: true }); } catch (eN3) {}
+        return true;
+      })
+      .catch(function (err) {
+        engineMountPromise = null;
+        console.warn("[WhirledChrome] engineSrc load failed", err);
+        try { pushNotice("status", "Could not load engineSrc (CORS / URL?). Use local Vite — engine stays private.", { transient: true }); } catch (eN4) {}
+        return false;
+      });
+    return engineMountPromise;
+  }
+
   // WhirledChrome bridge — engine mounts only via getStageEl() → #stage-slot
   // ---------------------------------------------------------------------------
   // ENGINE DEV: Contract for private WhirledClassicGame (Pixi). Read ENGINE-BRIDGE.md.
@@ -12261,6 +12346,10 @@
     window.WhirledChrome = {
       version: "0.4",
       getStageEl: function () { return document.getElementById("stage-slot"); },
+      // (?v=20260906cm) Chrome asks an optional external engine to mount — never embeds private game files.
+      tryMountEngine: function () { return tryLoadAndMountEngine(); },
+      isEngineMounted: function () { return !!engineMounted || !!(document.getElementById("stage-slot") && document.getElementById("stage-slot").getAttribute("data-whirled-engine") === "1"); },
+      getEngineSrc: function () { return getEngineSrc(); },
       getSession: function () { return session(); },
       getRoom: function () { return { id: "loft", name: ROOM }; },
       onChat: function (fn) { listeners.chat.push(fn); },
@@ -12313,6 +12402,8 @@
       getAvatarPlaybackMode: function () { return getAvatarPlaybackMode(); }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
+    try { tryLoadAndMountEngine(); } catch (eEng) {}
+
   }
   function occupants() {
     return liveOccupants.slice();

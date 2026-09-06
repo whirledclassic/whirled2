@@ -1,4 +1,7 @@
-## What shipped (?v=20260906cl — cover was hiding walk; DemoAvatar DIRECT visible)
+## ?v=20260906cm
+- Chrome-only engineSrc mount; no private engine in repo; Nabir repo untouched.
+
+## What shipped (?v=20260906cm — cover was hiding walk; DemoAvatar DIRECT visible)
 
 - **Root cause:** CSS `companion-cover` forced stand tofu/thumb `z-index:6` over `ruffle-player` — DemoAvatar green walk ran **under** static cover (invisible). Nest lag made it worse.
 - **Fix:**
@@ -8,7 +11,7 @@
   4. Tofu: `transform-box:fill-box` on `.tofu-leg-l/r`; stand tofu SVG leg groups + bob when walking.
 - Preserve ck: AvatarHost soft connect / ConnectBag props; cj tofu CSS + chrome floor-click.
 - Docs: `SMOOTH-RUFFLE.md`, `QA-FLASH.md`, `ROOT-CAUSE.md` (“cover was hiding walk”).
-- Cache: **`?v=20260906cl`**. Push: `/tmp/push-cl.js` (`WHIRLED_DO_PUSH=1`).
+- Cache: **`?v=20260906cm`**. Push: `/tmp/push-cl.js` (`WHIRLED_DO_PUSH=1`).
 
 ## What shipped (?v=20260906ck — companion hostWalk + DemoAvatar continuous walk)
 
