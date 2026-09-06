@@ -1269,6 +1269,24 @@ button.card.shop-card {
 
 /* Stuff upload + invite + occupant menu (20260905s) */
 .how-stuff-panel h3 { margin: 0 0 6px; color: #1e6fa8; font-size: 15px; }
+
+/* Avatar lab (20260906ad) — On hold panel + gated lab UI; pale-blue chrome only */
+.avatar-lab-hold-panel h3,
+.avatar-lab-panel h2 { margin: 0 0 6px; color: #1e6fa8; font-size: 15px; }
+.avatar-lab-hold-panel { margin: 10px 0; background: #f7fbfe; border: 1px dashed #b7d3e8; }
+.avatar-lab-panel { margin: 10px 0; background: #f7fbfe; }
+.avatar-lab-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.avatar-lab-row { display: flex; gap: 12px; align-items: flex-start; padding: 8px; border: 1px solid #c5deee; border-radius: 6px; background: #fff; }
+.avatar-lab-row.is-active { border-color: #3aa3e0; box-shadow: 0 0 0 1px #9fd0ee; }
+.avatar-lab-thumb, .avatar-lab-swatch { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #b7d3e8; background: #e8f4fb; flex: 0 0 auto; }
+.avatar-lab-meta { flex: 1; min-width: 0; }
+.avatar-lab-row-actions, .avatar-lab-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.avatar-lab-import-label { display: inline-flex; align-items: center; cursor: pointer; }
+.avatar-lab-upload-form input[type="number"] {
+  width: 100%; box-sizing: border-box; margin-top: 4px;
+  border: 1px solid #b7d3e8; border-radius: 4px; padding: 8px;
+  font: 13px var(--ui); color: #16324a; background: #fff;
+}
 .stuff-card { display: block; width: 100%; text-align: left; cursor: pointer; padding: 0; border: 1px solid #c5deee; border-radius: 6px; overflow: hidden; background: #fff; color: inherit; font: inherit; }
 .stuff-card:hover { border-color: #3aa3e0; }
 .stuff-thumb, .stuff-detail-thumb {
@@ -4256,4 +4274,83 @@ button.tb.tb-music,
 @media (max-width: 520px) {
   .games-explain-grid { grid-template-columns: 1fr; }
   .games-home-nav .games-nav-btn { flex: 1 1 auto; text-align: center; }
+}
+
+
+/* ---- 20260906ad: Friendly People / wall Delete / shop fav / volume / share ---- */
+/* Beginner: pale blue chrome only. ENGINE DEV: chrome CSS — never styles #stage-slot engine. */
+
+.friendly-people-panel h2 { margin-top: 0; }
+.friendly-strip { display: flex; flex-direction: column; gap: 8px; }
+.friendly-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid #d7eaf6;
+}
+.friendly-row .friend-thumb { display: inline-flex; align-items: center; gap: 8px; }
+.friendly-row .friend-thumb img,
+.friendly-row .friend-fallback {
+  width: 40px; height: 40px; border-radius: 6px; object-fit: cover;
+  background: #e8f4fb; display: inline-grid; place-items: center; font-weight: 700; color: #1e6fa8;
+}
+.friendly-empty { margin: 0; }
+.friendly-toggle-panel .friendly-check { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0; }
+
+.wall-row {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px;
+}
+.wall-row .wall-row-body { flex: 1 1 160px; min-width: 0; }
+.wall-delete-btn {
+  flex: 0 0 auto; color: #a33; font-size: 12px; margin-left: auto;
+}
+.wall-delete-btn:hover { text-decoration: underline; }
+
+.shop-card { position: relative; }
+.shop-card-fav {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 32px; height: 32px; min-width: 32px; padding: 0;
+  border-radius: 50%; border: 1px solid #9bb8cc; background: #fff;
+  font-size: 16px; line-height: 1; cursor: pointer;
+  box-shadow: 0 1px 4px rgba(20,60,90,0.15);
+}
+.shop-card-fav.is-on { background: #3aa3e0; color: #fff; border-color: #1e6fa8; }
+.shop-card-fav:focus-visible { outline: 2px solid #1e6fa8; outline-offset: 2px; }
+
+.tb-vol-wrap {
+  position: relative; display: inline-flex; align-items: center; gap: 2px;
+}
+.tb-vol-wrap.is-muted .tb-vol { opacity: 0.45; filter: grayscale(0.4); }
+.tb-vol-open {
+  font-size: 10px; padding: 0 4px; min-width: 18px; height: 26px; line-height: 26px;
+  border: 1px solid #b7d3e8; border-radius: 4px; background: #fff; color: #1e6fa8; cursor: pointer;
+}
+.tb-vol-pop {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 80;
+  min-width: 180px; padding: 10px 12px; border-radius: 8px;
+  background: #fff; border: 1px solid #9bb8cc; box-shadow: 0 8px 20px rgba(20,60,90,0.22);
+  color: #16324a;
+}
+.tb-vol-label { display: block; font-size: 12px; margin-bottom: 6px; }
+.tb-vol-label input[type="range"] { width: 100%; margin-top: 4px; accent-color: #3aa3e0; }
+
+.room-share-card .invite-link-label { display: block; margin: 10px 0 6px; font-size: 13px; }
+.room-share-card input,
+.room-share-card textarea {
+  width: 100%; box-sizing: border-box; margin-top: 4px;
+  border: 1px solid #b7d3e8; border-radius: 4px; padding: 8px;
+  font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; color: #16324a; background: #f7fbfe;
+}
+.room-invite-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.room-menu [data-room-lock].is-on {
+  background: #3aa3e0; color: #fff; border-color: #1e6fa8;
+}
+.room-menu [data-room-lock]:disabled {
+  opacity: 0.55; cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .tb-vol-wrap { display: none !important; }
+  .shop-card-fav { width: 36px; height: 36px; min-width: 36px; font-size: 18px; }
+  .friendly-row .action-btn { width: 100%; }
+  .room-share-card { width: 100%; max-width: 100%; }
 }

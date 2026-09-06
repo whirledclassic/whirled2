@@ -6,23 +6,35 @@ Date: 2026-09-06
 
 - Deep dive of Grey Havens GitHub (`msoy`, `whirled-sdk`, `whirled-projects`) + community `lulzsun/whirled2` SWF/Ruffle path.
 - Plan doc: [AVATAR-IMPORT.md](./AVATAR-IMPORT.md) — deep Grey Havens research (SWF + remix ZIP + ~80×60 thumb, SHA-1 HashMediaDesc, Ruffle host shim, ENGINE-BRIDGE policy bump for Phase 2).
-- Upload UI + demo media API still next (not in this chrome-only ship).
+- Avatar lab stays **locked** (Stuff → Avatars On hold unless `?avatarLab=1`). No Ruffle/SWF in rooms.
 
-## What shipped (?v=20260906ac)
+## What shipped (?v=20260906ad)
 
-- **Chat visual polish**: Overlay bubbles (cyan names, contrast, soft fade), readable Slide panel, clearer tabs/unread, polished Send + 16px mobile input, tidy chat options, stage bubbles readability. Mobile still Overlay-only (no black hood).
-- **Games expand**: home nav Browse / Tables / AVR Coming Soon / My scores; Parlor vs AVR explainers; empty-state + How games work; labeled Coming Soon placeholder cards (not fake catalog); detail Play / Watch / Tables; local `whirled2.gameScores` stub.
-- Prior **?v=20260906ab** (folded): Club tier cards (Free / Supporter / Creator / Studio Coming Soon).
-- Prior **?v=20260906aa** (folded): shared loft soundtrack; Facebook Connect removed; room preview before enter.
+Chrome fidelity (SITE-FIXES top 5) + owner lock polish:
+
+1. **Me → Friendly People strip** — under Friends Online; honest empty state; Account toggle; Friendly auto-accept friend requests.
+2. **Profile wall Delete** — profile owner deletes any wall post; authors delete their own.
+3. **Shop grid ♥ Favorite** — heart on listing cards (same `whirled2.favorites` as detail).
+4. **Toolbar Volume + mute-safe music** — mute + slider (persisted); muted skips loading local/embed tracks.
+5. **Share / embed room popup** — share URL + optional iframe snippet (no social APIs).
+6. **Room lock triad** — Unlocked / Friends / Locked (owner-only; guests view-only).
+
+Prior folded: **ac** chat polish + Games expand; **ab** Club tiers; **aa** room preview / soundtrack / no Facebook Connect.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ac
+- Local / Pages cache: `?v=20260906ad` (`LOGO_V` in `app.js` / `index.html`)
+- Live mock (when pushed): https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ad
 - Site root: https://whirledclassic.github.io/whirled2/
+
+## PLAN (not shipped)
+
+- Mobile **landscape** fullscreen stage + corner Overlay chat drawer (comment only in `app.js` near `ensureMobileChatOverlay`).
 
 ## Out of scope
 
 - No payments / Buy Bars / live membership checkout
 - No fake NPCs / invented live game catalog titles
 - No zero-setup social OAuth on static Pages
+- Avatar SWF / Ruffle in rooms (**ON HOLD**)
 - Do not push unless instructed

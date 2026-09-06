@@ -206,6 +206,7 @@ Use (1) while iterating. Use (3) for the first public GitHub Pages prototype.
 - **Do not** edit the private engine from this public repo (or copy private sources here) without asking.
 - **Do not** treat coins as real money — labels only.
 - **Do not** bring Flash / SWF / Ruffle into this stack.
+- **Avatar lab deferred** — see AVATAR-IMPORT.md; wardrobe APIs experimental, not wired to stage.
 - **Do not** assume `#decorate-layer` is yours — that is chrome furniture chips (sibling overlay).
 - **Do not** replace Slide/Overlay chat history — that stays chrome. Stage speech/thought bubbles near avatars may move to Pixi later (see section 11).
 
@@ -276,9 +277,10 @@ Welcome aboard. Baby steps: standalone Pixi first → `mountWhirledEngine(host)`
 
 ## Avatar import / classic SWF wardrobe (ENGINE DEV)
 
-See **[AVATAR-IMPORT.md](./AVATAR-IMPORT.md)** for the full Grey Havens research:
+**Avatar lab deferred** — see **[AVATAR-IMPORT.md](./AVATAR-IMPORT.md)**; wardrobe APIs experimental, **not wired to stage**. Flash/Ruffle remain banned for live rooms until an explicit Phase 2 bridge bump.
 
 - Classic avatars = **SWF + thumb + scale**, addressed by **SHA-1** (`HashMediaDesc` in `greyhavens/msoy`).
-- Playback path = **Ruffle** (+ optional AvatarControl host shim); study community AGPL whirled2 architecture — do not paste their code without license review.
-- Chrome will own wardrobe upload/list/export; engine mounts active avatar media URL into `#stage-slot`.
-- Suggested hooks: `WhirledChrome.getWardrobe()`, `WhirledChrome.setActiveAvatar(idOrUrl)`.
+- Playback path (Phase 2, later) = **Ruffle** (+ optional AvatarControl host shim); study community AGPL whirled2 architecture — do not paste their code without license review.
+- Chrome owns gated wardrobe upload/list/export behind `?avatarLab=1`. **Wear (lab only)** stores `activeId` — does **not** change `#stage-slot`.
+- Experimental read helpers today: `WhirledChrome.getWardrobe()`, `getActiveAvatarId()` — ignore for room rendering until Phase 2.
+- Future hooks (not live): `setActiveAvatar(idOrUrl)` → engine mount — **do not implement playback yet**.

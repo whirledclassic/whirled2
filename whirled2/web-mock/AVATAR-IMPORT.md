@@ -1,8 +1,13 @@
 # AVATAR-IMPORT — classic Whirled avatars → Whirled2
 
+**STATUS: DEFERRED / SIDE PROJECT — locked off for normal users.**
+
 **Audience:** beginners on the web-mock chrome + ENGINE DEV on the Pixi (or later) room engine.  
-**Status:** research plan (Sep 2026). **Do not** treat this as a license to scrape whirled.club shop media.  
-**Related:** `ENGINE-BRIDGE.md` (current chrome↔engine contract), Stuff upload UI in `app.js`, research clones under `/workspace/research/`.
+**Status:** Phase 0–1 wardrobe foundation exists behind a feature flag; **not** active for visitors (Sep 2026). **Do not** treat this as a license to scrape whirled.club shop media.  
+**Unlock side work:** URL `?avatarLab=1` (sets `localStorage whirled2.avatarLab = "1"`) or set that storage key manually. Default **OFF**.  
+**Related:** `ENGINE-BRIDGE.md` (Flash/Ruffle still banned for live rooms; Phase 2 deferred), Stuff upload UI in `app.js`, research clones under `/workspace/research/`.
+
+**What normal users see:** Stuff → Avatars keeps the stub thumbnail upload + a quiet **“Classic SWF wardrobe — On hold”** note. No SWF upload UI, no Wear that affects the room.
 
 ---
 

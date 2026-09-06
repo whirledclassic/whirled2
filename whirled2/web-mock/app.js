@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ac";
+  var LOGO_V = "20260906ad";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -56,6 +56,14 @@
   var ROLES_KEY = "whirled2.roles";
   var CHAT_UI_KEY = "whirled2.chatUi";
   var FIRST_USER_KEY = "whirled2.firstUserId";
+  // How this works: Avatar lab is a SIDE PROJECT. Default OFF so normal visitors see no SWF wardrobe UI.
+  // Unlock with ?avatarLab=1 (also sets localStorage) or localStorage whirled2.avatarLab = "1".
+  // ENGINE DEV: lab Wear only writes wardrobe.activeId — never mounts Ruffle / never touches #stage-slot.
+  var AVATAR_LAB_KEY = "whirled2.avatarLab";
+  var WARDROBE_KEY = "whirled2.wardrobe";
+  var MEDIA_IDB_NAME = "whirled2-media";
+  var MEDIA_IDB_STORE = "blobs";
+  var AVATAR_SWF_MAX_BYTES = 10 * 1024 * 1024; // classic medium upload ~10MB
   var BROWSER_THEME_KEY = "whirled2.browserTheme";
   // How this works: browser themes are CSS-variable presets on #app[data-theme=…].
   // Saved in localStorage whirled2.browserTheme. Premium cards are labels only (Coming Soon).
@@ -784,6 +792,14 @@
     // Beginner: on a phone, tap "Open player" / "Open on YouTube" — those always work even if the tiny iframe play button is hard to hit.
     // ENGINE DEV: #room-embed-dock is created in shell() after #main / before .bar — paint never destroys it.
     // Touch: raise z-index + pointer-events; expand sheet for ~220px tap target on iOS.
+    // How this works (20260906ad mute-safe): when muted, do NOT mount the embed iframe (classic wiki:
+    // muted → do not load the track — avoids a bad stream breaking the room). Labels still update elsewhere.
+    // Beginner: Mute = no YouTube/Spotify load; Unmute remounts from saved playlist embedSrc.
+    if (roomAudioMuted) {
+      removeRoomEmbedDock();
+      try { updateRoomMusicChip(); } catch (eMuteDock) {}
+      return null;
+    }
     if (!inRoom || !pl || (pl.source !== "youtube" && pl.source !== "spotify") || !pl.embedSrc) {
       removeRoomEmbedDock();
       return null;
@@ -1070,8 +1086,11 @@
     // How this works: local → <audio>; youtube/spotify → #room-embed-dock iframe; pause local when not local.
     // Beginner: closing the Room music modal does NOT call this teardown — only leave/local-switch does.
     // ENGINE DEV: single-track sets audio.loop=true; multi-track uses playlistNext on ended for continuous play.
+    // How this works (20260906ad): mute-safe — when muted, unload local src and skip embed mount (do not fetch).
+    // Beginner: Mute never breaks the room; Unmute loads music again from the saved playlist.
     var a = ensureRoomAudioEl();
     a.muted = !!roomAudioMuted;
+    try { a.volume = roomAudioMuted ? 0 : Math.max(0, Math.min(1, roomAudioVolume)); } catch (eVol) {}
     var pl = loadPlaylist();
     var src = normalizePlaylistSource(pl.source);
     if (!inRoom) {
@@ -1083,7 +1102,7 @@
     if (src !== "local") {
       try { a.pause(); a.removeAttribute("src"); a.removeAttribute("data-track-id"); a.loop = false; } catch (eHide) {}
       a.style.display = "none";
-      ensureRoomEmbedDock(pl);
+      ensureRoomEmbedDock(pl); // no-ops / removes dock when muted
       musicGestureNeeded = false;
       var btnHide = document.getElementById("music-gesture-btn");
       if (btnHide) btnHide.hidden = true;
@@ -1096,6 +1115,13 @@
     if (!track || !track.dataUrl) {
       try { a.pause(); a.removeAttribute("src"); a.loop = false; } catch (e2) {}
       try { updateRoomMusicChip(); } catch (eEmpty) {}
+      return;
+    }
+    // Mute-safe local: do not assign src while muted (classic — muted means do not load the track).
+    if (roomAudioMuted) {
+      try { a.pause(); a.removeAttribute("src"); a.removeAttribute("data-track-id"); a.loop = false; } catch (eMuteLocal) {}
+      musicGestureNeeded = false;
+      try { updateRoomMusicChip(); } catch (eMuteChip) {}
       return;
     }
     // Single track → native loop; queue → playlistNext wraps (already continuous).
@@ -1239,7 +1265,7 @@
 
   var STUFF_CATS = [
     // How this works: wiki Stuff rail categories. howBlurb = empty-state “How do I get stuff?”
-    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload a stub avatar thumbnail here, or earn/list later — never invent demo avatars." },
+    { id: "avatars", label: "Avatars", empty: "You have no avatars yet.", how: "Avatars are how you look in rooms. Upload a stub avatar thumbnail here. Classic SWF wardrobe is On hold (side project) — see AVATAR-IMPORT.md." },
     { id: "furniture", label: "Furniture", empty: "You have no furniture yet.", how: "Furniture fills your loft. Upload a named piece with optional thumb, then Decorate Room to place chips." },
     { id: "backdrops", label: "Backdrops", empty: "You have no backdrops yet.", how: "Backdrops set the room scene. Upload an image you have rights to, then place it while decorating." },
     { id: "toys", label: "Toys", empty: "You have no toys yet.", how: "Toys are playful room items. Create your own stub here — no fake catalog fillers." },
@@ -1290,7 +1316,31 @@
   var helpOpen = false;
   var legalOpen = false; // Help → Legal / Disclaimer
   var musicGestureNeeded = false; // browser blocked autoplay — show Click to play
-  var roomAudioMuted = false;
+  // How this works (20260906ad): mute + volume prefs persist in localStorage.
+  // Beginner: Mute remembers across reloads; volume slider is 0–100%.
+  // ENGINE DEV: mute-safe load skips mounting audio/embed when muted (classic wiki Music).
+  var ROOM_MUTE_KEY = "whirled2.roomMute";
+  var ROOM_VOL_KEY = "whirled2.roomVolume"; // 0..1 float
+  function loadRoomMutedPref() {
+    try { return localStorage.getItem(ROOM_MUTE_KEY) === "1"; } catch (e) { return false; }
+  }
+  function saveRoomMutedPref(on) {
+    try { localStorage.setItem(ROOM_MUTE_KEY, on ? "1" : "0"); } catch (e) {}
+  }
+  function loadRoomVolumePref() {
+    try {
+      var v = parseFloat(localStorage.getItem(ROOM_VOL_KEY));
+      if (isNaN(v)) return 0.7;
+      return Math.max(0, Math.min(1, v));
+    } catch (e) { return 0.7; }
+  }
+  function saveRoomVolumePref(v) {
+    try { localStorage.setItem(ROOM_VOL_KEY, String(Math.max(0, Math.min(1, Number(v) || 0)))); } catch (e) {}
+  }
+  var roomAudioMuted = loadRoomMutedPref();
+  var roomAudioVolume = loadRoomVolumePref();
+  var roomShareOpen = false; // Share / embed room popup
+  var volPopoverOpen = false; // toolbar volume slider popover
   var stuffListMode = false; // show list form on stuff detail
   var FEED = [];
   var GROUPS_KEY = "whirled2.groups";
@@ -1342,6 +1392,250 @@
   function saveStuff(items) {
     localStorage.setItem(STUFF_KEY, JSON.stringify(items.slice(0, 200)));
   }
+
+  // ---------------------------------------------------------------------------
+  // Avatar lab (Phase 0–1 foundation) — DEFERRED / locked off for normal users
+  // How this works: Stuff → Avatars shows an "On hold" note unless avatarLab is on.
+  // When on: list/upload/export wardrobe JSON + SWF blobs in IndexedDB whirled2-media.
+  // Wear (lab only) sets activeId in localStorage — room chrome / #stage-slot ignore it.
+  // ENGINE DEV: Flash/Ruffle still banned for live rooms (ENGINE-BRIDGE.md). Phase 2 deferred.
+  // ---------------------------------------------------------------------------
+  function syncAvatarLabFlagFromUrl() {
+    // How this works: visiting ?avatarLab=1 turns the lab on and remembers it in localStorage.
+    try {
+      var q = new URLSearchParams(location.search || "");
+      if (q.get("avatarLab") === "1") {
+        localStorage.setItem(AVATAR_LAB_KEY, "1");
+      }
+    } catch (e) {}
+  }
+  function isAvatarLabOn() {
+    // How this works: lab is OFF by default. ON if storage flag is "1" or URL has ?avatarLab=1.
+    try {
+      if (localStorage.getItem(AVATAR_LAB_KEY) === "1") return true;
+    } catch (e) {}
+    try {
+      var q = new URLSearchParams(location.search || "");
+      if (q.get("avatarLab") === "1") return true;
+    } catch (e2) {}
+    return false;
+  }
+  function emptyWardrobe() {
+    return { version: 1, avatars: [], activeId: null };
+  }
+  function loadWardrobe() {
+    // How this works: wardrobe manifest lives in localStorage; SWF bytes live in IndexedDB by SHA-1.
+    try {
+      var raw = JSON.parse(localStorage.getItem(WARDROBE_KEY) || "null");
+      if (!raw || typeof raw !== "object") return emptyWardrobe();
+      if (!Array.isArray(raw.avatars)) raw.avatars = [];
+      if (raw.version == null) raw.version = 1;
+      if (raw.activeId === undefined) raw.activeId = null;
+      return raw;
+    } catch (e) {
+      return emptyWardrobe();
+    }
+  }
+  function saveWardrobe(w) {
+    w = w || emptyWardrobe();
+    try {
+      localStorage.setItem(WARDROBE_KEY, JSON.stringify({
+        version: w.version || 1,
+        avatars: (w.avatars || []).slice(0, 100),
+        activeId: w.activeId || null
+      }));
+    } catch (e) {}
+  }
+  function bufToHex(buf) {
+    var u8 = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
+    var out = "";
+    for (var i = 0; i < u8.length; i++) {
+      var h = u8[i].toString(16);
+      out += h.length === 1 ? "0" + h : h;
+    }
+    return out;
+  }
+  // Pure JS SHA-1 fallback when SubtleCrypto is missing (old browsers / file:// quirks).
+  // ENGINE DEV: classic msoy used SHA-1 for HashMediaDesc — keep SHA-1 for wardrobe ids.
+  function sha1PureJs(arrayBuffer) {
+    function rotl(n, s) { return (n << s) | (n >>> (32 - s)); }
+    function toWords(u8) {
+      var l = u8.length;
+      var nWords = (((l + 8) >> 6) + 1) * 16;
+      var w = new Array(nWords);
+      var i;
+      for (i = 0; i < nWords; i++) w[i] = 0;
+      for (i = 0; i < l; i++) w[i >> 2] |= u8[i] << (24 - (i % 4) * 8);
+      w[i >> 2] |= 0x80 << (24 - (i % 4) * 8);
+      w[nWords - 1] = l * 8;
+      return w;
+    }
+    var u8 = new Uint8Array(arrayBuffer);
+    var words = toWords(u8);
+    var h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
+    for (var i = 0; i < words.length; i += 16) {
+      var w = new Array(80), j, a, b, c, d, e, f, k, temp;
+      for (j = 0; j < 16; j++) w[j] = words[i + j] | 0;
+      for (j = 16; j < 80; j++) w[j] = rotl(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
+      a = h0; b = h1; c = h2; d = h3; e = h4;
+      for (j = 0; j < 80; j++) {
+        if (j < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
+        else if (j < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+        else if (j < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+        else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+        temp = (rotl(a, 5) + f + e + k + w[j]) | 0;
+        e = d; d = c; c = rotl(b, 30); b = a; a = temp;
+      }
+      h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0; h4 = (h4 + e) | 0;
+    }
+    function hex32(n) {
+      var s = (n >>> 0).toString(16);
+      return ("00000000" + s).slice(-8);
+    }
+    return hex32(h0) + hex32(h1) + hex32(h2) + hex32(h3) + hex32(h4);
+  }
+  function sha1OfArrayBuffer(arrayBuffer) {
+    // How this works: prefer SubtleCrypto SHA-1; fall back to pure JS so lab works offline.
+    return Promise.resolve().then(function () {
+      if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+        return crypto.subtle.digest("SHA-1", arrayBuffer).then(function (dig) {
+          return bufToHex(dig);
+        }).catch(function () {
+          return sha1PureJs(arrayBuffer);
+        });
+      }
+      return sha1PureJs(arrayBuffer);
+    });
+  }
+  function openMediaIdb() {
+    // How this works: IndexedDB keystore whirled2-media / blobs — SWF bytes by SHA-1 hex key.
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) {
+        reject(new Error("IndexedDB not available in this browser."));
+        return;
+      }
+      var req = indexedDB.open(MEDIA_IDB_NAME, 1);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(MEDIA_IDB_STORE)) {
+          db.createObjectStore(MEDIA_IDB_STORE);
+        }
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error("IndexedDB open failed")); };
+    });
+  }
+  function idbPutBlob(sha1, record) {
+    return openMediaIdb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(MEDIA_IDB_STORE, "readwrite");
+        tx.objectStore(MEDIA_IDB_STORE).put(record, sha1);
+        tx.oncomplete = function () { resolve(sha1); };
+        tx.onerror = function () { reject(tx.error || new Error("IDB put failed")); };
+      });
+    });
+  }
+  function idbGetBlob(sha1) {
+    return openMediaIdb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(MEDIA_IDB_STORE, "readonly");
+        var req = tx.objectStore(MEDIA_IDB_STORE).get(sha1);
+        req.onsuccess = function () { resolve(req.result || null); };
+        req.onerror = function () { reject(req.error || new Error("IDB get failed")); };
+      });
+    });
+  }
+  function idbClearAllBlobs() {
+    return openMediaIdb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(MEDIA_IDB_STORE, "readwrite");
+        tx.objectStore(MEDIA_IDB_STORE).clear();
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error || new Error("IDB clear failed")); };
+      });
+    }).catch(function () { /* IDB optional when clearing */ });
+  }
+  function fileToArrayBuffer(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error("Could not read file.")); };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  function arrayBufferToBase64(arrayBuffer) {
+    var u8 = new Uint8Array(arrayBuffer);
+    var chunk = 0x8000;
+    var parts = [];
+    for (var i = 0; i < u8.length; i += chunk) {
+      parts.push(String.fromCharCode.apply(null, u8.subarray(i, i + chunk)));
+    }
+    return btoa(parts.join(""));
+  }
+  function avatarLabHoldPanelHtml() {
+    // How this works: default users only see this quiet note — no SWF upload, no Wear.
+    return '<div class="panel avatar-lab-hold-panel" id="avatar-lab-hold">'
+      + '<h3>Classic SWF wardrobe — On hold</h3>'
+      + '<p class="meta">Side project — not active for visitors. Room look stays the stub thumbnail path. '
+      + 'Devs: see <code>AVATAR-IMPORT.md</code> and unlock local tools with <code>?avatarLab=1</code>.</p>'
+      + '</div>';
+  }
+  function avatarLabPanelHtml() {
+    // How this works: full lab UI only when flag is ON. Wear sets activeId only (no room change).
+    // ENGINE DEV: do not mount these SWFs in #stage-slot yet — Phase 2 deferred.
+    var w = loadWardrobe();
+    var rows;
+    if (!w.avatars.length) {
+      rows = '<p class="meta">No lab avatars yet. Upload a .swf you created or have rights to.</p>';
+    } else {
+      rows = '<ul class="avatar-lab-list">' + w.avatars.map(function (av) {
+        var active = w.activeId && w.activeId === av.id;
+        var thumb = av.thumbDataUrl
+          ? '<img class="avatar-lab-thumb" src="' + av.thumbDataUrl + '" alt="" />'
+          : '<div class="swatch avatar-lab-swatch"></div>';
+        return '<li class="avatar-lab-row' + (active ? " is-active" : "") + '" data-lab-id="' + esc(av.id) + '">'
+          + thumb
+          + '<div class="avatar-lab-meta">'
+          +   '<strong>' + esc(av.name || "Avatar") + '</strong>'
+          +   (active ? ' <span class="meta">(lab active)</span>' : '')
+          +   '<p class="meta">sha1 ' + esc((av.sha1 || "").slice(0, 12)) + '… · ' + esc(av.mime || "application/x-shockwave-flash")
+          +   ' · scale ' + esc(String(av.scale != null ? av.scale : 1)) + '</p>'
+          +   '<div class="avatar-lab-row-actions">'
+          +     '<button type="button" class="action-btn" data-lab-wear="' + esc(av.id) + '">Wear (lab only)</button>'
+          +   '</div>'
+          + '</div></li>';
+      }).join("") + '</ul>';
+    }
+    return '<div class="panel avatar-lab-panel" id="avatar-lab-panel">'
+      + '<div class="room-side-head"><h2>Avatar lab</h2>'
+      +   '<span class="meta">flag on · side work</span></div>'
+      + '<p class="meta">Phase 0–1 archive only. <b>Wear (lab only)</b> saves <code>activeId</code> in '
+      + '<code>whirled2.wardrobe</code> — it does <b>not</b> change the room avatar or <code>#stage-slot</code> yet. '
+      + 'See <code>AVATAR-IMPORT.md</code>.</p>'
+      + '<div class="section-label">Wardrobe</div>'
+      + rows
+      + '<div class="section-label">Upload SWF (lab)</div>'
+      + '<form id="avatar-lab-upload-form" class="stuff-upload-form avatar-lab-upload-form">'
+      +   '<label>Name <input name="name" maxlength="80" required placeholder="My avatar" /></label>'
+      +   '<label>Avatar SWF <input type="file" name="swf" accept=".swf,application/x-shockwave-flash,application/vnd.adobe.flash.movie" required /></label>'
+      +   '<label>Thumbnail (optional, ~80×60) <input type="file" name="thumb" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+      +   '<label>Scale <input name="scale" type="number" min="0.1" max="4" step="0.05" value="1" /></label>'
+      +   '<label class="check-row"><input type="checkbox" name="rights" required /> I confirm this is my own creation or I have the rights to store it here (no shop scrapes).</label>'
+      +   '<button type="submit">Save to lab wardrobe</button>'
+      +   '<p class="meta" id="avatar-lab-upload-msg"></p>'
+      + '</form>'
+      + '<div class="section-label">Lab tools</div>'
+      + '<div class="avatar-lab-tools">'
+      +   '<button type="button" class="action-btn" data-lab-export="1">Export wardrobe.json</button>'
+      +   '<label class="action-btn avatar-lab-import-label">Import manifest JSON'
+      +     '<input type="file" accept="application/json,.json" id="avatar-lab-import-file" hidden />'
+      +   '</label>'
+      +   '<button type="button" class="action-btn danger" data-lab-clear="1">Clear lab data</button>'
+      + '</div>'
+      + '<p class="meta" id="avatar-lab-tools-msg">Export downloads the manifest only. SWF blobs stay in IndexedDB <code>whirled2-media</code> (no JSZip in this mock — re-upload SWFs after import if needed).</p>'
+      + '</div>';
+  }
+
   function loadShop() {
     try { return JSON.parse(localStorage.getItem(SHOP_KEY) || "[]"); } catch (e) { return []; }
   }
@@ -1869,8 +2163,23 @@
       return { mode: mode, ownerId: String(obj.ownerId || "") };
     } catch (e) { return defaultRoomLock(); }
   }
+  function canSetRoomLock() {
+    // How this works: loft owner (first user) or current lock ownerId may change Unlocked/Friends/Locked.
+    // Beginner: only the room owner flips the three lock choices (wiki Room control bar).
+    var s = session();
+    if (!s || !s.user) return false;
+    var sid = String(s.user.id);
+    if (isLoftOwner()) return true;
+    var lock = loadRoomLock();
+    if (lock && lock.ownerId && String(lock.ownerId) === sid) return true;
+    // First set: no owner yet → allow current session to claim (same as saveRoomLock).
+    if (!lock || !lock.ownerId) return true;
+    return false;
+  }
   function saveRoomLock(mode) {
-    // How this works: whoever sets the lock becomes ownerId (session user, else firstUserId).
+    // How this works: owner sets Unlocked / Friends / Locked; stamps ownerId.
+    // Beginner: guests cannot change the lock — buttons are disabled for them.
+    if (!canSetRoomLock()) return;
     mode = mode || "unlocked";
     if (mode !== "unlocked" && mode !== "friends" && mode !== "locked") mode = "unlocked";
     var ownerId = "";
@@ -1878,7 +2187,12 @@
       if (session() && session().user && session().user.id) ownerId = String(session().user.id);
       else ownerId = localStorage.getItem(FIRST_USER_KEY) || "";
     } catch (e) {}
+    // Keep prior ownerId if loft owner is adjusting someone else's claimed lock? Prefer session claimer.
     try {
+      var prev = loadRoomLock();
+      if (prev && prev.ownerId && isLoftOwner() && String(prev.ownerId) !== ownerId) {
+        // loft first-user may always set; keep themselves as ownerId for clarity
+      }
       localStorage.setItem(ROOM_LOCK_KEY, JSON.stringify({ mode: mode, ownerId: ownerId }));
     } catch (e2) {}
   }
@@ -2194,6 +2508,28 @@
       return isFriendly(p.id) && String(p.id) !== sid;
     });
   }
+  function friendlyPeopleStripHtml() {
+    // How this works (20260906ad): Me home lists Friendly People under Friends Online.
+    // Beginner: Friendly helpers auto-accept friend requests. Empty = honest "none yet".
+    // ENGINE DEV: only real local users with whirled2.friendly.{id}=1 — never invent NPCs.
+    var people = listFriendlyPeople();
+    if (!people.length) {
+      return '<p class="meta friendly-empty">No Friendly People yet. Helpers who turn on Friendly '
+        + '(Account) show up here and auto-accept friend requests.</p>';
+    }
+    return '<div class="friendly-strip" role="list">' + people.map(function (p) {
+      var ph = "";
+      try { ph = localStorage.getItem("whirled2.photo." + p.id) || ""; } catch (ePh) {}
+      var thumb = ph
+        ? '<img src="' + ph + '" alt="" width="40" height="40" />'
+        : '<span class="friend-fallback">' + esc(String(p.name || "?").slice(0, 1).toUpperCase()) + '</span>';
+      return '<div class="friendly-row" role="listitem">'
+        + '<button type="button" class="friend-thumb" data-profile="' + esc(p.id) + '" title="' + esc(p.name) + '">'
+        + thumb + '<span>' + esc(p.name) + '</span></button>'
+        + '<button type="button" class="action-btn" data-add-friend="' + esc(p.id) + '" data-friend-name="' + esc(p.name) + '">Add Friend</button>'
+        + '</div>';
+    }).join("") + '</div>';
+  }
   function playersOnlineCount() {
     // How this works: honest local mock — session (you) + distinct friends online + loft occupants.
     var ids = {};
@@ -2333,6 +2669,14 @@
   }
   // How this works (20260906q): on phones, Slide's dark panel eats the green stage.
   // Auto-switch to Overlay once for the session preference so the black slab never returns.
+  // ---------------------------------------------------------------------------
+  // PLAN (future — do not implement in this pass): mobile landscape fullscreen + corner chat
+  // How this would work later: when phone is landscape + in-room, offer a fullscreen stage
+  // (screen.orientation / CSS fullscreen on .stage-host) and tuck Overlay chat into a
+  // corner drawer so the room stays readable. Portrait keeps today's Overlay-only path.
+  // Beginner: landscape mode is a polish idea for phones held sideways — not shipped yet.
+  // ENGINE DEV: never move #room-embed-dock under #stage-slot; fullscreen host = .stage-host only.
+  // ---------------------------------------------------------------------------
   function ensureMobileChatOverlay() {
     // Purpose: phones force Overlay chat so Slide never opens a black slab under the stage.
     // How: if narrow viewport and mode was slide, flip to overlay once and notice once.
@@ -2410,16 +2754,24 @@
     return arr;
   }
   function shopCard(item) {
+    // How this works (20260906ad): grid card opens detail; ♥ toggles favorite without leaving the grid.
+    // Beginner: heart uses the same whirled2.favorites list as the item detail page.
+    // ENGINE DEV: div (not button) so the fav control is not nested buttons; click order checks fav first.
     var id = item.id || item.name || "";
     var tone = item.kind === "backdrop" || itemCat(item) === "backdrops" ? "night" : (item.kind === "avatar" || itemCat(item) === "avatars") ? "fox" : "";
     var price = formatShopPrice(item.coins != null ? item.coins : item.price, item.owned);
+    var favs = loadFavorites();
+    var isFav = favs.indexOf(id) >= 0;
     var visual = item.thumb
       ? '<img class="stuff-thumb" src="' + item.thumb + '" alt="" />'
       : '<div class="swatch ' + tone + '"></div>';
-    return '<button type="button" class="card shop-card" data-shop-item="' + esc(id) + '">'
+    return '<div class="card shop-card" data-shop-item="' + esc(id) + '" role="button" tabindex="0">'
+      + '<button type="button" class="shop-card-fav fav-btn' + (isFav ? " is-on" : "") + '" data-shop-fav="' + esc(id) + '" title="'
+      + (isFav ? "Remove favorite" : "Favorite") + '" aria-label="' + (isFav ? "Remove favorite" : "Favorite") + '">'
+      + (isFav ? "♥" : "♡") + '</button>'
       + visual + '<div class="body"><h3>' + esc(item.name || "Item") + '</h3>'
       + '<p class="meta">' + esc(item.kind || itemCat(item)) + " · " + esc(item.creator || item.sellerName || "member") + '</p>'
-      + '<div class="price">' + esc(String(price)) + '</div></div></button>';
+      + '<div class="price">' + esc(String(price)) + '</div></div></div>';
   }
   var PASSPORT_KEY = "whirled2.passport.";
   var PASSPORT_PROG_KEY = "whirled2.passportProg.";
@@ -2744,6 +3096,27 @@
       acceptFriendRequest(incoming.id);
       return incoming;
     }
+    // How this works (20260906ad): Friendly People auto-accept incoming friend requests (classic).
+    // Beginner: if they turned on Friendly, you become friends immediately — no Accept wait.
+    // ENGINE DEV: same-browser mock; still writes both sides via addFriendForUser.
+    if (isFriendly(toId)) {
+      addFriendForUser(s.user.id, { id: toId, name: toName });
+      addFriendForUser(toId, { id: s.user.id, name: s.user.name });
+      rememberProfile({ id: toId, name: toName });
+      try {
+        grantCurrency(s.user.id, 15, 0, { kind: "friend", label: "Friend accepted", note: "+15 coins — friended " + toName });
+        grantCurrency(toId, 15, 0, { kind: "friend", label: "Friend accepted", note: "+15 coins — friended by " + (s.user.name || "") });
+        refreshWalletChrome();
+      } catch (eFrAuto) {}
+      pushNotice("friending", toName + " (Friendly) auto-accepted — you are friends!");
+      sendMail({
+        toId: toId,
+        toName: toName,
+        subject: "Friend request auto-accepted",
+        body: s.user.name + " friended you (Friendly People auto-accept)."
+      });
+      return { id: "fr-auto", fromId: s.user.id, toId: toId, status: "accepted", at: new Date().toISOString() };
+    }
     var req = {
       id: "fr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       fromId: s.user.id,
@@ -2801,6 +3174,7 @@
     try {
       var wallAcc = loadWall(s.user.id);
       wallAcc.unshift({
+        id: newWallPostId(),
         who: hit.fromName || hit.fromId,
         fromId: hit.fromId,
         text: "accepted your friend request.",
@@ -3517,7 +3891,76 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ac";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ad";
+  }
+  function roomShareUrl() {
+    // How this works (20260906ad): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
+    // Beginner: same base Pages URL + #rooms — no fake social APIs.
+    var base = shareInviteUrl();
+    if (base.indexOf("#") >= 0) base = base.split("#")[0];
+    return base + "#rooms";
+  }
+  function roomEmbedSnippet() {
+    // How this works: optional iframe snippet pointing at the room preview/enter URL.
+    // Beginner: copy/paste into a page you own — Whirled2 does not post to social networks.
+    // ENGINE DEV: embed hits the static mock URL only; no server-side oEmbed.
+    var url = roomShareUrl();
+    return '<iframe src="' + url + '" title="Whirled2 room" width="480" height="320" '
+      + 'style="border:1px solid #9bb8cc;border-radius:6px;max-width:100%" '
+      + 'loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+  }
+  function roomSharePopupHtml() {
+    // How this works: Share / embed popup beyond clipboard-only (classic room control bar).
+    if (!roomShareOpen) return "";
+    var url = roomShareUrl();
+    var snip = roomEmbedSnippet();
+    return '<div class="modal-backdrop room-share-backdrop" id="room-share-modal" data-room-share-backdrop="1" role="presentation">'
+      + '<div class="modal-card room-share-card" role="dialog" aria-modal="true" aria-label="Share or embed room" data-room-share-card="1" onclick="event.stopPropagation()">'
+      +   '<div class="room-side-head"><h2>Share or embed</h2>'
+      +     '<button type="button" class="text-btn" data-room-share-close="1" aria-label="Close">×</button></div>'
+      +   '<p class="meta">Copy a link so friends can open the Rooms lobby and preview this loft. Optional embed uses a plain iframe — no social APIs.</p>'
+      +   '<label class="invite-link-label">Share URL'
+      +     '<input id="room-share-url" readonly value="' + esc(url) + '" /></label>'
+      +   '<div class="invite-them-actions">'
+      +     '<button type="button" class="action-btn" data-room-share-copy-url="1">Copy link</button>'
+      +   '</div>'
+      +   '<label class="invite-link-label">Embed snippet'
+      +     '<textarea id="room-share-embed" readonly rows="4">' + esc(snip) + '</textarea></label>'
+      +   '<div class="invite-them-actions">'
+      +     '<button type="button" class="action-btn" data-room-share-copy-embed="1">Copy embed</button>'
+      +   '</div>'
+      +   '<p class="meta" id="room-share-msg"></p>'
+      + '</div></div>';
+  }
+  function openRoomSharePopup() {
+    roomShareOpen = true;
+    var existing = document.getElementById("room-share-modal");
+    if (existing) existing.remove();
+    var wrap = document.createElement("div");
+    wrap.innerHTML = roomSharePopupHtml();
+    var app = document.getElementById("app");
+    if (wrap.firstChild && app) app.appendChild(wrap.firstChild);
+  }
+  function closeRoomSharePopup() {
+    roomShareOpen = false;
+    var el = document.getElementById("room-share-modal");
+    if (el) el.remove();
+  }
+  function volToolbarHtml() {
+    // How this works (20260906ad): classic-ish Volume — mute toggle + slider popover.
+    // Beginner: speaker button mutes; open the slider to set loudness (saved on this browser).
+    // ENGINE DEV: volume applies to local <audio>; mute-safe skips embed/local load when muted.
+    var pct = Math.round((roomAudioVolume || 0) * 100);
+    var muteTitle = roomAudioMuted ? "Unmute room music" : "Mute room music";
+    return '<span class="tb-vol-wrap' + (roomAudioMuted ? " is-muted" : "") + (volPopoverOpen ? " is-open" : "") + '">'
+      + '<button type="button" class="tb tb-vol" title="' + muteTitle + '" aria-label="Volume" data-room-mute="1"></button>'
+      + '<button type="button" class="tb-vol-open text-btn" title="Volume slider" aria-label="Open volume slider" data-vol-toggle="1">▾</button>'
+      + '<div class="tb-vol-pop" id="tb-vol-pop"' + (volPopoverOpen ? "" : " hidden") + ' role="dialog" aria-label="Room volume">'
+      +   '<label class="tb-vol-label">Volume <span id="tb-vol-pct">' + pct + '%</span>'
+      +     '<input type="range" id="tb-vol-slider" min="0" max="100" step="1" value="' + pct + '" data-vol-slider="1" />'
+      +   '</label>'
+      +   '<button type="button" class="text-btn" data-room-mute="1">' + (roomAudioMuted ? "Unmute" : "Mute") + '</button>'
+      + '</div></span>';
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3731,6 +4174,7 @@
     // What: Stuff tab inventory by category (Avatars, Furniture, …).
     // How: left teal rail picks category; main shows Your Stuff grid or upload/detail.
     // Why: matches classic Stuff tab — empty until the player uploads; nothing invented.
+    // Avatar lab: Avatars category keeps stub thumbnail upload; SWF wardrobe is On hold unless ?avatarLab=1.
     var meta = catMeta(stuffCat);
     var all = loadStuff();
     var items = filterByCat(all, stuffCat);
@@ -3739,15 +4183,20 @@
       + '<p class="meta">Create furniture and media yourself (wiki Upload), or earn/buy later. Coins & Bars are play currency — no payments. Nothing is invented for you.</p>'
       + '<button type="button" class="action-btn" data-stuff-mode="upload">Upload…</button>'
       + '</div>';
+    // How this works: quiet On hold note (default) OR full Avatar lab (flag on) — only on Avatars browse.
+    var avatarExtra = "";
+    if (stuffCat === "avatars" && stuffMode === "browse") {
+      avatarExtra = isAvatarLabOn() ? avatarLabPanelHtml() : avatarLabHoldPanelHtml();
+    }
     var body;
     if (stuffMode === "upload") {
       body = stuffUploadForm(meta);
     } else if ((stuffMode === "detail" || stuffMode === "edit") && stuffItemId) {
       body = stuffDetail(findStuff(stuffItemId));
     } else if (!items.length) {
-      body = how + '<div class="panel"><p class="meta">' + esc(meta.empty) + (all.length ? "" : " Your inventory starts empty.") + '</p></div>';
+      body = how + avatarExtra + '<div class="panel"><p class="meta">' + esc(meta.empty) + (all.length ? "" : " Your inventory starts empty.") + '</p></div>';
     } else {
-      body = how + '<div class="grid">' + items.map(card).join("") + '</div>';
+      body = how + avatarExtra + '<div class="grid">' + items.map(card).join("") + '</div>';
     }
     return '<section class="page stuff-page"><div class="page-head"><div><h1>Stuff</h1><p class="meta">Your Stuff — what you already own (wiki Stuff tab).</p></div></div>'
       + '<div class="stuff-layout">' + catRail("stuff", stuffCat)
@@ -4574,7 +5023,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: chat visual polish + Games home (Browse / Tables / AVR / scores). Cache <code>?v=20260906ac</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: avatar lab deferred (On hold; unlock <code>?avatarLab=1</code>). Cache <code>?v=20260906ad</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -4656,7 +5105,10 @@ function helpPage() {
       // ENGINE DEV: persistent shell dock + CSS fixed is-expanded; ensureRoomEmbedDock / ensurePlaylistPanel after paint.
       +     chatTabsHtml()
       +     '<div class="chat-log" id="chat-log">' + activeChatMessages().map(chatRow).join('') + '</div>'
-      +     '<div class="room-invite-row"><button type="button" class="text-btn" data-copy-invite="room">Copy room invite link</button></div>'
+      +     '<div class="room-invite-row">'
+      +       '<button type="button" class="text-btn" data-room-share="1">Share / embed room…</button>'
+      +       '<button type="button" class="text-btn" data-copy-invite="room">Copy link</button>'
+      +     '</div>'
       +     '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
       +     (roomItemsPanelOpen ? roomItemsPanel() : '')
@@ -4683,6 +5135,50 @@ function helpPage() {
   }
   function saveWall(userId, rows) {
     localStorage.setItem(wallKey(userId), JSON.stringify(rows.slice(-80)));
+  }
+  function newWallPostId() {
+    // Beginner: every wall comment gets a small id so Delete can find it later.
+    return "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function wallPostKey(w) {
+    // How this works: prefer stored id; legacy rows fall back to at|fromId|text fingerprint.
+    if (!w) return "";
+    if (w.id) return String(w.id);
+    return String(w.at || "") + "|" + String(w.fromId || w.who || "") + "|" + String(w.text || "").slice(0, 80);
+  }
+  function canDeleteWallPost(wallOwnerId, post) {
+    // How this works (20260906ad): profile owner may delete any post on their wall;
+    // authors may delete their own posts (classic comment wall).
+    // Beginner: if it is your profile OR you wrote the comment, you see Delete.
+    var s = session();
+    if (!s || !s.user || !post) return false;
+    var me = String(s.user.id);
+    if (me === String(wallOwnerId || "")) return true;
+    if (post.fromId && String(post.fromId) === me) return true;
+    return false;
+  }
+  function wallRowHtml(w, wallOwnerId) {
+    // How this works: one wall row + optional Delete for owner/author.
+    // ENGINE DEV: delete is chrome localStorage only — never touches #stage-slot.
+    var key = wallPostKey(w);
+    var del = canDeleteWallPost(wallOwnerId, w)
+      ? ('<button type="button" class="text-btn wall-delete-btn" data-wall-delete="' + esc(key)
+        + '" data-wall-owner="' + esc(wallOwnerId || "") + '" title="Delete comment">Delete</button>')
+      : "";
+    return '<div class="wall-row" data-wall-post="' + esc(key) + '">'
+      + '<span class="ava">' + esc(String(w.who || "?").slice(0, 1)) + '</span>'
+      + '<div class="wall-row-body"><b>' + esc(w.who || "member") + '</b> ' + esc(w.text || "")
+      + '<time>' + esc(String(w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>'
+      + del + '</div>';
+  }
+  function deleteWallPost(wallOwnerId, postKey) {
+    // Beginner: removes one comment from that profile wall in this browser.
+    if (!wallOwnerId || !postKey) return false;
+    var rows = loadWall(wallOwnerId);
+    var next = rows.filter(function (w) { return wallPostKey(w) !== String(postKey); });
+    if (next.length === rows.length) return false;
+    saveWall(wallOwnerId, next);
+    return true;
   }
   function loadStatus(userId) {
     try { return localStorage.getItem(STATUS_KEY + userId) || ""; } catch (e) { return ""; }
@@ -5435,6 +5931,9 @@ function helpPage() {
       +       '<button type="button" class="text-btn" data-me="share">Share Whirled</button>'
       +     '</div>'
       +     '<div class="panel"><h2>My Friends Online</h2>' + friendBox + '</div>'
+      +     '<div class="panel friendly-people-panel"><h2>Friendly People</h2>'
+      +       '<p class="meta">Helpers who auto-accept friend requests (classic Me tab).</p>'
+      +       friendlyPeopleStripHtml() + '</div>'
       +   '</aside>'
       + '</div></section>';
   }
@@ -5459,8 +5958,9 @@ function helpPage() {
       ? '<img class="profile-photo" src="' + photo + '" alt="Profile photo" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(me.initials) + '</span></div>';
     wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
+    // How this works (20260906ad): owner sees Delete on every wall post; authors on their own.
     var wallHtml = wall.length ? wall.map(function (w) {
-      return '<div class="wall-row"><span class="ava">' + esc((w.who || "?").slice(0, 1)) + '</span><div><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div></div>';
+      return wallRowHtml(w, sid);
     }).join("") : '<p class="meta">No comments yet.</p>';
     var newsHtml = wall.filter(function (w) { return w.kind === "status" || w.kind === "comment"; }).slice(0, 8).map(function (w) {
       return '<div class="news-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
@@ -5998,6 +6498,17 @@ function helpPage() {
       +   '<p class="meta">Browser look: <button type="button" class="text-btn" data-me="themes">Themes</button> (CSS presets on this device). Group world themes live on group pages for managers.</p>'
       +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
       + '</div>'
+      // How this works (20260906ad): Friendly People toggle — demo ignores Level 10 / 20-friends gate.
+      // Beginner: turn on to appear on others' Me → Friendly People and auto-accept friend requests.
+      // ENGINE DEV: flag is whirled2.friendly.{userId} only — no invented helpers.
+      + '<div class="panel friendly-toggle-panel">'
+      +   '<h2>Friendly People</h2>'
+      +   '<p class="meta">Classic Whirled showed helpers who auto-accept friend requests. Whirled2 demo: toggle freely (no Level 10 gate).</p>'
+      +   '<label class="check-row friendly-check">'
+      +     '<input type="checkbox" data-friendly-toggle="1"' + (isFriendly(sid) ? " checked" : "") + ' /> '
+      +     'I am a Friendly Person (auto-accept friend requests)</label>'
+      +   '<p class="meta" id="friendly-toggle-msg">' + (isFriendly(sid) ? "You appear on Me → Friendly People for others on this browser." : "Off — you will not auto-accept.") + '</p>'
+      + '</div>'
       + '<div class="panel">'
       +   '<h2>Other sign-in</h2>'
       +   '<p class="meta">Username / password is primary (no Meta App ID steps).</p>'
@@ -6025,8 +6536,9 @@ function helpPage() {
       ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(initials) + '</span></div>';
     wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
+    // How this works (20260906ad): profile owner or comment author can Delete.
     var wallHtml = wall.length ? wall.map(function (w) {
-      return '<div class="wall-row"><b>' + esc(w.who) + '</b> ' + esc(w.text) + '<time>' + esc((w.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
+      return wallRowHtml(w, id);
     }).join("") : '<p class="meta">No comments yet.</p>';
     var isSelf = session() && session().user.id === id;
     var member = "";
@@ -6493,7 +7005,7 @@ function helpPage() {
       +   '<input id="chat-input" maxlength="240" placeholder="Type here to chat!" autocomplete="off" />'
       +   '<button class="send" type="submit">send</button>'
       +   '<span class="toolbar">'
-      +     '<button type="button" class="tb tb-vol" title="Mute / unmute room music" aria-label="Volume" data-room-mute="1"></button>'
+      +     volToolbarHtml()
       +     '<span class="tb-go-wrap">'
       +       '<button type="button" class="tb tb-go" title="Go" aria-label="Go" data-tb="go"></button>'
       +       goMenuHtml()
@@ -6512,11 +7024,15 @@ function helpPage() {
       +         '<button type="button" data-room-menu="snapshot">Take snapshot (stub)</button>'
       +         '<button type="button" data-room-menu="zoom">Zoom (stub)</button>'
       +         '<button type="button" data-room-menu="playlist">View room music</button>'
+      +         '<button type="button" data-room-share="1">Share / embed room…</button>'
       +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
-      +         '<div class="room-lock-row meta">Lock (enforced locally)</div>'
-      +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock().mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + '>🔓 Unlocked</button>'
-      +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock().mode || "") === "friends" ? ' class="is-on"' : '') + '>👥 Friends</button>'
-      +         '<button type="button" data-room-lock="locked"' + ((loadRoomLock().mode || "") === "locked" ? ' class="is-on"' : '') + '>🔒 Locked</button>'
+      // How this works (20260906ad): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
+      // Beginner: room owner picks who may enter. Guests see the current mode but cannot change it.
+      // ENGINE DEV: chrome gate via canEnterLoft; does not touch #stage-slot.
+      +         '<div class="room-lock-row meta">Room lock (owner)' + (canSetRoomLock() ? "" : " — view only") + '</div>'
+      +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock().mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + (canSetRoomLock() ? "" : " disabled") + '>🔓 Unlocked</button>'
+      +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock().mode || "") === "friends" ? ' class="is-on"' : '') + (canSetRoomLock() ? "" : " disabled") + '>👥 Friends</button>'
+      +         '<button type="button" data-room-lock="locked"' + ((loadRoomLock().mode || "") === "locked" ? ' class="is-on"' : '') + (canSetRoomLock() ? "" : " disabled") + '>🔒 Locked</button>'
       +         '<button type="button" data-room-menu="lobby">' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '</button>'
       +       '</div>'
       +     '</span>'
@@ -6934,6 +7450,7 @@ function helpPage() {
   // ---------------------------------------------------------------------------
   function exposeBridge() {
     // ENGINE DEV: wallet is chrome localStorage; getWallet() is optional read-only for engine.
+    // Avatar lab wardrobe APIs are experimental read helpers — activeId is NOT applied to #stage-slot.
     window.WhirledChrome = {
       version: "0.4",
       getStageEl: function () { return document.getElementById("stage-slot"); },
@@ -6947,6 +7464,12 @@ function helpPage() {
         var s = session();
         if (!s || !s.user) return { coins: 0, bars: 0, streakDays: 0 };
         return getWalletSnapshot(s.user.id);
+      },
+      // Experimental (avatar lab): manifest only — never mounts SWF / Ruffle.
+      getWardrobe: function () { return loadWardrobe(); },
+      getActiveAvatarId: function () {
+        var w = loadWardrobe();
+        return w && w.activeId ? w.activeId : null;
       }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
@@ -7272,6 +7795,8 @@ function helpPage() {
     return false;
   }
   function boot() {
+    // How this works: ?avatarLab=1 unlocks the deferred SWF wardrobe lab for side work only.
+    syncAvatarLabFlagFromUrl();
     applyBrowserTheme();
     if (session()) {
       stripStuckPokeNotices();
@@ -7628,6 +8153,59 @@ function helpPage() {
       copyInviteLink(copyInv.getAttribute("data-copy-invite"), copyInv.getAttribute("data-copy-invite-id"));
       return;
     }
+    if (ev.target.closest("[data-room-share]") && session()) {
+      // How this works: open Share / embed modal (URL + iframe snippet).
+      try {
+        var rmenuShare = document.getElementById("room-menu");
+        if (rmenuShare) rmenuShare.hidden = true;
+      } catch (eRmS) {}
+      openRoomSharePopup();
+      return;
+    }
+    // How this works: backdrop outside the card, or ×, closes Share/embed.
+    if ((ev.target.closest("[data-room-share-backdrop]") && !ev.target.closest("[data-room-share-card]"))
+        || ev.target.closest("[data-room-share-close]")) {
+      closeRoomSharePopup();
+      return;
+    }
+    if (ev.target.closest("[data-room-share-copy-url]") && session()) {
+      var urlEl = document.getElementById("room-share-url");
+      var urlVal = urlEl ? urlEl.value : roomShareUrl();
+      var msgU = document.getElementById("room-share-msg");
+      function doneUrl() { if (msgU) msgU.textContent = "Link copied."; pushNotice("green", "Room link copied.", { transient: true }); }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(urlVal).then(doneUrl).catch(function () { window.prompt("Copy room link:", urlVal); doneUrl(); });
+        } else { window.prompt("Copy room link:", urlVal); doneUrl(); }
+      } catch (eCu) { try { window.prompt("Copy room link:", urlVal); doneUrl(); } catch (e2) {} }
+      return;
+    }
+    if (ev.target.closest("[data-room-share-copy-embed]") && session()) {
+      var embEl = document.getElementById("room-share-embed");
+      var embVal = embEl ? embEl.value : roomEmbedSnippet();
+      var msgE = document.getElementById("room-share-msg");
+      function doneEmb() { if (msgE) msgE.textContent = "Embed snippet copied."; pushNotice("green", "Embed snippet copied.", { transient: true }); }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(embVal).then(doneEmb).catch(function () { window.prompt("Copy embed snippet:", embVal); doneEmb(); });
+        } else { window.prompt("Copy embed snippet:", embVal); doneEmb(); }
+      } catch (eCe) { try { window.prompt("Copy embed snippet:", embVal); doneEmb(); } catch (e3) {} }
+      return;
+    }
+    var wallDel = ev.target.closest("[data-wall-delete]");
+    if (wallDel && session()) {
+      // How this works: Delete for profile owner or comment author.
+      var wOwner = wallDel.getAttribute("data-wall-owner") || session().user.id;
+      var wKey = wallDel.getAttribute("data-wall-delete");
+      if (deleteWallPost(wOwner, wKey)) {
+        pushNotice("gray", "Comment deleted.", { transient: true });
+        if (String(wOwner) === String(session().user.id)) { viewingId = null; meSub = "profile"; }
+        else viewingId = wOwner;
+        paint("me");
+      }
+      return;
+    }
+    // Friendly checkbox is handled on the change listener (keeps checked state honest).
     var reactBtn = ev.target.closest("[data-react]");
     if (reactBtn && session()) {
       toggleChatReaction(reactBtn.getAttribute("data-react-msg"), reactBtn.getAttribute("data-react"));
@@ -7973,6 +8551,53 @@ function helpPage() {
       paint("stuff");
       return;
     }
+    // How this works: Avatar lab buttons (only meaningful when flag on). Wear never touches #stage-slot.
+    if (ev.target.closest("[data-lab-wear]") && session() && isAvatarLabOn()) {
+      var wearId = ev.target.closest("[data-lab-wear]").getAttribute("data-lab-wear");
+      var ww = loadWardrobe();
+      var found = false;
+      for (var wi = 0; wi < ww.avatars.length; wi++) {
+        if (ww.avatars[wi].id === wearId) { found = true; break; }
+      }
+      if (!found) {
+        pushNotice("status", "Lab avatar not found.");
+        return;
+      }
+      ww.activeId = wearId;
+      saveWardrobe(ww);
+      // ENGINE DEV: activeId stored only — room chrome / #stage-slot unchanged.
+      pushNotice("green", "Lab wear saved (does not change room avatar yet).", { transient: true });
+      paint("stuff");
+      return;
+    }
+    if (ev.target.closest("[data-lab-export]") && session() && isAvatarLabOn()) {
+      var pack = loadWardrobe();
+      var blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json" });
+      var aEl = document.createElement("a");
+      aEl.href = URL.createObjectURL(blob);
+      aEl.download = "wardrobe.json";
+      document.body.appendChild(aEl);
+      aEl.click();
+      setTimeout(function () {
+        try { URL.revokeObjectURL(aEl.href); } catch (eR) {}
+        if (aEl.parentNode) aEl.parentNode.removeChild(aEl);
+      }, 500);
+      var tmsg = document.getElementById("avatar-lab-tools-msg");
+      if (tmsg) tmsg.textContent = "Downloaded wardrobe.json (manifest). SWF bytes stay in IndexedDB whirled2-media — re-upload SWFs after import if needed.";
+      return;
+    }
+    if (ev.target.closest("[data-lab-clear]") && session() && isAvatarLabOn()) {
+      if (!confirm("Clear all Avatar lab wardrobe data on this browser? (SWF blobs + manifest)")) return;
+      saveWardrobe(emptyWardrobe());
+      idbClearAllBlobs().then(function () {
+        pushNotice("gray", "Avatar lab data cleared.", { transient: true });
+        paint("stuff");
+      }).catch(function () {
+        pushNotice("gray", "Wardrobe cleared (IndexedDB clear skipped).", { transient: true });
+        paint("stuff");
+      });
+      return;
+    }
     var stuffItemBtn = ev.target.closest("[data-stuff-item]");
     if (stuffItemBtn && session() && !ev.target.closest("form")) {
       stuffItemId = stuffItemBtn.getAttribute("data-stuff-item") || null;
@@ -8220,6 +8845,13 @@ function helpPage() {
       paint("shop");
       return;
     }
+    // How this works: ♥ Favorite must run before opening the card (fav sits inside data-shop-item).
+    var shopFav = ev.target.closest("[data-shop-fav]");
+    if (shopFav && session()) {
+      toggleFavorite(shopFav.getAttribute("data-shop-fav"));
+      paint("shop");
+      return;
+    }
     var shopItemBtn = ev.target.closest("[data-shop-item]");
     if (shopItemBtn && session()) {
       shopItemId = shopItemBtn.getAttribute("data-shop-item") || null;
@@ -8229,12 +8861,6 @@ function helpPage() {
     }
     if (ev.target.closest("[data-shop-back]") && session()) {
       shopItemId = null;
-      paint("shop");
-      return;
-    }
-    var shopFav = ev.target.closest("[data-shop-fav]");
-    if (shopFav && session()) {
-      toggleFavorite(shopFav.getAttribute("data-shop-fav"));
       paint("shop");
       return;
     }
@@ -8487,13 +9113,18 @@ function helpPage() {
     }
     var roomLockBtn = ev.target.closest("[data-room-lock]");
     if (roomLockBtn && session()) {
+      // How this works: three click choices — Unlocked / Friends / Locked (wiki). Owner only.
+      if (!canSetRoomLock()) {
+        pushNotice("orange", "Only the room owner can change the lock.", { transient: true });
+        return;
+      }
       saveRoomLock(roomLockBtn.getAttribute("data-room-lock") || "unlocked");
+      pushNotice("green", "Room lock: " + (roomLockBtn.getAttribute("data-room-lock") || "unlocked") + ".", { transient: true });
       var rmenu2 = document.getElementById("room-menu");
       if (rmenu2) rmenu2.hidden = true;
       roomMenuOpen = false;
       if (inRoom) paint("rooms");
       else {
-        // refresh menu state in shell
         paint(document.querySelector(".tab.is-on") ? document.querySelector(".tab.is-on").getAttribute("data-tab") : "rooms");
       }
       return;
@@ -8620,21 +9251,50 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-room-mute]") && session()) {
-      // How this works: toggle mute for local <audio>; refresh dock/modal labels without killing the live iframe.
-      // Beginner: Mute on the mini bar does not stop or remount YouTube/Spotify.
-      // ENGINE DEV: when modal closed, patch dock button text only — never clear data-embed-src.
+      // How this works (20260906ad): toggle mute, persist, then mute-safe sync (unload when muted).
+      // Beginner: Mute remembers on this browser and does not leave a broken half-loaded track.
+      // ENGINE DEV: muted → remove embed dock / clear local audio src; unmute remounts from playlist.
       roomAudioMuted = !roomAudioMuted;
+      saveRoomMutedPref(roomAudioMuted);
       var aMute = document.getElementById("room-audio");
-      if (aMute) aMute.muted = roomAudioMuted;
+      if (aMute) {
+        aMute.muted = roomAudioMuted;
+        try { aMute.volume = roomAudioMuted ? 0 : roomAudioVolume; } catch (eV) {}
+      }
       try {
-        document.querySelectorAll("#room-embed-dock [data-room-mute], #room-playlist-panel [data-room-mute]").forEach(function (b) {
+        document.querySelectorAll("#room-embed-dock [data-room-mute], #room-playlist-panel [data-room-mute], .tb-vol-pop [data-room-mute]").forEach(function (b) {
           b.textContent = roomAudioMuted ? "Unmute" : "Mute";
         });
+        var volWrap = document.querySelector(".tb-vol-wrap");
+        if (volWrap) {
+          if (roomAudioMuted) volWrap.classList.add("is-muted");
+          else volWrap.classList.remove("is-muted");
+        }
+        var volBtn = document.querySelector(".tb.tb-vol");
+        if (volBtn) volBtn.title = roomAudioMuted ? "Unmute room music" : "Mute room music";
       } catch (eMuteLbl) {}
+      try { syncRoomAudio(); } catch (eSyncMute) {}
       if (playlistPanelOpen && inRoom) {
         playlistPanelDirty = true;
         paint("rooms");
       }
+      return;
+    }
+    if (ev.target.closest("[data-vol-toggle]") && session()) {
+      // How this works: open/close the volume slider popover next to the toolbar speaker.
+      volPopoverOpen = !volPopoverOpen;
+      var pop = document.getElementById("tb-vol-pop");
+      var wrap = document.querySelector(".tb-vol-wrap");
+      if (pop) pop.hidden = !volPopoverOpen;
+      if (wrap) {
+        if (volPopoverOpen) wrap.classList.add("is-open");
+        else wrap.classList.remove("is-open");
+      }
+      return;
+    }
+    var volSlider = ev.target.closest("[data-vol-slider]");
+    if (volSlider && session()) {
+      // input event handled separately — click path no-op
       return;
     }
     if (ev.target.closest("[data-playlist-next]") && session() && canControlRoomMusic()) {
@@ -8990,6 +9650,28 @@ function helpPage() {
   // ENGINE DEV: profile page chrome only; not #stage-slot.
   app.addEventListener("input", function (ev) {
     if (!session() || !ev.target || !ev.target.closest) return;
+    // How this works (20260906ad): live volume slider — persist + apply to local <audio>.
+    // Beginner: drag the slider; music gets quieter/louder. Mute still unloads media safely.
+    if (ev.target.getAttribute && ev.target.getAttribute("data-vol-slider") === "1") {
+      var pct = Math.max(0, Math.min(100, Number(ev.target.value) || 0));
+      roomAudioVolume = pct / 100;
+      saveRoomVolumePref(roomAudioVolume);
+      var pctEl = document.getElementById("tb-vol-pct");
+      if (pctEl) pctEl.textContent = pct + "%";
+      var aVol = document.getElementById("room-audio");
+      if (aVol && !roomAudioMuted) {
+        try { aVol.volume = roomAudioVolume; } catch (eAv) {}
+      }
+      // Dragging volume up while muted → unmute + remount (classic slider feel).
+      if (roomAudioMuted && pct > 0) {
+        roomAudioMuted = false;
+        saveRoomMutedPref(false);
+        try { syncRoomAudio(); } catch (eUnmute) {}
+        var volWrap = document.querySelector(".tb-vol-wrap");
+        if (volWrap) volWrap.classList.remove("is-muted");
+      }
+      return;
+    }
     if (ev.target.getAttribute && ev.target.getAttribute("data-occ-filter") === "1") {
       occFilterQ = String(ev.target.value || "").slice(0, 40);
       try { refreshOccupantRail(); } catch (eOcc) {}
@@ -9014,10 +9696,65 @@ function helpPage() {
     }
   });
   app.addEventListener("change", function (ev) {
+    // How this works: import wardrobe.json manifest into whirled2.wardrobe (blobs stay in IDB separately).
+    if (ev.target.id === "avatar-lab-import-file" && session() && isAvatarLabOn()) {
+      var ifile = ev.target.files && ev.target.files[0];
+      var imsg = document.getElementById("avatar-lab-tools-msg");
+      if (!ifile) return;
+      var ireader = new FileReader();
+      ireader.onload = function () {
+        try {
+          var parsed = JSON.parse(String(ireader.result || ""));
+          if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.avatars)) {
+            throw new Error("Need a wardrobe.json with an avatars array.");
+          }
+          var cur = loadWardrobe();
+          var byId = {};
+          cur.avatars.forEach(function (x) { byId[x.id] = x; });
+          parsed.avatars.forEach(function (x) {
+            if (!x || !x.id) return;
+            byId[x.id] = {
+              id: String(x.id),
+              name: String(x.name || "Avatar").slice(0, 80),
+              sha1: String(x.sha1 || ""),
+              mime: String(x.mime || "application/x-shockwave-flash"),
+              scale: Number(x.scale) > 0 ? Number(x.scale) : 1,
+              thumbDataUrl: x.thumbDataUrl ? String(x.thumbDataUrl) : "",
+              createdAt: x.createdAt || new Date().toISOString()
+            };
+          });
+          cur.avatars = Object.keys(byId).map(function (k) { return byId[k]; }).slice(0, 100);
+          if (parsed.activeId) cur.activeId = parsed.activeId;
+          saveWardrobe(cur);
+          if (imsg) imsg.textContent = "Imported manifest. Re-upload any missing SWFs so IndexedDB has matching SHA-1 blobs.";
+          pushNotice("green", "Wardrobe manifest imported.", { transient: true });
+          paint("stuff");
+        } catch (eImp) {
+          if (imsg) imsg.textContent = eImp.message || "Import failed.";
+        }
+        try { ev.target.value = ""; } catch (eClr) {}
+      };
+      ireader.onerror = function () { if (imsg) imsg.textContent = "Could not read JSON file."; };
+      ireader.readAsText(ifile);
+      return;
+    }
     if (ev.target.matches("[data-playlist-owner-only]") && session() && canControlRoomMusic()) {
       var plO = loadPlaylist();
       plO.ownerOnlyAdd = !!ev.target.checked;
       savePlaylist(plO);
+      return;
+    }
+    // How this works (20260906ad): Account → Friendly People checkbox.
+    // Beginner: when checked, you auto-accept friend requests and appear on Me → Friendly People.
+    if (ev.target.matches && ev.target.matches("[data-friendly-toggle]") && session()) {
+      setFriendly(session().user.id, !!ev.target.checked);
+      var fmsg = document.getElementById("friendly-toggle-msg");
+      if (fmsg) {
+        fmsg.textContent = ev.target.checked
+          ? "You appear on Me → Friendly People for others on this browser."
+          : "Off — you will not auto-accept.";
+      }
+      pushNotice("green", ev.target.checked ? "Friendly Person on." : "Friendly Person off.", { transient: true });
       return;
     }
     // How this works: color pickers sync hex fields + live preview on .profile-page (no Save needed).
@@ -9275,7 +10012,8 @@ function helpPage() {
         return;
       }
       var wall2 = loadWall(targetWall);
-      wall2.unshift({ who: you().name, text: text3, at: new Date().toISOString(), kind: "comment", fromId: session().user.id });
+      // Beginner: each new comment gets an id so the owner (or you) can Delete it later.
+      wall2.unshift({ id: newWallPostId(), who: you().name, text: text3, at: new Date().toISOString(), kind: "comment", fromId: session().user.id });
       saveWall(targetWall, wall2);
       pushNotice("comment", you().name + " commented on a profile.");
       if (targetWall === session().user.id) { viewingId = null; meSub = "profile"; }
@@ -9335,6 +10073,98 @@ function helpPage() {
       meSub = "friends";
       viewingId = null;
       paint("me");
+      return;
+    }
+    // How this works: Avatar lab SWF upload — SHA-1 + IndexedDB blob + wardrobe JSON entry.
+    // ENGINE DEV: does not mount Ruffle / does not change #stage-slot.
+    if (ev.target.id === "avatar-lab-upload-form" && session() && isAvatarLabOn()) {
+      var lfd = new FormData(ev.target);
+      var lmsg = document.getElementById("avatar-lab-upload-msg");
+      var lname = String(lfd.get("name") || "").trim().slice(0, 80);
+      var lscale = Number(lfd.get("scale"));
+      if (!(lscale > 0)) lscale = 1;
+      if (!lname) { if (lmsg) lmsg.textContent = "Name required."; return; }
+      if (!lfd.get("rights")) { if (lmsg) lmsg.textContent = "Rights confirmation required."; return; }
+      var swfInput = ev.target.querySelector('input[name="swf"]');
+      var thumbInput = ev.target.querySelector('input[name="thumb"]');
+      var swfFile = swfInput && swfInput.files && swfInput.files[0];
+      var thumbFile = thumbInput && thumbInput.files && thumbInput.files[0];
+      if (!swfFile) { if (lmsg) lmsg.textContent = "Pick a .swf file."; return; }
+      var looksSwf = /\.swf$/i.test(swfFile.name || "") || /flash|shockwave/i.test(swfFile.type || "");
+      if (!looksSwf) { if (lmsg) lmsg.textContent = "File should be a .swf avatar."; return; }
+      if (swfFile.size > AVATAR_SWF_MAX_BYTES) {
+        if (lmsg) lmsg.textContent = "SWF over classic ~10MB cap for this lab.";
+        return;
+      }
+      if (lmsg) lmsg.textContent = "Hashing + saving…";
+      function finishLab(thumbDataUrl) {
+        fileToArrayBuffer(swfFile).then(function (buf) {
+          return sha1OfArrayBuffer(buf).then(function (sha1) {
+            var b64 = arrayBufferToBase64(buf);
+            var record = {
+              sha1: sha1,
+              mime: "application/x-shockwave-flash",
+              name: swfFile.name || (lname + ".swf"),
+              base64: b64,
+              size: swfFile.size,
+              storedAt: new Date().toISOString()
+            };
+            function afterStore() {
+              var w = loadWardrobe();
+              var id = "av" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+              w.avatars.unshift({
+                id: id,
+                name: lname,
+                sha1: sha1,
+                mime: "application/x-shockwave-flash",
+                scale: lscale,
+                thumbDataUrl: thumbDataUrl || "",
+                createdAt: new Date().toISOString()
+              });
+              saveWardrobe(w);
+              // Optional demo server mirror (Pages ignores — lab works local-only).
+              try {
+                if (window.WhirledApi && typeof window.WhirledApi.postMedia === "function") {
+                  window.WhirledApi.postMedia({ sha1: sha1, mime: record.mime, base64: b64, name: record.name }).catch(function () {});
+                }
+                if (window.WhirledApi && typeof window.WhirledApi.putWardrobe === "function" && session().user) {
+                  window.WhirledApi.putWardrobe(session().user.id, w).catch(function () {});
+                }
+              } catch (eApi) {}
+              if (lmsg) lmsg.textContent = "Saved. SHA-1 " + sha1.slice(0, 12) + "… (lab only — room unchanged).";
+              pushNotice("green", "Lab avatar “" + lname + "” saved.", { transient: true });
+              paint("stuff");
+            }
+            return idbPutBlob(sha1, record).then(afterStore).catch(function (err) {
+              // Fallback: tiny SWFs may sit in localStorage media map if IDB fails.
+              try {
+                var map = JSON.parse(localStorage.getItem("whirled2.media.fallback") || "{}");
+                if (b64.length < 400000) {
+                  map[sha1] = record;
+                  localStorage.setItem("whirled2.media.fallback", JSON.stringify(map));
+                  afterStore();
+                  return;
+                }
+              } catch (eFb) {}
+              if (lmsg) lmsg.textContent = (err && err.message) || "Could not store SWF in IndexedDB.";
+            });
+          });
+        }).catch(function (err) {
+          if (lmsg) lmsg.textContent = (err && err.message) || "Read/hash failed.";
+        });
+      }
+      if (thumbFile) {
+        if (thumbFile.size > 200000) {
+          if (lmsg) lmsg.textContent = "Thumb over ~200KB — shrink it.";
+          return;
+        }
+        var tr = new FileReader();
+        tr.onload = function () { finishLab(String(tr.result || "")); };
+        tr.onerror = function () { if (lmsg) lmsg.textContent = "Could not read thumb."; };
+        tr.readAsDataURL(thumbFile);
+      } else {
+        finishLab("");
+      }
       return;
     }
     if (ev.target.id === "stuff-upload-form" && session()) {

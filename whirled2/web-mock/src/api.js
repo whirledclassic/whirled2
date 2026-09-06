@@ -11,6 +11,8 @@
  * - Shared soundtrack: getRoomMusic / setRoomMusic — HTTP when server; else localStorage
  *   key "whirled2.roomMusic.loft" (same-tab + multi-tab via storage event only on Pages).
  * - ENGINE DEV: chrome HTTP / localStorage only — never mounts players in #stage-slot.
+ * - Avatar lab (experimental, gated in app.js): optional POST /api/media, GET /api/media/:sha1,
+ *   GET/PUT /api/wardrobe/:memberId — Pages works without these (local IndexedDB only).
  */
 (function (root) {
   "use strict";
@@ -315,6 +317,60 @@
       } catch (err) {
         return this.history(room);
       }
+    },
+
+    // -------------------------------------------------------------------------
+    // Avatar lab experimental APIs (optional). Lab works local-only without server.
+    // How this works: when WHIRLED_API is set, chrome may mirror wardrobe/media here.
+    // Beginner: GitHub Pages has no server — ignore failures. ENGINE DEV: not wired to stage.
+    // -------------------------------------------------------------------------
+    async postMedia(payload) {
+      // payload: { base64, mime, name } or { dataBase64: ... }
+      payload = payload || {};
+      try {
+        return await request("/api/media", {
+          method: "POST",
+          body: JSON.stringify({
+            base64: payload.base64 || payload.dataBase64 || "",
+            mime: payload.mime || "application/octet-stream",
+            name: payload.name || "",
+            sha1: payload.sha1 || ""
+          })
+        });
+      } catch (err) {
+        if (apiBase() && err.message !== "no-api") throw err;
+        return { sha1: payload.sha1 || "", offline: true };
+      }
+    },
+
+    async getMedia(sha1) {
+      try {
+        return await request("/api/media/" + encodeURIComponent(sha1));
+      } catch (err) {
+        if (apiBase() && err.message !== "no-api") throw err;
+        return null;
+      }
+    },
+
+    async getWardrobe(memberId) {
+      try {
+        return await request("/api/wardrobe/" + encodeURIComponent(memberId));
+      } catch (err) {
+        if (apiBase() && err.message !== "no-api") throw err;
+        return { version: 1, avatars: [], activeId: null, offline: true };
+      }
+    },
+
+    async putWardrobe(memberId, wardrobe) {
+      try {
+        return await request("/api/wardrobe/" + encodeURIComponent(memberId), {
+          method: "PUT",
+          body: JSON.stringify(wardrobe || {})
+        });
+      } catch (err) {
+        if (apiBase() && err.message !== "no-api") throw err;
+        return wardrobe || { version: 1, avatars: [], activeId: null, offline: true };
+      }
     }
   };
 
@@ -332,6 +388,17 @@
     if (row.facebookName) out.facebookName = row.facebookName;
     if (row.email) out.email = row.email;
     return out;
+  }
+
+  // How this works: lightweight offline password digests (not for production auth).
+  function hashGuess(password) {
+    var s = String(password || "");
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return "hg" + (h >>> 0).toString(16);
   }
 
   function initials(name) {

@@ -241,3 +241,12 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Chat**: CSS deep-fix Overlay/Slide/tabs/bar/opts/`#stage-bubbles`; mobile Overlay-only unchanged.
 - **Games**: `gamesHomeNavHtml`, parlor/AVR explainers, Coming Soon placeholders (not `whirled2.games` rows), `whirled2.gameScores` display stub, detail Play/Watch/Tables.
 - **Cache**: `LOGO_V` / `?v=20260906ac`. Do not push unless instructed.
+
+## Avatar lab deferred (?v=20260906ad)
+
+- Classic SWF wardrobe is a **side project** — locked off for normal users.
+- Unlock: `?avatarLab=1` (sets `localStorage whirled2.avatarLab=1`) or set that key to `"1"`.
+- Default Stuff → Avatars: stub thumb upload + **“Classic SWF wardrobe — On hold”** (link/path to `AVATAR-IMPORT.md`).
+- Lab on: wardrobe JSON (`whirled2.wardrobe`) + SWF blobs in IndexedDB `whirled2-media`; Wear sets `activeId` only — **room / `#stage-slot` unchanged**.
+- Do **not** mount Ruffle or bump ENGINE-BRIDGE Flash ban yet (Phase 2 deferred).
+- Cache: `LOGO_V` / `?v=20260906ad`. Do not push unless instructed.

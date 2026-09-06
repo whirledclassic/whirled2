@@ -7,6 +7,8 @@
  * - In-memory users + loft chat; not a production database.
  * - Endpoints used by src/api.js: /api/register, /api/login, /api/me,
  *   /api/rooms/:id/chat, occupants, music (+ optional music/resync).
+ *   Experimental avatar lab: POST /api/media, GET /api/media/:sha1, GET/PUT /api/wardrobe/:memberId
+ *   (optional — Pages/lab work without these; not wired to room stage).
  *
  * Shared room soundtrack (chrome sync protocol):
  * - GitHub Pages alone cannot sync two phones. Run this demo server so clients
@@ -25,11 +27,20 @@ const DATA = path.join(__dirname, "data.json");
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 
+const MEDIA_DIR = path.join(__dirname, "media");
+function ensureMediaDir() {
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+}
+function sha1OfBuffer(buf) {
+  return crypto.createHash("sha1").update(buf).digest("hex");
+}
+
 // DB shape kept in server/data.json (created on first write).
 function emptyDb() {
   // How this works: roomMusic[roomId] holds the shared loft soundtrack timeline.
   // Beginner: startedAt is when the current embed began — clients seek to (now - startedAt).
-  return { users: {}, sessions: {}, messages: [], presence: {}, roomMusic: {} };
+  // wardrobes[memberId] + media index; blob files under server/media/<sha1>
+  return { users: {}, sessions: {}, messages: [], presence: {}, roomMusic: {}, wardrobes: {}, mediaIndex: {} };
 }
 function load() {
   try { return Object.assign(emptyDb(), JSON.parse(fs.readFileSync(DATA, "utf8"))); }
@@ -313,6 +324,90 @@ const server = http.createServer(async (req, res) => {
       db.roomMusic[room] = prev;
       save(db);
       return send(res, 200, prev);
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Avatar lab experimental media + wardrobe (optional; Pages works without)
+    // How this works: POST /api/media stores bytes by SHA-1; GET returns metadata + base64.
+    // GET/PUT /api/wardrobe/:memberId stores the JSON manifest. Not wired to #stage-slot.
+    // Beginner: only used when the Avatar lab flag is on in the chrome.
+    // -------------------------------------------------------------------------
+    if (req.method === "POST" && url.pathname === "/api/media") {
+      const user = authUser(db, req);
+      if (!user) return send(res, 401, { error: "Sign in first." });
+      const body = await readBody(req);
+      const b64 = String(body.base64 || body.dataBase64 || "");
+      if (!b64) return send(res, 400, { error: "base64 required." });
+      let buf;
+      try { buf = Buffer.from(b64, "base64"); } catch (e) {
+        return send(res, 400, { error: "Invalid base64." });
+      }
+      if (!buf.length) return send(res, 400, { error: "Empty media." });
+      if (buf.length > 10 * 1024 * 1024) return send(res, 400, { error: "Media over 10MB lab cap." });
+      const sha1 = body.sha1 && /^[a-f0-9]{40}$/i.test(String(body.sha1))
+        ? String(body.sha1).toLowerCase()
+        : sha1OfBuffer(buf);
+      // Verify client sha1 when provided
+      const computed = sha1OfBuffer(buf);
+      if (body.sha1 && String(body.sha1).toLowerCase() !== computed) {
+        return send(res, 400, { error: "sha1 mismatch." });
+      }
+      ensureMediaDir();
+      const filePath = path.join(MEDIA_DIR, computed);
+      fs.writeFileSync(filePath, buf);
+      if (!db.mediaIndex) db.mediaIndex = {};
+      db.mediaIndex[computed] = {
+        sha1: computed,
+        mime: String(body.mime || "application/octet-stream").slice(0, 120),
+        name: String(body.name || "").slice(0, 180),
+        size: buf.length,
+        ownerId: user.id,
+        at: new Date().toISOString()
+      };
+      save(db);
+      return send(res, 201, { sha1: computed, size: buf.length, mime: db.mediaIndex[computed].mime });
+    }
+    const mediaGet = url.pathname.match(/^\/api\/media\/([a-fA-F0-9]{40})$/);
+    if (mediaGet && req.method === "GET") {
+      const sha1 = mediaGet[1].toLowerCase();
+      const meta = (db.mediaIndex && db.mediaIndex[sha1]) || { sha1: sha1, mime: "application/octet-stream" };
+      const filePath = path.join(MEDIA_DIR, sha1);
+      if (!fs.existsSync(filePath)) return send(res, 404, { error: "Media not found." });
+      const buf = fs.readFileSync(filePath);
+      return send(res, 200, {
+        sha1: sha1,
+        mime: meta.mime || "application/octet-stream",
+        name: meta.name || "",
+        size: buf.length,
+        base64: buf.toString("base64")
+      });
+    }
+    const wardrobeMatch = url.pathname.match(/^\/api\/wardrobe\/([^/]+)$/);
+    if (wardrobeMatch) {
+      const memberId = decodeURIComponent(wardrobeMatch[1]);
+      if (!db.wardrobes) db.wardrobes = {};
+      if (req.method === "GET") {
+        const row = db.wardrobes[memberId] || { version: 1, avatars: [], activeId: null };
+        return send(res, 200, row);
+      }
+      if (req.method === "PUT") {
+        const user = authUser(db, req);
+        if (!user) return send(res, 401, { error: "Sign in first." });
+        // How this works: only the signed-in member may PUT their own wardrobe in this demo.
+        if (user.id !== memberId) return send(res, 403, { error: "Can only edit your own wardrobe." });
+        const body = await readBody(req);
+        const next = {
+          version: Number(body.version) || 1,
+          avatars: Array.isArray(body.avatars) ? body.avatars.slice(0, 100) : [],
+          activeId: body.activeId || null,
+          updatedAt: Date.now(),
+          ownerId: memberId
+        };
+        db.wardrobes[memberId] = next;
+        save(db);
+        return send(res, 200, next);
+      }
     }
 
     // logout clears session presence
