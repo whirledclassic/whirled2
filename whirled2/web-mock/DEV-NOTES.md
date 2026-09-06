@@ -2,30 +2,44 @@
 
 Plain-English map of the chrome. Read this before changing chat, notices, themes, or music.
 
+## For the engine developer
+
+You work on private **WhirledClassicGame** (Pixi). This folder is only the website chrome.
+
+1. Read **[ENGINE-BRIDGE.md](./ENGINE-BRIDGE.md)** end-to-end before mounting.
+2. Comment conventions in `app.js` / CSS:
+   - `// How this works:` — beginner notes for chrome maintainers
+   - `// ENGINE DEV:` — bridge contract (stage mount, API, bubbles you may later own)
+3. Do not break `#stage-slot`, `exposeBridge()`, or `whirled:ready`.
+
+---
+
 ## File map
 
 | File | Role |
 |------|------|
 | `index.html` | Boot shell. Loads `src/styles.css`, `src/api.js`, `app.js`. **Cache-bust** with `?v=YYYYMMDDx` on every asset + reload links. |
-| `app.js` | Almost all UI: gate, tabs, Me/Stuff/Games/Rooms/Groups/Shop, chat, notices, themes, playlist. One big IIFE. |
+| `app.js` | Almost all UI: gate, tabs, Me/Stuff/Games/Rooms/Groups/Shop, chat, notices, themes, playlist, stage bubbles. One big IIFE. |
 | `src/api.js` | `WhirledApi` — register/login/chat/presence. If `WHIRLED_API` empty → **offline localStorage** (GitHub Pages default). |
 | `src/styles.css` | Classic pale-blue chrome + theme presets (`#app[data-theme]`). |
 | `server/server.mjs` | Optional Node API for shared chat when `WHIRLED_API` points at it. Not required for Pages. |
+| `ENGINE-BRIDGE.md` | Full Pixi engineer runbook. |
 | `CONCEPT.md` / `STATUS.md` | Product notes + what shipped. |
 
 ## How to bump cache-bust `?v=`
 
-1. Pick a new token, e.g. `20260906b`.
+1. Pick a new token, e.g. `20260906j`.
 2. Replace in `index.html` (CSS + JS `href`/`src`, and the “reload fresh” links).
-3. Replace in repo root `index.html` redirect (Pages) if present.
-4. Mention the token in `STATUS.md` and Help text.
-5. Push to `whirledclassic/whirled2` `main` so GitHub Pages picks it up. Hard-refresh or open the new `?v=` URL on phones.
+3. Replace `LOGO_V` in `app.js`.
+4. Replace in repo root `index.html` redirect (Pages) if present.
+5. Mention the token in `STATUS.md` and Help text.
+6. Push to `whirledclassic/whirled2` `main` so GitHub Pages picks it up. Hard-refresh or open the new `?v=` URL on phones.
 
 ## Room chat lifetime (visit-scoped)
 
 - Leaving the room, logoff, or a fresh page load calls `clearRoomChatDisplay(true)` and removes `whirled2.chat.loft`.
 - Entering a room starts with an empty chat. Old sessions do not reappear.
-- Chat Options → **Clear all chat** (or `/clear`) wipes the same way.
+- Chat Options → **Clear all chat** (or `/clear`) wipes the same way (also clears `#stage-bubbles`).
 
 ## Chat modes (classic)
 
@@ -33,7 +47,9 @@ Plain-English map of the chrome. Read this before changing chat, notices, themes
 - Overlay → `#chat-overlay` absolute on left inside `.stage-host`.
 - Slide → `#chat-log` dark panel (sibling of `.stage-host`).
 - Do **not** `position:fixed` the overlay to the viewport / above the send bar — that broke phones.
-- Prefs: `localStorage whirled2.chatUi`.
+- Prefs: `localStorage whirled2.chatUi` (`mode`, `hideHistory`, `textSize`, `bubbleDuration`).
+- Stage bubbles (`#stage-bubbles`): separate from Slide/Overlay history; duration short/medium/long under Chat Options → Chat settings.
+- `/think text` → thought bubble; `/me` → emote; normal → speech. System lines skip bubbles.
 
 ## How chat submit works (and the radio bug we fixed)
 
@@ -69,8 +85,9 @@ Plain-English map of the chrome. Read this before changing chat, notices, themes
 
 ## Engine bridge (do not break)
 
-- Empty `#stage-slot` inside `.stage-host`; decorate chips in `#decorate-layer`.
-- `window.WhirledChrome.getStageEl()` only. See `ENGINE-BRIDGE.md`.
+- Empty `#stage-slot` inside `.stage-host`; decorate chips in `#decorate-layer` (z-index above canvas).
+- Temporary `#stage-bubbles` for avatar speech/thought until Pixi owns nametags.
+- `window.WhirledChrome` v0.4: `getStageEl`, `getSession`, `getRoom`, `onChat`, `sendChat`, `onOccupants`, `getChatUi`. See `ENGINE-BRIDGE.md`.
 
 ## LocalStorage keys (common)
 

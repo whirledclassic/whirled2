@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906i";
+  var LOGO_V = "20260906j";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -677,14 +677,17 @@
     try {
       var raw = JSON.parse(localStorage.getItem(CHAT_UI_KEY) || "null");
       if (raw && (raw.mode === "slide" || raw.mode === "overlay")) {
+        var dur = raw.bubbleDuration === "short" || raw.bubbleDuration === "long" ? raw.bubbleDuration : "medium";
         return {
           mode: raw.mode,
           hideHistory: !!raw.hideHistory,
-          textSize: raw.textSize === "sm" || raw.textSize === "lg" ? raw.textSize : "md"
+          textSize: raw.textSize === "sm" || raw.textSize === "lg" ? raw.textSize : "md",
+          // How this works: wiki Chat Settings — how long stage speech/thought bubbles stay up.
+          bubbleDuration: dur
         };
       }
     } catch (e) {}
-    return { mode: "overlay", hideHistory: false, textSize: "md" };
+    return { mode: "overlay", hideHistory: false, textSize: "md", bubbleDuration: "medium" };
   }
   function saveChatUi(cfg) {
     try { localStorage.setItem(CHAT_UI_KEY, JSON.stringify(cfg || loadChatUi())); } catch (e) {}
@@ -1067,15 +1070,25 @@
     var accent = role === "admin" ? " is-admin" : (role === "mod" ? " is-mod" : "");
     var text = String(msg.text || "");
     var emote = !!msg.emote;
+    var thought = !!msg.thought;
     if (!emote && (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text))) {
       emote = true;
       text = text.replace(/^\/(me|emote)\s+/i, "");
     }
+    if (!thought && /^\/think\s+/i.test(text)) {
+      thought = true;
+      text = text.replace(/^\/think\s+/i, "");
+    }
     var nameBtn = '<button type="button" class="chat-who" data-chat-who="' + esc(uid || msg.who || "") + '" data-chat-who-name="' + esc(msg.who || "") + '">' + esc(msg.who || "?") + '</button>';
-    var body = emote
-      ? ('<div class="chat-bubble emote"><i>' + esc(msg.who) + " " + esc(text) + "</i></div>")
-      : ('<div class="chat-bubble">' + esc(text) + "</div>");
-    return '<div class="chat-row' + accent + (emote ? " is-emote" : "") + '">'
+    var body;
+    if (emote) {
+      body = '<div class="chat-bubble emote"><i>' + esc(msg.who) + " " + esc(text) + "</i></div>";
+    } else if (thought) {
+      body = '<div class="chat-bubble thought"><i>' + esc(text) + "</i></div>";
+    } else {
+      body = '<div class="chat-bubble">' + esc(text) + "</div>";
+    }
+    return '<div class="chat-row' + accent + (emote ? " is-emote" : "") + (thought ? " is-thought" : "") + '">'
       + (emote ? "" : (nameBtn + roleBadgeHtml(role) + ' <time>' + esc(stamp) + "</time>"))
       + body + "</div>";
   }
@@ -1859,6 +1872,9 @@ function helpPage() {
       +     '<div class="stage-host">'
       +       '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
       +       decorateLayerHtml()
+      // How this works: #stage-bubbles = temporary avatar speech/thought over the stage
+      // (separate from Slide/Overlay history). ENGINE DEV: Pixi may later replace these.
+      +       '<div id="stage-bubbles" class="stage-bubbles" aria-live="polite"></div>'
       // How this works (classic Whirled / wiki Chat): Overlay chat sits ON the left of the
       // room window (inside .stage-host). Slide chat uses sibling #chat-log as its own
       // dark panel. Bottom #chat-form input stays in the chrome either way.
@@ -3071,6 +3087,7 @@ function helpPage() {
     if (host && host.classList.contains("stage-host") && !document.getElementById("decorate-layer")) {
       host.insertAdjacentHTML("beforeend", decorateLayerHtml());
     }
+    try { ensureStageBubblesEl(); } catch (e) {}
   }
   // Information: refreshChatLog writes both #chat-log (slide) and #chat-overlay (overlay).
   function refreshChatLog() {
@@ -3134,6 +3151,7 @@ function helpPage() {
     if (clearStorage === undefined) clearStorage = true;
     chat = [];
     refreshChatLog();
+    clearStageBubbles();
     if (clearStorage) {
       try { localStorage.removeItem("whirled2.chat.loft"); } catch (e) {}
     }
@@ -3210,7 +3228,111 @@ function helpPage() {
     layer.addEventListener("pointercancel", endDrag);
   }
   // ---------------------------------------------------------------------------
+  // Stage avatar bubbles (#stage-bubbles) — temporary chrome until Pixi nametags
+  // How this works: history stays in Slide/Overlay. These float near the bottom
+  // "avatar area" for speech / thought (/think) / emote (/me). Not system lines.
+  // ENGINE DEV: you may later replace this with Pixi nametag bubbles; until then
+  // chrome owns #stage-bubbles. Read getChatUi().bubbleDuration for timing.
+  // ---------------------------------------------------------------------------
+  var _stageBubbleSeen = {};
+  var _stageBubbleTimers = [];
+  function bubbleDurationMs() {
+    var d = (loadChatUi().bubbleDuration || "medium");
+    if (d === "short") return 2500;
+    if (d === "long") return 7000;
+    return 4000; // medium default ~4s
+  }
+  function ensureStageBubblesEl() {
+    var host = document.querySelector(".stage-host");
+    if (!host) return null;
+    var el = document.getElementById("stage-bubbles");
+    if (el) return el;
+    el = document.createElement("div");
+    el.id = "stage-bubbles";
+    el.className = "stage-bubbles";
+    el.setAttribute("aria-live", "polite");
+    var overlay = document.getElementById("chat-overlay");
+    if (overlay && overlay.parentElement === host) host.insertBefore(el, overlay);
+    else host.appendChild(el);
+    return el;
+  }
+  function clearStageBubbles() {
+    _stageBubbleSeen = {};
+    while (_stageBubbleTimers.length) {
+      try { clearTimeout(_stageBubbleTimers.pop()); } catch (e) {}
+    }
+    var el = document.getElementById("stage-bubbles");
+    if (el) el.innerHTML = "";
+  }
+  function spawnStageBubble(msg) {
+    if (!msg || msg.system) return;
+    var id = msg.id || ("b" + Date.now() + Math.random());
+    if (_stageBubbleSeen[id]) return;
+    _stageBubbleSeen[id] = true;
+    var host = ensureStageBubblesEl();
+    if (!host) return;
+    var raw = String(msg.text || "");
+    var kind = "speech";
+    var text = raw;
+    if (msg.emote || /^\/me\s+/i.test(raw) || /^\/emote\s+/i.test(raw)) {
+      kind = "emote";
+      text = raw.replace(/^\/(me|emote)\s+/i, "");
+      text = (msg.who || "?") + " " + text;
+    } else if (msg.thought || /^\/think\s+/i.test(raw)) {
+      kind = "thought";
+      text = raw.replace(/^\/think\s+/i, "");
+    }
+    text = String(text || "").trim();
+    if (!text) return;
+    var bub = document.createElement("div");
+    bub.className = "stage-bubble stage-bubble--" + kind;
+    bub.setAttribute("data-bubble-id", id);
+    // Slightly randomized above bottom-center avatar area
+    var leftPct = 42 + (Math.random() * 16 - 8); // ~34–50%
+    var bottomPct = 18 + (Math.random() * 10); // ~18–28%
+    bub.style.left = leftPct + "%";
+    bub.style.bottom = bottomPct + "%";
+    if (kind === "thought") {
+      bub.innerHTML = '<div class="stage-bubble-cloud">' + esc(text) + "</div>";
+    } else if (kind === "emote") {
+      bub.innerHTML = "<i>" + esc(text) + "</i>";
+    } else {
+      bub.innerHTML = '<div class="stage-bubble-speech">' + esc(text) + '</div><span class="stage-bubble-pointer" aria-hidden="true"></span>';
+    }
+    if (kind !== "emote" && msg.who) {
+      var who = document.createElement("div");
+      who.className = "stage-bubble-who";
+      who.textContent = String(msg.who);
+      bub.insertBefore(who, bub.firstChild);
+    }
+    host.appendChild(bub);
+    // Cap visible bubbles
+    while (host.children.length > 6) host.removeChild(host.firstChild);
+    var ms = bubbleDurationMs();
+    var t = setTimeout(function () {
+      if (bub.parentNode) bub.parentNode.removeChild(bub);
+    }, ms);
+    _stageBubbleTimers.push(t);
+  }
+  function noteStageBubblesFromChat(list) {
+    // How this works: when poll/history brings new messages, spawn bubbles for unseen ones.
+    (list || []).forEach(function (m) { spawnStageBubble(m); });
+  }
+
+  // ---------------------------------------------------------------------------
   // WhirledChrome bridge — engine mounts only via getStageEl() → #stage-slot
+  // ---------------------------------------------------------------------------
+  // ENGINE DEV: Contract for private WhirledClassicGame (Pixi). Read ENGINE-BRIDGE.md.
+  // You (engine developer) mount with mountWhirledEngine(host) where
+  //   host = WhirledChrome.getStageEl() === #stage-slot
+  //   resizeTo: host — canvas ONLY inside that element.
+  // API (version "0.4"):
+  //   version, getStageEl(), getSession(), getRoom(), onChat(fn), sendChat(text),
+  //   onOccupants(fn), getChatUi() → { mode, hideHistory, textSize, bubbleDuration }
+  // Listen for document event "whirled:ready" if bridge is not ready yet (detail = this object).
+  // Do NOT draw outside #stage-slot. Do NOT rebuild login. Coins are labels only. No Flash.
+  // #decorate-layer and #stage-bubbles are chrome siblings above your canvas (see z-index in ENGINE-BRIDGE.md).
+  // Chrome may show temporary #stage-bubbles until you own Pixi nametag bubbles.
   // ---------------------------------------------------------------------------
   function exposeBridge() {
     window.WhirledChrome = {
@@ -3220,7 +3342,8 @@ function helpPage() {
       getRoom: function () { return { id: "loft", name: ROOM }; },
       onChat: function (fn) { listeners.chat.push(fn); },
       sendChat: function (text) { return window.WhirledApi.postChat("loft", text); },
-      onOccupants: function (fn) { listeners.occupants.push(fn); fn(occupants()); }
+      onOccupants: function (fn) { listeners.occupants.push(fn); fn(occupants()); },
+      getChatUi: function () { return loadChatUi(); }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
   }
@@ -3248,16 +3371,22 @@ function helpPage() {
     }
     chatSendTimes.push(now);
     var emote = false;
+    var thought = false;
     var sendText = text;
     if (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text)) {
       emote = true;
       sendText = text; // keep prefix so history shows; chatRow detects
+    } else if (/^\/think\s+/i.test(text)) {
+      thought = true;
+      sendText = text; // keep /think prefix for history + bubble detection
     }
     var result = await window.WhirledApi.postChat("loft", sendText);
     var msg = result.message || result;
     if (emote) msg.emote = true;
+    if (thought) msg.thought = true;
     if (!chat.some(function (m) { return m.id === msg.id; })) chat.push(msg);
     refreshChatLog();
+    spawnStageBubble(msg);
     listeners.chat.forEach(function (fn) { try { fn(msg); } catch (e) {} });
     try { awardAction("chat"); } catch (e) {}
   }
@@ -3276,6 +3405,13 @@ function helpPage() {
       +   '<button type="button" class="action-btn' + (ui.textSize === "md" ? " is-on" : "") + '" data-chat-size="md">M</button>'
       +   '<button type="button" class="action-btn' + (ui.textSize === "lg" ? " is-on" : "") + '" data-chat-size="lg">L</button>'
       + '</div>'
+      + '<div class="chat-opts-title">Chat settings</div>'
+      + '<div class="chat-opts-sizes" title="How long stage speech bubbles stay">'
+      +   '<button type="button" class="action-btn' + (ui.bubbleDuration === "short" ? " is-on" : "") + '" data-chat-bubble-dur="short">Short</button>'
+      +   '<button type="button" class="action-btn' + ((ui.bubbleDuration || "medium") === "medium" ? " is-on" : "") + '" data-chat-bubble-dur="medium">Medium</button>'
+      +   '<button type="button" class="action-btn' + (ui.bubbleDuration === "long" ? " is-on" : "") + '" data-chat-bubble-dur="long">Long</button>'
+      + '</div>'
+      + '<p class="meta" style="margin:4px 8px 8px;font-size:11px">Stage bubble duration (above avatars)</p>'
       + '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear all chat</button>';
   }
   function openChatNameMenu(id, name, x, y) {
@@ -3349,7 +3485,15 @@ function helpPage() {
       if (!session()) return;
       var result = await window.WhirledApi.pollChat("loft");
       var next = result.messages || [];
-      if (next.length !== chat.length) { chat = next; refreshChatLog(); }
+      if (next.length !== chat.length) {
+        var prevIds = {};
+        chat.forEach(function (m) { if (m && m.id) prevIds[m.id] = true; });
+        chat = next;
+        refreshChatLog();
+        next.forEach(function (m) {
+          if (m && m.id && !prevIds[m.id]) spawnStageBubble(m);
+        });
+      }
     }, 2500);
   }
   // ---------------------------------------------------------------------------
@@ -3455,6 +3599,14 @@ function helpPage() {
       saveChatUi(uiS);
       renderChatOptsMenu();
       refreshChatLog();
+      return;
+    }
+    if (ev.target.closest("[data-chat-bubble-dur]")) {
+      var uiB = loadChatUi();
+      var bd = ev.target.closest("[data-chat-bubble-dur]").getAttribute("data-chat-bubble-dur") || "medium";
+      uiB.bubbleDuration = (bd === "short" || bd === "long") ? bd : "medium";
+      saveChatUi(uiB);
+      renderChatOptsMenu();
       return;
     }
     if (ev.target.closest("[data-chat-clear]")) {

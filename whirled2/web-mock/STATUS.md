@@ -2,17 +2,17 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906i)
+## What shipped (?v=20260906j)
 
-- **Passport stamps** (wiki Passport): earnable catalog (Mingle/Play/Create/Shop) via `awardAction`; progress in `whirled2.passportProg.{userId}`, stamps in `whirled2.passport.{userId}`. Go! navigates to the relevant tab. Coins stay labels only.
-- **Mail Reply + Delete** on inbox rows; Reply prefills compose via `window.__mailCompose`.
-- **Join them!** on Friends online + Me home friends online → enters Studio Loft.
-- **Add Friend** opens Let’s be buddies! customize-message modal (same as invite-buddy), not instant add.
-- Room chat visit-scoped wipe + Slide/Overlay from prior builds kept.
+- **ENGINE-BRIDGE.md** expanded into a full hired-engine-developer runbook (two-repo model, local chrome, Vite standalone, `mountWhirledEngine`, API table, `whirled:ready`, wiring options, do-nots, checklist, z-index, chat vs stage bubbles).
+- **DEV-NOTES.md** + **README.md** top “For the engine developer” sections; comment conventions (`How this works` / `ENGINE DEV`).
+- **Stage avatar bubbles** (`#stage-bubbles`): temporary speech / thought (`/think`) / emote (`/me`) over the stage; duration in Chat Options → Chat settings (`whirled2.chatUi.bubbleDuration`); cleared on leave/clear.
+- **WhirledChrome v0.4** — `exposeBridge` ENGINE DEV contract comments + `getChatUi()`.
+- Prior: passport stamps, mail Reply/Delete, Join them!, Add Friend modal, visit-scoped chat.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906i
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906j
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
