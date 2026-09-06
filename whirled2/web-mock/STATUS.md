@@ -5,7 +5,7 @@ Date: 2026-09-06
 ## Avatar research (same wave)
 
 - Deep dive of Grey Havens GitHub (`msoy`, `whirled-sdk`, `whirled-projects`) + community `lulzsun/whirled2` SWF/Ruffle path.
-- Plan doc: [AVATAR-IMPORT.md](./AVATAR-IMPORT.md) — SHA-1 wardrobe archive, user SWF upload, Ruffle bridge, sync so avatars are not lost.
+- Plan doc: [AVATAR-IMPORT.md](./AVATAR-IMPORT.md) — deep Grey Havens research (SWF + remix ZIP + ~80×60 thumb, SHA-1 HashMediaDesc, Ruffle host shim, ENGINE-BRIDGE policy bump for Phase 2).
 - Upload UI + demo media API still next (not in this chrome-only ship).
 
 ## What shipped (?v=20260906ac)
