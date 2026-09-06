@@ -146,10 +146,10 @@ Whirled2 loft mirrors the **nested Loader host** with a thin ORIGINAL companion 
 
 ## Top 5 gaps blocking club-like sync
 
-1. **Sleeping / AFK** — `appearanceChanged_v2` sleeping bit must flip via loft idle → `hostSleep` (host stub ready; chrome wire pending).
-2. **Walk duration / location lerp** — club keeps `isMoving` true for whole `WalkAnimation` and updates screen/`_loc`; we only edge-toggle moving + optional locX.
-3. **Avatar-initiated `setLocation_v1`** — must become a real move (appearance moving=true → arrive → false), not just store coords.
-4. **Speak path** — loft chat must call `hostSpoke` → `avatarSpoke_v1` for talk anims.
+1. **Sleeping / AFK** — ✅ loft ~60s idle → `hostSleep(true)`; activity → `hostSleep(false)` (?v=20260906by).
+2. **Walk duration / location lerp** — ✅ `moving=true` whole chrome trek + ~100ms locX `hostWalk` ticks (?v=20260906by).
+3. **Avatar-initiated `setLocation_v1`** — ✅ bridge → `chromeWalkTo` / `hostWalk(true)` (?v=20260906by).
+4. **Speak path** — ✅ loft chat → `hostSpoke` → `avatarSpoke_v1` (?v=20260906by).
 5. **Media fallbacks** — no MediaStub / default-avatar when loadBytes fails; config `datapack` always null.
 
 ---

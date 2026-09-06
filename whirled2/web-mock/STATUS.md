@@ -1,10 +1,20 @@
+## What shipped (?v=20260906bz)
+
+- **Flash QA cleanup:** removed duplicate `flashQa` guest helpers in `app.js` (one path: ephemeral session → Wear demo → loft)
+- Preserve by: self-host Ruffle, hostLoadBytes, walk-lerp/spoke/sleep, Grey Havens host stubs
+- Cache: **`?v=20260906bz`**. Push: `/tmp/push-bz.js`.
+
 ## What shipped (?v=20260906by)
 
 - **Flash sync (preserve bx hostLoadBytes):** companion `hostLoadBytes(base64)` → `Loader.loadBytes` + **`allowCodeImport`** → `controlConnect` → `gotControl_v1` → `appearanceChanged_v2`
 - Host SWF **9407B** (`assets/avatar-host/avatar-host.swf`): `hostWalk` / `hostSleep` / `hostSpoke` / `setLocation_v1` (club idle/speak/usercode-move parity)
+- **Walk duration parity (club WalkAnimation):** floor click → `notifyLoftWalk(true)` / `hostWalk(true,orient,locX)` at START; `loftHostState.moving=true` until chrome billboard arrive → `hostWalk(false)`; ~100ms locX tick while moving
+- **setLocation_v1:** bridge `setLocation` → `WhirledChrome.chromeWalkTo` (or re-apply `hostWalk(true)`); not store-only
+- **hostSpoke:** loft room chat → `callHostSpoke()` → `avatarSpoke_v1`
+- **hostSleep:** ~60s idle → `hostSleep(true)` + optional nameplate Zzz; activity / floor click / chat → `hostSleep(false)`
 - **Ruffle first-class:** vendored `assets/ruffle/` self-host + jsDelivr/unpkg fallback; `preloadRuffle()`; prefer `callExternalInterface`
 - Guest QA: `?flashQa=1` helpers + `assets/ruffle/demo-qa.swf` / `assets/avatars/flash-qa/demo-avatar.swf`
-- Docs: expanded `FLASH-SYNC-RESEARCH.md` (protocol dig + sibling gaps — **no AGPL copy**)
+- Docs: `FLASH-SYNC-RESEARCH.md` + `GREY-HAVENS-PROTOCOL.md` (study only — **no AGPL copy**)
 - Preserve: bx loadBytes path, bt never-tofu, bg dual Wear, br club, Whirl
 - Cache: **`?v=20260906by`**. Push: `/tmp/push-by.js` (dry-run default). **Do not push from executor.**
 

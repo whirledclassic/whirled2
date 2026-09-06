@@ -185,10 +185,10 @@ Room chrome (GWT) then embeds **world-client.swf** via swfobject. Avatars are **
 
 Prior bag was already close. Remaining gaps that break **club-like** sync:
 
-1. **Sleeping never driven from chrome** until `hostSleep` wired in `classic-avatar.js` (AFK/zzz).
+1. **Sleeping** — ✅ chrome ~60s idle → `hostSleep` (?v=20260906by).
 2. **No WalkAnimation parity** — we toggle moving bool; club interpolates `_loc` every frame while `_walk != null`.
-3. **`setLocation_v1` does not start a walk** — club `requestMove` → server → `moveTo` → appearance moving=true.
-4. **`avatarSpoke_v1`** needs loft chat → `hostSpoke` (stub ready; chrome not hooked).
+3. **`setLocation_v1`** — ✅ bridge → chromeWalkTo / hostWalk(true) (?v=20260906by).
+4. **`avatarSpoke_v1`** — ✅ loft chat → `hostSpoke` (?v=20260906by).
 5. **MediaStub / default-avatar** path absent — failed media stays blank (club substitutes stub/default).
 6. **`datapack` always null** — config/DataPack avatars may no-op colors/parts.
 7. Deprecated-but-called: covered (`setWalkSpeed_v1`, `triggerEvent_v1`).

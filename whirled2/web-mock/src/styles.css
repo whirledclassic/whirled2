@@ -5699,7 +5699,7 @@ button.tb.tb-music,
 }
 
 /* ---- 20260906aw: Classic Flash / Whirled avatar upload + Ruffle overlay ----
- * Beginner: Stuff → Avatars shows Classic Flash panel. Experimental badge = Ruffle path.
+ * Beginner (?v=20260906bz): Classic Flash panel. Live Ruffle status badge (Ready/Mounting/Playing/Failed).
  * ENGINE DEV: Ruffle mounts in chrome slots only — never inside #stage-slot.
  */
 .classic-exp-badge {
@@ -5724,6 +5724,46 @@ button.tb.tb-music,
   font-size: 9px;
   pointer-events: none;
 }
+/* (?v=20260906bz) Live Ruffle status — Ready / Mounting / Playing / Failed (not vague Experimental) */
+.ruffle-status-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  font: 700 10px/1.4 "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: #1e6fa8;
+  background: linear-gradient(#f0f8ff, #cfe8f8);
+  border: 1px solid #7eb6d4;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.ruffle-status-badge-overlay {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  margin: 0;
+  font-size: 9px;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+.ruffle-status-badge.is-loading,
+.ruffle-status-badge.is-mounting { background: linear-gradient(#fff8e8, #f5e0a8); border-color: #d4b06a; color: #8a5a10; }
+.ruffle-status-badge.is-ready,
+.ruffle-status-badge.is-playing { background: linear-gradient(#e8f8ef, #c5ead4); border-color: #6aad7a; color: #1e6a3a; }
+.ruffle-status-badge.is-failed { background: linear-gradient(#fde8e8, #f5c5c5); border-color: #d47a7a; color: #a33; }
+.ruffle-status-badge.is-idle { background: #f0f5f9; color: #5a7a90; border-color: #c5d6e4; }
+.avatar-ruffle-host.is-failed[data-ruffle-error]::after {
+  content: attr(data-ruffle-error);
+  display: block;
+  max-width: 140px;
+  margin-top: 2px;
+  font: 600 9px/1.3 "Trebuchet MS", sans-serif;
+  color: #a33;
+  pointer-events: none;
+}
+
 .classic-avatar-panel {
   border: 1px solid #7eb6d4;
   background: linear-gradient(#f7fbfe, #e8f4fb);
@@ -6492,7 +6532,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   transform-origin: center bottom;
   pointer-events: none !important;
 }
-/* (?v=20260906by): companion host Body flips via orient — bob Y only (no CSS scaleX double-flip) */
+/* (?v=20260906bz): companion host Body flips via orient — bob Y only (no CSS scaleX double-flip) */
 @keyframes whirled-swf-host-bob-y {
   0%, 100% { transform: translateY(0); }
   25% { transform: translateY(-4px); }
@@ -7105,7 +7145,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906by — Nested companion host + never-tofu Classic Flash loft (stand thumb + hitbox)
+   ?v=20260906bz — Nested companion host + never-tofu Classic Flash loft (stand thumb + hitbox)
    Beginner: if Ruffle is slow/fails, last thumb still shows — not grey tofu bean.
    ENGINE DEV: stand thumb PE none; hitbox/nameplate keep emote clicks.
    ========================================================================== */
@@ -7155,7 +7195,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906by — Companion hostWalk + chrome puppet backup (Wear→loft never blank)
+   ?v=20260906bz — Companion hostWalk + chrome puppet backup (Wear→loft never blank)
    Beginner: stand thumb / initial glyph always visible; floor bob + face flip.
    ENGINE DEV: mountRuffle must not wipe stand; sha1-only Wear resolves via IDB.
    ========================================================================== */
