@@ -1,9 +1,13 @@
-## What shipped (?v=20260906cl — DemoAvatar DIRECT walk visible; ck cover hid nest)
+## What shipped (?v=20260906cl — cover was hiding walk; DemoAvatar DIRECT visible)
 
-- **Root cause (ck flashQa):** companion-cover hid DemoAvatar when nest never `"connected"` → no visible green walk.
-- **Fix:** `shouldCompanionOnly` skips nest for demo-avatar/demo-qa → **DIRECT** Ruffle + EI `hostWalk` continuous legs. Stock Body still COMPANION-ONLY.
+- **Root cause:** CSS `companion-cover` forced stand tofu/thumb `z-index:6` over `ruffle-player` — DemoAvatar green walk ran **under** static cover (invisible). Nest lag made it worse.
+- **Fix:**
+  1. CSS `:has(ruffle-player)` hides stand; player z-index 4; hide on `.is-playing` / billboard `.is-walking`.
+  2. `shouldCompanionOnly` → **demo-avatar / flashQa DIRECT** + EI `hostWalk`. Real Body still COMPANION-ONLY.
+  3. JS `hideStandCoverForPaint` on chromeWalkTo / notifyLoftWalk / connected / DIRECT remount.
+  4. Tofu: `transform-box:fill-box` on `.tofu-leg-l/r`; stand tofu SVG leg groups + bob when walking.
 - Preserve ck: AvatarHost soft connect / ConnectBag props; cj tofu CSS + chrome floor-click.
-- Docs: `WHY-FLASH-FAILS.md`, `GREY-HAVENS-RUFFLE-REPLICATE.md` (cite only).
+- Docs: `SMOOTH-RUFFLE.md`, `QA-FLASH.md`, `ROOT-CAUSE.md` (“cover was hiding walk”).
 - Cache: **`?v=20260906cl`**. Push: `/tmp/push-cl.js` (`WHIRLED_DO_PUSH=1`).
 
 ## What shipped (?v=20260906ck — companion hostWalk + DemoAvatar continuous walk)
