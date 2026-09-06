@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906cb";
+  var LOGO_V = "20260906cc";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2189,7 +2189,7 @@
 
 
   function classicRuffleWearHtml(worn, posStyle) {
-    // (?v=20260906cb): Always mount Ruffle companion host + hitbox/nameplate + stand thumb OR glyph.
+    // (?v=20260906cc): Always mount Ruffle companion host + hitbox/nameplate + stand thumb OR glyph.
     // Beginner: never tofu / never blank when a .swf is worn (sha1-only OK — IDB resolves at mount).
     // ENGINE DEV: data-swf-sha1 on host; PE none on Ruffle; hitbox owns emotes; stand survives mountRuffle.
     var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
@@ -2452,7 +2452,7 @@
     // Animate billboard toward floor click. Walk frames while moving; idle on arrive.
     // How this works (?v=20260906bb): Hybrid PNG swaps walk frames (Whirl path). SWF-only MOVES the
     // billboard + synthesized bob/flip (Ruffle PE none). Never tofu mid-walk.
-    // (?v=20260906cb): notifyLoftWalk(true) at START keeps loftHostState.moving until arrive → hostWalk(false).
+    // (?v=20260906cc): notifyLoftWalk(true) at START keeps loftHostState.moving until arrive → hostWalk(false).
     // Beginner: Flash walk plays the whole floor trek. ENGINE DEV: classic-avatar ticks locX ~100ms.
     if (isEngineMountedOnStage()) return; // ENGINE DEV: yield to Pixi
     var layer = document.getElementById("avatar-wear-layer");
@@ -2483,13 +2483,13 @@
     try { cancelAvatarEmoteTimer(); } catch (eEm0) {}
     var hasWalkPng = !!(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length);
     setAvatarState(hasWalkPng ? "walk" : "idle");
-    // (?v=20260906cb): ALWAYS notify classic module on floor walk when present (Wear + hostWalk).
+    // (?v=20260906cc): ALWAYS notify classic module on floor walk when present (Wear + hostWalk).
     // Beginner: PNG walk still runs; Ruffle companion also gets hostWalk for in-SWF scenes.
     // ENGINE DEV: do not gate on useSwfMotion — peer Grey Havens lerp/speak/sleep needs every walk pulse.
     var useSwfMotion = !hasWalkPng && !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1
       || worn.mediaKind === "swf" || layerIsSwf || layer.classList.contains("is-swf"));
     try {
-      // (?v=20260906cb): floor click wakes hostSleep; notifyLoftWalk(true) until arrive → hostWalk(false).
+      // (?v=20260906cc): floor click wakes hostSleep; notifyLoftWalk(true) until arrive → hostWalk(false).
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.noteLoftActivity) {
         WhirledClassicAvatar.noteLoftActivity();
       }
@@ -5909,7 +5909,7 @@
   var AWAY_KEY = "whirled2.away.";
   // How this works (?v=20260906bk): wiki Room gray Zzz — local idle after ~2 min without pointer/key/chat.
   // Beginner: move mouse, type, or chat to clear Idle; /away still wins (yellow).
-  // (?v=20260906cb): touchActivity also noteLoftActivity → hostSleep(false); Flash sleep ~60s in classic-avatar.
+  // (?v=20260906cc): touchActivity also noteLoftActivity → hostSleep(false); Flash sleep ~60s in classic-avatar.
   var LAST_ACTIVITY_KEY = "whirled2.lastActivity.";
   var IDLE_MS = 120000;
   var lastActivityAt = Date.now();
@@ -5920,7 +5920,7 @@
       var s = session();
       if (s && s.user) localStorage.setItem(LAST_ACTIVITY_KEY + s.user.id, String(lastActivityAt));
     } catch (eTa) {}
-    // (?v=20260906cb): wake Flash hostSleep (~60s idle → appearance sleeping).
+    // (?v=20260906cc): wake Flash hostSleep (~60s idle → appearance sleeping).
     try {
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.noteLoftActivity) {
         WhirledClassicAvatar.noteLoftActivity();
@@ -12270,7 +12270,7 @@
       listAvatarEmotes: function () { return listAvatarEmotes(); },
       getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
       isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); },
-      // (?v=20260906cb): avatar setLocation_v1 bridge → chromeWalkTo (logical x*100 → %).
+      // (?v=20260906cc): avatar setLocation_v1 bridge → chromeWalkTo (logical x*100 → %).
       chromeWalkTo: function (xPct, yPct) { return chromeWalkTo(xPct, yPct); },
       // How this works (?v=20260906bd): debug/UX — 'png-hybrid' | 'ruffle' | 'tofu' | 'png'
       // Beginner: Whirl walking → usually 'png' (Ruffle not running). Force Ruffle / SWF-only → 'ruffle'.
@@ -12790,7 +12790,7 @@
     if (!chat.some(function (m) { return m.id === msg2.id; })) chat.push(msg2);
     refreshChatLog();
     spawnStageBubble(msg2);
-    // (?v=20260906cb): loft chat → hostSpoke → avatarSpoke_v1 (talk anim when companion connected).
+    // (?v=20260906cc): loft chat → hostSpoke → avatarSpoke_v1 (talk anim when companion connected).
     try {
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.callHostSpoke) {
         WhirledClassicAvatar.callHostSpoke();
@@ -13108,7 +13108,7 @@
     } catch (e) { return null; }
   }
 
-  // (?v=20260906cb): Guest Flash QA loft WITHOUT login — ?flashQa=1 (and/or avatarDebug=1).
+  // (?v=20260906cc): Guest Flash QA loft WITHOUT login — ?flashQa=1 (and/or avatarDebug=1).
   // Beginner: duplicate thin helpers removed — one guest path only.
   // Beginner: was blocked at the login gate for browser QA. Ephemeral session → loft → companion + demo SWF.
   // ENGINE DEV: does not replace real accounts; marks session.flashQa. Companion hostLoadBytes still primary.
@@ -13212,7 +13212,7 @@
     // How this works: ?avatarLab=1 unlocks the deferred SWF wardrobe lab for side work only.
     // Discord: if URL has discord_token, accept it before paint (async me fetch).
     // Beginner (?v=20260906au): ?page=dev|docs|developers opens Developer Information Hub after login.
-    // (?v=20260906cb): ?flashQa=1 / avatarDebug=1 → ephemeral session before gate (browser QA).
+    // (?v=20260906cc): ?flashQa=1 / avatarDebug=1 → ephemeral session before gate (browser QA).
     try { ensureFlashQaGuestSession(); } catch (eFq) {}
     syncAvatarLabFlagFromUrl();
     // ---- MERGE NOTE (?v=20260906ax): wire classic-avatar.js hooks (additive) ----

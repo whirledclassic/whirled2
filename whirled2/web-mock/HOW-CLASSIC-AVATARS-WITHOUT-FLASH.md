@@ -119,3 +119,8 @@ Whirl starter, chat visit-since, pale-blue chrome, transparent Ruffle, PE-none l
 ## bx note — nested loadBytes
 
 Stock Wear from IDB uses companion `hostLoadBytes(base64)` → `Loader.loadBytes` (not nested blob URLs). See `FLASH-SYNC-RESEARCH.md`.
+
+
+## How Ruffle is integrated (?v=20260906cc)
+
+See **[RUFFLE-INTEGRATION.md](./RUFFLE-INTEGRATION.md)** for the official API recipe (`publicPath`, `player.ruffle().load`, `{data: ArrayBuffer}`, `callExternalInterface`). Opt-in Classic Flash Wear mounts in `#avatar-ruffle-host` only — never `#stage-slot`.

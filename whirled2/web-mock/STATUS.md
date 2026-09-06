@@ -1,3 +1,9 @@
+## What shipped (?v=20260906cc)
+
+- **Ruffle integration (docs-correct):** `publicPath` for self-host wasm; load via `player.ruffle().load`; IDB avatars prefer `{data: ArrayBuffer}`; EI via `callExternalInterface`; `RUFFLE-INTEGRATION.md`
+- Preserve: cb DIRECT-stable Wear (no companion wipe), by self-host pack, Flash opt-in dual modes
+- Cache: **`?v=20260906cc`**.
+
 ## What shipped (?v=20260906cb)
 
 - **Flash blank loft CRITICAL:** companion-first left transparent empty `host.swf` + faded stand → nothing visible (worse than tofu).
