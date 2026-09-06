@@ -2537,16 +2537,27 @@ body > .party-panel {
   flex-shrink: 0;
   margin: 0 10px 4px;
 }
-/* Room music side panel mounted on #app so paint does not flash-unmount it */
+/* Room music side panel mounted on #app so paint does not flash-unmount it.
+   How this works: z-index ~110 so the panel sits above expanded Open player (z=100) and the chat bar.
+   Beginner: when Room music is open you can tap/paste in the link box; it is not covered by the player sheet.
+   ENGINE DEV: pointer-events auto on panel + form controls; never rely on lower .room-side-panel z-index:5. */
 #app > #room-playlist-panel.room-side-panel {
   position: fixed;
   right: 8px;
   top: 60px;
-  z-index: 50;
+  z-index: 110;
   max-height: calc(100vh - 140px);
   width: min(320px, 92vw);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
+}
+#app > #room-playlist-panel.room-side-panel input,
+#app > #room-playlist-panel.room-side-panel textarea,
+#app > #room-playlist-panel.room-side-panel select,
+#app > #room-playlist-panel.room-side-panel button {
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .room-embed-head {
   display: flex; justify-content: space-between; align-items: center;
@@ -2600,7 +2611,8 @@ body > .party-panel {
   height: 200px;
 }
 .playlist-embed-preview .room-embed-frame { min-height: 200px; height: 200px; }
-.playlist-embed-form input[type="url"],
+.playlist-embed-form input[type="text"],
+.playlist-embed-form input.playlist-embed-url,
 .playlist-embed-form button {
   min-height: 44px;
   font-size: 16px; /* iOS: avoid zoom-on-focus */
@@ -2609,6 +2621,14 @@ body > .party-panel {
   padding: 10px 16px;
   font-weight: 700;
 }
+.playlist-paste-steps {
+  margin: 8px 0 10px;
+  padding-left: 1.25em;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #3a5a70;
+}
+.playlist-paste-steps li { margin: 2px 0; }
 .playlist-source-tabs .action-btn {
   min-height: 40px;
   padding: 8px 12px;
@@ -2651,9 +2671,14 @@ body > .party-panel {
 .playlist-embed-form {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0;
 }
-.playlist-embed-form input[type="url"] {
-  flex: 1; min-width: 180px; padding: 6px 8px;
+.playlist-embed-form input[type="text"],
+.playlist-embed-form input.playlist-embed-url {
+  flex: 1; min-width: 180px; padding: 10px 12px;
   border: 1px solid #b7d3e8; border-radius: 4px;
+  font-size: 16px;
+  min-height: 44px;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .owner-music-note { color: #8ab0c4; }
 .legal-embed-note { font-size: 11px; margin-top: 10px; }

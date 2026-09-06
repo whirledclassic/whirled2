@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906v";
+  var LOGO_V = "20260906w";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -426,15 +426,52 @@
     applyRoomEmbedExpanded(dock);
     return dock;
   }
+  function playlistPanelHasFocus() {
+    // How this works: if an embed URL field (or any form control) is focused, never replaceChild the panel.
+    // Beginner: replacing mid-paste dismisses the keyboard and kills the paste — that was the bug.
+    try {
+      var panel = document.getElementById("room-playlist-panel");
+      var ae = document.activeElement;
+      if (!panel || !ae || !panel.contains(ae)) return false;
+      var tag = (ae.tagName || "").toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select";
+    } catch (eFocus) { return false; }
+  }
+  function focusPlaylistEmbedUrl() {
+    // How this works: after opening Room music, focus the paste field so owners can paste immediately.
+    // Beginner: one tap Room music → keyboard/paste ready on the link box.
+    // ENGINE DEV: rAF so the field exists after mount/replace.
+    requestAnimationFrame(function () {
+      try {
+        var panel = document.getElementById("room-playlist-panel");
+        if (!panel) return;
+        var inp = panel.querySelector('#playlist-embed-form input[name="embedUrl"], #playlist-smart-embed-form input[name="embedUrl"]');
+        if (!inp) return;
+        try { inp.focus({ preventScroll: false }); } catch (eF) { try { inp.focus(); } catch (eF2) {} }
+        try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (eSc) {}
+      } catch (eFocusUrl) {}
+    });
+  }
+  function collapseRoomEmbedSheet() {
+    // How this works: expanded Open player sheet is z-index 100; Room music panel needs to sit above it.
+    // Beginner: opening Room music collapses the big player so it does not cover the paste box.
+    roomEmbedExpanded = false;
+    try {
+      var dock = document.getElementById("room-embed-dock");
+      if (dock) applyRoomEmbedExpanded(dock);
+    } catch (eCol) {}
+  }
   function ensurePlaylistPanel() {
     // How this works: Room music side panel mounts on #app (outside #main) so paint does not flash-unmount it.
     // Beginner: panel stays open across mute / source tabs until Close / leave / clearStrayUI.
-    // ENGINE DEV: refresh HTML in place when open; remove when closed or off Rooms tab.
+    // ENGINE DEV: do NOT replaceChild on every paint — only when playlistPanelDirty (or first mount).
+    // Never rebuild while an input/textarea/select inside the panel is focused (paste/keyboard survive).
     var app = document.getElementById("app");
     var existing = document.getElementById("room-playlist-panel");
     var onRooms = app && app.getAttribute("data-tab") === "rooms";
     if (!app || !playlistPanelOpen || !inRoom || !session() || !onRooms) {
       if (existing) existing.remove();
+      playlistPanelDirty = false;
       return null;
     }
     // Drop any copy that landed under #main from an old paint.
@@ -446,6 +483,17 @@
         if (existing && main.contains(existing)) existing.remove(), existing = null;
       }
     } catch (eStray) {}
+    existing = document.getElementById("room-playlist-panel");
+    // Keep live DOM when open + already mounted unless explicitly dirty.
+    if (existing && existing.parentNode === app) {
+      if (playlistPanelHasFocus()) {
+        // Defer rebuild: leave dirty so a later paint refreshes once focus leaves.
+        return existing;
+      }
+      if (!playlistPanelDirty) {
+        return existing;
+      }
+    }
     var html = playlistPanel();
     var wrap = document.createElement("div");
     wrap.innerHTML = html;
@@ -462,6 +510,7 @@
       } else if (bar) app.insertBefore(next, bar);
       else app.appendChild(next);
     }
+    playlistPanelDirty = false;
     try {
       var panel = document.getElementById("room-playlist-panel");
       if (panel) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -514,11 +563,15 @@
     }
   }
   function playlistNext(fromEnded) {
+    // How this works: advance local queue once (no double pl.current++).
+    // Beginner: Next / track-ended both call this; click handler must not increment again.
+    // ENGINE DEV: set playlistPanelDirty so ensurePlaylistPanel can refresh "Now playing" once.
     var pl = loadPlaylist();
     if (normalizePlaylistSource(pl.source) !== "local") return;
     if (!pl.tracks.length) return;
-    pl.current = (pl.current + 1) % pl.tracks.length;
+    pl.current = (pl.current + 1) % pl.tracks.length; // once only — do not increment again in the click handler
     savePlaylist(pl);
+    playlistPanelDirty = true;
     if (playlistPanelOpen && inRoom) paint("rooms");
     else syncRoomAudio();
   }
@@ -583,9 +636,13 @@
           : (src === "local" ? '<p class="meta">Local adds locked to loft owner.</p>' : ""))
       + (owner && src === "local"
           ? ('<div class="section-label">Or paste YouTube / Spotify</div>'
-            + '<p class="meta">Paste a link to auto-switch music source and set the embed.</p>'
+            + '<ol class="playlist-paste-steps">'
+            + '<li>Pick <b>YouTube</b> or <b>Spotify</b> (or paste below to auto-pick)</li>'
+            + '<li>Paste the share link</li>'
+            + '<li>Tap <b>Set embed</b></li>'
+            + '</ol>'
             + '<form id="playlist-smart-embed-form" class="playlist-embed-form">'
-            + '<input name="embedUrl" type="url" required placeholder="https://youtu.be/… or https://open.spotify.com/…" />'
+            + '<input name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="Paste YouTube or Spotify link here" />'
             + '<button type="submit">Set embed</button></form>')
           : "");
     var embedOpen = pl.embedUrl
@@ -593,12 +650,19 @@
         + (src === "spotify" ? "Open on Spotify" : "Open on YouTube") + '</a>')
       : "";
     var embedBody = ''
+      + (owner
+          ? ('<ol class="playlist-paste-steps">'
+            + '<li>Pick <b>YouTube</b> or <b>Spotify</b> above</li>'
+            + '<li>Paste the share link in the box</li>'
+            + '<li>Tap <b>Set embed</b></li>'
+            + '</ol>')
+          : "")
       + '<p class="meta">' + (src === "youtube"
-          ? "Paste youtube.com / music.youtube.com / youtu.be / Shorts / Live / playlist URLs (si= share links OK). Embeds use youtube-nocookie. Video must allow embedding."
-          : "Paste open.spotify.com (intl- paths OK) track / album / playlist / episode. Playlists must be <b>public</b>. Prefer Copy link over spotify.link shorts.") + '</p>'
+          ? "Accepts youtube.com / music.youtube.com / youtu.be / Shorts / Live / playlist (si= share links OK). Embeds use youtube-nocookie. Video must allow embedding."
+          : "Accepts open.spotify.com (intl- paths OK) track / album / playlist / episode. Playlists must be <b>public</b>. Prefer Copy link over spotify.link shorts.") + '</p>'
       + (owner
           ? ('<form id="playlist-embed-form" class="playlist-embed-form">'
-            + '<input name="embedUrl" type="url" required placeholder="' + (src === "youtube" ? "https://www.youtube.com/watch?v=…" : "https://open.spotify.com/playlist/…") + '" value="' + esc(pl.embedUrl || "") + '" />'
+            + '<input name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="' + (src === "youtube" ? "Paste YouTube link here" : "Paste Spotify link here") + '" value="' + esc(pl.embedUrl || "") + '" />'
             + '<button type="submit">Set embed</button></form>')
           : '<p class="meta">Owner controls room music — embed URL is read-only for guests.</p>')
       + (pl.embedSrc
@@ -648,6 +712,10 @@
   var roomMenuOpen = false;
   var roomPanelOpen = false;
   var playlistPanelOpen = false; // Room menu → View room music
+  // How this works: playlistPanelDirty = true when source/embed/mute/queue changes so ensurePlaylistPanel may rebuild once.
+  // Beginner: while you are typing/pasting a link, the panel HTML is never replaced (keyboard stays up).
+  // ENGINE DEV: set dirty before paint(); clear after successful remount; Close/leave/clearStrayUI remove the node.
+  var playlistPanelDirty = false;
   // How this works: #room-embed-dock lives in shell() outside #main — paint never destroys the iframe.
   // Beginner: Open player sticks open across mute / YouTube↔Spotify taps until you Close player or leave.
   // ENGINE DEV: roomEmbedExpanded + CSS is-expanded (fixed sheet inside #app). Never reparent to body.
@@ -1103,6 +1171,7 @@
     roomMenuOpen = false;
     partyPanelOpen = false;
     playlistPanelOpen = false;
+    playlistPanelDirty = false;
     roomEmbedExpanded = false;
     roomItemsPanelOpen = false;
     roomSharePanelOpen = false;
@@ -2759,7 +2828,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906v";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906w";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3605,7 +3674,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: room music dock lives outside #main (Open/Close survive paint on phone) + embeds + Profile look custom BG + Facebook Connect. Cache <code>?v=20260906v</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Room music paste-URL fix (panel no longer rebuilds mid-paste; paste-friendly text fields; panel above Open player). Cache <code>?v=20260906w</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5792,7 +5861,7 @@ function helpPage() {
     applyBrowserTheme();
     // How this works: #room-embed-dock is outside #main — no park needed before innerHTML.
     // Beginner: Open player stays open when you mute or switch YouTube/Spotify in Room music.
-    // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts side panel on #app.
+    // ENGINE DEV: syncRoomAudio → ensureRoomEmbedDock; ensurePlaylistPanel remounts only when playlistPanelDirty (never while paste field focused).
     if (legalOpen || tab === "legal") { legalOpen = true; helpOpen = false; main.innerHTML = legalPage(); }
     else if (helpOpen || tab === "help") { helpOpen = true; legalOpen = false; main.innerHTML = helpPage(); }
     else if (tab === "rooms") main.innerHTML = rooms();
@@ -6610,12 +6679,15 @@ function helpPage() {
         ev.stopPropagation();
         if (!inRoom) inRoom = true;
         playlistPanelOpen = true;
+        playlistPanelDirty = true;
+        collapseRoomEmbedSheet();
         roomPanelOpen = false;
         decorateMode = false;
         partyPanelOpen = false;
         paint("rooms");
         try { syncRoomAudio(); } catch (eS) {}
         try { ensurePlaylistPanel(); } catch (eP) {}
+        focusPlaylistEmbedUrl();
       }
     }, true);
   })();
@@ -7564,6 +7636,8 @@ function helpPage() {
     var openMusic = ev.target.closest("[data-open-room-music]");
     if (openMusic && session()) {
       // How this works: one-tap Room music on mobile (toolbar was hard to find).
+      // Beginner: collapses Open player so it does not cover the paste link box.
+      // ENGINE DEV: dirty + collapseRoomEmbedSheet before paint; focus paste field after mount.
       if (!inRoom) {
         pushNotice("gray", "Enter a room first to play music.", { transient: true });
         return;
@@ -7572,11 +7646,14 @@ function helpPage() {
       var rmM = document.getElementById("room-menu");
       if (rmM) rmM.hidden = true;
       playlistPanelOpen = true;
+      playlistPanelDirty = true;
+      collapseRoomEmbedSheet();
       roomPanelOpen = false;
       roomItemsPanelOpen = false;
       decorateMode = false;
       partyPanelOpen = false;
       paint("rooms");
+      focusPlaylistEmbedUrl();
       return;
     }
     var roomMenuBtn = ev.target.closest("[data-room-menu]");
@@ -7610,12 +7687,15 @@ function helpPage() {
       } else if (rm === "playlist") {
         if (!inRoom) { inRoom = true; }
         playlistPanelOpen = true;
+        playlistPanelDirty = true;
+        collapseRoomEmbedSheet();
         roomPanelOpen = false;
         decorateMode = false;
         partyPanelOpen = false;
         paint("rooms");
         loadOccupants();
         syncRoomAudio();
+        focusPlaylistEmbedUrl();
       } else if (rm === "view-items") {
         if (!inRoom) { inRoom = true; }
         roomItemsPanelOpen = true;
@@ -7657,6 +7737,11 @@ function helpPage() {
     }
     if (ev.target.closest("[data-playlist-close]") && session()) {
       playlistPanelOpen = false;
+      playlistPanelDirty = false;
+      try {
+        var plClose = document.getElementById("room-playlist-panel");
+        if (plClose) plClose.remove();
+      } catch (eClose) {}
       paint("rooms");
       return;
     }
@@ -7701,13 +7786,17 @@ function helpPage() {
     }
     if (ev.target.closest("[data-playlist-open-panel]") && session()) {
       // How this works: compact dock button opens Room music side panel.
+      // Beginner: collapses Open player first so paste UI is not covered (sheet z=100 vs panel).
       if (!inRoom) inRoom = true;
       playlistPanelOpen = true;
+      playlistPanelDirty = true;
+      collapseRoomEmbedSheet();
       roomPanelOpen = false;
       decorateMode = false;
       partyPanelOpen = false;
       paint("rooms");
       syncRoomAudio();
+      focusPlaylistEmbedUrl();
       return;
     }
     var plSrcBtn = ev.target.closest("[data-playlist-source]");
@@ -7727,8 +7816,10 @@ function helpPage() {
       if (nextSrc === "local") roomEmbedExpanded = false;
       savePlaylist(plS);
       playlistPanelOpen = true;
+      playlistPanelDirty = true; // source tabs change body → allow one remount
       paint("rooms");
       syncRoomAudio();
+      focusPlaylistEmbedUrl();
       return;
     }
     // How this works: playlist controls — owner play/remove/next; mute; gesture unlock for autoplay.
@@ -7743,13 +7834,16 @@ function helpPage() {
       roomAudioMuted = !roomAudioMuted;
       var aMute = document.getElementById("room-audio");
       if (aMute) aMute.muted = roomAudioMuted;
-      if (playlistPanelOpen && inRoom) paint("rooms");
+      // Mute label refresh: dirty so panel can remount once — skipped while paste field focused.
+      if (playlistPanelOpen && inRoom) {
+        playlistPanelDirty = true;
+        paint("rooms");
+      }
       return;
     }
     if (ev.target.closest("[data-playlist-next]") && session() && isLoftOwner()) {
+      // playlistNext already increments once + paints/syncs — do not double-increment or double-paint.
       playlistNext(false);
-      if (playlistPanelOpen) paint("rooms");
-      else syncRoomAudio();
       return;
     }
     var plPlay = ev.target.closest("[data-playlist-play]");
@@ -7757,6 +7851,7 @@ function helpPage() {
       var pl = loadPlaylist();
       pl.current = Math.max(0, Number(plPlay.getAttribute("data-playlist-play")) || 0);
       savePlaylist(pl);
+      playlistPanelDirty = true;
       paint("rooms");
       syncRoomAudio();
       return;
@@ -7770,6 +7865,7 @@ function helpPage() {
         if (pl2.current >= pl2.tracks.length) pl2.current = Math.max(0, pl2.tracks.length - 1);
         savePlaylist(pl2);
       }
+      playlistPanelDirty = true;
       paint("rooms");
       syncRoomAudio();
       return;
@@ -8871,6 +8967,7 @@ function helpPage() {
         if (dockForce) dockForce.removeAttribute("data-embed-src");
       } catch (eForce) {}
       playlistPanelOpen = true;
+      playlistPanelDirty = true; // after Set embed: OK to remount panel once with preview
       paint("rooms");
       syncRoomAudio();
       pushNotice("green", "Room embed set — press play in the player. " + (srcE === "spotify" ? "Open on Spotify" : "Open on YouTube") + " is in the dock.", { transient: true });
@@ -8910,6 +9007,7 @@ function helpPage() {
       if (plA.tracks.length === 1) plA.current = 0;
       savePlaylist(plA);
       playlistPanelOpen = true;
+      playlistPanelDirty = true;
       paint("rooms");
       syncRoomAudio();
       return;

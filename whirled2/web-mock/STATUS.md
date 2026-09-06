@@ -2,9 +2,10 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906v)
+## What shipped (?v=20260906w)
 
-- **Room music dock outside `#main`**: `#room-embed-dock` is a persistent shell host after `#main` / before `.bar`. `paint("rooms")` no longer races or collapses the Open player sheet. Expanded sheet uses CSS `position:fixed; z-index:100` while the node stays inside `#app` (never `document.body`) so Open/Close/Room music clicks keep working on phones. Document capture backup for embed controls. `#room-playlist-panel` mounts on `#app` via `ensurePlaylistPanel()` so it does not flash-unmount on every control tap.
+- **Room music paste-URL fix**: `ensurePlaylistPanel()` no longer `replaceChild`s the panel on every `paint()` — only when `playlistPanelDirty` (source/embed/mute/queue) or first open. Never rebuilds while an input/textarea/select inside the panel is focused (keyboard + paste survive). Embed fields are `type="text"` + `inputmode="url"` (large touch target). Opening Room music collapses the Open player sheet and focuses the paste field. Panel z-index ~110 above expanded dock (z=100). Clearer owner paste steps.
+- Prior **?v=20260906v**: room music dock outside `#main` (Open/Close survive paint).
 - Prior **?v=20260906u**: park/reattach attempt (superseded — body reparent broke clicks).
 - Prior **?v=20260906t**: room music embeds (mobile) + Profile look custom BG + Facebook Connect.
 - Prior **?v=20260906s**: Facebook Connect first land.
@@ -13,7 +14,7 @@ Date: 2026-09-06
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906v
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906w
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
