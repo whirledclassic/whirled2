@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bm";
+  var LOGO_V = "20260906bn";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -4919,7 +4919,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl + bm) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm + bn) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4956,6 +4956,9 @@
       "• bm: club gaps after bl — /st alias, bare /speak|/think|/shout mode switch, room Zoom slider,",
       "  snapshot Coming Soon modal, party Follow-host stub, hangout invite blue notice, AVR name legend —",
       "  classic-avatar.js Flash loft interact UNTOUCHED",
+      "• bn: club gaps after bm — /action|/ac plays PNG/chrome emotes (prefix match; bare opens menu),",
+      "  /msg|/tell|/w whisper aliases, Club ★ name legend stub, self-menu Away/Back,",
+      "  shortcuts/help refresh — classic-avatar.js Flash loft interact UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -5088,10 +5091,10 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Club polish after bl Flash loft: /st alias, bare /speak|/think|/shout switches compose mode\n"
-        + "• Room Zoom slider (local CSS on .stage-host); Snapshot preview modal (Coming Soon capture)\n"
-        + "• Parties Follow host Coming Soon; hangout batch invite → blue notice; AVR name legend stub\n"
-        + "Preserve: bl Flash loft interact (classic-avatar.js untouched), bg dual Wear, bk–bj club, Whirl, visit-since.",
+        + "• Club polish after bm: /action|/ac plays PNG/chrome emotes (prefix; bare opens menu)\n"
+        + "• /msg|/tell|/w whisper aliases; Club ★ name legend stub; self-menu Away/Back\n"
+        + "• Shortcuts/help lines refreshed for action + whisper\n"
+        + "Preserve: bl/bm Flash loft interact (classic-avatar.js untouched), bg dual Wear, bk–bj club, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -6292,7 +6295,8 @@
       +     '<li><b>/away</b> [msg] <b>/back</b> — yellow name + optional away note</li>'
       +     '<li><b>/dnd</b> [msg] — do-not-disturb toggle (wiki Chat)</li>'
       +     '<li><b>/bleepall</b> — hide/unhide all room items for you (session)</li>'
-      +     '<li><b>/action</b> <i>name</i> · <b>/state</b> <i>name</i> — avatar stubs (Coming Soon)</li>'
+      +     '<li><b>/action</b> <i>name</i> (/ac) — play emote (bare opens menu) · <b>/state</b>|/st Coming Soon</li>'
+      +     '<li><b>/msg</b>|/tell|/w <i>name</i> [text] — open whisper / send PM</li>'
       +   '</ul></div></div>';
   }
   function runCommand(cmd) {
@@ -6583,12 +6587,17 @@
     if (p.you) {
       // How this works (20260906ak): Change avatar… → recent 5 + tofu + Stuff list (classic).
       // How this works (?v=20260906at): room self-menu — Profile, Change avatar, Emotes/actions.
+      // How this works (?v=20260906bn): self menu Away/Back mirrors wiki /away /back (yellow name).
+      var selfAway = !!(id && isAway(id));
       menu = '<div class="occ-menu" role="menu">'
         + '<button type="button" class="occ-menu-item" data-profile="' + esc(id) + '">View Profile</button>'
         + '<button type="button" class="occ-menu-item" data-me="profile">Edit profile</button>'
         + changeAvatarMenuHtml()
         + '<div class="occ-menu-sep" aria-hidden="true"></div>'
         + '<button type="button" class="occ-menu-item" data-open-avatar-emotes="1">Emotes / actions…</button>'
+        + (selfAway
+          ? '<button type="button" class="occ-menu-item" data-self-back="1" title="/back">I\'m back</button>'
+          : '<button type="button" class="occ-menu-item" data-self-away="1" title="/away">Set away…</button>')
         + '<button type="button" class="occ-menu-item" data-room-menu="decorate">Decorate Room…</button>'
         + '</div>';
     } else {
@@ -6638,6 +6647,7 @@
     // How this works (?v=20260906bj): /dnd and /away both drive yellow; rail can be hidden via Chat options.
     // How this works (?v=20260906bk): local idle (~2 min) drives gray Zzz; white = pets (Coming Soon).
     // How this works (?v=20260906bm): AVR icon-over-name Coming Soon (wiki Room); peach clone stub stays.
+    // How this works (?v=20260906bn): Club Whirled ★ before name — Coming Soon (wiki Room; see MEMBERSHIP.md).
     // Beginner: peach = logged-out greeting clone (classic under development) — Coming Soon here.
     return '<div class="occ-legend" title="Presence + classic name colors">'
       + '<span><i class="lg green"></i> Here</span>'
@@ -6647,6 +6657,7 @@
       + '<span title="Pets use white names in classic Whirled — Coming Soon"><i class="lg white"></i> Pet <span class="soon-tag">Soon</span></span>'
       + '<span title="Logged-out greeting clone — Coming Soon"><i class="lg peach"></i> Clone <span class="soon-tag">Soon</span></span>'
       + '<span title="AVR game icon over name — Coming Soon (wiki Room)"><i class="lg avr"></i> AVR <span class="soon-tag">Soon</span></span>'
+      + '<span title="Club Whirled star before name — Coming Soon (wiki Room)"><i class="lg club"></i> Club ★ <span class="soon-tag">Soon</span></span>'
       + '</div>';
   }
   function occupantRailHtml(here) {
@@ -11979,7 +11990,8 @@
         "/broadcast <msg> — highlighted (coins)",
         "/away|/afk [msg] · /dnd [msg] · /back — yellow name",
         "/bleepall — hide all room items (you)",
-        "/action <name> · /state|/st <name> — avatar stubs",
+        "/action|/ac [name] — emote (bare = menu) · /state|/st Coming Soon",
+        "/msg|/tell|/w <name> [text] — whisper",
         "/clear — clear active chat tab"
       ];
       if (helpTopic === "away" || helpTopic === "afk") {
@@ -11991,13 +12003,15 @@
       } else if (helpTopic === "broadcast") {
         helpLines = ["/broadcast <msg> — room-wide highlight; escalating coin cost (earn-only)."];
       } else if (helpTopic === "action" || helpTopic === "ac") {
-        helpLines = ["/action <name> (/ac) — trigger avatar action. Full AvatarControl Coming Soon."];
+        helpLines = ["/action|/ac [name] — play worn emote (prefix ok). Bare /action opens Emotes menu. /state still Coming Soon."];
       } else if (helpTopic === "state" || helpTopic === "st") {
         helpLines = ["/state <name> (/st) — avatar state change. Full AvatarControl Coming Soon."];
       } else if (helpTopic === "speak" || helpTopic === "sp" || helpTopic === "think" || helpTopic === "th" || helpTopic === "shout" || helpTopic === "sh") {
         helpLines = ["/speak|/think|/shout (or /sp /th /sh) — with text sends in that mode; alone switches the Speak button."];
       } else if (helpTopic === "me" || helpTopic === "emote" || helpTopic === "em" || helpTopic === "e") {
         helpLines = ["/me <text> (/emote /em /e) — emote line: YourName text"];
+      } else if (helpTopic === "msg" || helpTopic === "tell" || helpTopic === "w" || helpTopic === "whisper") {
+        helpLines = ["/msg|/tell|/w <name> [message] — open private tab; with text, send whisper."];
       }
       pushSystemChat(helpLines.join(" · "), { ephemeral: true });
       return;
@@ -12065,10 +12079,134 @@
       refreshChatLog();
       return;
     }
+
+    if (/^\/(msg|tell|w)\b/i.test(text)) {
+      // How this works (?v=20260906bn): wiki-adjacent whisper aliases — open PM tab / send private line.
+      // Beginner: /w Name hello · /msg Name · /tell Name hi — resolves occupants + friends by name/id.
+      var wBody = text.replace(/^\/(msg|tell|w)\s*/i, "").trim();
+      if (!wBody) {
+        pushSystemChat("Usage: /msg|/tell|/w <name> [message]", { ephemeral: true });
+        return;
+      }
+      var wParts = wBody.split(/\s+/);
+      var wNameQ = wParts.shift();
+      var wMsg = wParts.join(" ").trim();
+      function resolveWhisperTarget(q) {
+        q = String(q || "").trim().toLowerCase();
+        if (!q) return null;
+        var pool = [];
+        try { (liveOccupants || []).forEach(function (p) { if (p && p.id) pool.push(p); }); } catch (eO) {}
+        try {
+          (loadFriends() || []).forEach(function (f) {
+            if (!f || !f.id) return;
+            if (!pool.some(function (p) { return String(p.id) === String(f.id); })) pool.push(f);
+          });
+        } catch (eF) {}
+        var exact = null, prefix = [];
+        pool.forEach(function (p) {
+          var nm = String(p.name || "").toLowerCase();
+          var id = String(p.id || "").toLowerCase();
+          if (id === q || nm === q) exact = p;
+          else if (nm.indexOf(q) === 0 || id.indexOf(q) === 0) prefix.push(p);
+        });
+        if (exact) return exact;
+        if (prefix.length === 1) return prefix[0];
+        if (prefix.length > 1) return { ambiguous: prefix };
+        return null;
+      }
+      var tgt = resolveWhisperTarget(wNameQ);
+      if (tgt && tgt.ambiguous) {
+        pushSystemChat("Ambiguous name — try: " + tgt.ambiguous.map(function (p) { return p.name || p.id; }).join(", "), { ephemeral: true });
+        return;
+      }
+      if (!tgt || !tgt.id) {
+        pushSystemChat("No player matching \"" + wNameQ + "\" in this room or friends.", { ephemeral: true });
+        return;
+      }
+      var sidW = session() && session().user ? session().user.id : "";
+      if (sidW && String(tgt.id) === String(sidW)) {
+        pushSystemChat("You cannot whisper yourself.", { ephemeral: true });
+        return;
+      }
+      openPmTab(tgt.id, tgt.name || tgt.id);
+      if (wMsg) {
+        // Re-enter pushChat as if on PM tab with the message body.
+        try { refreshChatLog(); } catch (eR) {}
+        // Inline send on PM (mirror pushChat PM path lightly)
+        var sW = session();
+        var msgW = {
+          id: "pm" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+          who: sW && sW.user ? sW.user.name : "Guest",
+          userId: sW && sW.user ? sW.user.id : "guest",
+          text: String(wMsg).slice(0, 240),
+          at: new Date().toISOString(),
+          pm: true
+        };
+        var pmListW = loadPmChat(tgt.id);
+        pmListW.push(msgW);
+        savePmChat(tgt.id, pmListW);
+        if (isAway(tgt.id)) {
+          var awayNoteW = "";
+          try { awayNoteW = getAwayMessage(tgt.id) || ""; } catch (eAnW) {}
+          pmListW.push({
+            id: "sys" + Date.now(),
+            system: true,
+            text: awayNoteW
+              ? ('(auto-reply) They are away: "' + String(awayNoteW).slice(0, 120) + '"')
+              : "(auto-reply) They are away right now.",
+            at: new Date().toISOString()
+          });
+          savePmChat(tgt.id, pmListW);
+        }
+        try { awardAction("chat"); } catch (eAwW) {}
+      }
+      try { refreshChatLog(); } catch (eR2) {}
+      pushNotice("blue", "Whisper: " + (tgt.name || tgt.id), { transient: true });
+      return;
+    }
     if (/^\/(action|ac)\b/i.test(text)) {
-      var actName = text.replace(/^\/(action|ac)\s*/i, "").trim() || "wave";
-      pushSystemChat("Action “" + actName + "” — Coming Soon (AvatarControl / engine).", { ephemeral: true });
-      pushNotice("orange", "Avatar /action — Coming Soon.", { transient: true });
+      // How this works (?v=20260906bn): wiki /action (/ac) — play worn PNG emote or chrome/Ruffle emote.
+      // Beginner: bare /action opens the Emotes menu; prefix match (e.g. /ac w → wave) like classic.
+      var actRaw = text.replace(/^\/(action|ac)\s*/i, "").trim();
+      if (!actRaw) {
+        try {
+          var billAc = document.querySelector("#avatar-wear-layer .avatar-wear-billboard")
+            || document.getElementById("avatar-wear-layer");
+          if (billAc) openAvatarEmoteMenu(billAc);
+          else pushSystemChat("Emotes menu — Wear an avatar first, or tap your loft avatar.", { ephemeral: true });
+        } catch (eAcOpen) {
+          pushSystemChat("Could not open emotes menu.", { ephemeral: true });
+        }
+        return;
+      }
+      var actQ = actRaw.toLowerCase();
+      var knownActs = ["wave", "dance", "sit", "happy", "pose", "stand"];
+      var wornAc = null;
+      try { wornAc = loadWornAvatar(); } catch (eW) {}
+      var listed = [];
+      try { listed = listAvatarEmotes(wornAc) || []; } catch (eL) {}
+      var keysAc = listed.length ? listed.map(function (e) { return e.key; }) : knownActs.slice();
+      var actName = "";
+      if (keysAc.indexOf(actQ) >= 0) actName = actQ;
+      else {
+        var hitsAc = keysAc.filter(function (k) { return k.indexOf(actQ) === 0; });
+        if (hitsAc.length === 1) actName = hitsAc[0];
+        else if (hitsAc.length > 1) {
+          pushSystemChat("Ambiguous /action \"" + actRaw + "\" — try: " + hitsAc.join(", "), { ephemeral: true });
+          return;
+        } else actName = actQ;
+      }
+      var played = false;
+      try { played = !!playAvatarEmote(actName); } catch (ePlay) { played = false; }
+      if (!played) {
+        try { played = !!playClassicChromeEmote(actName); } catch (eCh) { played = false; }
+      }
+      if (played) {
+        pushSystemChat("Action: " + actName, { ephemeral: true });
+      } else {
+        pushSystemChat("Action \"" + actName + "\" — no matching emote on this avatar (try /action with no args).", { ephemeral: true });
+        pushNotice("orange", "Avatar /action — no match.", { transient: true });
+      }
       return;
     }
     if (/^\/(state|st)(?:\s|$)/i.test(text)) {
@@ -14029,6 +14167,25 @@
       var cnmC = document.getElementById("chat-name-menu");
       if (cnmC) cnmC.remove();
       pushNotice("orange", "Complain / report — Coming Soon. No fake moderation queue yet.", { transient: true });
+      return;
+    }
+    // How this works (?v=20260906bn): self occ-menu Away / Back (wiki /away /back).
+    if (ev.target.closest("[data-self-away]") && session()) {
+      setAway(true, "");
+      pushSystemChat('You are now away: "I\'m away from the keyboard." (Yellow name)');
+      pushNotice("yellow", "Away on.", { transient: true });
+      occMenuId = null;
+      try { refreshOccupantRail(); } catch (eSa) {}
+      try { refreshChatLog(); } catch (eSa2) {}
+      return;
+    }
+    if (ev.target.closest("[data-self-back]") && session()) {
+      setAway(false);
+      pushSystemChat("You are back.");
+      pushNotice("blue", "Back.", { transient: true });
+      occMenuId = null;
+      try { refreshOccupantRail(); } catch (eSb) {}
+      try { refreshChatLog(); } catch (eSb2) {}
       return;
     }
     if (ev.target.closest("[data-open-avatar-emotes]") && session()) {

@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bn)
+
+- **Club gaps + polish (after bm):** wiki **/action|/ac** plays PNG or chrome/Ruffle emotes (prefix match; bare opens Emotes menu); **/msg|/tell|/w** whisper aliases; **Club ★** name-color legend stub; self occ-menu **Away/Back**; shortcuts/help refreshed
+- **Preserve:** bl/bm Flash loft interact (`classic-avatar.js` UNTOUCHED), bg dual Wear cards, bk idle Zzz /e /em /state Boot, bj /dnd /bleepall /occupants, bi/bh/bf/bc, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bn`**. Push: `/tmp/push-bn.js` (dry-run default).
+
 ## What shipped (?v=20260906bm)
 
 - **Club gaps + polish (after bl):** wiki **/st** alias for /state; bare **/speak|/think|/shout** (and /sp /th /sh) switch compose mode; **Room Zoom** local CSS slider on `.stage-host`; **Snapshot** Coming Soon preview modal; Parties **Follow host** Coming Soon; hangout batch invite → **blue** notice; **AVR** name-color legend stub

@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bm` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bn` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,19 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bm`)
+## Closed this pass (`?v=20260906bn`)
+
+| Item | Notes |
+|------|--------|
+| /action /ac live | Prefix match → playAvatarEmote or chrome/Ruffle emote; bare opens Emotes menu |
+| /msg /tell /w | Whisper aliases — open PM + optional send; occupant/friend name resolve |
+| Club ★ legend | Wiki Room Club Whirled star — Coming Soon swatch (MEMBERSHIP.md) |
+| Self Away/Back | Occupant self-menu toggles yellow name (wiki /away /back) |
+| Preserve | bl/bm Flash loft interact (`classic-avatar.js` untouched); bg dual Wear; bk–bj club; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bm`)
 
 | Item | Notes |
 |------|--------|
