@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bc";
+  var LOGO_V = "20260906bd";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1405,7 +1405,11 @@
   // How this works (?v=20260906ba): decorate inventory filter + snap grid (wiki Furniture edit polish).
   // Beginner: filter Your Stuff by kind; Snap aligns chips to an 8px grid when you drop them.
   var decorateInvFilter = "all"; // all | furniture | backdrops | toys | images
-  var decorateSnapGrid = true;
+  // How this works (?v=20260906bd): snap preference persists so decorate polish survives reloads.
+  // Beginner: Snap to 8px grid keeps furniture tidy; turn off for free placement.
+  var decorateSnapGrid = (function () {
+    try { return localStorage.getItem("whirled2.decorateSnap") !== "0"; } catch (e) { return true; }
+  })();
   var doorGlowPreview = false; // Room menu → View clickable furniture (green door glow)
   var makeDoorPanelOpen = false; // side panel when linking/creating via a door chip
   var partyPanelOpen = false;
@@ -1715,6 +1719,86 @@
     var w = loadWornAvatar();
     return !!(w && w.stuffId === id);
   }
+  // How this works (?v=20260906bd): crystal-clear playback mode for loft + Stuff + debug.
+  // Beginner: if you see the avatar walking and Wear Whirl/Hybrid PNGs, that motion is PNG sprites — NOT Ruffle.
+  // Ruffle only mounts when the loft actually has #avatar-ruffle-host for a .swf appearance.
+  // ENGINE DEV: WhirledChrome.getAvatarPlaybackMode() → 'png-hybrid' | 'ruffle' | 'tofu' | 'png'.
+  function isWhirlAvatarItem(item) {
+    if (!item) return false;
+    var slug = String(item.slug || (item.pack && item.pack.slug) || "");
+    var path = String(item.packPath || "");
+    var name = String(item.name || "");
+    return slug === "cyan-hair" || /cyan-hair/i.test(path) || /^whirl$/i.test(name.trim());
+  }
+  function itemHasRealPngWalk(item) {
+    if (!item) return false;
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasPngWalk) {
+        if (WhirledClassicAvatar.itemHasPngWalk(item)) return true;
+      }
+    } catch (e) {}
+    if (item.frames && item.frames.length) return true;
+    if (item.states && item.states.idle && item.states.idle.frames && item.states.idle.frames.length) return true;
+    if (item.states && item.states.walk && item.states.walk.frames && item.states.walk.frames.length) return true;
+    if (item.pack && item.pack.states) {
+      var ps = item.pack.states;
+      if (ps.idle && ps.idle.frames && ps.idle.frames.length) return true;
+      if (ps.walk && ps.walk.frames && ps.walk.frames.length) return true;
+    }
+    return false;
+  }
+  function getAvatarPlaybackMode(wornOpt) {
+    // Returns: tofu | ruffle | png-hybrid | png
+    var worn = wornOpt;
+    if (!worn) {
+      try { worn = loadWornAvatar(); } catch (e) { worn = null; }
+    }
+    if (!worn) worn = makeTofuWornRow();
+    if (worn.isTofu || worn.stuffId === TOFU_AVATAR_ID || worn.source === "tofu") return "tofu";
+    var isSwf = !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf" || worn.kind === "swf");
+    var wantsClassic = !!(worn.classicFlashOptIn || worn.useClassicFlash
+      || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemWantsClassicFlash && WhirledClassicAvatar.itemWantsClassicFlash(worn)));
+    var forceRuffleLoft = !!(worn.forceRuffleInLoft
+      || (window.WhirledClassicAvatar && WhirledClassicAvatar.forceRuffleInLoft && WhirledClassicAvatar.forceRuffleInLoft(worn)));
+    var hasPng = itemHasRealPngWalk(worn);
+    // Ruffle actually mounts only when Force Ruffle OR SWF-only (no PNG walk).
+    if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && (!hasPng || forceRuffleLoft)) {
+      return "ruffle";
+    }
+    if (hasPng) return (isSwf || wantsClassic) ? "png-hybrid" : "png";
+    if (isSwf || wantsClassic) return "ruffle";
+    return "png";
+  }
+  function avatarPlaybackBadgeHtml(mode, item) {
+    // Crystal-clear loft / Stuff labels (?v=20260906bd) — UI, not only docs.
+    mode = mode || "png";
+    var whirl = isWhirlAvatarItem(item);
+    if (mode === "tofu") {
+      return '<span class="avatar-playback-badge is-tofu" title="Default tofu — no Ruffle">Tofu · no Ruffle</span>';
+    }
+    if (mode === "ruffle") {
+      return '<span class="avatar-playback-badge is-ruffle" title="Ruffle WASM Flash emulator is mounted for this .swf">Appearance: Ruffle (SWF)</span>';
+    }
+    if (whirl || (item && /^whirl$/i.test(String(item.name || "").trim()))) {
+      return '<span class="avatar-playback-badge is-png" title="Whirl starter — PNG/WebP spritesheets in HTML/CSS/JS. Ruffle is NOT involved.">Whirl · PNG</span>';
+    }
+    if (mode === "png-hybrid") {
+      return '<span class="avatar-playback-badge is-png-hybrid" title="Walking uses PNG frames. Ruffle is NOT running in the loft (unless Force Ruffle).">Walking: PNG hybrid (no Ruffle)</span>';
+    }
+    return '<span class="avatar-playback-badge is-png" title="PNG/WebP sprite walk in chrome — Ruffle not involved.">Walking: PNG (no Ruffle)</span>';
+  }
+  function stuffPlaybackModeLabel(item) {
+    // Stuff Wear card / viewer — same vocabulary as loft badge.
+    if (!item) return "";
+    var mode = getAvatarPlaybackMode(item);
+    var whirl = isWhirlAvatarItem(item);
+    if (mode === "ruffle") return '<span class="stuff-playback-label is-ruffle">Wear mode: Ruffle SWF</span>';
+    if (whirl) return '<span class="stuff-playback-label is-png">Wear mode: Whirl · PNG walk (no Ruffle)</span>';
+    if (mode === "png-hybrid") return '<span class="stuff-playback-label is-png-hybrid">Wear mode: Hybrid (PNG walk) — Ruffle not for loft walk</span>';
+    if (itemHasRealPngWalk(item)) return '<span class="stuff-playback-label is-png">Wear mode: Hybrid (PNG walk)</span>';
+    return '<span class="stuff-playback-label is-png">Wear mode: PNG sprites</span>';
+  }
+
   function avatarWearLayerHtml() {
     // How this works: billboard sprite in the room chrome (like item in your space).
     // Beginner: if nothing Worn yet, show classic default tofu so the loft isn’t empty.
@@ -1759,18 +1843,20 @@
     // SWF-only (no real PNG walk): transparent Ruffle host; pointer-events none; chrome moves + bob.
     if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && !hasPngFrames) {
       var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
-      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle">'
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle" data-playback="ruffle">'
         + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
         +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" title="Ruffle experimental — transparent; floor click moves you"></div>'
         +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar")
-        +   ' <span class="classic-exp-badge">Experimental</span></div>'
+        +   ' <span class="classic-exp-badge">Experimental</span> '
+        +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
         + '</div></div>';
     }
     if (isTofu) {
-      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Default tofu avatar">'
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Default tofu avatar" data-loft-mode="tofu" data-playback="tofu">'
         + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
         +   tofuSvgHtml("tofu-avatar tofu-wear")
-        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Tofu") + '</div>'
+        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Tofu") + ' '
+        +   avatarPlaybackBadgeHtml("tofu", worn) + '</div>'
         + '</div></div>';
     }
     worn = normalizeWornAvatar(worn) || worn;
@@ -1785,11 +1871,12 @@
       // Never show broken tofu when a classic SWF is worn — fall back to transparent Ruffle.
       if ((worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && (isSwf || wantsClassic || worn.classicFlashOptIn)) {
         var swfAttr2 = esc(worn.swfUrl || worn.swfDataUrl || "");
-        return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr2 + '" data-loft-mode="ruffle">'
+        return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr2 + '" data-loft-mode="ruffle" data-playback="ruffle">'
           + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
           +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr2 + '" title="Ruffle experimental — transparent; floor click moves you"></div>'
           +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar")
-          +   ' <span class="classic-exp-badge">Experimental</span></div>'
+          +   ' <span class="classic-exp-badge">Experimental</span> '
+          +   avatarPlaybackBadgeHtml("ruffle", worn) + '</div>'
           + '</div></div>';
       }
       // Last resort: show tofu instead of an empty invisible layer (PNG packs only).
@@ -1833,10 +1920,17 @@
     var layerClass = "avatar-wear-layer is-on"
       + (loftMode === "hybrid" ? " is-swf-hybrid is-hybrid-smooth" : "")
       + (classicSlot ? " is-swf-hybrid" : "");
-    var plateExtra = loftMode === "hybrid"
-      ? (' ' + (hybridBadge || '<span class="classic-hybrid-badge">Hybrid (smooth)</span>'))
-      : (classicSlot ? ' <span class="classic-exp-badge">Experimental</span>' : "");
-    return '<div id="avatar-wear-layer" class="' + layerClass + '" aria-label="Worn avatar" data-loft-mode="' + loftMode + '">'
+    // How this works (?v=20260906bd): nameplate always states PNG vs Ruffle so walk ≠ Flash confusion.
+    // Beginner: Whirl / Hybrid PNG walk → "Whirl · PNG" / "Walking: PNG hybrid (no Ruffle)". Ruffle badge only if mounted.
+    var playMode = "png";
+    if (loftMode === "ruffle") playMode = "ruffle";
+    else if (loftMode === "hybrid") playMode = "png-hybrid";
+    else if (isWhirlAvatarItem(worn)) playMode = "png";
+    else if (hasPngFrames) playMode = "png";
+    var clearBadge = avatarPlaybackBadgeHtml(playMode, worn);
+    var plateExtra = " " + clearBadge
+      + (loftMode === "ruffle" ? ' <span class="classic-exp-badge">Experimental</span>' : "");
+    return '<div id="avatar-wear-layer" class="' + layerClass + '" aria-label="Worn avatar" data-loft-mode="' + loftMode + '" data-playback="' + playMode + '">'
       + '<div class="avatar-wear-billboard" data-avatar-hit="1"' + meta + ' style="' + posStyle + '">'
       +   classicSlot
       +   '<img class="avatar-wear-sprite" src="' + src0 + '" alt="' + esc(worn.name || "Avatar") + '" />'
@@ -2398,10 +2492,12 @@
       +     loftBackdropHtml({ subtle: true })
       +     '<div class="avatar-viewer-billboard"' + meta + ' style="--avatar-scale:' + scale + '">'
       +       sprite
-      +       '<div class="avatar-viewer-nameplate">' + esc(item.name || "Avatar") + '</div>'
+      +       '<div class="avatar-viewer-nameplate">' + esc(item.name || "Avatar") + ' '
+      +         avatarPlaybackBadgeHtml(getAvatarPlaybackMode(item), item) + '</div>'
       +     '</div>'
       +   '</div>'
       +   '<div class="avatar-viewer-toolbar">'
+      +     stuffPlaybackModeLabel(item)
       +     '<label class="avatar-scale-label" title="Scale (classic diagonal-arrow control)">'
       +       '<span class="avatar-scale-ico" aria-hidden="true">'
       +         '<svg viewBox="0 0 24 24" width="18" height="18" focusable="false">'
@@ -2416,8 +2512,8 @@
       +       wearBtn
       +       '<button type="button" class="text-btn" data-avatar-states-soon="1" title="Classic SWF states — Coming Soon">States / actions…</button>'
       +     '</div>'
-      +     '<p class="meta avatar-viewer-note">Preview play flips sprite-pack frames when available. '
-      +       'Classic Flash: enable <b>Classic Flash avatar (experimental)</b> on the item for Ruffle preview — full AvatarControl states Coming Soon.</p>'
+      +     '<p class="meta avatar-viewer-note">Preview play flips <b>PNG spritesheets</b> in HTML/JS when available — that is <b>not</b> Ruffle. '
+      +       'Ruffle only loads for .swf preview / Force Ruffle / SWF-only Wear. Full AvatarControl states Coming Soon.</p>'
       +   '</div>'
       +   (function () {
             try {
@@ -4626,7 +4722,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc + bd) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4635,7 +4731,10 @@
       "• Dev Hub (?page=dev), Make Door / Drop Door, passport seals",
       "• ba/bc: real Groups forum + Admin panel + /broadcast (escalating coins)",
       "• bc QA: fixed occupant NaN names (QA AxNaNNaN → QA Ax) via sanitize/heal",
-      "• bc on top of bb Flash walk/tofu (classic-avatar.js preserved)",
+      "• bd: decorate tool handlers (filter/snap/scale/z/dup/nudge/flip), friends search matchWhy,",
+      "  room-lock strip + preview blurbs, Groups theme + manager thread flags, passport group medals,",
+      "  mobile immersive Enter from Room menu",
+      "• classic-avatar.js preserved (bb Flash walk/tofu)",
       "",
       "See STATUS.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md for details.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -4767,15 +4866,18 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Groups forum (threads/replies) + seeded Whirled2 Developers\n"
-        + "• Admin panel (Me → Admin / header) — Make/Remove admin\n"
-        + "• /broadcast escalating coins (wiki Bars → Whirled2 coins)\n"
-        + "• Occupant NaN name heal\n"
-        + "• Flash without plugin: see Flash / avatars thread + HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md\n"
-        + "Preserve: Hybrid Flash path, Whirl, chat visit-since, pale-blue az chrome.",
+        + "• Decorate polish: filter/snap/scale/z/duplicate/nudge/flip handlers wired (wiki Furniture)\n"
+        + "• Friends search: email/real name/interests + matchWhy badge\n"
+        + "• Room lock: strip badge + preview who-can-enter; Room menu immersive Enter\n"
+        + "• Groups: accent theme form + manager sticky/announce/lock; join → passport\n"
+        + "• Passport: group medals from joined groups + Room Guardian / Group Joiner stamps\n"
+        + "• UX clarity: loft/Stuff badges — Walking: PNG hybrid (no Ruffle) vs Appearance: Ruffle (SWF); Whirl · PNG\n"
+        + "• Debug: WhirledChrome.getAvatarPlaybackMode() → png-hybrid | ruffle | tofu | png\n"
+        + "Preserve: bc Groups/Admin/broadcast/NaN, bb Flash hybrid, Whirl, chat visit-since, pale-blue, earn-only.",
       at: new Date().toISOString()
     });
-    if (!updates.body || updates.body.indexOf("ba:") < 0) updates.body = overnightChangelogBody();
+    // How this works (?v=20260906bd): refresh sticky OP body so Developers see the full overnight list.
+    updates.body = overnightChangelogBody();
     saveGroupThreads(g.id, threads);
   }
   // ---------------------------------------------------------------------------
@@ -5018,7 +5120,11 @@
     { id: "door_builder", cat: "create", name: "Door Builder", tip: "Make a door linking two rooms.", action: "makeDoor", need: 1, goTab: "rooms", goEnter: true, goDecorate: true },
     { id: "room_hopper", cat: "play", name: "Room Hopper", tip: "Travel through a door to another room.", action: "doorTravel", need: 1, goTab: "rooms", goEnter: true },
     { id: "shop_lister", cat: "shop", name: "Shop Lister", tip: "List an item in the Shop.", action: "shopList", need: 1, goTab: "stuff" },
-    { id: "window_shopper", cat: "shop", name: "Window Shopper", tip: "Open a shop item detail.", action: "shopView", need: 1, goTab: "shop" }
+    { id: "window_shopper", cat: "shop", name: "Window Shopper", tip: "Open a shop item detail.", action: "shopView", need: 1, goTab: "shop" },
+    // How this works (?v=20260906bd): wiki-ish passport extras — Groups + Room lock (earn-only coins).
+    // Beginner: Join a group or set Friends/Locked on a room you own to earn these seals.
+    { id: "group_joiner", cat: "mingle", name: "Group Joiner", tip: "Join a group discussion club.", action: "groupJoin", need: 1, goTab: "groups" },
+    { id: "room_guardian", cat: "play", name: "Room Guardian", tip: "Set a room lock to Friends or Locked.", action: "roomLock", need: 1, goTab: "rooms", goEnter: true }
   ];
   function loadPassport(userId) {
     try {
@@ -6964,7 +7070,9 @@
         + '<button type="button" class="action-btn danger" data-stuff-delete="' + esc(item.id) + '">Delete Item</button>'
         + '</div>'
         + (isAvatar
-          ? ('<p class="meta">Wear → loft <code>#avatar-wear-layer</code>. Hybrid (smooth) = PNG walk when idle/walk attached; Force Ruffle = SWF appearance (transparent, no black box). Scale applies to preview + loft.</p>'
+          ? ('<p class="meta">Wear → loft <code>#avatar-wear-layer</code>. <b>If it walks after Wear Whirl/Hybrid PNGs, that motion is PNG sprites — Ruffle is NOT involved.</b> '
+            + 'Hybrid (PNG walk) = default. Force Ruffle = SWF appearance only (transparent). Scale applies to preview + loft.</p>'
+            + stuffPlaybackModeLabel(item)
             + '<div class="stuff-detail-actions">'
             +   '<button type="button" class="action-btn" data-avatar-wiz-remap="' + esc(item.id) + '">Remap states…</button>'
             +   '<button type="button" class="text-btn" data-avatar-guide-open="1">How to make an avatar</button>'
@@ -7443,10 +7551,18 @@
     var threadList = threads.length
       ? '<ul class="thread-list">' + threads.map(function (th) {
           var flags = (th.sticky ? "📌 " : "") + (th.announce ? "📢 " : "") + (th.locked ? "🔒 " : "");
-          return '<li class="thread-row">'
+          var mgrTools = isMgr
+            ? (' <span class="group-thread-mgr">'
+              + '<button type="button" class="text-btn" data-group-thread-flag="sticky" data-group-open="' + esc(g.id) + '" data-group-thread="' + esc(th.id) + '" title="Toggle sticky">' + (th.sticky ? "Unpin" : "Pin") + '</button>'
+              + '<button type="button" class="text-btn" data-group-thread-flag="announce" data-group-open="' + esc(g.id) + '" data-group-thread="' + esc(th.id) + '" title="Toggle announcement">' + (th.announce ? "Unannounce" : "Announce") + '</button>'
+              + '<button type="button" class="text-btn" data-group-thread-flag="locked" data-group-open="' + esc(g.id) + '" data-group-thread="' + esc(th.id) + '" title="Toggle lock">' + (th.locked ? "Unlock" : "Lock") + '</button>'
+              + '</span>')
+            : "";
+          return '<li class="thread-row' + (th.sticky || th.announce ? " is-flagged" : "") + '">'
             + '<button type="button" class="text-btn thread-title-btn" data-group-thread="' + esc(th.id) + '" data-group-open="' + esc(g.id) + '">'
             + flags + '<b>' + esc(th.title) + '</b></button>'
-            + ' <span class="meta">by ' + esc(th.who || "") + ' · ' + ((th.replies && th.replies.length) || 0) + ' replies</span></li>';
+            + ' <span class="meta">by ' + esc(th.who || "") + ' · ' + ((th.replies && th.replies.length) || 0) + ' replies</span>'
+            + mgrTools + '</li>';
         }).join("") + '</ul>'
       : '<p class="meta">No threads match. Start a discussion below.</p>';
     var joinBtn = isMember
@@ -7476,6 +7592,13 @@
       + '</div>'
       + adminTools
       + '<p class="meta">Enter hall opens Rooms / Studio Loft (shared whirled halls later). Wiki: discussion forum + hall.</p>'
+      + (isMgr
+        ? ('<div class="panel group-theme-panel"><div class="section-label">Group look (local)</div>'
+          + '<p class="meta">Tint this group home on your browser. Themed Whirled shop branding stays Coming Soon — no fake catalog.</p>'
+          + '<form id="group-theme-form" class="group-theme-form" data-group-theme="' + esc(g.id) + '">'
+          +   '<label>Accent <input type="color" name="hex" value="' + esc((gTheme.hex) || "#1e6fa8") + '" /></label>'
+          +   '<button type="submit" class="action-btn">Save accent</button></form></div>')
+        : '')
       + '<div class="section-label">Members (' + members.length + ')</div>'
       + '<div class="panel">' + memberRows + '</div>'
       + '<div class="section-label">Discussion forum</div>'
@@ -7647,6 +7770,11 @@
       +     '<h3 class="room-preview-name">' + roomLockGlyphHtml(mode) + ' ' + esc(room.name || ROOM) + '</h3>'
       +     '<p class="meta">owner: <b>' + esc(ownerName) + '</b>' + (room.blurb ? (" · " + esc(room.blurb)) : (roomId === "loft" ? " · home whirled" : "")) + '</p>'
       +     '<p class="meta">Lock: <b>' + esc(lockLabel) + '</b> · ' + esc(rating) + ' · ' + online + ' online</p>'
+      +     '<p class="meta room-preview-lock-blurb">' + (mode === "unlocked"
+          ? "Anyone on this browser may Enter."
+          : (mode === "friends"
+            ? "Friends of the owner (plus the owner) may Enter — others see a lock notice."
+            : "Only the room owner may Enter.")) + '</p>'
       +     '<div class="section-label">People here</div>'
       +     people
       +     nowPlaying
@@ -7796,8 +7924,9 @@
     return all.filter(function (it) { return allow[itemCat(it)]; });
   }
   function decorateChipHtml(it) {
-    // How this works (?v=20260906ba): chips show green door badge; optional scale + z-index (furniture polish).
-    // Beginner: decorate mode = drag/select/scale; outside = only doors capture clicks (travel).
+    // How this works (?v=20260906bd): chips show green door badge; scale + z + optional flipX (furniture polish).
+    // Beginner: decorate mode = drag/select/scale/flip; outside = only doors capture clicks (travel).
+    // ENGINE DEV: #decorate-layer sibling of #stage-slot — transform is CSS only, not Pixi.
     var x = Number(it.x) || 40;
     var y = Number(it.y) || 40;
     var scale = Number(it.scale);
@@ -7805,6 +7934,7 @@
     scale = Math.max(0.5, Math.min(2.5, scale));
     var z = Number(it.z);
     if (!isFinite(z)) z = 1;
+    var flipX = !!it.flipX;
     var isDoor = !!(it.doorTo);
     var selected = decorateMode && selectedDecId && selectedDecId === it.id;
     var thumb = it.thumb
@@ -7813,12 +7943,15 @@
     var title = it.name || "item";
     if (isDoor) title = (it.doorLabel || title) + " — door → " + (it.doorLabel || it.doorTo);
     if (scale !== 1) title += " · " + Math.round(scale * 100) + "%";
+    if (flipX) title += " · flipped";
     var cls = "decorate-chip"
       + (isDoor ? " is-door" : "")
       + (selected ? " is-selected" : "")
-      + (doorGlowPreview && isDoor ? " is-glowing" : "");
+      + (doorGlowPreview && isDoor ? " is-glowing" : "")
+      + (flipX ? " is-flipped" : "");
+    var sx = (flipX ? -scale : scale);
     var style = "left:" + x + "px;top:" + y + "px;z-index:" + (10 + Math.round(z))
-      + ";transform:scale(" + scale + ");transform-origin:top left";
+      + ";transform:scale(" + sx + "," + scale + ");transform-origin:top left";
     return '<div class="' + cls + '" data-dec-id="' + esc(it.id) + '"'
       + (isDoor ? (' data-door-to="' + esc(it.doorTo) + '"') : "")
       + ' style="' + style + '" title="' + esc(title) + '" role="button" tabindex="0">'
@@ -7921,26 +8054,37 @@
     var selTools = "";
     if (selChip) {
       var sc2 = Number(selChip.scale); if (!(sc2 > 0)) sc2 = 1;
+      // How this works (?v=20260906bd): selected chip tools — scale, z-order, nudge, flip, duplicate.
+      // Beginner: pick a chip, then nudge with arrows or Flip to mirror art without re-uploading.
       selTools = '<div class="dec-sel-tools">'
-        + '<p class="meta dec-sel-hint">Selected: <b>' + esc(selChip.name || "Item") + '</b> — drag on stage, or use tools:</p>'
+        + '<p class="meta dec-sel-hint">Selected: <b>' + esc(selChip.name || "Item") + '</b>'
+        + (selChip.flipX ? ' · flipped' : '') + ' — drag on stage, or use tools:</p>'
         + '<div class="dec-tool-row">'
         +   '<button type="button" class="action-btn" data-dec-scale="-0.1" title="Smaller">−</button>'
         +   '<span class="meta">Scale ' + Math.round(sc2 * 100) + '%</span>'
         +   '<button type="button" class="action-btn" data-dec-scale="0.1" title="Bigger">+</button>'
         +   '<button type="button" class="text-btn" data-dec-z="front">Bring front</button>'
         +   '<button type="button" class="text-btn" data-dec-z="back">Send back</button>'
+        +   '<button type="button" class="text-btn" data-dec-flip="1" title="Mirror left/right">Flip</button>'
         +   '<button type="button" class="text-btn" data-dec-dup="1">Duplicate</button>'
+        + '</div>'
+        + '<div class="dec-tool-row dec-nudge-row" role="group" aria-label="Nudge">'
+        +   '<span class="meta">Nudge</span>'
+        +   '<button type="button" class="action-btn" data-dec-nudge="left" title="Left">←</button>'
+        +   '<button type="button" class="action-btn" data-dec-nudge="up" title="Up">↑</button>'
+        +   '<button type="button" class="action-btn" data-dec-nudge="down" title="Down">↓</button>'
+        +   '<button type="button" class="action-btn" data-dec-nudge="right" title="Right">→</button>'
         + '</div>'
         + '<button type="button" class="action-btn" data-open-make-door="1">Make Door…</button>'
         + '</div>';
     } else {
-      selTools = '<p class="meta">Tip: tap a chip on the stage (or a name below) to select it for scale / Make Door.</p>';
+      selTools = '<p class="meta">Tip: tap a chip on the stage (or a name below) to select it for scale / nudge / Flip / Make Door.</p>';
     }
     return '<div class="room-side-panel decorate-panel" id="decorate-panel">'
       + '<div class="panel">'
       +   '<div class="room-side-head"><h2>Decorate Room</h2>'
       +     '<button type="button" class="text-btn" data-decorate-close="1">Close</button></div>'
-      +   '<p class="meta">Wiki Furniture — filter Stuff, drag chips, snap to grid, scale. Select → <b>Make Door</b>. ENGINE DEV: layer sibling of #stage-slot.</p>'
+      +   '<p class="meta">Wiki Furniture (?v=20260906bd) — filter Stuff, drag chips, snap, scale, nudge, flip. Select → <b>Make Door</b>. ENGINE DEV: layer sibling of #stage-slot.</p>'
       +   '<label class="dec-snap-row"><input type="checkbox" data-dec-snap="1"' + (decorateSnapGrid ? " checked" : "") + ' /> Snap to 8px grid</label>'
       +   selTools
       +   '<div class="section-label">Your Stuff</div>'
@@ -9611,7 +9755,7 @@
     return Object.keys(map).map(function (k) { return map[k]; });
   }
   function searchPeople(q) {
-    // How this works (?v=20260906ba): match Whirled name, permaname/id, email, real name, or interests (wiki Friend).
+    // How this works (?v=20260906bd): match Whirled name, permaname/id, email, real name, interests, or status (wiki Friend).
     // Beginner: type any of those; results never invent players who are not already known on this browser.
     q = String(q || "").trim().toLowerCase();
     if (!q) return [];
@@ -9622,16 +9766,20 @@
       var email = String(p.email || "").toLowerCase();
       var real = String(p.realName || "").toLowerCase();
       var interests = String(p.interests || "").toLowerCase();
+      var status = "";
+      try { status = String(loadStatus(p.id) || "").toLowerCase(); } catch (eSt) {}
       var hit = name.indexOf(q) >= 0 || id.indexOf(q) >= 0
         || (email && email.indexOf(q) >= 0)
         || (real && real.indexOf(q) >= 0)
-        || (interests && interests.indexOf(q) >= 0);
+        || (interests && interests.indexOf(q) >= 0)
+        || (status && status.indexOf(q) >= 0);
       if (!hit) return false;
       // Annotate why it matched (UI hint) — not persisted.
       if (id === q || id.indexOf(q) === 0) p.matchWhy = "permaname";
       else if (email && email.indexOf(q) >= 0) p.matchWhy = "email";
       else if (real && real.indexOf(q) >= 0) p.matchWhy = "real name";
       else if (interests && interests.indexOf(q) >= 0) p.matchWhy = "interests";
+      else if (status && status.indexOf(q) >= 0) p.matchWhy = "status";
       else p.matchWhy = "name";
       return true;
     }).slice(0, 40);
@@ -9719,9 +9867,10 @@
     var results = searchPeople(friendSearchQ);
     var searchRows;
     if (!String(friendSearchQ || "").trim()) {
-      searchRows = '<p class="meta">Type a Whirled name or permaname (id). Results only include people in this session, your friends, or saved profiles — no invented players.</p>';
+      searchRows = '<p class="meta">Search by Whirled name, permaname, email, real name, interests, or status. '
+        + 'Results only include people on this browser (occupants / friends / known profiles / local accounts) — no invented players.</p>';
     } else if (!results.length) {
-      searchRows = '<p class="meta">No matches among occupants, friends, or known profiles.</p>';
+      searchRows = '<p class="meta">No matches for “' + esc(friendSearchQ) + '” among occupants, friends, known profiles, or local accounts.</p>';
     } else {
       searchRows = results.map(function (p) {
         var rel = friendRelation(p.id);
@@ -9736,11 +9885,17 @@
         } else {
           act = '<button type="button" class="action-btn" data-add-friend="' + esc(p.id) + '" data-friend-name="' + esc(p.name) + '">Invite</button>';
         }
+        var why = p.matchWhy ? ('<span class="friend-match-why" title="Matched field">via ' + esc(p.matchWhy) + '</span>') : "";
+        var extra = "";
+        if (p.matchWhy === "email" && p.email) extra = '<div class="meta">' + esc(p.email) + '</div>';
+        else if (p.matchWhy === "real name" && p.realName) extra = '<div class="meta">' + esc(p.realName) + '</div>';
+        else if (p.matchWhy === "interests" && p.interests) extra = '<div class="meta">' + esc(String(p.interests).slice(0, 80)) + '</div>';
         return '<div class="friend-list-row' + (p.online ? " is-online" : "") + '">'
           + '<span class="ava">' + esc(String(p.name || "?").slice(0, 1).toUpperCase()) + '</span>'
           + '<div class="friend-list-main">'
-          +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(p.id) + '"><b>' + esc(p.name) + '</b></button>' + roleBadgeHtml(getRole(p.id))
+          +   '<button type="button" class="text-btn friend-list-name" data-profile="' + esc(p.id) + '"><b>' + esc(p.name) + '</b></button>' + roleBadgeHtml(getRole(p.id)) + " " + why
           +   '<div class="meta">permaname ' + esc(p.id) + (p.online ? " · online" : "") + '</div>'
+          +   extra
           + '</div>'
           + '<div class="friend-list-actions">'
           +   act
@@ -9756,7 +9911,7 @@
       + (invitePanelOpen ? inviteThemPanel() : '')
       + '<div class="section-label">Search</div>'
       + '<form id="friend-search-form" class="friend-search-form">'
-      +   '<input name="q" maxlength="60" placeholder="Search by Whirled name or permaname" value="' + esc(friendSearchQ) + '" />'
+      +   '<input name="q" maxlength="60" placeholder="Name, permaname, email, real name, interests…" value="' + esc(friendSearchQ) + '" />'
       +   '<button type="submit">Search</button>'
       + '</form>'
       + '<div class="friend-search-results">' + searchRows + '</div>'
@@ -9860,8 +10015,25 @@
       +   '</div>'
       +   '<div class="passport-body">' + stampSections + '</div>'
       +   '<div class="cp-section"><h2>Group Medals</h2>'
-      +     '<p class="meta">No group medals yet. Medals appear when groups and shared whirleds go live.</p>'
-      +     '<button type="button" class="text-btn" data-tab="groups">Browse Groups</button>'
+      +     (function () {
+            try { ensureWhirled2DevGroup(); } catch (eGM) {}
+            var gs = loadGroups();
+            var meId = sid;
+            var joined = gs.filter(function (g) {
+              return (g.members || []).some(function (m) { return String(m.id) === String(meId); });
+            });
+            if (!joined.length) {
+              return '<p class="meta">No group medals yet — join a group to earn a local seal (not a fake shop medal).</p>'
+                + '<button type="button" class="text-btn" data-tab="groups">Browse Groups</button>';
+            }
+            return '<div class="group-medal-grid">' + joined.map(function (g) {
+              return '<div class="group-medal-seal medal-seal" title="Joined ' + esc(g.name) + '">'
+                + '<span class="stamp-seal" aria-hidden="true">★</span>'
+                + '<span class="stamp-name">' + esc(g.name) + '</span>'
+                + '<span class="meta">Member</span></div>';
+            }).join("") + '</div>'
+              + '<p class="meta">Local seals from groups you joined on this browser — earn-only, no invented catalog medals.</p>';
+          })()
       +   '</div>'
       +   '<p class="meta">Player: ' + esc(me.name) + ' · permaname ' + esc(sid) + '</p>'
       + '</div></section>';
@@ -10556,6 +10728,9 @@
       +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock(currentRoomId).mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>🔓 Unlocked</button>'
       +         '<button type="button" data-room-lock="friends"' + ((loadRoomLock(currentRoomId).mode || "") === "friends" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>👥 Friends</button>'
       +         '<button type="button" data-room-lock="locked"' + ((loadRoomLock(currentRoomId).mode || "") === "locked" ? ' class="is-on"' : '') + (canSetRoomLock(currentRoomId) ? "" : " disabled") + '>🔒 Locked</button>'
+      +         '<div class="room-lock-row meta">Mobile immersion</div>'
+      +         '<button type="button" data-immersive-enter="1" title="Hide top chrome; stage fills phone">Enter immersive</button>'
+      +         '<button type="button" data-immersive-exit="1">Exit immersive</button>'
       +         '<button type="button" data-room-menu="lobby">' + (inRoom ? "Leave to lobby" : "Rooms lobby") + '</button>'
       +       '</div>'
       +     '</span>'
@@ -11220,7 +11395,10 @@
       playAvatarEmote: function (name) { return playAvatarEmote(name); },
       listAvatarEmotes: function () { return listAvatarEmotes(); },
       getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
-      isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); }
+      isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); },
+      // How this works (?v=20260906bd): debug/UX — 'png-hybrid' | 'ruffle' | 'tofu' | 'png'
+      // Beginner: Whirl walking → usually 'png' (Ruffle not running). Force Ruffle / SWF-only → 'ruffle'.
+      getAvatarPlaybackMode: function () { return getAvatarPlaybackMode(); }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
   }
@@ -12423,6 +12601,21 @@
     if (ev.target.closest("[data-immersive-exit]")) {
       exitLandscapeImmersion();
       return;
+    // How this works (?v=20260906bd): Room menu → Enter immersive (phones) without waiting for rotate.
+    // Beginner: hides top tabs so the loft stage is bigger; Exit immersive restores chrome.
+    if (ev.target.closest("[data-immersive-enter]") && session() && inRoom) {
+      roomImmersiveForcedOff = false;
+      try {
+        document.body.classList.add("room-immersive");
+        roomImmersive = true;
+        var exitBtnE = document.querySelector(".room-immersive-exit");
+        if (exitBtnE) exitBtnE.hidden = false;
+        document.body.classList.add("chat-mobile-overlay");
+        try { requestRoomFullscreen(); } catch (eFsE) {}
+        pushNotice("blue", "Immersive loft — Exit fullscreen / Exit immersive to restore tabs.", { transient: true });
+      } catch (eImmE) {}
+      return;
+    }
     }
     // How this works: lobby tile / recent chip → preview sheet (NOT inRoom yet).
     // Beginner: Cancel stays in lobby; Enter in the sheet joins (with soft curtain).
@@ -13125,14 +13318,20 @@
       if (!stuffAdd) return;
       var layoutAdd = loadRoomLayout();
       var nidDec = "dec" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      // How this works (?v=20260906bd): backdrops start large at origin; furniture stacks on a grid.
+      // Beginner: Add to room → drag; Snap keeps chips tidy.
+      var kindAdd = itemCat(stuffAdd);
+      var isBd = kindAdd === "backdrops";
       layoutAdd.items.push({
         id: nidDec,
         stuffId: stuffAdd.id,
         name: stuffAdd.name,
         thumb: stuffAdd.thumb || "",
-        kind: itemCat(stuffAdd),
-        x: 40 + (layoutAdd.items.length % 6) * 56,
-        y: 40 + Math.floor(layoutAdd.items.length / 6) * 56
+        kind: kindAdd,
+        x: isBd ? 8 : (40 + (layoutAdd.items.length % 6) * 56),
+        y: isBd ? 8 : (40 + Math.floor(layoutAdd.items.length / 6) * 56),
+        scale: isBd ? 1.6 : 1,
+        z: isBd ? 0 : 1
       });
       saveRoomLayout(layoutAdd);
       decorateMode = true;
@@ -13147,8 +13346,109 @@
       var layoutRem = loadRoomLayout();
       layoutRem.items = layoutRem.items.filter(function (it) { return it.id !== rid; });
       saveRoomLayout(layoutRem);
+      if (selectedDecId === rid) selectedDecId = null;
       paint("rooms");
       if (decorateMode) bindDecorateDrag();
+      return;
+    }
+    // How this works (?v=20260906bd): wire Decorate filter / snap / scale / z / flip / nudge / dup.
+    // Beginner: these buttons were painted in ba but needed click handlers — now they work.
+    // ENGINE DEV: only mutates whirled2.roomLayout.* chips — never #stage-slot.
+    var decFilt = ev.target.closest("[data-dec-filter]");
+    if (decFilt && session() && decorateMode) {
+      decorateInvFilter = decFilt.getAttribute("data-dec-filter") || "all";
+      paint("rooms");
+      bindDecorateDrag();
+      return;
+    }
+    var decSnap = ev.target.closest("[data-dec-snap]");
+    if (decSnap && session()) {
+      decorateSnapGrid = !!decSnap.checked;
+      try { localStorage.setItem("whirled2.decorateSnap", decorateSnapGrid ? "1" : "0"); } catch (eSn) {}
+      return;
+    }
+    function mutateSelectedDec(mutator) {
+      if (!selectedDecId) {
+        pushNotice("orange", "Select a furniture chip first.", { transient: true });
+        return false;
+      }
+      var layout = loadRoomLayout();
+      var hit = null;
+      for (var i = 0; i < layout.items.length; i++) {
+        if (layout.items[i].id === selectedDecId) { hit = layout.items[i]; break; }
+      }
+      if (!hit) return false;
+      mutator(hit, layout);
+      saveRoomLayout(layout);
+      return true;
+    }
+    var decScale = ev.target.closest("[data-dec-scale]");
+    if (decScale && session() && decorateMode) {
+      var dScale = Number(decScale.getAttribute("data-dec-scale")) || 0;
+      if (mutateSelectedDec(function (it) {
+        var sc = Number(it.scale); if (!(sc > 0)) sc = 1;
+        it.scale = Math.max(0.5, Math.min(2.5, Math.round((sc + dScale) * 100) / 100));
+      })) {
+        paint("rooms");
+        bindDecorateDrag();
+      }
+      return;
+    }
+    var decZ = ev.target.closest("[data-dec-z]");
+    if (decZ && session() && decorateMode) {
+      var zDir = decZ.getAttribute("data-dec-z");
+      if (mutateSelectedDec(function (it, layout) {
+        var zs = layout.items.map(function (x) { return Number(x.z) || 1; });
+        var maxZ = Math.max.apply(null, zs.concat([1]));
+        var minZ = Math.min.apply(null, zs.concat([1]));
+        it.z = zDir === "front" ? (maxZ + 1) : (minZ - 1);
+      })) {
+        paint("rooms");
+        bindDecorateDrag();
+      }
+      return;
+    }
+    var decFlip = ev.target.closest("[data-dec-flip]");
+    if (decFlip && session() && decorateMode) {
+      if (mutateSelectedDec(function (it) { it.flipX = !it.flipX; })) {
+        paint("rooms");
+        bindDecorateDrag();
+      }
+      return;
+    }
+    var decNudge = ev.target.closest("[data-dec-nudge]");
+    if (decNudge && session() && decorateMode) {
+      var dir = decNudge.getAttribute("data-dec-nudge");
+      var step = decorateSnapGrid ? 8 : 4;
+      if (mutateSelectedDec(function (it) {
+        var x = Number(it.x) || 0, y = Number(it.y) || 0;
+        if (dir === "left") x -= step;
+        else if (dir === "right") x += step;
+        else if (dir === "up") y -= step;
+        else if (dir === "down") y += step;
+        it.x = Math.max(0, x);
+        it.y = Math.max(0, y);
+      })) {
+        paint("rooms");
+        bindDecorateDrag();
+      }
+      return;
+    }
+    var decDup = ev.target.closest("[data-dec-dup]");
+    if (decDup && session() && decorateMode) {
+      if (mutateSelectedDec(function (it, layout) {
+        var copy = JSON.parse(JSON.stringify(it));
+        copy.id = "dec" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        copy.x = (Number(it.x) || 0) + 16;
+        copy.y = (Number(it.y) || 0) + 16;
+        if (copy.doorTo) { delete copy.doorTo; delete copy.doorLabel; }
+        layout.items.push(copy);
+        selectedDecId = copy.id;
+      })) {
+        try { awardAction("decorate"); } catch (eAw) {}
+        paint("rooms");
+        bindDecorateDrag();
+      }
       return;
     }
     if (ev.target.closest("[data-dec-save]") && session()) {
@@ -13452,6 +13752,8 @@
         }
       }
       saveGroups(glist);
+      try { awardAction("groupJoin"); } catch (eGJ) {}
+      pushNotice("green", "Joined group.", { transient: true });
       paint("groups");
       return;
     }
@@ -13465,6 +13767,27 @@
         }
       }
       saveGroups(gl);
+      paint("groups");
+      return;
+    }
+    var gFlag = ev.target.closest("[data-group-thread-flag]");
+    if (gFlag && session()) {
+      // How this works (?v=20260906bd): managers pin/announce/lock discussion threads.
+      var gidF = gFlag.getAttribute("data-group-open");
+      var tidF = gFlag.getAttribute("data-group-thread");
+      var flag = gFlag.getAttribute("data-group-thread-flag");
+      var threadsF = loadGroupThreads(gidF);
+      for (var tf = 0; tf < threadsF.length; tf++) {
+        if (threadsF[tf].id === tidF) {
+          if (flag === "sticky") threadsF[tf].sticky = !threadsF[tf].sticky;
+          else if (flag === "announce") threadsF[tf].announce = !threadsF[tf].announce;
+          else if (flag === "locked") threadsF[tf].locked = !threadsF[tf].locked;
+          break;
+        }
+      }
+      saveGroupThreads(gidF, threadsF);
+      groupViewId = gidF;
+      groupThreadId = null;
       paint("groups");
       return;
     }
@@ -13575,8 +13898,15 @@
         pushNotice("orange", "Only the room owner can change the lock.", { transient: true });
         return;
       }
-      saveRoomLock(roomLockBtn.getAttribute("data-room-lock") || "unlocked", currentRoomId || "loft");
-      pushNotice("green", "Room lock: " + (roomLockBtn.getAttribute("data-room-lock") || "unlocked") + ".", { transient: true });
+      // How this works (?v=20260906bd): owner lock triad + passport Room Guardian when privacy tightens.
+      // Beginner: Unlocked = anyone; Friends = mutual friends; Locked = owner only (this browser).
+      var newLock = roomLockBtn.getAttribute("data-room-lock") || "unlocked";
+      saveRoomLock(newLock, currentRoomId || "loft");
+      var lockPretty = newLock === "friends" ? "Friends only" : (newLock === "locked" ? "Locked (owner only)" : "Unlocked (anyone)");
+      pushNotice("green", "Room lock: " + lockPretty + ".", { transient: true });
+      if (newLock === "friends" || newLock === "locked") {
+        try { awardAction("roomLock"); } catch (eRL) {}
+      }
       var rmenu2 = document.getElementById("room-menu");
       if (rmenu2) rmenu2.hidden = true;
       roomMenuOpen = false;

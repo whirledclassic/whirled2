@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bc` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bd` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,23 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bc`)
+## Closed this pass (`?v=20260906bd`)
+
+| Item | Notes |
+|------|--------|
+| Playback clarity | Loft + Stuff badges: PNG hybrid / Whirl · PNG vs Ruffle (SWF); `getAvatarPlaybackMode()` |
+| Decorate polish | Wired filter/snap/scale/z/dup/nudge/flip; snap persist; backdrop place |
+| Friends search | matchWhy + status field; clearer empty/placeholder |
+| Room lock | Pretty labels + Room Guardian stamp; preview who-can-enter |
+| Groups polish | Accent theme form; manager pin/announce/lock; join stamp |
+| Passport | Group medals from joined groups; Group Joiner / Room Guardian |
+| Mobile immersion | Room menu Enter immersive |
+| classic-avatar.js | Badge copy only — walk/tofu mount logic preserved |
+
+---
+
+## Closed earlier (`?v=20260906bc`)
+
 
 | Item | Notes |
 |------|--------|
@@ -90,7 +106,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Area | web-mock | Gap |
 |------|----------|-----|
 | Avatars inventory + Wear | **Working** (sprite path) | SWF catalog **P0**/lab |
-| Furniture / decorate place | Partial — decorate layer / place images | Full classic furniture types **P1** |
+| Furniture / decorate place | Partial — decorate layer / place images | Decorate tools wired `bd` (still not full classic types) **P1** |
 | Backdrops / toys / pets / videos | Not a full classic inventory | **P1–P2** |
 | Music as Stuff items | Room playlist embeds (YT/Spotify), not MP3 Stuff shop | **P1** vs wiki MP3 upload |
 | Send as Gift | Mail/gifts chrome exists in limited form | Full item gift **P2** |
@@ -104,7 +120,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Enter loft / multi-room catalog | **Working** (local rooms map) | — |
 | `#stage-slot` + loft placeholder | **Working** | Pixi engine ownership **P0** |
 | Decorate / place | Partial | Full furniture edit **P1** |
-| Lock / share / embed | Working chrome + pale-blue dock (ax) | Wiki-complete lock UX **P2** |
+| Lock / share / embed | Working chrome + pale-blue dock (ax) | Lock triad + preview blurbs `bd`; wiki-complete share/embed **P2** |
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
 | Parties | Toolbar stub / limited | **P1** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |
@@ -135,7 +151,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Me → Profile + info/status/photo | **Working** | — |
 | Profile look (themes, BG image, banner) | **Working** after `an` fix | — |
 | Status → notices | **Working** (local) | — |
-| Passport stamps / medals | **Improved** (`at`) seal UI + door stamps; earn-only | Group medals **P1** |
+| Passport stamps / medals | **Improved** (`at`) seal UI + door stamps; earn-only | Local group medals from joined groups `bd`; shared whirled medals later **P2** |
 | Permaname / email / age gates | Simplified register | Classic account fields **P2** |
 | Wiki `Me` page | Missing upstream | Use Starting_out + Profile |
 

@@ -774,7 +774,8 @@
     if (!worn || worn.isTofu) return "";
     if (!shouldMountRuffleInLoft(worn)) {
       if (itemIsHybrid(worn) && itemWantsClassicFlash(worn)) {
-        return '<span class="classic-hybrid-badge" title="PNG chrome walk + SWF on file">Hybrid (smooth)</span>';
+        // (?v=20260906bd): crystal-clear — PNG walk means Ruffle is NOT running in loft.
+        return '<span class="classic-hybrid-badge" title="Walking uses PNG spritesheets in HTML/JS. Ruffle is NOT involved unless Force Ruffle.">Walking: PNG hybrid (no Ruffle)</span>';
       }
       return "";
     }
@@ -786,11 +787,13 @@
   }
 
   function classicHybridBadgeHtml(worn) {
+    // How this works (?v=20260906bd): UI label only — does not change mount/walk.
+    // Beginner: Hybrid badge = PNG walk. Ruffle badge = Force Ruffle SWF appearance.
     if (!worn || !itemIsHybrid(worn)) return "";
     if (forceRuffleInLoft(worn)) {
-      return '<span class="classic-exp-badge" title="Force Ruffle in loft">Ruffle loft</span>';
+      return '<span class="classic-exp-badge avatar-playback-badge is-ruffle" title="Ruffle WASM is mounted for .swf appearance">Appearance: Ruffle (SWF)</span>';
     }
-    return '<span class="classic-hybrid-badge" title="PNG chrome walk; SWF kept for Stuff preview">Hybrid (smooth)</span>';
+    return '<span class="classic-hybrid-badge avatar-playback-badge is-png-hybrid" title="PNG spritesheets walk the loft. Ruffle is NOT involved.">Walking: PNG hybrid (no Ruffle)</span>';
   }
 
   // ---------------------------------------------------------------------------

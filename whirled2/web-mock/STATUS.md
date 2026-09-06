@@ -1,26 +1,27 @@
+## What shipped (?v=20260906bd)
+
+- **Playback clarity (user confusion fix):** loft nameplate + Stuff Wear cards show crystal-clear badges:
+  - `Walking: PNG hybrid (no Ruffle)` / `Whirl · PNG` when PNG spritesheets drive motion
+  - `Appearance: Ruffle (SWF)` only when `#avatar-ruffle-host` is actually mounted
+  - Debug: `WhirledChrome.getAvatarPlaybackMode()` → `png-hybrid` | `ruffle` | `tofu` | `png`
+  - HOW-CLASSIC opening strengthened: walking Whirl/Hybrid PNGs ≠ Ruffle
+- **Decorate polish:** wired missing filter/snap/scale/z/dup + nudge/flip; snap persists; backdrops place larger
+- **Friends search:** email / real name / interests / status + matchWhy badge
+- **Room lock:** clearer labels + Room Guardian stamp; preview who-can-enter blurb
+- **Groups:** accent theme form (managers); pin/announce/lock thread tools; join → Group Joiner stamp
+- **Passport:** group medals from joined groups; Room Guardian / Group Joiner seals
+- **Mobile immersion:** Room menu Enter immersive (not only landscape auto)
+- Built on **bc** Groups/Admin/broadcast/NaN + **bb** Flash hybrid — **did not regress** `classic-avatar.js` walk/tofu
+- Preserve: Whirl starter, chat visit-since, pale-blue chrome, earn-only, no MySpace, no fake catalog
+- Cache: **`?v=20260906bd`**. Push: `/tmp/push-bd.js` (dry-run default).
+
 ## What shipped (?v=20260906bc)
 
-- **Groups (wiki-faithful):** list / create / join, group home (logo+banner placeholders), discussion threads + replies, search, sticky/announce, Group chat. Pale-blue classic, mobile-friendly.
-- **Seeded `Whirled2 Developers`:** Updates & notes + Flash / avatars + General. Overnight changelog (ar→az + ba/bc), **NaN QA fail note**, **Flash-without-plugin** post linking `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md`.
-- **Admin panel:** Me → Admin + header Admin when `isAdmin`. Make/Remove admin. Bootstrap: first account / Test / `whirled2.forceAdmin=1` + `whirled2.admins` (Dev Hub).
-- **/broadcast:** escalating **coins** (base 50 ×1.5 per local day). Classic wiki used Bars (~5 inflate); documented. Highlighted BROADCAST bubble; clear insufficient-funds error.
-- **QA NaN fix:** `sanitizeDisplayName` strips `/NaN/gi`; heal session/users/profiles on boot; presence never paints `QA AxNaNNaN`.
-- Friends search: email / real name / interests (local). Decorate filter/snap/scale (earlier polish kept).
-- Built **on top of bb** Flash walk/tofu + HOW-CLASSIC — **did not revert** `classic-avatar.js`.
-- Preserve: Hybrid Flash, Whirl, chat visit-since, Dev Hub, pale-blue az chrome, earn-only, no MySpace, no fake catalog.
-- Cache: **`?v=20260906bc`**. Push: `/tmp/push-bc.js` (dry-run default).
+- Groups forum + seeded Whirled2 Developers; Admin; /broadcast; NaN heal; friends search fields.
 
 ## What shipped (?v=20260906bb)
 
-- Flash walk/tofu polish + HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md (Flash agent).
-
-## What shipped (?v=20260906az)
-
-- Pale room chrome extras (CSS).
-
-## What shipped (?v=20260906ay)
-
-- Flash hybrid + transparent Ruffle + pale-blue bar kill.
+- Flash walk/tofu polish + HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md
 
 # Whirled2 Chrome — STATUS
 
@@ -33,3 +34,4 @@ Date: 2026-09-06
 - `#stage-slot` = engine mount; Wear / chrome walk / emotes on `#avatar-wear-layer` sibling.
 - No secrets in client — only `WHIRLED_API` origin.
 - **Whirl** is the starter avatar (slug `cyan-hair`).
+- **Walking animation with Whirl/Hybrid PNGs is not Ruffle** — Ruffle is SWF-only.

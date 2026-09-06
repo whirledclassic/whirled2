@@ -1,11 +1,14 @@
 # Classic Whirled avatars — without Adobe Flash
 
-**Cache:** `?v=20260906bb`  
+**Cache:** `?v=20260906bd`  
 **Audience:** beginners + ENGINE DEV. In-site: Help → **Developers** → *Classic Whirled avatars — without Adobe Flash*. Groups → **Dev Updates** thread.
 
 ---
 
 ## Currently (read this box first)
+
+> **If your avatar is walking/animating and you only Wear Whirl or Hybrid with PNGs → that motion is PNG spritesheets in HTML/CSS/JS. Ruffle is NOT involved.**  
+> **Ruffle is only the WASM Flash emulator for `.swf` files** (Stuff preview / Force Ruffle / SWF-only Wear).
 
 > **Ruffle = YES (optional path).**  
 > **Default smooth room movement = PNG hybrid (Ruffle not required).**
@@ -13,6 +16,8 @@
 - Browsers **cannot** run Adobe Flash Player anymore.
 - Whirled2 **never** asks you to install Flash.
 - If you only use **Whirl** (or other PNG packs) and never upload a `.swf`, **Ruffle never loads**.
+- In the loft, look at the **nameplate badge**: `Whirl · PNG` / `Walking: PNG hybrid (no Ruffle)` vs `Appearance: Ruffle (SWF)`.
+- Debug: `WhirledChrome.getAvatarPlaybackMode()` → `'png-hybrid' | 'ruffle' | 'tofu' | 'png'`.
 
 ---
 
