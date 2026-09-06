@@ -71,7 +71,7 @@ In your private repo:
 
 The website owns the window. You own **one rectangle**: `#stage-slot`.
 
-**Placeholder loft (chrome only, `?v=20260906ak`):** Until you mount, `#stage-slot` may contain a CSS `.loft-backdrop` (soft walls/floor). Call `host.replaceChildren(app.canvas)` as usual — that clears the placeholder. Worn Stuff sprites stay on sibling `#avatar-wear-layer` (not inside your canvas) until Pixi owns avatars.
+**Placeholder loft (chrome only):** Until you mount, `#stage-slot` may contain a CSS `.loft-backdrop` (soft walls/floor). Call `host.replaceChildren(app.canvas)` as usual — that clears the placeholder. Worn Stuff sprites + chrome click-to-walk stay on sibling `#avatar-wear-layer` (not inside your canvas) until Pixi owns avatars (`?v=20260906ao`).
 
 
 ```
@@ -140,6 +140,10 @@ Chrome sets this after paint / login and fires `whirled:ready` with the same obj
 | `onOccupants(fn)` | subscribe | Occupant list; called immediately with current list. |
 | `getChatUi()` | fn → prefs | Read `whirled2.chatUi` (`mode`, `hideHistory`, `textSize`, `bubbleDuration`). |
 | `getWallet()` | fn → `{ coins, bars, streakDays }` | **Optional read-only** wallet snapshot from chrome `localStorage` (`whirled2.wallet.{userId}`). Coins & Bars are play currency (Bars earn-only); no payments. |
+| `getWornAvatar()` | fn → worn row or null | Stuff sprite Wear row. May include `states` (`idle`/`walk`/`stand`/`pose`), `state`, `frames`. |
+| `setAvatarState(name)` | fn → bool | Chrome billboard state swap (`idle`/`walk`/…). No-op once you own avatars in Pixi. |
+| `getAvatarWalkTarget()` | fn → `{ xPct, yPct, at }` or null | Last chrome click-to-walk target (compat until engine walk). |
+| `isChromeWalkActive()` | fn → bool | `true` while chrome handles floor clicks; `false` when your canvas is in `#stage-slot`. |
 
 Message shape on `onChat` (approx.):
 
@@ -275,6 +279,32 @@ Two different systems:
 | Auth / hosting notes | `NETWORKING.md` |
 
 Welcome aboard. Baby steps: standalone Pixi first → `mountWhirledEngine(host)` → iframe or bundle → walk + nametags.
+
+---
+
+## 12) Unified avatar pack + chrome click-to-walk (?v=20260906ao)
+
+**Beginner context:** Stuff can Wear one **Cyan Hair** avatar (idle + walk + stand/pose). Until your Pixi engine mounts, clicking the loft floor walks the chrome billboard on `#avatar-wear-layer`.
+
+**Your private repo today:** Vite + Pixi, `Player` uses `bunny.png`, mounts to `#pixi-container`, no `mountWhirledEngine` yet. That is fine for iteration.
+
+**When you plug into chrome:**
+
+1. Export `mountWhirledEngine(host)` and call it with `WhirledChrome.getStageEl()` (`#stage-slot`).
+2. Use `resizeTo: host` — **not** `resizeTo: window`.
+3. Prefer consuming the same unified pack JSON chrome already ships:
+
+```
+assets/avatars/user-pack/cyan-hair/pack.json
+→ states.idle / states.walk / states.stand / states.pose
+→ each: { frames: [...], frameDurationsMs: [...] }
+```
+
+4. Read worn pack via `WhirledChrome.getWornAvatar()` (includes `states`).
+5. When your canvas is inside `#stage-slot`, chrome **disables** click-to-walk automatically (`isChromeWalkActive()` → false). You then own pointer + walk with stage-local coordinates.
+6. Do **not** put your canvas in `#avatar-wear-layer` — that layer stays a chrome overlay until you replace it.
+
+Also see [AVATAR-STUFF-FIDELITY.md](./AVATAR-STUFF-FIDELITY.md) and [STUFF-AVATARS.md](./STUFF-AVATARS.md).
 
 ---
 
