@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906h";
+  var LOGO_V = "20260906i";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -746,11 +746,27 @@
       + '<div class="price">' + esc(String(price)) + '</div></div></button>';
   }
   var PASSPORT_KEY = "whirled2.passport.";
+  var PASSPORT_PROG_KEY = "whirled2.passportProg.";
   var PASSPORT_CATS = [
     { id: "mingle", label: "Mingle" },
     { id: "play", label: "Play" },
     { id: "create", label: "Create" },
     { id: "shop", label: "Shop" }
+  ];
+  // How this works: wiki Passport stamps. Each stamp listens for an action name;
+  // awardAction bumps whirled2.passportProg.{userId}, then copies the stamp into
+  // whirled2.passport.{userId} when the need count is met (idempotent). Coins stay labels only.
+  var STAMP_CATALOG = [
+    { id: "first_hello", cat: "mingle", name: "First Hello", tip: "Send a chat message in a room.", action: "chat", need: 1, goTab: "rooms", goEnter: true },
+    { id: "make_friend", cat: "mingle", name: "Make a Friend", tip: "Invite someone to be your buddy.", action: "friend", need: 1, goTab: "me", goMe: "friends" },
+    { id: "postmaster", cat: "mingle", name: "Postmaster", tip: "Send a piece of mail.", action: "mail", need: 1, goTab: "me", goMe: "mail" },
+    { id: "status_update", cat: "mingle", name: "Status Update", tip: "Save a profile status.", action: "status", need: 1, goTab: "me", goMe: "profile" },
+    { id: "room_visitor", cat: "play", name: "Room Visitor", tip: "Enter Studio Loft.", action: "enterRoom", need: 1, goTab: "rooms", goEnter: true },
+    { id: "party_starter", cat: "play", name: "Party Starter", tip: "Create a party from the toolbar.", action: "party", need: 1, goTab: "rooms", goEnter: true, goParty: true },
+    { id: "creator", cat: "create", name: "Creator", tip: "Upload something to Stuff.", action: "upload", need: 1, goTab: "stuff" },
+    { id: "decorator", cat: "create", name: "Decorator", tip: "Place a decorate chip in your loft.", action: "decorate", need: 1, goTab: "rooms", goEnter: true, goDecorate: true },
+    { id: "shop_lister", cat: "shop", name: "Shop Lister", tip: "List an item in the Shop.", action: "shopList", need: 1, goTab: "stuff" },
+    { id: "window_shopper", cat: "shop", name: "Window Shopper", tip: "Open a shop item detail.", action: "shopView", need: 1, goTab: "shop" }
   ];
   function loadPassport(userId) {
     try {
@@ -762,6 +778,74 @@
   }
   function savePassport(userId, stamps) {
     try { localStorage.setItem(PASSPORT_KEY + userId, JSON.stringify((stamps || []).slice(0, 200))); } catch (e) {}
+  }
+  function loadPassportProg(userId) {
+    try {
+      var raw = localStorage.getItem(PASSPORT_PROG_KEY + userId);
+      if (!raw) return {};
+      var obj = JSON.parse(raw);
+      return obj && typeof obj === "object" && !Array.isArray(obj) ? obj : {};
+    } catch (e) { return {}; }
+  }
+  function savePassportProg(userId, prog) {
+    try { localStorage.setItem(PASSPORT_PROG_KEY + userId, JSON.stringify(prog || {})); } catch (e) {}
+  }
+  function awardAction(action) {
+    // How this works: bump progress for this action; award any catalog stamp whose
+    // need is newly met. Safe to call often — already-earned stamps are skipped.
+    var s = session();
+    if (!s || !s.user || !action) return;
+    var uid = s.user.id;
+    var prog = loadPassportProg(uid);
+    prog[action] = (Number(prog[action]) || 0) + 1;
+    savePassportProg(uid, prog);
+    var earned = loadPassport(uid);
+    var have = {};
+    earned.forEach(function (st) { if (st && st.id) have[st.id] = true; });
+    var newly = [];
+    STAMP_CATALOG.forEach(function (stamp) {
+      if (stamp.action !== action) return;
+      if (have[stamp.id]) return;
+      if ((Number(prog[action]) || 0) < stamp.need) return;
+      earned.unshift({
+        id: stamp.id,
+        name: stamp.name,
+        cat: stamp.cat,
+        tip: stamp.tip,
+        at: new Date().toISOString()
+      });
+      have[stamp.id] = true;
+      newly.push(stamp.name);
+    });
+    if (newly.length) {
+      savePassport(uid, earned);
+      try {
+        pushNotice("green", "Passport stamp" + (newly.length > 1 ? "s" : "") + ": " + newly.join(", ") + "!", { transient: true });
+      } catch (e) {}
+    }
+  }
+  function findStamp(id) {
+    for (var i = 0; i < STAMP_CATALOG.length; i++) if (STAMP_CATALOG[i].id === id) return STAMP_CATALOG[i];
+    return null;
+  }
+  function goPassportStamp(stamp) {
+    // How this works: Passport Go! jumps to the tab/sub where you can earn that stamp.
+    if (!stamp) return;
+    clearStrayUI();
+    if (stamp.goEnter) {
+      inRoom = true;
+      clearRoomChatDisplay(true);
+    }
+    if (stamp.goDecorate) decorateMode = true;
+    if (stamp.goParty) partyPanelOpen = true;
+    if (stamp.goMe) {
+      meSub = stamp.goMe;
+      viewingId = null;
+      galleryViewId = null;
+    }
+    var tab = stamp.goTab || "me";
+    paint(tab);
+    if (stamp.goEnter) loadOccupants();
   }
     var ROOM = "Studio Loft";
   var chat = [];
@@ -837,6 +921,11 @@
       if (m.id === id && !m.read) { m.read = true; changed = true; }
     });
     if (changed) saveMail(list);
+  }
+  function deleteMail(id) {
+    // How this works: remove one message from whirled2.mail by id, then caller refreshes UI.
+    if (!id) return;
+    saveMail(loadMail().filter(function (m) { return m.id !== id; }));
   }
   function removeFriend(id) {
     saveFriends(loadFriends().filter(function (f) { return f.id !== id; }));
@@ -948,9 +1037,9 @@
     if (!friendInvitePending) return "";
     var t = friendInvitePending;
     return '<div class="modal-backdrop" id="buddy-invite-modal" data-buddy-cancel="1">'
-      + '<div class="modal-card" role="dialog" aria-label="Friend request" onclick="event.stopPropagation()">'
-      +   '<h2>Invite ' + esc(t.name) + '</h2>'
-      +   '<p class="meta">Optional message (sent as a mail note). Default classic text below.</p>'
+      + '<div class="modal-card" role="dialog" aria-label="Let\'s be buddies!" onclick="event.stopPropagation()">'
+      +   '<h2>Let\'s be buddies!</h2>'
+      +   '<p class="meta">Invite <b>' + esc(t.name) + '</b> — optional message (sent as a mail note). Default classic text below.</p>'
       +   '<form id="buddy-invite-form" data-buddy-id="' + esc(t.id) + '" data-buddy-name="' + esc(t.name) + '">'
       +     '<textarea name="message" rows="3" maxlength="400">Let\'s be buddies!</textarea>'
       +     '<div class="invite-them-actions">'
@@ -2119,7 +2208,10 @@ function helpPage() {
     });
     var friendBox = friendsOnline.length
       ? friendsOnline.map(function (p) {
-          return '<div class="friend-row"><span class="ava">' + esc(p.initials || "?") + '</span><div><b>' + esc(p.name) + '</b><div class="sub">In ' + esc(p.room || ROOM) + '</div></div></div>';
+          return '<div class="friend-row"><span class="ava">' + esc(p.initials || "?") + '</span>'
+            + '<div><b>' + esc(p.name) + '</b><div class="sub">In ' + esc(p.room || ROOM) + '</div>'
+            + '<button type="button" class="action-btn" data-join-them="1" data-join-name="' + esc(p.name) + '">Join them!</button>'
+            + '</div></div>';
         }).join("")
       : '<p class="meta">None of your friends are online right now.</p>';
     var peopleNow = liveOccupants.length || (session() ? 1 : 0);
@@ -2320,6 +2412,7 @@ function helpPage() {
         +   '<div class="meta">' + (isOn ? "Online · " : "") + esc(loc) + '</div>'
         + '</div>'
         + '<div class="friend-list-actions">'
+        +   (isOn ? '<button type="button" class="action-btn" data-join-them="1" data-join-name="' + esc(f.name) + '">Join them!</button>' : '')
         +   '<button type="button" class="action-btn" data-mail-to="' + esc(f.id) + '" data-mail-name="' + esc(f.name) + '">Send Mail</button>'
         +   '<button type="button" class="action-btn" data-enter-room="loft">Visit Home</button>'
         +   '<button type="button" class="action-btn" data-remove-friend="' + esc(f.id) + '">Remove</button>'
@@ -2384,14 +2477,22 @@ function helpPage() {
     var friends = loadFriends();
     var preTo = (composeTo && composeTo.id) || "";
     var preName = (composeTo && composeTo.name) || "";
+    var preSubject = (composeTo && composeTo.subject) || "";
+    var preBody = (composeTo && composeTo.body) || "";
     var listHtml = inbox.length ? inbox.map(function (m) {
       var mine = m.fromId === me.id;
       var unread = !m.read && m.toId === me.id;
+      // How this works: Reply/Delete stopPropagation in the click handler so the row
+      // still marks-read on normal clicks, but buttons do not fire that path.
+      var replyBtn = mine ? "" : ('<button type="button" class="action-btn" data-mail-reply="' + esc(m.id) + '">Reply</button>');
       return '<div class="mail-row' + (unread ? " unread" : "") + '" data-mail-id="' + esc(m.id) + '">'
         + '<div class="mail-meta"><b>' + esc(mine ? ("To " + m.toName) : ("From " + m.fromName)) + '</b>'
         + '<time>' + esc((m.at || "").slice(0, 16).replace("T", " ")) + '</time></div>'
         + '<div class="mail-subject">' + esc(m.subject) + '</div>'
-        + '<div class="mail-body">' + esc(m.body) + '</div></div>';
+        + '<div class="mail-body">' + esc(m.body) + '</div>'
+        + '<div class="mail-row-actions">' + replyBtn
+        +   '<button type="button" class="action-btn danger" data-mail-delete="' + esc(m.id) + '">Delete</button>'
+        + '</div></div>';
     }).join("") : '<p class="meta">No mail yet.</p>';
     var friendOpts = friends.map(function (f) {
       return '<option value="' + esc(f.id) + '"' + (f.id === preTo ? " selected" : "") + '>' + esc(f.name) + '</option>';
@@ -2404,8 +2505,8 @@ function helpPage() {
       +       '<label>To friend <select name="friendId"><option value="">— pick a friend —</option>' + friendOpts + '</select></label>'
       +       '<label>Or free id <input name="toId" maxlength="40" placeholder="player id" value="' + esc(preTo && !friends.some(function(f){return f.id===preTo;}) ? preTo : "") + '" /></label>'
       +       '<label>Name <input name="toName" maxlength="40" placeholder="display name" value="' + esc(preName) + '" /></label>'
-      +       '<label>Subject <input name="subject" maxlength="120" required /></label>'
-      +       '<label>Message <textarea name="body" rows="5" maxlength="2000" required></textarea></label>'
+      +       '<label>Subject <input name="subject" maxlength="120" required value="' + esc(preSubject) + '" /></label>'
+      +       '<label>Message <textarea name="body" rows="5" maxlength="2000" required>' + esc(preBody) + '</textarea></label>'
       +       '<button type="submit">Send Mail</button>'
       +       '<p class="meta" id="mail-msg">Stored in this browser (localStorage).</p>'
       +     '</form></div>'
@@ -2415,31 +2516,35 @@ function helpPage() {
   function mePassport() {
     var sid = session().user.id;
     var me = you();
-    var stamps = loadPassport(sid);
-    var byCat = {};
-    PASSPORT_CATS.forEach(function (c) { byCat[c.id] = []; });
-    stamps.forEach(function (s) {
-      var cat = (s && s.cat) || "mingle";
-      if (!byCat[cat]) byCat[cat] = [];
-      byCat[cat].push(s);
-    });
+    var earned = loadPassport(sid);
+    var have = {};
+    earned.forEach(function (s) { if (s && s.id) have[s.id] = s; });
+    var prog = loadPassportProg(sid);
+    var earnedCount = STAMP_CATALOG.filter(function (st) { return !!have[st.id]; }).length;
+    var totalCount = STAMP_CATALOG.length;
     var stampSections = PASSPORT_CATS.map(function (c) {
-      var list = byCat[c.id] || [];
-      var grid = list.length
-        ? '<div class="stamp-grid">' + list.map(function (s) {
-            return '<div class="stamp-cell"><span class="stamp-name">' + esc(s.name || "Stamp") + '</span></div>';
-          }).join("") + '</div>'
-        : '<div class="stamp-grid empty"><div class="stamp-cell empty-slot"><span class="meta">No stamps yet</span></div></div>';
+      var list = STAMP_CATALOG.filter(function (st) { return st.cat === c.id; });
+      var grid = '<div class="stamp-grid">' + list.map(function (st) {
+        var got = !!have[st.id];
+        var cur = Number(prog[st.action]) || 0;
+        var pct = Math.min(100, Math.round((cur / Math.max(1, st.need)) * 100));
+        var tip = got ? ("Earned: " + st.tip) : ("Locked — " + st.tip + (st.need > 1 ? (" (" + Math.min(cur, st.need) + "/" + st.need + ")") : ""));
+        return '<div class="stamp-cell' + (got ? " is-earned" : " is-locked") + '" title="' + esc(tip) + '">'
+          + '<span class="stamp-name">' + esc(st.name) + '</span>'
+          + '<span class="meta">' + (got ? "Earned" : "Locked") + '</span>'
+          + (got ? "" : '<div class="stamp-prog" aria-hidden="true"><i style="width:' + pct + '%"></i></div>')
+          + '<button type="button" class="action-btn stamp-go" data-passport-go="' + esc(st.id) + '">Go!</button>'
+          + '</div>';
+      }).join("") + '</div>';
       return '<div class="passport-cat">'
-        + '<div class="passport-cat-head"><h3>' + esc(c.label) + '</h3>'
-        + '<button type="button" class="action-btn" disabled title="Coins rewards later — labels only">Go!</button></div>'
+        + '<div class="passport-cat-head"><h3>' + esc(c.label) + '</h3></div>'
         + grid + '</div>';
     }).join("");
     return '<section class="page me-page passport-page">' + meSubnav()
       + '<div class="panel passport-shell">'
       +   '<div class="passport-head"><h1>My Passport</h1>'
-      +     '<p class="meta">Stamps mark achievements across Mingle, Play, Create, and Shop. They arrive with the engine / achievements track — this page stays empty until then.</p>'
-      +     '<p class="meta">Stored optionally as <code>whirled2.passport.' + esc(sid) + '</code> (array) for later.</p>'
+      +     '<p class="meta">Earn stamps by mingling, playing, creating, and shopping. Coins stay labels only — stamps never grant coins. Progress is saved in this browser.</p>'
+      +     '<p class="meta">Progress: <b>' + earnedCount + '</b> / ' + totalCount + ' stamps · keys <code>whirled2.passport.' + esc(sid) + '</code> + <code>whirled2.passportProg.' + esc(sid) + '</code></p>'
       +   '</div>'
       +   '<div class="passport-body">' + stampSections + '</div>'
       +   '<div class="cp-section"><h2>Group Medals</h2>'
@@ -3154,6 +3259,7 @@ function helpPage() {
     if (!chat.some(function (m) { return m.id === msg.id; })) chat.push(msg);
     refreshChatLog();
     listeners.chat.forEach(function (fn) { try { fn(msg); } catch (e) {} });
+    try { awardAction("chat"); } catch (e) {}
   }
   function renderChatOptsMenu() {
     var menu = document.getElementById("chat-opts-menu");
@@ -3414,6 +3520,7 @@ function helpPage() {
       clearRoomChatDisplay(true);
       paint("rooms");
       loadOccupants();
+      try { awardAction("enterRoom"); } catch (e) {}
       return;
     }
     if (ev.target.closest("[data-leave-room]")) {
@@ -3453,6 +3560,7 @@ function helpPage() {
         clearRoomChatDisplay(true);
         paint("rooms");
         loadOccupants();
+        try { awardAction("enterRoom"); } catch (e) {}
       } else if (g === "friends") {
         meSub = "friends";
         viewingId = null;
@@ -3693,6 +3801,7 @@ function helpPage() {
       decorateMode = true;
       paint("rooms");
       bindDecorateDrag();
+      try { awardAction("decorate"); } catch (e) {}
       return;
     }
     var decRem = ev.target.closest("[data-dec-remove]");
@@ -3766,30 +3875,23 @@ function helpPage() {
     }
     var addF = ev.target.closest("[data-add-friend]");
     if (addF && session()) {
+      // How this works: Add Friend opens the Let's be buddies! customize-message
+      // modal (same path as invite-buddy). Instant add only if already friends.
       var fid = addF.getAttribute("data-add-friend");
       var fname = addF.getAttribute("data-friend-name") || fid;
-      addFriend({ id: fid, name: fname });
-      // Local same-browser: leave a short note for both sides.
-      sendMail({
-        toId: session().user.id,
-        toName: session().user.name,
-        fromId: fid,
-        fromName: fname,
-        subject: "New friend",
-        body: fname + " is now on your friends list.",
-        read: false
-      });
-      sendMail({
-        toId: fid,
-        toName: fname,
-        subject: "You have a new friend",
-        body: session().user.name + " added you as a friend.",
-        read: false
-      });
-      pushNotice("friending", "You friended " + fname + "."); rememberProfile({ id: fid, name: fname });
-      meSub = "friends";
-      viewingId = null;
-      paint("me");
+      if (loadFriends().some(function (f) { return f.id === fid; })) {
+        pushNotice("gray", fname + " is already on your friends list.");
+        return;
+      }
+      friendInvitePending = { id: fid, name: fname };
+      occMenuId = null;
+      var chatMenu = document.getElementById("chat-name-menu");
+      if (chatMenu) chatMenu.remove();
+      if (!document.getElementById("buddy-invite-modal")) {
+        var wrapAdd = document.createElement("div");
+        wrapAdd.innerHTML = friendInvitePopup();
+        if (wrapAdd.firstChild) document.getElementById("app").appendChild(wrapAdd.firstChild);
+      }
       return;
     }
     var pokeOther = ev.target.closest("[data-poke]");
@@ -3832,6 +3934,7 @@ function helpPage() {
     if (shopItemBtn && session()) {
       shopItemId = shopItemBtn.getAttribute("data-shop-item") || null;
       paint("shop");
+      try { awardAction("shopView"); } catch (e) {}
       return;
     }
     if (ev.target.closest("[data-shop-back]") && session()) {
@@ -4188,8 +4291,57 @@ function helpPage() {
       paint("me");
       return;
     }
+    var joinThem = ev.target.closest("[data-join-them]");
+    if (joinThem && session()) {
+      // How this works: Join them! drops you into Studio Loft with your friend (local occupants).
+      var jname = joinThem.getAttribute("data-join-name") || "friend";
+      inRoom = true;
+      clearRoomChatDisplay(true);
+      paint("rooms");
+      loadOccupants();
+      pushNotice("blue", "Joined " + jname + " in Studio Loft.");
+      try { awardAction("enterRoom"); } catch (e) {}
+      return;
+    }
+    var passGo = ev.target.closest("[data-passport-go]");
+    if (passGo && session()) {
+      goPassportStamp(findStamp(passGo.getAttribute("data-passport-go")));
+      return;
+    }
+    var mailReply = ev.target.closest("[data-mail-reply]");
+    if (mailReply && session()) {
+      ev.stopPropagation();
+      var rid = mailReply.getAttribute("data-mail-reply");
+      var rmsg = loadMail().filter(function (m) { return m.id === rid; })[0];
+      if (rmsg) {
+        var subj = String(rmsg.subject || "");
+        if (!/^re:\s/i.test(subj)) subj = "Re: " + subj;
+        // How this works: window.__mailCompose prefills Me→Mail compose (to / subject / optional quote).
+        window.__mailCompose = {
+          id: rmsg.fromId,
+          name: rmsg.fromName || rmsg.fromId,
+          subject: subj,
+          body: "\n\n---\n" + (rmsg.fromName || "Them") + " wrote:\n" + String(rmsg.body || "")
+        };
+        meSub = "mail";
+        viewingId = null;
+        paint("me");
+      }
+      return;
+    }
+    var mailDel = ev.target.closest("[data-mail-delete]");
+    if (mailDel && session()) {
+      ev.stopPropagation();
+      var did = mailDel.getAttribute("data-mail-delete");
+      if (did && confirm("Delete this mail?")) {
+        deleteMail(did);
+        meSub = "mail";
+        paint("me");
+      }
+      return;
+    }
     var mailRow = ev.target.closest("[data-mail-id]");
-    if (mailRow && session() && !ev.target.closest("form")) {
+    if (mailRow && session() && !ev.target.closest("form") && !ev.target.closest("[data-mail-reply]") && !ev.target.closest("[data-mail-delete]")) {
       markMailRead(mailRow.getAttribute("data-mail-id"));
       // refresh unread badge in header without full navigation reset
       var badge = document.querySelector(".mail-btn u");
@@ -4320,6 +4472,7 @@ function helpPage() {
         wall.unshift({ who: you().name, text: "updated status: " + st, at: new Date().toISOString(), kind: "status" });
         saveWall(session().user.id, wall);
         pushNotice("status", you().name + " " + st);
+        try { awardAction("status"); } catch (e) {}
       }
       meSub = "profile";
       profileEditSection = null;
@@ -4364,6 +4517,7 @@ function helpPage() {
         subject: String(md.get("subject") || ""),
         body: String(md.get("body") || "")
       });
+      try { awardAction("mail"); } catch (e) {}
       // Same-browser peer copy already stored as one message to toId.
       window.__mailCompose = null;
       meSub = "mail";
@@ -4405,6 +4559,7 @@ function helpPage() {
       });
       pushNotice("friending", "Friend request sent to " + bname + ".");
       rememberProfile({ id: bid, name: bname });
+      try { awardAction("friend"); } catch (e) {}
       friendInvitePending = null;
       occMenuId = null;
       meSub = "friends";
@@ -4447,6 +4602,7 @@ function helpPage() {
         stuffMode = "detail";
         appendTransaction({ kind: "upload", label: "Uploaded Stuff “" + sname + "” (" + stype + ")", coins: 0 });
         pushNotice("green", "Saved “" + sname + "” to Stuff.", { transient: true });
+        try { awardAction("upload"); } catch (e) {}
         paint("stuff");
       }
       if (isMusicUp) {
@@ -4554,6 +4710,7 @@ function helpPage() {
       stuffListMode = false;
       appendTransaction({ kind: "list", label: "Listed “" + (src.name || "item") + "” in Shop", coins: coins });
       pushNotice("green", "Listed “" + (src.name || "item") + "” in Shop at " + coins + " coins (label).", { transient: true });
+      try { awardAction("shopList"); } catch (e) {}
       paint("stuff");
       return;
     }
@@ -4630,6 +4787,7 @@ function helpPage() {
       saveMyPartyId(pid);
       partyPanelOpen = true;
       pushNotice("blue", "Created party “" + pname + "”.");
+      try { awardAction("party"); } catch (e) {}
       if (inRoom) paint("rooms");
       else paint(document.querySelector(".tab.is-on") ? document.querySelector(".tab.is-on").getAttribute("data-tab") : "rooms");
       renderNotices();

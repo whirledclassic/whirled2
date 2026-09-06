@@ -799,7 +799,14 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   font-size: 12px; color: #16324a;
 }
 .stamp-cell.empty-slot { color: #5a7a90; }
+.stamp-cell.is-locked { opacity: 0.72; background: #f0f5f9; }
+.stamp-cell.is-earned { border-style: solid; border-color: #7eb6d8; background: #fff; box-shadow: 0 1px 0 rgba(30,111,168,0.12); }
 .stamp-name { font-weight: 700; color: #1e6fa8; }
+.stamp-cell .stamp-go { margin-top: 6px; font-size: 11px; padding: 2px 8px; }
+.stamp-prog { width: 80%; height: 4px; background: #d7eaf6; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.stamp-prog i { display: block; height: 100%; background: #3a90c4; }
+.mail-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.friend-row .action-btn { margin-top: 4px; }
 
 /* Account */
 .account-grid { display: grid; gap: 10px; margin: 12px 0; }
