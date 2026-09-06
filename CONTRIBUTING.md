@@ -34,7 +34,12 @@ Classic priority: keep lab notes accurate. Do not publish the VM.
 
 ## Artist work
 
-See [whirled2/ARTISTS.md](whirled2/ARTISTS.md). Same money line as code: volunteer now, credit always, pay only from real revenue later.
+Read the terms and pick a role: [whirled2/ARTISTS.md](whirled2/ARTISTS.md).
+
+Apply here (email + optional GitHub issue):
+https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html
+
+Same money line as code: volunteer now, credit always, pay only from real revenue later.
 
 ## Code style (Whirled 2)
 
