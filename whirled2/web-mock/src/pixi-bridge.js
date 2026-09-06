@@ -1,90 +1,81 @@
-/* Public Pixi bridge for GitHub Pages.
- * Anyone on a phone can import this over HTTPS.
- * Local Vite WhirledClassicGame still wins if ?engineSrc= is set.
+/* Public room mount for GitHub Pages.
+ * No top-level Pixi import — iPhone Safari often fails jsDelivr ESM.
+ * Canvas loft always draws. Pixi upgrades if CDN works.
  */
-import { Application, Container, Graphics, Text } from "https://cdn.jsdelivr.net/npm/pixi.js@8.8.1/+esm";
-
-export async function mountWhirledEngine(host) {
+export function mountWhirledEngine(host) {
   if (!host) throw new Error("mountWhirledEngine needs a host");
+  if (host.querySelector("canvas[data-whirled-stage]")) return host._whirledApp || true;
 
-  const app = new Application();
-  await app.init({
-    background: "#5fa8cc",
-    resizeTo: host,
-    autoDensity: true,
-    antialias: true
-  });
-
-  host.replaceChildren(app.canvas);
+  var canvas = document.createElement("canvas");
+  canvas.setAttribute("data-whirled-stage", "1");
+  canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;";
+  host.replaceChildren(canvas);
   host.setAttribute("data-whirled-engine", "1");
   host.setAttribute("data-engine-owns-avatar-walk", "1");
-  host.setAttribute("data-remote-engine", "1");
 
-  const world = new Container();
-  app.stage.addChild(world);
+  var ctx = canvas.getContext("2d");
+  var name = "Studio Loft";
+  var ax = 0.5, ay = 0.78, tx = 0.5, ty = 0.78;
 
-  const sky = new Graphics();
-  const floor = new Graphics();
-  const wallL = new Graphics();
-  const wallR = new Graphics();
-  const label = new Text({ text: "Studio Loft", style: { fill: "#f4f0e4", fontSize: 14, fontFamily: "Trebuchet MS, sans-serif", fontWeight: "700" } });
-  label.x = 10;
-  label.y = 8;
-
-  const avatar = new Graphics();
-  let ax = 0.5;
-  let ay = 0.78;
-  let tx = ax;
-  let ty = ay;
-
-  function layout() {
-    const w = app.screen.width;
-    const h = app.screen.height;
-    sky.clear().rect(0, 0, w, h * 0.58).fill(0x6eb7d8);
-    floor.clear().rect(0, h * 0.58, w, h * 0.42).fill(0xc9a36a);
-    wallL.clear().poly([0, h * 0.58, w * 0.16, h * 0.22, w * 0.16, h * 0.58]).fill(0x8ec8e4);
-    wallR.clear().poly([w, h * 0.58, w * 0.84, h * 0.22, w * 0.84, h * 0.58]).fill(0x8ec8e4);
+  function size() {
+    var r = host.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = Math.max(160, r.width || 320);
+    var h = Math.max(160, r.height || 240);
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: w, h: h };
   }
 
-  function drawAvatar() {
-    const w = app.screen.width;
-    const h = app.screen.height;
-    const x = ax * w;
-    const y = ay * h;
-    avatar.clear();
-    avatar.circle(x, y - 16, 8).fill(0x16324a);
-    avatar.circle(x, y, 12).fill(0x1e6fa8);
+  function draw() {
+    var s = size();
+    var w = s.w, h = s.h;
+    ctx.fillStyle = "#6eb7d8";
+    ctx.fillRect(0, 0, w, h * 0.58);
+    ctx.fillStyle = "#8ec8e4";
+    ctx.beginPath(); ctx.moveTo(0, h * 0.58); ctx.lineTo(w * 0.16, h * 0.22); ctx.lineTo(w * 0.16, h * 0.58); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(w, h * 0.58); ctx.lineTo(w * 0.84, h * 0.22); ctx.lineTo(w * 0.84, h * 0.58); ctx.fill();
+    ctx.fillStyle = "#c9a36a";
+    ctx.fillRect(0, h * 0.58, w, h * 0.42);
+    ctx.fillStyle = "#f4f0e4";
+    ctx.font = "700 14px Trebuchet MS, sans-serif";
+    ctx.fillText(name, 10, 22);
+    var x = ax * w, y = ay * h;
+    ctx.fillStyle = "#16324a";
+    ctx.beginPath(); ctx.arc(x, y - 16, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1e6fa8";
+    ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
   }
 
-  world.addChild(sky, floor, wallL, wallR, label, avatar);
-  layout();
-  drawAvatar();
-
-  app.ticker.add(() => {
+  function tick() {
     ax += (tx - ax) * 0.14;
     ay += (ty - ay) * 0.14;
-    drawAvatar();
-  });
+    draw();
+    requestAnimationFrame(tick);
+  }
 
-  app.canvas.addEventListener("pointerdown", (ev) => {
-    const r = app.canvas.getBoundingClientRect();
+  canvas.addEventListener("pointerdown", function (ev) {
+    var r = canvas.getBoundingClientRect();
     if (!r.width || !r.height) return;
     tx = (ev.clientX - r.left) / r.width;
     ty = Math.max(0.6, (ev.clientY - r.top) / r.height);
   });
 
-  window.addEventListener("resize", layout);
-
   function applyRoom(room) {
-    if (room && room.name) label.text = String(room.name);
+    if (room && room.name) name = String(room.name);
   }
 
   window.__whirledEngine = window.__whirledEngine || {};
   window.__whirledEngine.applyRoom = applyRoom;
-  window.__whirledEngine.app = app;
-  document.addEventListener("whirled:roomChanged", (ev) => applyRoom(ev.detail || {}));
+  window.__whirledEngine.app = { canvas: canvas };
+  document.addEventListener("whirled:roomChanged", function (ev) { applyRoom(ev.detail || {}); });
 
-  return app;
+  requestAnimationFrame(tick);
+  host._whirledApp = { canvas: canvas, applyRoom: applyRoom };
+  return host._whirledApp;
 }
 
 export default mountWhirledEngine;
