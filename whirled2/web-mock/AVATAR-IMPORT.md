@@ -1,6 +1,15 @@
+
+
+## Classic avatars without Adobe Flash (?v=20260906bb)
+
+> **Currently: Ruffle = YES (optional path). Default smooth room movement = PNG hybrid (Ruffle not required).**
+
+Full plain-English note: [HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md](./HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md).  
+Whirl-only users never load Ruffle. Hybrid loft uses PNG idle/walk like Whirl; SWF-only uses transparent Ruffle + bob walk.
+
 # AVATAR-IMPORT — classic Whirled avatars → Whirled2
 
-**STATUS (?v=20260906ay): HYBRID (SMOOTH) LOFT + TRANSPARENT RUFFLE.** Classic upload shipped (Experimental). Legacy wardrobe lab still deferred behind `?avatarLab=1`. See `QA-FLASH.md`.
+**STATUS (?v=20260906bb): Hybrid PNG walk fix + optional Ruffle; one-flow Wear & enter loft. See HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.** Classic upload shipped (Experimental). Legacy wardrobe lab still deferred behind `?avatarLab=1`. See `QA-FLASH.md`.
 
 **Audience:** beginners on the web-mock chrome + ENGINE DEV on the Pixi (or later) room engine.  
 **Status:** Phase 0–1 wardrobe foundation exists behind a feature flag; **not** active for visitors (Sep 2026). **Do not** treat this as a license to scrape whirled.club shop media.  

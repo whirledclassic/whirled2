@@ -1,25 +1,29 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906ay` (`LOGO_V`)  
+**Cache:** `?v=20260906bb` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
 
 ---
 
-## Using old Whirled / Flash avatars (first-class)
+## Classic Whirled avatars — without Adobe Flash
 
-Classic Flash/SWF avatars stay a **first-class path** alongside modern PNG packs.
+> **Currently: Ruffle = YES (optional path). Default smooth room movement = PNG hybrid (Ruffle not required).**
+
+Browsers can’t run Flash Player; we never require it. **Hybrid (smooth)** = PNG/WebP idle+walk for loft click-to-walk. **Ruffle** (WASM, CDN) is optional for real `.swf` preview / SWF-only Wear. Whirl-only users never load Ruffle.
+
+Full note: [HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md](./HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md).
 
 | Doc | What |
 |-----|------|
+| [HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md](./HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md) | Plain-English: Hybrid + optional Ruffle |
 | [AVATAR-IMPORT.md](./AVATAR-IMPORT.md) | Legacy Whirled SWF → Stuff / wardrobe |
 | [AVATAR-CREATOR-GUIDE.md](./AVATAR-CREATOR-GUIDE.md) | Flash/Animate → Publish SWF **or** PNG sequences for Wear |
 | [FLA-TEST-AVATAR.md](./FLA-TEST-AVATAR.md) | FLA lab notes — `.fla` alone cannot play; publish SWF / export PNGs |
+| [QA-FLASH.md](./QA-FLASH.md) | Overnight Flash / loft checklist |
 
-**Stub / in progress:** SWF upload → analyze → Ruffle preview (chrome lab, `?avatarLab=1`). Lab Wear / Ruffle stay on chrome layers — **do not** force Flash into `#stage-slot`. Pixi owns the stage mount; SWF path is parallel.
-
-In-site: open the hub card **Using old Whirled / Flash avatars**, or Stuff → **How to make an avatar**.
+Wear / Ruffle stay on chrome layers — **do not** force Flash into `#stage-slot`. In-site: Developers hub card + Groups → **Dev Updates**.
 
 ---
 
@@ -63,7 +67,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906ay` — Hybrid Flash loft + pale-blue room chrome (see `QA-FLASH.md`).
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bb` — Hybrid Flash loft + pale-blue room chrome (see `QA-FLASH.md`).
 
 ---
 
@@ -84,6 +88,25 @@ Cross-link: [Using old Whirled / Flash avatars](#using-old-whirled--flash-avatar
 | `index.html` | cache-bust + `WHIRLED_API` on Pages |
 
 
-### Classic Flash module (?v=20260906ay)
+### Classic Flash module (?v=20260906bb)
 
-`src/classic-avatar.js` — Stuff upload/analyze/Ruffle Experimental; loft **Hybrid (smooth)** PNG walk by default; Force Ruffle toggle; transparent stage. See AVATAR-IMPORT.md / QA-FLASH.md.
+`src/classic-avatar.js` — one-flow upload → Analyze → Wear & enter loft; Hybrid PNG walk; optional Ruffle; SWF bob walk. See HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md / QA-FLASH.md.
+
+
+## Admin bootstrap (?v=20260906ba)
+
+Local admins live in `whirled2.roles` + `whirled2.admins`.
+
+1. **Automatic:** first registered user id (`whirled2.firstUserId`), or display name / id `Test` / `admin`.
+2. **Secret once:** in the browser console on Pages/local:
+   `localStorage.setItem("whirled2.forceAdmin","1"); location.reload()`
+   Then open **Me → Admin** (or header **Admin**) and promote others; you can remove the force flag after.
+3. Admins manage the seeded **Whirled2 Developers** group.
+
+## /broadcast (earn-only coins)
+
+Classic wiki used **Bars** (start ~5, inflate; Club Whirled fixed 10k coins). Whirled2 charges **coins**: base **50**, then ×**1.5** per broadcast the same local day (`whirled2.broadcastState`). Usage: `/broadcast hello`.
+
+## Classic avatars without Flash
+
+See `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md` and Groups → Whirled2 Developers → **Flash / avatars**.

@@ -1,45 +1,47 @@
-# QA-FLASH — overnight Flash / loft interact checklist (?v=20260906ay)
+# QA-FLASH — overnight Flash / loft interact checklist (?v=20260906bb)
 
 **Audience:** beginners verifying Wear + loft; ENGINE DEV confirming chrome vs Ruffle boundaries.
 
+## Currently
+
+> **Ruffle = YES (optional path). Default smooth room movement = PNG hybrid (Ruffle not required).**  
+> Whirl-only → Ruffle never loads. See `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md`.
+
 ## Root causes we fixed
 
-1. **Black background** — Ruffle default opaque stage / missing `wmode:"transparent"` + CSS. Fixed: `backgroundColor: null`, `wmode: "transparent"`, transparent CSS on `#avatar-ruffle-host` / player / canvas.
-2. **Cannot click / walk** — (a) Ruffle layer ate pointer events; (b) stock Whirled SWFs need **AvatarControl** host (`controlConnect` / `appearanceChanged_*`) — without it the SWF idles forever. Fixed practically: **Hybrid (smooth)** PNG chrome walk by default; loft Ruffle uses `pointer-events: none` so floor clicks reach `.stage-host`.
-3. **Brown/black room bars** — `.stage-wrap` / mobile `.workspace` used brown band gradients (`#5c4030` / `#8b6914`) and `#000` voids. Swept to pale-blue classic chrome + cool blue loft floor.
+1. **Black background** — Ruffle opaque stage. Fixed: `wmode:"transparent"`, `backgroundColor:null`, transparent CSS.
+2. **Cannot click / walk** — Ruffle ate pointer events; stock SWFs need AvatarControl. Fixed: Hybrid PNG walk default; loft Ruffle `pointer-events:none`.
+3. **Brown/black room bars** — swept to pale-blue (ay/az).
+4. **Tofu / wrong sprite on Hybrid walk (?v=20260906bb)** — preview/thumb alone was treated as Hybrid; empty walk frames blanked the billboard → tofu fallback. Fixed: strict PNG idle/walk gate; never wipe frames mid-walk; never tofu when SWF worn; SWF-only gets Ruffle + bob/flip motion.
+5. **Huge SWF data URL on worn row** — could blow localStorage Wear. Fixed: prefer `swfSha1` + IDB; strip large data URLs from worn snapshot.
 
 ## What to do on Wear
 
 | Item type | What Wear does | How you walk |
 |-----------|----------------|--------------|
 | **Whirl / PNG pack** | PNG billboard | Click loft floor |
-| **Hybrid (SWF + PNG idle/walk)** | **Hybrid (smooth)** — PNG in loft; SWF for Stuff Ruffle preview | Click floor (PNG walk frames / emotes) |
-| **SWF-only (Classic Flash opt-in)** | Transparent Ruffle on loft | Click floor to **move billboard**; SWF anim stays idle until AvatarControl host |
-| **Force Ruffle in loft** (toggle on item) | SWF overlay even if PNGs exist | Floor still moves; prefer Hybrid for feel |
+| **Hybrid (SWF + PNG idle/walk)** | **Hybrid (smooth)** — PNG in loft; SWF for Stuff Ruffle preview | Click floor (PNG walk / emotes) |
+| **SWF-only** | Transparent Ruffle | Click floor → move + bob; recommend PNG for Hybrid |
+| **Force Ruffle** | SWF overlay | Floor still moves |
 
 ### Steps (Test profile)
 
-1. Hard-reload `?v=20260906ay` (or clear cache).
-2. Stuff → Avatars → confirm **Whirl** seeded + Worn (starter).
-3. If you have a classic upload: open item → see **Loft mode** pill (Hybrid / Ruffle).
-4. Wear hybrid item → loft nameplate shows **Hybrid (smooth)** → click floor → walks.
-5. Wear SWF-only → no black box (loft shows through) → click floor → avatar position moves.
-6. Rooms: no brown/black stripes on stage frame, occupant strip, music dock chrome, Clear chat / Share row.
-7. Optional: enable **Force Ruffle in loft** → SWF appears; floor still clickable around it.
+1. Hard-reload `?v=20260906bb`.
+2. Stuff → Avatars → Whirl seeded + Worn.
+3. Classic upload: Drop SWF → Analyze (auto Experimental/Hybrid) → Save → **Wear & enter loft**.
+4. Hybrid with PNG idle+walk → nameplate Hybrid (smooth) → floor walk uses PNG (not tofu).
+5. SWF-only → no black box; floor click moves + bob; no tofu.
+6. Click avatar → emotes if frames; else Coming Soon stubs (walk still works).
+7. Developers hub → callout shows Ruffle optional / PNG default.
+8. Groups → Dev Updates → without-Flash thread present.
 
-## Automated smoke (no browser)
+## Automated smoke
 
 ```bash
 node scripts/qa-flash-check.cjs
 node --check src/classic-avatar.js app.js
 ```
 
-## AvatarControl next steps (honest)
-
-- Host must answer `controlConnect` and drive `appearanceChanged_v1/v2`.
-- Do **not** copy AGPL `whirled-host` code; study Grey Havens / whirled.club ASdocs only.
-- Until then: Hybrid PNG is the playable path.
-
 ## Preserve
 
-Whirl auto seed+Wear, room visual overhaul, av chat visit-since, Dev Hub, classic-avatar.js module, earn-only, no MySpace, no fake catalog.
+Whirl auto seed+Wear, pale-blue chrome, av chat visit-since, Dev Hub, classic-avatar.js, earn-only, no MySpace, no fake catalog, transparent Ruffle, PE none on loft SWF.

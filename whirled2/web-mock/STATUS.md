@@ -1,37 +1,32 @@
+## What shipped (?v=20260906bb)
+
+- **Flash walk polish:** Hybrid loft MUST use PNG idle/walk (Whirl path) — not tofu, not frozen SWF slide. Root cause: preview/thumb alone counted as Hybrid + empty walk frames wiped billboard → tofu; huge SWF data URLs could break Wear persist.
+- **SWF-only:** transparent Ruffle + synthesized bob/flip while chrome moves; never tofu when SWF worn.
+- **One-flow:** Analyze auto-checks Experimental + Hybrid → Save → **Wear & enter loft**.
+- **Emotes:** Hybrid frames work; else Coming Soon stubs that don’t break walk.
+- **Docs:** `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md` — **Ruffle = YES (optional)**; default smooth move = PNG hybrid. Dev Hub callout + Groups **Dev Updates** thread.
+- Cache: **`?v=20260906bb`**. Push: `/tmp/push-bb.js` (dry-run; do not merge over mid-flight **ba** blindly — fold note if needed). QA: `node scripts/qa-flash-check.cjs`.
+- Preserves Whirl, pale-blue az chrome, av chat visit-since, transparent Ruffle, PE none on loft SWF.
+
+## What shipped (?v=20260906ba)
+
+- **Groups (wiki-faithful):** list / create / join, group home (logo+banner placeholders), discussion threads + replies, search, sticky/announce flags, Group chat button. Pale-blue classic mobile-friendly chrome.
+- **Seeded `Whirled2 Developers`:** owner = first/local admin; members get Developers role; threads **Updates & notes**, **Flash / avatars**, **General**. Auto overnight changelog + NaN QA note + Flash-without-plugin post (links `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md`).
+- **Admin panel:** Me → Admin + header Admin (if `isAdmin`). List local users; Make/Remove admin. Bootstrap: first account / Test / `whirled2.forceAdmin=1` + `whirled2.admins` (Dev Hub).
+- **/broadcast:** escalating **coins** (base 50 ×1.5/day count). Classic wiki used Bars (start ~5); Whirled2 earn-only documents the coin model. Highlighted `BROADCAST` bubble; insufficient funds error.
+- **QA NaN fix:** `sanitizeDisplayName` always strips `/NaN/gi`; heal session/users/profiles on boot; presence self-name never paints `QA AxNaNNaN`.
+- Also: friends search email/realName/interests; decorate filter/snap/scale (earlier in ba pass).
+- Preserve: ay Flash hybrid + transparent Ruffle, Whirl, chat visit-since, Dev Hub, pale-blue az room chrome, earn-only, no MySpace, no fake catalog.
+- Cache: **`?v=20260906ba`**. Push: `/tmp/push-ba.js` (dry-run default). Do not fight `classic-avatar.js` walk (bb Flash agent).
+
 ## What shipped (?v=20260906az)
 
-- **Extra visual polish** on ay bar kill: flat pale stage-wrap (no stripe bands), soft loft viewport containment, wood floor clipped inside `#stage-slot` only.
-- Immersive mode: pale `#cfe4f4` main/workspace (not charcoal `#1a2a38`); room-strip frosted pale card.
-- Music gesture FAB pale-blue; collapsed embed letterbox stays hidden.
-- CSS-only — **no JS**. Preserves Flash Hybrid / Whirl / av chat visit-since / Clear / classic-avatar.
-- Cache: **`?v=20260906az`**. Push: `/tmp/push-az.js` (dry-run default).
-
-## What shipped (?v=20260906ay) — visual bar kill (merged into ay styles)
-
-- **Room chrome stacking:** killed full-width brown `#5c4030`/`#8b6914` bands on `.stage-wrap` / `.workspace`; pale loft-blue chrome only.
-- **IN THIS ROOM rail:** no near-black `#1b2833`/`#121920` strip — pale-blue occupant rail (desktop + mobile chip strip).
-- **Black bars removed:** workspace `#000` void, mobile rail `#000` borders, slide chat `#0b1014`/`#121a22` slabs, bottom `.bar` night black on rooms, collapsed music iframe letterbox as chrome bar.
-- **Floor:** subtle warm wood + grid stays **inside** `.loft-floor` / `#stage-slot` only — not a full-width brown bar under the stage eating UI.
-- Music mini-bar stays pale-blue (ax); expanded player hole deep-blue not pure black chrome.
-- Preserves **av** chat visit-since / Clear, **Whirl** default, **classic-avatar** / Hybrid ay path. No JS touched (CSS-only).
-- Bar kill landed under ay; **extras polished as `?v=20260906az`** (see below).
+- Extra visual polish on ay bar kill: flat pale stage-wrap, soft loft viewport, wood floor clipped inside `#stage-slot`.
+- Immersive pale `#cfe4f4`; music FAB pale-blue. CSS-only.
 
 ## What shipped (?v=20260906ay)
 
-- **Flash interact (P0):** transparent Ruffle stage (`wmode:transparent` + `backgroundColor:null` + CSS) — no black box; loft `#avatar-ruffle-host` `pointer-events:none` so floor click-to-walk works.
-- **Hybrid (smooth) default:** when SWF + PNG idle/walk exist, loft uses PNG chrome walk/emotes; Stuff keeps Ruffle preview. Label **Hybrid (smooth)**. Experimental **Force Ruffle in loft** toggle for SWF overlay.
-- **SWF-only:** transparent Ruffle appearance; chrome moves billboard on floor click; walk *anim* still needs AvatarControl host (documented, no AGPL copy).
-- **Room chrome:** killed brown/black bars (stage-wrap / workspace / loft-floor / occ-rail / chat toolbar) → pale-blue classic only.
-- Preserves Whirl auto seed+Wear, ax room overhaul intent, av chat visit-since, au Dev Hub, earn-only, no MySpace / fake catalog.
-- Cache: **`?v=20260906ay`**. Push: `/tmp/push-ay.js` (dry-run default). QA: `QA-FLASH.md` + `node scripts/qa-flash-check.cjs`.
-
-## What shipped (?v=20260906ax)
-
-- Room visual overhaul (pale-blue music dock; kill green grass); Whirl starter auto-Wear; FLA Test stub; NaN/toast fixes; Flash hybrid path kept (aw).
-
-## What shipped (?v=20260906aw)
-
-- Classic Flash panel (`src/classic-avatar.js`); hybrid SWF+PNG; Experimental Wear; Ruffle loft host.
+- Flash interact: transparent Ruffle; Hybrid (smooth) default; pale-blue room chrome (no brown/black bars).
 
 # Whirled2 Chrome — STATUS
 

@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906ay
+ * Cache: ?v=20260906bb
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906ay";
+  var VERSION = "20260906bb";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -27,8 +27,9 @@
   var THUMB_MAX_BYTES = 1 * 1024 * 1024;
   var RUFFLE_CDN = "https://unpkg.com/@ruffle-rs/ruffle";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906ay): loft prefers PNG chrome walk (Hybrid smooth).
+  // How this works (?v=20260906bb): loft prefers PNG chrome walk (Hybrid smooth).
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
+  // SWF-only: transparent Ruffle + synthesized bob/flip walk — never broken tofu.
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
   var api = {};
 
@@ -488,27 +489,36 @@
     return false;
   }
 
+  function stateHasFrames(st) {
+    return !!(st && st.frames && st.frames.length);
+  }
+
   function itemHasPngWalk(item) {
-    // Beginner: hybrid needs at least one idle/walk PNG so chrome can click-to-walk smoothly.
-    if (!item) return false;
+    // Beginner (?v=20260906bb): Hybrid needs REAL idle/walk PNG frames — not thumb/preview alone.
+    // Root cause of "tofu / wrong sprite" walk: treating preview-only as Hybrid, then loft
+    // tried PNG chrome walk without walk frames (or blanked frames → tofu fallback).
+    // ENGINE DEV: same gate Whirl uses — states.idle / states.walk / frames[].
+    if (!item || item.isTofu) return false;
     if (item.frames && item.frames.length) return true;
-    if (item.preview && !item.isTofu) return true;
     if (item.states) {
-      var idle = item.states.idle || item.states.stand;
-      var walk = item.states.walk;
-      if (idle && idle.frames && idle.frames.length) return true;
-      if (walk && walk.frames && walk.frames.length) return true;
+      if (stateHasFrames(item.states.idle) || stateHasFrames(item.states.stand)) return true;
+      if (stateHasFrames(item.states.walk)) return true;
     }
     if (item.pack && item.pack.states) {
       var ps = item.pack.states;
-      if (ps.idle && ps.idle.frames && ps.idle.frames.length) return true;
-      if (ps.walk && ps.walk.frames && ps.walk.frames.length) return true;
+      if (stateHasFrames(ps.idle) || stateHasFrames(ps.stand) || stateHasFrames(ps.walk)) return true;
     }
     return false;
   }
 
+  function itemHasStandThumb(item) {
+    // Thumb/preview only — useful as stand art under SWF motion, NOT enough for Hybrid smooth.
+    if (!item || item.isTofu) return false;
+    return !!(item.preview || item.thumb);
+  }
+
   function itemIsHybrid(item) {
-    // Hybrid (smooth): SWF for appearance/archive + PNG states for loft walk/emotes.
+    // Hybrid (smooth): SWF archive + PNG idle/walk for loft click-to-walk (Whirl path).
     return !!(item && itemHasClassicSwf(item) && itemHasPngWalk(item));
   }
 
@@ -539,6 +549,76 @@
     if (shouldMountRuffleInLoft(worn)) return "ruffle";
     if (itemHasPngWalk(worn)) return "png";
     return "unknown";
+  }
+
+  function wornHasClassicSwf(worn) {
+    return !!(worn && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1
+      || worn.mediaKind === "swf" || itemHasClassicSwf(worn)));
+  }
+
+  /**
+   * SWF-only walk UX (?v=20260906bb): bob + slight flip the loft billboard / Ruffle host
+   * while chrome moves it. Stock SWFs cannot animate via AvatarControl yet — this keeps
+   * the room feeling alive without broken tofu or a frozen slide.
+   */
+  function setLoftWalkMotion(on) {
+    var layer = document.getElementById("avatar-wear-layer");
+    if (!layer) return;
+    var bill = layer.querySelector(".avatar-wear-billboard");
+    var host = layer.querySelector("#avatar-ruffle-host, .avatar-ruffle-host");
+    if (on) {
+      layer.classList.add("is-swf-walking");
+      if (bill) bill.classList.add("is-swf-walking");
+      if (host) host.classList.add("is-swf-walking");
+    } else {
+      layer.classList.remove("is-swf-walking");
+      if (bill) bill.classList.remove("is-swf-walking");
+      if (host) host.classList.remove("is-swf-walking");
+    }
+  }
+
+  function ensureClassicWornStates(row, item) {
+    // How this works: Wear must carry classic item states + artFaces so loft = Whirl path.
+    // Beginner: absolutize happens in app.js; here we merge pack.states if row.states empty.
+    if (!row) return row;
+    item = item || {};
+    var packStates = (item.pack && item.pack.states) || item.states || null;
+    if (packStates && typeof packStates === "object") {
+      var hasAny = false;
+      Object.keys(packStates).forEach(function (k) {
+        if (stateHasFrames(packStates[k])) hasAny = true;
+      });
+      if (hasAny) {
+        if (!row.states || typeof row.states !== "object") row.states = {};
+        Object.keys(packStates).forEach(function (k) {
+          if (stateHasFrames(packStates[k]) && !stateHasFrames(row.states[k])) {
+            row.states[k] = {
+              frames: (packStates[k].frames || []).slice(),
+              frameDurationsMs: (packStates[k].frameDurationsMs || []).slice()
+            };
+          }
+        });
+      }
+    }
+    // Idle from frames / preview if still missing — never invent tofu.
+    if (!row.states) row.states = {};
+    if (!stateHasFrames(row.states.idle)) {
+      if (row.frames && row.frames.length) {
+        row.states.idle = { frames: row.frames.slice(), frameDurationsMs: (row.frameDurationsMs || []).slice() };
+      } else if (row.preview) {
+        row.states.idle = { frames: [row.preview], frameDurationsMs: [400] };
+      } else if (row.thumb) {
+        row.states.idle = { frames: [row.thumb], frameDurationsMs: [400] };
+      }
+    }
+    if (!(row.frames && row.frames.length) && stateHasFrames(row.states.idle)) {
+      row.frames = row.states.idle.frames.slice();
+      row.frameDurationsMs = (row.states.idle.frameDurationsMs || []).slice();
+    }
+    if (!row.artFaces) {
+      row.artFaces = item.artFaces || (item.pack && item.pack.artFaces) || "left";
+    }
+    return row;
   }
 
   /*
@@ -594,30 +674,33 @@
   }
 
   function classicUploadPanelHtml() {
-    // How this works: Stuff → Avatars browse shows this pale-blue panel. No obscure ?avatarLab flag required
-    // for YOUR uploads — Wear uses Experimental badge + optional classic Flash opt-in.
+    // How this works (?v=20260906bb): one-flow — Drop SWF (+ optional PNG) → Analyze → auto Experimental/Hybrid
+    // → Save → optional Wear & enter loft. No Adobe Flash Player install. See HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.
     return '<div class="panel classic-avatar-panel" id="classic-avatar-panel">'
       + '<div class="room-side-head"><h2>Classic Flash / Whirled avatars</h2>'
       + experimentalBadgeHtml() + '</div>'
-      + '<p class="meta">Upload <b>your own</b> old Whirled <code>.swf</code> (plus optional thumb / <b>PNG idle+walk</b>). '
-      + 'Best feel: <b>Hybrid (smooth)</b> — PNG chrome walks in the loft; Ruffle preview in Stuff. '
-      + 'SWF-only Ruffle idles without an AvatarControl host (Coming Soon). Transparent stage — no black box. '
-      + 'Never scrape shop media. See <code>AVATAR-IMPORT.md</code> / <code>QA-FLASH.md</code>.</p>'
+      + '<p class="meta"><b>One-flow setup:</b> drop your own old Whirled <code>.swf</code> (plus optional PNG idle+walk zip/files) → '
+      + '<b>Analyze</b> → we auto-check Experimental + Hybrid → <b>Save to Stuff</b> → <b>Wear &amp; enter loft</b>. '
+      + 'No Flash Player install — browsers use PNG walk and/or open-source <b>Ruffle</b> (WASM). '
+      + 'Best feel: <b>Hybrid (smooth)</b> = PNG chrome walk like Whirl. SWF-only still Wearable (transparent Ruffle + bob walk). '
+      + 'Never scrape shop media. Docs: <code>HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md</code> / <code>AVATAR-IMPORT.md</code> / <code>QA-FLASH.md</code>.</p>'
       + '<form id="classic-avatar-upload-form" class="stuff-upload-form classic-avatar-form">'
       +   '<label>Name <input name="name" maxlength="80" required placeholder="My classic avatar" /></label>'
       +   '<label>Description <textarea name="description" rows="2" maxlength="400" placeholder="Optional notes"></textarea></label>'
-      +   '<label>Avatar media (.swf / .fla / zip with swf+thumb) '
+      +   '<label>Avatar media (.swf / .fla / zip with swf+thumb+pngs) '
       +     '<input type="file" name="media" accept=".swf,.fla,.zip,application/x-shockwave-flash,application/zip,application/vnd.adobe.flash.movie" required /></label>'
       +   '<label>Thumbnail (optional, ~80×60 PNG/JPG/GIF) '
       +     '<input type="file" name="thumb" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
-      +   '<label>PNG idle fallback (optional) '
+      +   '<label>PNG idle (recommended for Hybrid smooth walk) '
       +     '<input type="file" name="idle" accept="image/png,image/webp,image/jpeg,image/gif" /></label>'
-      +   '<label>PNG walk fallback (optional, multi-select) '
+      +   '<label>PNG walk frames (recommended, multi-select) '
       +     '<input type="file" name="walk" accept="image/png,image/webp,image/jpeg,image/gif" multiple /></label>'
-      +   '<label class="check-row"><input type="checkbox" name="classicOptIn" checked /> '
-      +     'Classic Flash (experimental) — Ruffle in Stuff preview; loft prefers Hybrid PNG walk when idle/walk attached</label>'
+      +   '<label class="check-row"><input type="checkbox" name="classicOptIn" checked data-auto-classic="1" /> '
+      +     'Classic Flash (experimental) — Ruffle preview; loft uses Hybrid PNG walk when idle/walk attached</label>'
+      +   '<label class="check-row"><input type="checkbox" name="preferHybrid" checked data-auto-hybrid="1" /> '
+      +     'Prefer Hybrid (smooth) — use PNG idle/walk in loft when attached (recommended)</label>'
       +   '<label class="check-row"><input type="checkbox" name="forceRuffle" /> '
-      +     'Force Ruffle in loft (Experimental) — show SWF on stage; still needs AvatarControl to walk; may feel laggy</label>'
+      +     'Force Ruffle in loft (Experimental) — SWF appearance; chrome still moves you; may feel laggy</label>'
       +   '<label class="check-row"><input type="checkbox" name="rights" required /> '
       +     'I confirm this is my own creation or I have the rights to store it (no shop scrapes).</label>'
       +   '<div class="stuff-detail-actions">'
@@ -626,10 +709,11 @@
       +   '</div>'
       +   '<p class="meta" id="classic-avatar-upload-msg"></p>'
       +   '<div id="classic-avatar-analyze-out"></div>'
+      +   '<div id="classic-avatar-post-save" class="classic-post-save" hidden></div>'
       +   '<div id="classic-avatar-ruffle-preview" class="classic-ruffle-preview" hidden>'
       +     '<div class="section-label">Ruffle preview ' + experimentalBadgeHtml() + '</div>'
       +     '<div class="classic-ruffle-host" id="classic-ruffle-host"></div>'
-      +     '<p class="meta">Play-as-is (transparent stage). Walk/states need AvatarControl host shim — Coming Soon. Prefer Hybrid PNG for loft.</p>'
+      +     '<p class="meta">Transparent stage (no black box). SWF walk anim needs AvatarControl — Coming Soon. Attach PNG idle+walk for Hybrid smooth loft walk.</p>'
       +   '</div>'
       + '</form>'
       + '<p class="meta fla-test-soon"><b>FLA lab reference:</b> <code>assets/avatars/fla-lab/</code> holds a source .fla + sketch bitmaps (Coming Soon as Wearable). '
@@ -977,7 +1061,7 @@
   // ---------------------------------------------------------------------------
   var bound = false;
   function bindEvents(hooks) {
-    // hooks: { findStuff, saveStuff, loadStuff, session, paint, pushNotice, wearStuffAvatar }
+    // hooks: { findStuff, saveStuff, loadStuff, session, paint, pushNotice, wearStuffAvatar, enterLoft }
     if (hooks) {
       if (hooks.findStuff) api._findStuff = hooks.findStuff;
       if (hooks.saveStuff) api._saveStuff = hooks.saveStuff;
@@ -986,6 +1070,7 @@
       if (hooks.paint) api._paint = hooks.paint;
       if (hooks.pushNotice) api._pushNotice = hooks.pushNotice;
       if (hooks.wearStuffAvatar) api._wearStuffAvatar = hooks.wearStuffAvatar;
+      if (hooks.enterLoft) api._enterLoft = hooks.enterLoft;
       if (hooks.awardAction) api._awardAction = hooks.awardAction;
     }
     if (bound) return;
@@ -1014,8 +1099,18 @@
       if (msg) msg.textContent = "Analyzing…";
       analyzeFile(file).then(function (report) {
         if (out) out.innerHTML = analyzeReportHtml(report);
-        if (msg) msg.textContent = report.isSwf ? "SWF detected — you can Save, or Preview below after Save." : (report.isFla ? "FLA archived path only — publish SWF for playback." : "See analyze results.");
-        // Live Ruffle preview for SWF before save
+        // Auto-setup (?v=20260906bb): check Experimental + Prefer Hybrid after Analyze.
+        try {
+          if (form) {
+            if (form.classicOptIn) form.classicOptIn.checked = true;
+            if (form.preferHybrid) form.preferHybrid.checked = true;
+          }
+        } catch (eAuto) {}
+        var tip = report.isSwf
+          ? "SWF detected — Experimental + Hybrid auto-checked. Attach PNG idle+walk for smooth loft walk (Ruffle optional for preview)."
+          : (report.isFla ? "FLA archived path only — publish SWF for playback." : "See analyze results.");
+        if (msg) msg.textContent = tip;
+        // Live Ruffle preview for SWF before save (optional path — loads CDN only when previewing SWF)
         if (report.isSwf && report._buffer) {
           var prev = document.getElementById("classic-avatar-ruffle-preview");
           var host = document.getElementById("classic-ruffle-host");
@@ -1049,6 +1144,41 @@
       }).catch(function (err) {
         if (api._pushNotice) api._pushNotice("status", String(err && err.message || err));
       });
+      return;
+    }
+
+    // Wear & enter loft (one-flow after Save)
+    var wearEnter = t.closest("[data-classic-wear-enter]");
+    if (wearEnter) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      var wid = wearEnter.getAttribute("data-classic-wear-enter");
+      var wItem = api._findStuff && api._findStuff(wid);
+      if (!wItem) {
+        if (api._pushNotice) api._pushNotice("status", "Avatar not found — try Stuff → Avatars.");
+        return;
+      }
+      if (api._wearStuffAvatar) api._wearStuffAvatar(wItem);
+      if (api._pushNotice) {
+        api._pushNotice("green", itemIsHybrid(wItem)
+          ? "Wearing Hybrid (smooth) — entering loft. Click floor to walk."
+          : "Wearing Flash avatar — entering loft. Click floor to move (bob walk). PNG idle+walk = smoother.", { transient: true });
+      }
+      // Enter rooms loft via hook if present
+      if (typeof api._enterLoft === "function") api._enterLoft();
+      else if (api._paint) {
+        try { if (global.WhirledChrome && typeof global.WhirledChrome.enterRoom === "function") global.WhirledChrome.enterRoom("loft"); } catch (eEr) {}
+        api._paint("rooms");
+      }
+      return;
+    }
+    var openDet = t.closest("[data-classic-open-detail]");
+    if (openDet) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      var oid = openDet.getAttribute("data-classic-open-detail");
+      if (typeof api._openStuffDetail === "function") api._openStuffDetail(oid);
+      else if (api._paint) api._paint("stuff");
       return;
     }
 
@@ -1133,6 +1263,13 @@
     }
     if (msg) msg.textContent = "Saving…";
     saveClassicUploadFromForm(form, sess.user).then(function (row) {
+      // Prefer Hybrid: do not force Ruffle when user checked preferHybrid (default).
+      try {
+        if (form.preferHybrid && form.preferHybrid.checked && form.forceRuffle && !form.forceRuffle.checked) {
+          row.forceRuffleInLoft = false;
+          if (row.pack) row.pack.forceRuffleInLoft = false;
+        }
+      } catch (eHy) {}
       var items = (api._loadStuff && api._loadStuff()) || [];
       items.unshift(row);
       try {
@@ -1142,17 +1279,29 @@
         return;
       }
       if (api._awardAction) try { api._awardAction("upload"); } catch (eA) {}
-      if (api._pushNotice) {
-        api._pushNotice("green", row.classicFlashOptIn
-          ? "Classic avatar saved. Open it → Wear (Experimental Flash). Add PNGs anytime for walk."
-          : "Classic avatar saved (archive / PNG path). Enable Classic Flash on the item for Ruffle.", { transient: true });
+      var hybridNow = itemIsHybrid(row);
+      var notice = hybridNow
+        ? "Saved Hybrid (smooth) — PNG loft walk ready. Wear & enter loft, or open the card."
+        : (row.classicFlashOptIn
+          ? "Saved SWF Wearable — transparent Ruffle + bob walk. Attach PNG idle+walk anytime for Hybrid smooth."
+          : "Classic avatar saved. Enable Classic Flash on the item for Ruffle preview.");
+      if (api._pushNotice) api._pushNotice("green", notice, { transient: true });
+      var post = document.getElementById("classic-avatar-post-save");
+      if (post) {
+        post.hidden = false;
+        post.innerHTML = '<div class="section-label">Ready</div>'
+          + '<p class="meta">' + esc(notice) + '</p>'
+          + '<div class="stuff-detail-actions">'
+          +   '<button type="button" class="action-btn" data-classic-wear-enter="' + esc(row.id) + '">Wear &amp; enter loft</button>'
+          +   '<button type="button" class="text-btn" data-classic-open-detail="' + esc(row.id) + '">Open in Stuff</button>'
+          + '</div>'
+          + (hybridNow ? '' : '<p class="meta">Tip: add PNG idle+walk for Hybrid (smooth) — Ruffle is optional and only loads for SWF preview / Force Ruffle.</p>');
       }
+      if (msg) msg.textContent = "Saved.";
       if (api._paint) {
-        // Open detail — app.js uses stuffMode / stuffItemId; set via hooks if provided
         if (typeof api._openStuffDetail === "function") api._openStuffDetail(row.id);
         else api._paint("stuff");
       }
-      if (msg) msg.textContent = "Saved.";
     }).catch(function (err) {
       if (msg) msg.textContent = String(err && err.message || err);
     });
@@ -1162,23 +1311,35 @@
   // Enrich worn row when app.js wears an item (called from hook)
   // ---------------------------------------------------------------------------
   function enrichWornRow(row, item) {
+    // How this works (?v=20260906bb): copy classic fields; keep worn row SMALL (sha1, not huge data URL)
+    // so localStorage Wear does not fail → tofu. Resolve SWF bytes from IDB at mount time.
     if (!row || !item) return row;
     if (item.swfSha1) row.swfSha1 = item.swfSha1;
-    if (item.swfDataUrl) row.swfDataUrl = item.swfDataUrl;
-    if (item.swfUrl) row.swfUrl = item.swfUrl;
     if (item.swfName) row.swfName = item.swfName;
     if (item.swfBytes) row.swfBytes = item.swfBytes;
+    // Prefer tiny URLs only — drop multi-MB data: URLs from the worn snapshot.
+    if (item.swfUrl && String(item.swfUrl).indexOf("data:") !== 0) row.swfUrl = item.swfUrl;
+    if (item.swfDataUrl && String(item.swfDataUrl).length < 120000) {
+      row.swfDataUrl = item.swfDataUrl;
+      if (!row.swfUrl) row.swfUrl = item.swfDataUrl;
+    } else if (row.swfDataUrl && String(row.swfDataUrl).length >= 120000) {
+      try { delete row.swfDataUrl; } catch (eStrip) { row.swfDataUrl = undefined; }
+    }
     row.classicFlashOptIn = !!(item.classicFlashOptIn || item.useClassicFlash
       || (item.pack && item.pack.classicFlashOptIn));
     row.forceRuffleInLoft = !!(item.forceRuffleInLoft || item.useRuffleInLoft
       || (item.pack && (item.pack.forceRuffleInLoft || item.pack.useRuffleInLoft)));
     if (item.source) row.source = item.source;
+    ensureClassicWornStates(row, item);
     if (row.classicFlashOptIn && (row.swfSha1 || row.swfDataUrl || row.swfUrl)) {
       row.mediaKind = "swf";
       if (!row.swfUrl && row.swfDataUrl) row.swfUrl = row.swfDataUrl;
     }
+    // Hybrid flag from item (has PNG frames) — worn row may omit empty walk until setAvatarState.
+    row.isHybrid = itemIsHybrid(item) || itemIsHybrid(row);
     row.loftRenderMode = loftRenderMode(row);
-    row.isHybrid = itemIsHybrid(row);
+    // Never mark classic Wear as tofu.
+    if (row.isTofu && wornHasClassicSwf(row)) row.isTofu = false;
     return row;
   }
 
@@ -1202,10 +1363,14 @@
   api.itemHasClassicSwf = itemHasClassicSwf;
   api.itemWantsClassicFlash = itemWantsClassicFlash;
   api.itemHasPngWalk = itemHasPngWalk;
+  api.itemHasStandThumb = itemHasStandThumb;
   api.itemIsHybrid = itemIsHybrid;
   api.forceRuffleInLoft = forceRuffleInLoft;
   api.shouldMountRuffleInLoft = shouldMountRuffleInLoft;
   api.loftRenderMode = loftRenderMode;
+  api.wornHasClassicSwf = wornHasClassicSwf;
+  api.setLoftWalkMotion = setLoftWalkMotion;
+  api.ensureClassicWornStates = ensureClassicWornStates;
   api.classicHybridBadgeHtml = classicHybridBadgeHtml;
   api.describeAvatarControlNextSteps = describeAvatarControlNextSteps;
   api.enrichWornRow = enrichWornRow;
@@ -1217,8 +1382,9 @@
   api.SWF_MAX_BYTES = SWF_MAX_BYTES;
   api.FORCE_RUFFLE_KEY = FORCE_RUFFLE_KEY;
 
-  // Allow app.js to set open-detail helper
+  // Allow app.js to set open-detail / enter-loft helpers
   api.setOpenStuffDetail = function (fn) { api._openStuffDetail = fn; };
+  api.setEnterLoft = function (fn) { api._enterLoft = fn; };
 
   global.WhirledClassicAvatar = api;
 })(typeof window !== "undefined" ? window : this);

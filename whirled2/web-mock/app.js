@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ay";
+  var LOGO_V = "20260906bb";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -37,15 +37,27 @@
       return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
     });
   }
-  // How this works (?v=20260906ax): strip accidental "NaN" concat bugs (e.g. Invalid Date → name+getMonth()+0+getDate()+0).
-  // Beginner: display names must stay human — never show TestNaN0NaN0 in the occupant strip.
+  // How this works (?v=20260906ba): ALWAYS strip /NaN/gi first, then recover human remnant.
+  // Root cause: Invalid Date → name+getMonth()+getDate() became "QA AxNaNNaN" in occupant rail.
+  // Beginner: never show NaN in In this room / chips / chat who — heal session on boot too.
   function sanitizeDisplayName(name, fallback) {
-    var s = String(name == null ? "" : name).trim();
-    if (!s || /NaN/i.test(s)) {
-      s = String(fallback == null ? "" : fallback).trim();
+    function scrub(v) {
+      var t = String(v == null ? "" : v);
+      // Strip every NaN token (case-insensitive) and control junk left by date concat bugs.
+      t = t.replace(/NaN/gi, "");
+      t = t.replace(/[\u0000-\u001f]/g, "");
+      // Collapse leftover "Ax00" / "Ax0000" pad residue after NaN strip (keep letters+spaces+_-).
+      t = t.replace(/([A-Za-z])(?:0{1,4})+$/g, "$1");
+      t = t.replace(/\s{2,}/g, " ").trim();
+      return t;
     }
-    s = s.replace(/NaN/gi, "").replace(/\s{2,}/g, " ").trim();
-    if (!s || /^[0\W]*$/.test(s)) s = String(fallback || "Player").trim() || "Player";
+    var s = scrub(name);
+    if (!s || /NaN/i.test(s)) s = scrub(fallback);
+    if (!s || /^[0\W]*$/.test(s)) s = scrub(fallback) || "Player";
+    if (!s) s = "Player";
+    // Final belt: never return a string that still contains NaN.
+    s = scrub(s);
+    if (/NaN/i.test(s) || !s) s = "Player";
     return s.slice(0, 40);
   }
   function displayNameForOccupant(p) {
@@ -53,10 +65,54 @@
     try {
       var s = session();
       if (s && s.user && p && (p.you || String(p.id) === String(s.user.id))) {
-        return sanitizeDisplayName(s.user.name, "You");
+        var selfName = sanitizeDisplayName(s.user.name, "You");
+        // Heal in-memory + storage if presence still carried AxNaNNaN.
+        if (String(s.user.name || "") !== selfName) {
+          try {
+            s.user.name = selfName;
+            localStorage.setItem("whirled2.session", JSON.stringify(s));
+          } catch (eH) {}
+        }
+        return selfName;
       }
     } catch (e) {}
     return sanitizeDisplayName(p && p.name, (p && p.id) || "Player");
+  }
+  function healStoredDisplayNames() {
+    // How this works (?v=20260906ba): one-shot boot heal for session + users + known profiles.
+    // Beginner: fixes "QA AxNaNNaN" left from older builds without waiting for next login.
+    try {
+      var s = session();
+      if (s && s.user) {
+        var cn = sanitizeDisplayName(s.user.name, s.user.id || "Player");
+        if (cn && cn !== String(s.user.name || "")) {
+          s.user.name = cn;
+          localStorage.setItem("whirled2.session", JSON.stringify(s));
+        }
+      }
+    } catch (e1) {}
+    try {
+      var users = JSON.parse(localStorage.getItem("whirled2.users") || "{}");
+      var dirty = false;
+      Object.keys(users).forEach(function (k) {
+        var u = users[k];
+        if (!u) return;
+        var n = sanitizeDisplayName(u.name, u.id || k);
+        if (n !== String(u.name || "")) { u.name = n; dirty = true; }
+      });
+      if (dirty) localStorage.setItem("whirled2.users", JSON.stringify(users));
+    } catch (e2) {}
+    try {
+      var known = JSON.parse(localStorage.getItem("whirled2.knownProfiles") || "[]");
+      var kd = false;
+      known = (known || []).map(function (p) {
+        if (!p) return p;
+        var n = sanitizeDisplayName(p.name, p.id || "Player");
+        if (n !== String(p.name || "")) { p.name = n; kd = true; }
+        return p;
+      });
+      if (kd) localStorage.setItem("whirled2.knownProfiles", JSON.stringify(known));
+    } catch (e3) {}
   }
   // ---------------------------------------------------------------------------
   // localStorage keys + UI state
@@ -1321,6 +1377,7 @@
   var shopItemId = null;
   var groupViewId = null;
   var groupThreadId = null;
+  var groupDiscussQ = ""; // Groups forum search (?v=20260906ba)
   var roomMenuOpen = false;
   var roomPanelOpen = false;
   var playlistPanelOpen = false; // Room menu → View room music
@@ -1345,6 +1402,10 @@
   // How this works (?v=20260906at): selected decorate chip for Make Door / Drop Door.
   // Beginner: tap a chip while decorating → Make Door panel; outside decorate, doors travel.
   var selectedDecId = null;
+  // How this works (?v=20260906ba): decorate inventory filter + snap grid (wiki Furniture edit polish).
+  // Beginner: filter Your Stuff by kind; Snap aligns chips to an 8px grid when you drop them.
+  var decorateInvFilter = "all"; // all | furniture | backdrops | toys | images
+  var decorateSnapGrid = true;
   var doorGlowPreview = false; // Room menu → View clickable furniture (green door glow)
   var makeDoorPanelOpen = false; // side panel when linking/creating via a door chip
   var partyPanelOpen = false;
@@ -1563,11 +1624,20 @@
     // How this works: unified packs expose states{idle,walk,...}; legacy packs = idle-only from frames.
     // Beginner: Whirl has idle + walk so click-to-walk can animate. Parts stay optional.
     // ENGINE DEV: same shape Pixi Player should later consume from pack.json.
+    // (?v=20260906bb): empty states {} must NOT short-circuit — fall through to frames/preview.
     var states = null;
     if (item && item.states && typeof item.states === "object") states = item.states;
     else if (item && item.pack && item.pack.states) states = item.pack.states;
     var packPath = (item && (item.packPath || (item.slug ? ("assets/avatars/user-pack/" + item.slug + "/") : ""))) || "";
+    var statesHaveFrames = false;
     if (states) {
+      try {
+        Object.keys(states).forEach(function (k) {
+          if (states[k] && states[k].frames && states[k].frames.length) statesHaveFrames = true;
+        });
+      } catch (eSf) { statesHaveFrames = false; }
+    }
+    if (states && statesHaveFrames) {
       return absolutizeStateMap(states, packPath) || { idle: { frames: [], frameDurationsMs: [] } };
     }
     var frames = [];
@@ -1666,10 +1736,27 @@
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemWantsClassicFlash && WhirledClassicAvatar.itemWantsClassicFlash(worn)));
     var forceRuffleLoft = !!(worn.forceRuffleInLoft
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.forceRuffleInLoft && WhirledClassicAvatar.forceRuffleInLoft(worn)));
-    var hasPngFrames = !!(worn.frames && worn.frames.length) || !!worn.preview
-      || !!(worn.states && ((worn.states.idle && worn.states.idle.frames && worn.states.idle.frames.length)
-        || (worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length)));
-    // SWF-only (no PNG): transparent Ruffle host; pointer-events none; chrome moves billboard on floor click.
+    // (?v=20260906bb): Hybrid = real idle/walk PNG frames (not thumb/preview alone).
+    // Preview-only + SWF → Ruffle path + bob walk — never fake Hybrid / never tofu.
+    var hasRealPngWalk = false;
+    try {
+      if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasPngWalk) {
+        hasRealPngWalk = !!WhirledClassicAvatar.itemHasPngWalk(worn);
+      }
+    } catch (eHp) { hasRealPngWalk = false; }
+    if (!hasRealPngWalk) {
+      hasRealPngWalk = !!(worn.frames && worn.frames.length)
+        || !!(worn.states && ((worn.states.idle && worn.states.idle.frames && worn.states.idle.frames.length)
+          || (worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length)));
+      // Thumb/preview alone do NOT count as Hybrid PNG walk.
+      if (hasRealPngWalk && !(worn.frames && worn.frames.length)
+        && !(worn.states && worn.states.idle && worn.states.idle.frames && worn.states.idle.frames.length)
+        && !(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length)) {
+        hasRealPngWalk = false;
+      }
+    }
+    var hasPngFrames = hasRealPngWalk;
+    // SWF-only (no real PNG walk): transparent Ruffle host; pointer-events none; chrome moves + bob.
     if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && !hasPngFrames) {
       var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle">'
@@ -1695,7 +1782,17 @@
     if (!frames.length && worn.preview) frames = [worn.preview];
     if (!frames.length && worn.thumb) frames = [worn.thumb];
     if (!frames.length) {
-      // Last resort: show tofu instead of an empty invisible layer.
+      // Never show broken tofu when a classic SWF is worn — fall back to transparent Ruffle.
+      if ((worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && (isSwf || wantsClassic || worn.classicFlashOptIn)) {
+        var swfAttr2 = esc(worn.swfUrl || worn.swfDataUrl || "");
+        return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr2 + '" data-loft-mode="ruffle">'
+          + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
+          +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr2 + '" title="Ruffle experimental — transparent; floor click moves you"></div>'
+          +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar")
+          +   ' <span class="classic-exp-badge">Experimental</span></div>'
+          + '</div></div>';
+      }
+      // Last resort: show tofu instead of an empty invisible layer (PNG packs only).
       return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-tofu" aria-label="Avatar missing frames">'
         + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
         +   tofuSvgHtml("tofu-avatar tofu-wear")
@@ -1790,6 +1887,7 @@
   }
   function setAvatarState(stateName) {
     // How this works: swap billboard frames to idle / walk / stand / pose without full paint.
+    // (?v=20260906bb): never wipe frames to [] (root cause of tofu/wrong sprite mid-walk).
     var worn = loadWornAvatar();
     if (!worn || worn.isTofu) return false;
     var states = worn.states || {};
@@ -1800,9 +1898,13 @@
       else return false;
     }
     var st = states[name] || states.idle || { frames: worn.frames || [], frameDurationsMs: worn.frameDurationsMs || [] };
+    var nextFrames = (st.frames || []).slice();
+    if (!nextFrames.length && worn.frames && worn.frames.length) nextFrames = worn.frames.slice();
+    if (!nextFrames.length && worn.preview) nextFrames = [worn.preview];
+    if (!nextFrames.length && worn.thumb) nextFrames = [worn.thumb];
     worn.state = name;
-    worn.frames = (st.frames || []).slice();
-    worn.frameDurationsMs = (st.frameDurationsMs || []).slice();
+    worn.frames = nextFrames;
+    worn.frameDurationsMs = (st.frameDurationsMs || worn.frameDurationsMs || []).slice();
     saveWornAvatar(worn);
     var layer = document.getElementById("avatar-wear-layer");
     var bill = layer && layer.querySelector(".avatar-wear-billboard");
@@ -1853,8 +1955,8 @@
   }
   function chromeWalkTo(xPct, yPct) {
     // Animate billboard toward floor click. Walk frames while moving; idle on arrive.
-    // How this works (?v=20260906ay): Hybrid PNG swaps walk frames; SWF-only still MOVES the billboard
-    // (Ruffle pointer-events none). Stock SWF walk *animation* needs AvatarControl host — not chrome.
+    // How this works (?v=20260906bb): Hybrid PNG swaps walk frames (Whirl path). SWF-only MOVES the
+    // billboard + synthesized bob/flip (Ruffle PE none). Never tofu mid-walk.
     if (isEngineMountedOnStage()) return; // ENGINE DEV: yield to Pixi
     var layer = document.getElementById("avatar-wear-layer");
     var bill = layer && layer.querySelector(".avatar-wear-billboard");
@@ -1872,21 +1974,38 @@
     // Beginner: walking right needs a horizontal flip so they don't moonwalk.
     // ENGINE DEV: Pixi should read worn.artFaces the same way.
     var facesLeft = String(worn.artFaces || "").toLowerCase() === "left"
-      || String(worn.slug || "") === "cyan-hair";
+      || String(worn.slug || "") === "cyan-hair"
+      || !!(worn.classicFlashOptIn || worn.mediaKind === "swf");
     var movingRight = xPct >= cur;
     var face = facesLeft ? (movingRight ? -1 : 1) : (movingRight ? 1 : -1);
     applyWearBillboardPose(cur, face);
     // Cancel any in-flight emote so walk owns the billboard.
     try { cancelAvatarEmoteTimer(); } catch (eEm0) {}
-    setAvatarState((worn.states && worn.states.walk) ? "walk" : "idle");
+    var hasWalkPng = !!(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length);
+    setAvatarState(hasWalkPng ? "walk" : "idle");
+    // SWF-only / no walk PNGs: bob the Ruffle host while moving (classic-avatar helper).
+    var useSwfMotion = !hasWalkPng && !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || layer.classList.contains("is-swf"));
+    try {
+      if (useSwfMotion && window.WhirledClassicAvatar && WhirledClassicAvatar.setLoftWalkMotion) {
+        WhirledClassicAvatar.setLoftWalkMotion(true);
+      }
+    } catch (eMot) {}
     if (chromeWalkRaf) { try { cancelAnimationFrame(chromeWalkRaf); } catch (e) {} chromeWalkRaf = 0; }
     var start = cur;
     var dist = Math.abs(xPct - start);
     var speed = 28; // % per second — classic snappy walk
     var t0 = performance.now();
+    function clearSwfMotion() {
+      try {
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.setLoftWalkMotion) {
+          WhirledClassicAvatar.setLoftWalkMotion(false);
+        }
+      } catch (eCl) {}
+    }
     function step(now) {
       if (isEngineMountedOnStage()) {
         setAvatarState("idle");
+        clearSwfMotion();
         chromeWalkRaf = 0;
         return;
       }
@@ -1899,6 +2018,7 @@
         applyWearBillboardPose(xPct, face);
         persistWearPose(xPct, face);
         setAvatarState("idle");
+        clearSwfMotion();
         chromeWalkRaf = 0;
         return;
       }
@@ -1990,13 +2110,24 @@
   }
   function openAvatarEmoteMenu(anchorEl) {
     // Classic pale-blue action menu near the avatar billboard.
+    // (?v=20260906bb): Hybrid with frames → real emotes; SWF/hybrid missing frames → Coming Soon stubs (do not break walk).
     closeAvatarEmoteMenu();
     var worn = loadWornAvatar();
     var emotes = listAvatarEmotes(worn);
+    var stubs = [];
     if (!emotes.length) {
-      // Soft feedback when pack has no emote states.
-      try { pushSystemChat("This avatar has no emotes yet."); } catch (e) {}
-      return;
+      var isClassic = !!(worn && (worn.classicFlashOptIn || worn.mediaKind === "swf" || worn.swfSha1 || worn.swfUrl
+        || (worn.source && String(worn.source).indexOf("classic") === 0)));
+      if (isClassic || (worn && !worn.isTofu)) {
+        stubs = [
+          { key: "_soon_wave", label: "Wave (Coming Soon)", soon: true },
+          { key: "_soon_sit", label: "Sit (Coming Soon)", soon: true },
+          { key: "_soon_pose", label: "Pose (Coming Soon)", soon: true }
+        ];
+      } else {
+        try { pushSystemChat("This avatar has no emotes yet."); } catch (e) {}
+        return;
+      }
     }
     var host = document.querySelector(".stage-host");
     if (!host || !anchorEl) return;
@@ -2005,8 +2136,13 @@
     menu.className = "avatar-emote-menu";
     menu.setAttribute("role", "menu");
     menu.setAttribute("aria-label", "Avatar emotes");
+    var rows = emotes.length ? emotes : stubs;
     menu.innerHTML = '<div class="avatar-emote-title">Emotes</div>'
-      + emotes.map(function (e) {
+      + rows.map(function (e) {
+          if (e.soon) {
+            return '<button type="button" class="avatar-emote-btn is-soon" role="menuitem" data-avatar-emote-soon="1">'
+              + esc(e.label) + '</button>';
+          }
           return '<button type="button" class="avatar-emote-btn" role="menuitem" data-avatar-emote="'
             + esc(e.key) + '">' + esc(e.label) + '</button>';
         }).join("")
@@ -3372,6 +3508,50 @@
   function saveGroupThreads(gid, threads) {
     try { localStorage.setItem(groupThreadsKey(gid), JSON.stringify((threads || []).slice(0, 100))); } catch (e) {}
   }
+  function ensureDevUpdatesGroup() {
+    // How this works (?v=20260906bb): seed Dev Updates group + without-Flash thread (once).
+    var DEV_GID = "dev-updates";
+    var THREAD_ID = "classic-avatars-without-flash-bb";
+    try {
+      var list = loadGroups();
+      var found = null;
+      for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === DEV_GID) found = list[i];
+      if (!found) {
+        found = {
+          id: DEV_GID,
+          name: "Dev Updates",
+          blurb: "Chrome + engine notes for Whirled2 developers (pale-blue classic).",
+          creator: "Whirled2",
+          members: [],
+          at: new Date().toISOString(),
+          official: true
+        };
+        list.unshift(found);
+        saveGroups(list);
+      }
+      var threads = loadGroupThreads(DEV_GID);
+      var has = false;
+      for (var t = 0; t < threads.length; t++) if (threads[t] && threads[t].id === THREAD_ID) has = true;
+      if (!has) {
+        threads.unshift({
+          id: THREAD_ID,
+          title: "Classic Whirled avatars — without Adobe Flash (?v=20260906bb)",
+          who: "Whirled2",
+          body: "CURRENTLY: Ruffle = YES (optional path). Default smooth room movement = PNG hybrid (Ruffle not required).\n\n"
+            + "Browsers cannot run Flash Player anymore — we never ask you to install it.\n\n"
+            + "Beauty of the approach — Hybrid (smooth): PNG/WebP idle+walk(+emotes) for click-to-walk in chrome (fast, mobile-friendly). "
+            + "Optional Ruffle (open Flash emulator in WASM, CDN) plays real .swf files for Stuff preview / Force Ruffle / SWF-only Wear — transparent stage, pointer-events none so the room stays clickable.\n\n"
+            + "If you only use Whirl PNGs and never upload a SWF, Ruffle never loads.\n\n"
+            + "One-flow: Drop SWF (+ optional PNG) → Analyze → auto Experimental/Hybrid → Save → Wear & enter loft.\n\n"
+            + "Honest limits: full AvatarControl host still evolving; Hybrid is the delightful path today.\n\n"
+            + "Docs: HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md · AVATAR-IMPORT.md · QA-FLASH.md · Developers hub.",
+          replies: [],
+          at: new Date().toISOString()
+        });
+        saveGroupThreads(DEV_GID, threads);
+      }
+    } catch (eDevG) {}
+  }
   // ---------------------------------------------------------------------------
   // Room lock + multi-room catalog (wiki Room / Create Whirleds)
   // How this works: whirled2.rooms maps roomId → { id, name, ownerId, lock, createdAt }.
@@ -4310,6 +4490,292 @@
       });
     } catch (e4) {}
     saveRoles(map);
+    try {
+      var admSync = loadAdminsList();
+      Object.keys(map).forEach(function (uid) {
+        if (map[uid] === "admin" && admSync.indexOf(String(uid)) < 0) admSync.push(String(uid));
+      });
+      saveAdminsList(admSync);
+    } catch (eAdmSync) {}
+  }
+  // ---------------------------------------------------------------------------
+  // Admin list (?v=20260906ba) — whirled2.admins + roles. Bootstrap when empty.
+  // Beginner: first account / name Test / forceAdmin=1 become admin so J can promote others.
+  // DEV-HUB: secret bootstrap = localStorage whirled2.forceAdmin=1 then reload once.
+  // ---------------------------------------------------------------------------
+  function loadAdminsList() {
+    try {
+      var raw = JSON.parse(localStorage.getItem("whirled2.admins") || "[]");
+      return Array.isArray(raw) ? raw.map(String) : [];
+    } catch (e) { return []; }
+  }
+  function saveAdminsList(list) {
+    try { localStorage.setItem("whirled2.admins", JSON.stringify((list || []).slice(0, 200))); } catch (e) {}
+  }
+  function isAdmin(userId) {
+    userId = userId != null ? String(userId) : (session() && session().user && String(session().user.id)) || "";
+    if (!userId) return false;
+    if (getRole(userId) === "admin") return true;
+    if (loadAdminsList().indexOf(userId) >= 0) return true;
+    try {
+      var s = session();
+      if (s && s.user && String(s.user.id) === userId && (isPrivilegedName(s.user.name) || isPrivilegedName(userId))) return true;
+    } catch (e) {}
+    return false;
+  }
+  function makeAdmin(userId) {
+    userId = String(userId || "");
+    if (!userId) return;
+    setRole(userId, "admin");
+    var adm = loadAdminsList();
+    if (adm.indexOf(userId) < 0) adm.push(userId);
+    saveAdminsList(adm);
+  }
+  function removeAdmin(userId) {
+    userId = String(userId || "");
+    if (!userId || isPrivilegedName(userId)) return;
+    setRole(userId, "player");
+    saveAdminsList(loadAdminsList().filter(function (id) { return id !== userId; }));
+  }
+  function listLocalUsersForAdmin() {
+    var map = {};
+    function add(id, name) {
+      if (!id) return;
+      id = String(id);
+      map[id] = { id: id, name: sanitizeDisplayName(name || id, id) };
+    }
+    try {
+      var users = JSON.parse(localStorage.getItem("whirled2.users") || "{}");
+      Object.keys(users).forEach(function (k) {
+        var u = users[k];
+        if (u) add(u.id || k, u.name || k);
+      });
+    } catch (eU) {}
+    try { loadKnownProfiles().forEach(function (p) { add(p.id, p.name); }); } catch (eK) {}
+    try { loadFriends().forEach(function (f) { add(f.id, f.name); }); } catch (eF) {}
+    try { liveOccupants.forEach(function (p) { add(p.id, p.name); }); } catch (eO) {}
+    try { var s = session(); if (s && s.user) add(s.user.id, s.user.name); } catch (eS) {}
+    return Object.keys(map).map(function (k) { return map[k]; })
+      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+  }
+  var BROADCAST_KEY = "whirled2.broadcastState";
+  function loadBroadcastState(userId) {
+    try {
+      var all = JSON.parse(localStorage.getItem(BROADCAST_KEY) || "{}");
+      var st = all[String(userId)] || { day: "", count: 0 };
+      var today = localDayKey();
+      if (st.day !== today) return { day: today, count: 0 };
+      return { day: today, count: Math.max(0, Number(st.count) || 0) };
+    } catch (e) { return { day: localDayKey(), count: 0 }; }
+  }
+  function saveBroadcastState(userId, st) {
+    try {
+      var all = JSON.parse(localStorage.getItem(BROADCAST_KEY) || "{}");
+      all[String(userId)] = st;
+      localStorage.setItem(BROADCAST_KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
+  function nextBroadcastCost(userId) {
+    // How this works (?v=20260906ba): classic wiki /broadcast used Bars (start ~5, inflate).
+    // Whirled2 earn-only: coins base 50 ×1.5^count per local day. Beginner: earn coins first.
+    var st = loadBroadcastState(userId);
+    var cost = Math.floor(50 * Math.pow(1.5, st.count));
+    if (cost < 50) cost = 50;
+    if (cost > 500000) cost = 500000;
+    return { cost: cost, count: st.count, day: st.day };
+  }
+  function tryBroadcast(text) {
+    var s = session();
+    if (!s || !s.user) return { ok: false, error: "Sign in to broadcast." };
+    text = String(text || "").trim().slice(0, 200);
+    if (!text) return { ok: false, error: "Usage: /broadcast your message" };
+    var uid = String(s.user.id);
+    var quote = nextBroadcastCost(uid);
+    var spent = spendCurrency(uid, quote.cost, 0, {
+      kind: "broadcast", label: "Broadcast", note: "−" + quote.cost + " coins for /broadcast"
+    });
+    if (!spent.ok) {
+      var have = (spent.wallet && spent.wallet.coins) || 0;
+      return { ok: false, error: "Not enough coins for broadcast (need " + quote.cost + ", have " + have
+        + "). Classic used Bars; Whirled2 uses escalating coins (base 50 ×1.5 each today)." };
+    }
+    var st = loadBroadcastState(uid);
+    st.count = (Number(st.count) || 0) + 1;
+    st.day = localDayKey();
+    saveBroadcastState(uid, st);
+    var msg = {
+      id: "bc" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      who: sanitizeDisplayName(s.user.name, "Player"),
+      userId: uid, text: text, at: new Date().toISOString(), broadcast: true, shout: true
+    };
+    try {
+      var gLog = JSON.parse(localStorage.getItem("whirled2.broadcastLog") || "[]");
+      gLog.unshift({ who: msg.who, userId: uid, text: text, at: msg.at, cost: quote.cost });
+      localStorage.setItem("whirled2.broadcastLog", JSON.stringify(gLog.slice(0, 40)));
+    } catch (eL) {}
+    chat.push(msg);
+    if (chat.length > 120) chat = chat.slice(-100);
+    refreshChatLog();
+    try { spawnStageBubble(msg); } catch (eB) {}
+    try { if (typeof refreshWalletChrome === "function") refreshWalletChrome(); } catch (eW) {}
+    pushNotice("orange", "Broadcast sent (−" + quote.cost + " coins). Next today: "
+      + nextBroadcastCost(uid).cost + " coins.", { transient: true });
+    return { ok: true, cost: quote.cost, msg: msg };
+  }
+  var DEV_GROUP_ID = "g-whirled2-developers";
+  var DEV_GROUP_NAME = "Whirled2 Developers";
+  function overnightChangelogBody() {
+    return [
+      "Overnight chrome ships (ar→az + ba) — auto-posted for Developers.",
+      "",
+      "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
+      "• Chat visit-since + Clear my view (no cemetery rehydrate)",
+      "• Flash hybrid: PNG walk/emotes default; transparent Ruffle optional (no Adobe Flash plugin)",
+      "• Room visuals: pale-blue chrome (az) — no brown/black slabs",
+      "• Dev Hub (?page=dev), Make Door / Drop Door, passport seals",
+      "• ba: real Groups forum + Admin panel + /broadcast (escalating coins)",
+      "• ba QA: fixed occupant NaN names (QA AxNaNNaN → QA Ax) via sanitize/heal",
+      "",
+      "See STATUS.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md for details.",
+      "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
+    ].join("\n");
+  }
+  function flashWithoutPluginBody() {
+    return [
+      "HOW classic avatars work without Adobe Flash",
+      "",
+      "Whirled2 does not require the Adobe Flash Player plugin.",
+      "",
+      "1) Hybrid (smooth) — default when a Stuff avatar has PNG/WebP idle+walk frames:",
+      "   chrome walks the billboard on #avatar-wear-layer; emotes swap frames.",
+      "2) Optional Ruffle — experimental SWF preview / Force Ruffle loft uses the",
+      "   open-source Ruffle emulator (transparent wmode) — still not a Flash plugin.",
+      "3) SWF-only packs move as a billboard; full AvatarControl states need the engine later.",
+      "",
+      "Doc: HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md (web-mock root).",
+      "QA: QA-FLASH.md · scripts/qa-flash-check.cjs",
+      "Preserve: Whirl starter, chat visit-since, pale-blue az room chrome."
+    ].join("\n");
+  }
+  function ensureWhirled2DevGroup() {
+    var s = session();
+    if (!s || !s.user) return null;
+    var groups = loadGroups();
+    var g = null;
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i] && (groups[i].id === DEV_GROUP_ID || groups[i].name === DEV_GROUP_NAME)) {
+        g = groups[i]; break;
+      }
+    }
+    var ownerId = String(s.user.id);
+    var ownerName = sanitizeDisplayName(s.user.name, "Player");
+    try {
+      var first = localStorage.getItem(FIRST_USER_KEY) || "";
+      if (first) {
+        var users = JSON.parse(localStorage.getItem("whirled2.users") || "{}");
+        var fu = users[first] || users[String(first).toLowerCase()];
+        if (fu && fu.id) { ownerId = String(fu.id); ownerName = sanitizeDisplayName(fu.name, ownerId); }
+      }
+    } catch (eF) {}
+    if (!g) {
+      g = {
+        id: DEV_GROUP_ID, name: DEV_GROUP_NAME,
+        blurb: "Builders, Flash/Ruffle notes, overnight chrome updates. Seeded for J + developers.",
+        creatorId: ownerId, creatorName: ownerName, members: [], managers: [ownerId],
+        seed: true, logo: "", banner: "", at: new Date().toISOString()
+      };
+      groups.unshift(g);
+    }
+    g.blurb = g.blurb || "Builders, Flash/Ruffle notes, overnight chrome updates.";
+    g.managers = g.managers || [];
+    if (g.managers.indexOf(ownerId) < 0) g.managers.push(ownerId);
+    g.members = g.members || [];
+    function ensureMember(id, name, role) {
+      id = String(id || "");
+      if (!id) return;
+      var hit = null;
+      for (var m = 0; m < g.members.length; m++) {
+        if (String(g.members[m].id) === id) { hit = g.members[m]; break; }
+      }
+      if (!hit) g.members.push({ id: id, name: sanitizeDisplayName(name, id), role: role || "member" });
+      else {
+        if (role) hit.role = role;
+        hit.name = sanitizeDisplayName(hit.name || name, id);
+      }
+      if (role === "manager" && g.managers.indexOf(id) < 0) g.managers.push(id);
+    }
+    ensureMember(ownerId, ownerName, "manager");
+    ensureMember(s.user.id, s.user.name, "developer");
+    if (isAdmin(s.user.id)) {
+      ensureMember(s.user.id, s.user.name, "manager");
+      if (g.managers.indexOf(String(s.user.id)) < 0) g.managers.push(String(s.user.id));
+    }
+    var found = false;
+    for (var gi = 0; gi < groups.length; gi++) {
+      if (groups[gi].id === g.id) { groups[gi] = g; found = true; break; }
+    }
+    if (!found) groups.unshift(g);
+    saveGroups(groups);
+    var threads = loadGroupThreads(g.id);
+    function ensureThread(tid, title, body, sticky) {
+      var th = null;
+      for (var t = 0; t < threads.length; t++) {
+        if (threads[t].id === tid || threads[t].title === title) { th = threads[t]; break; }
+      }
+      if (!th) {
+        th = { id: tid, title: title, body: body, who: ownerName, whoId: ownerId,
+          sticky: !!sticky, locked: false, announce: !!sticky, replies: [], at: new Date().toISOString() };
+        threads.unshift(th);
+      } else if (body && (!th.body || th.body.length < 40)) th.body = body;
+      th.sticky = th.sticky || !!sticky;
+      return th;
+    }
+    var updates = ensureThread("th-updates", "Updates & notes", overnightChangelogBody(), true);
+    ensureThread("th-flash", "Flash / avatars", flashWithoutPluginBody(), true);
+    ensureThread("th-general", "General", "General discussion for Whirled2 builders. Keep it friendly — no fake catalog SKUs.", false);
+    updates.replies = updates.replies || [];
+    if (!updates.replies.some(function (r) { return r && /without Adobe Flash|HOW-CLASSIC-AVATARS/i.test(String(r.text || "")); })) {
+      updates.replies.push({ who: "Whirled2 Bot", whoId: "system", text: flashWithoutPluginBody(), at: new Date().toISOString() });
+    }
+    if (!updates.replies.some(function (r) { return r && /AxNaNNaN|occupant NaN/i.test(String(r.text || "")); })) {
+      updates.replies.push({
+        who: "Whirled2 Bot", whoId: "system",
+        text: "QA FAIL fix (?v=20260906ba): occupant rail showed “QA AxNaNNaN… you” while header was “QA Ax”.\n"
+          + "Cause: Invalid Date / pad fragments concatenated into display names.\n"
+          + "Fix: sanitizeDisplayName always strips /NaN/gi, heals session+users+profiles on boot, loadOccupants sanitizes presence.\n"
+          + "Verify: In this room shows “QA Ax” + you — never NaN.",
+        at: new Date().toISOString()
+      });
+    }
+    saveGroupThreads(g.id, threads);
+    return g;
+  }
+  function appendOvernightDevNotes() {
+    var g = findGroup(DEV_GROUP_ID);
+    if (!g) g = ensureWhirled2DevGroup();
+    if (!g) return;
+    var threads = loadGroupThreads(g.id);
+    var updates = null;
+    for (var i = 0; i < threads.length; i++) {
+      if (threads[i].id === "th-updates" || threads[i].title === "Updates & notes") { updates = threads[i]; break; }
+    }
+    if (!updates) return;
+    updates.replies = updates.replies || [];
+    var tag = "ship:" + LOGO_V;
+    if (updates.replies.some(function (r) { return r && String(r.tag || "") === tag; })) return;
+    updates.replies.unshift({
+      who: "Whirled2 Bot", whoId: "system", tag: tag,
+      text: "Ship note " + LOGO_V + "\n"
+        + "• Groups forum (threads/replies) + seeded Whirled2 Developers\n"
+        + "• Admin panel (Me → Admin / header) — Make/Remove admin\n"
+        + "• /broadcast escalating coins (wiki Bars → Whirled2 coins)\n"
+        + "• Occupant NaN name heal\n"
+        + "• Flash without plugin: see Flash / avatars thread + HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md\n"
+        + "Preserve: Hybrid Flash path, Whirl, chat visit-since, pale-blue az chrome.",
+      at: new Date().toISOString()
+    });
+    if (!updates.body || updates.body.indexOf("ba:") < 0) updates.body = overnightChangelogBody();
+    saveGroupThreads(g.id, threads);
   }
   // ---------------------------------------------------------------------------
   // Chat UI prefs — localStorage whirled2.chatUi { mode, hideHistory, textSize }
@@ -4653,7 +5119,7 @@
   var roomChatVisitSince = ""; // ISO string; empty = not in a room visit
   var roomChatRoomId = ""; // which room this visit chat belongs to
   var liveOccupants = [];
-  var meSub = "home"; // home | profile | rooms | friends | mail | passport | account | themes | club | blocklist | galleries | transactions | contests | share
+  var meSub = "home"; // home | profile | rooms | friends | mail | passport | account | admin | themes | club | blocklist | galleries | transactions | contests | share
   var newsFilter = "all"; // all | comments | friendings | status | stamps | rooms
   var roomSharePanelOpen = false; // Room menu → Share / Embed
   var profileEditSection = null; // null | status | photo | info | skin
@@ -5345,6 +5811,7 @@
       +     '<li><b>Ctrl/Cmd+K</b> — Command palette</li>'
       +     '<li><b>?</b> — This shortcuts overlay</li>'
       +     '<li><b>/think</b> <b>/shout</b> <b>/me</b> <b>/speak</b> — chat modes (or Speak button)</li>'
+      + '<li><b>/broadcast</b> <i>msg</i> — highlighted room broadcast (escalating coins)</li>'
       +     '<li><b>/clear</b> — clear active chat tab</li>'
       +     '<li><b>/away</b> <b>/back</b> — away stub (yellow name + PM auto-reply note)</li>'
       +   '</ul></div></div>';
@@ -5882,6 +6349,7 @@
     var emote = !!msg.emote;
     var thought = !!msg.thought;
     var shout = !!msg.shout;
+    var broadcast = !!msg.broadcast;
     if (!emote && (/^\/me\s+/i.test(text) || /^\/emote\s+/i.test(text))) {
       emote = true;
       text = text.replace(/^\/(me|emote)\s+/i, "");
@@ -5901,13 +6369,15 @@
       body = '<div class="chat-bubble emote"><i>' + esc(msg.who) + " " + esc(text) + "</i></div>";
     } else if (thought) {
       body = '<div class="chat-bubble thought"><i>' + esc(text) + '</i></div>';
+    } else if (broadcast) {
+      body = '<div class="chat-bubble broadcast"><span class="broadcast-tag">BROADCAST</span> <b>' + esc(text) + '</b></div>';
     } else if (shout) {
       body = '<div class="chat-bubble shout"><b>' + esc(text) + '</b></div>';
     } else {
       body = '<div class="chat-bubble">' + esc(text) + '</div>';
     }
     var mid = msg.id || "";
-    return '<div class="chat-row' + accent + (emote ? " is-emote" : "") + (thought ? " is-thought" : "") + (shout ? " is-shout" : "") + '" data-msg-id="' + esc(mid) + '">'
+    return '<div class="chat-row' + accent + (emote ? " is-emote" : "") + (thought ? " is-thought" : "") + (shout ? " is-shout" : "") + (broadcast ? " is-broadcast" : "") + '" data-msg-id="' + esc(mid) + '">'
       + (emote ? "" : (nameBtn + roleBadgeHtml(role) + ' <time>' + esc(stamp) + "</time>"))
       + body
       + (mid && typeof reactionPillsHtml === "function" ? reactionPillsHtml(mid) + reactionBarHtml(mid) : "")
@@ -6893,23 +7363,41 @@
     return null;
   }
   function groupThreadView(g, thread) {
+    // How this works (?v=20260906ba): wiki Group discussion — OP + replies, quote, member-only post.
+    // Beginner: sticky/announce threads stay on top; locked threads refuse new replies.
     var replies = (thread.replies || []);
-    var rows = replies.map(function (r) {
-      return '<div class="wall-row"><b>' + esc(r.who || "member") + '</b> ' + esc(r.text || "")
-        + '<time>' + esc((r.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
-    }).join("") || '<p class="meta">No replies yet.</p>';
-    return '<section class="page group-page">'
-      + '<button type="button" class="text-btn" data-group-open="' + esc(g.id) + '">← Back to ' + esc(g.name) + '</button>'
+    var rows = replies.map(function (r, ix) {
+      return '<article class="group-post' + (r.whoId === "system" ? " is-system" : "") + '">'
+        + '<header class="group-post-head"><b>' + esc(r.who || "member") + '</b>'
+        + '<time>' + esc((r.at || "").slice(0, 16).replace("T", " ")) + '</time></header>'
+        + '<div class="group-post-body">' + esc(r.text || "").replace(/\n/g, "<br>") + '</div>'
+        + (!thread.locked ? ('<button type="button" class="text-btn" data-group-quote="' + ix + '">Quote</button>') : "")
+        + '</article>';
+    }).join("") || '<p class="meta">No replies yet — be the first.</p>';
+    var s = session();
+    var meId = s && s.user ? s.user.id : "";
+    var isMember = (g.members || []).some(function (m) { return String(m.id) === String(meId); });
+    var replyForm = thread.locked
+      ? '<p class="meta">This thread is locked.</p>'
+      : (isMember
+        ? ('<form id="group-reply-form" class="group-reply-form" data-group-reply="' + esc(g.id) + '" data-thread-id="' + esc(thread.id) + '">'
+          +   '<label>Reply<textarea name="text" maxlength="2000" rows="4" placeholder="Write a reply…" required></textarea></label>'
+          +   '<button type="submit" class="action-btn">Post reply</button></form>')
+        : '<p class="meta">Join this group to reply.</p>');
+    var flags = (thread.sticky ? '<span class="group-flag sticky">Sticky</span>' : "")
+      + (thread.announce ? '<span class="group-flag announce">Announcement</span>' : "")
+      + (thread.locked ? '<span class="group-flag locked">Locked</span>' : "");
+    return '<section class="page group-page group-thread-page">'
+      + '<button type="button" class="text-btn" data-group-open="' + esc(g.id) + '">← ' + esc(g.name) + ' discussions</button>'
       + '<div class="featured">Discussion</div>'
-      + '<h1>' + esc(thread.title || "Thread") + '</h1>'
+      + '<h1>' + esc(thread.title || "Thread") + ' ' + flags + '</h1>'
       + '<p class="meta">Started by ' + esc(thread.who || "member") + '</p>'
-      + '<div class="panel"><p>' + esc(thread.body || "") + '</p></div>'
-      + '<div class="section-label">Replies</div>'
-      + '<div class="comment-list">' + rows + '</div>'
-      + '<form id="group-reply-form" data-group-reply="' + esc(g.id) + '" data-thread-id="' + esc(thread.id) + '">'
-      +   '<textarea name="text" maxlength="800" rows="3" placeholder="Reply…" required></textarea>'
-      +   '<button type="submit">Post reply</button>'
-      + '</form></section>';
+      + '<article class="group-post is-op panel"><div class="group-post-body">'
+      +   esc(thread.body || "").replace(/\n/g, "<br>") + '</div></article>'
+      + '<div class="section-label">Replies (' + replies.length + ')</div>'
+      + '<div class="group-post-list">' + rows + '</div>'
+      + replyForm
+      + '</section>';
   }
   function groupDetailPage(g) {
     if (!g) {
@@ -6926,61 +7414,87 @@
     var s = session();
     var meId = s && s.user ? s.user.id : "";
     var members = g.members || [];
-    var isMember = members.some(function (m) { return m.id === meId; });
-    var isCreator = g.creatorId === meId;
+    var isMember = members.some(function (m) { return String(m.id) === String(meId); });
+    var isCreator = String(g.creatorId) === String(meId);
+    var isMgr = isCreator || (g.managers || []).indexOf(String(meId)) >= 0 || (isAdmin(meId) && g.seed);
     var memberRows = members.length
       ? '<ul class="group-members">' + members.map(function (m) {
-          var tag = m.id === g.creatorId ? " (creator)" : "";
-          return '<li><button type="button" class="text-btn" data-profile="' + esc(m.id) + '">' + esc(m.name || m.id) + esc(tag) + '</button></li>';
+          var role = m.role || (String(m.id) === String(g.creatorId) ? "manager" : "member");
+          var tag = role === "manager" ? " · manager" : (role === "developer" ? " · Developers" : "");
+          return '<li><button type="button" class="text-btn" data-profile="' + esc(m.id) + '">' + esc(m.name || m.id) + '</button>'
+            + '<span class="meta">' + esc(tag) + '</span></li>';
         }).join("") + '</ul>'
       : '<p class="meta">No members yet.</p>';
-    var threads = loadGroupThreads(g.id);
+    var threads = loadGroupThreads(g.id).slice();
+    threads.sort(function (a, b) {
+      var as = (a.sticky || a.announce) ? 0 : 1;
+      var bs = (b.sticky || b.announce) ? 0 : 1;
+      if (as !== bs) return as - bs;
+      return String(b.at || "").localeCompare(String(a.at || ""));
+    });
+    var q = String(groupDiscussQ || "").trim().toLowerCase();
+    if (q) {
+      threads = threads.filter(function (th) {
+        return String(th.title || "").toLowerCase().indexOf(q) >= 0
+          || String(th.body || "").toLowerCase().indexOf(q) >= 0;
+      });
+    }
     var threadList = threads.length
       ? '<ul class="thread-list">' + threads.map(function (th) {
-          return '<li><button type="button" class="text-btn" data-group-thread="' + esc(th.id) + '" data-group-open="' + esc(g.id) + '"><b>' + esc(th.title) + '</b></button>'
+          var flags = (th.sticky ? "📌 " : "") + (th.announce ? "📢 " : "") + (th.locked ? "🔒 " : "");
+          return '<li class="thread-row">'
+            + '<button type="button" class="text-btn thread-title-btn" data-group-thread="' + esc(th.id) + '" data-group-open="' + esc(g.id) + '">'
+            + flags + '<b>' + esc(th.title) + '</b></button>'
             + ' <span class="meta">by ' + esc(th.who || "") + ' · ' + ((th.replies && th.replies.length) || 0) + ' replies</span></li>';
         }).join("") + '</ul>'
-      : '<p class="meta">No threads yet. Start a discussion below.</p>';
+      : '<p class="meta">No threads match. Start a discussion below.</p>';
     var joinBtn = isMember
       ? '<button type="button" class="action-btn" data-group-leave="' + esc(g.id) + '"' + (isCreator ? ' disabled title="Creators stay in their group"' : '') + '>Leave</button>'
-      : '<button type="button" class="action-btn" data-group-join="' + esc(g.id) + '">Join this group</button>';
-    // How this works: creators act as managers here. Theme panel is Coming Soon (wiki Whirleds FAQ)
-    // plus an optional local hex draft that only tints this group's header on this browser.
+      : '<button type="button" class="action-btn group-join-btn" data-group-join="' + esc(g.id) + '">Join this group</button>';
     var gTheme = loadGroupTheme(g.id) || {};
     var headerStyle = (gTheme.hex ? (' style="--group-accent:' + esc(gTheme.hex) + '"') : '');
-    var themePanel = isCreator
-      ? ('<div class="section-label">Edit Whirled theme</div>'
-        + '<div class="panel group-theme-panel">'
-        +   '<span class="club-badge-soon">Coming Soon</span>'
-        +   '<p>Classic themed Whirleds let managers <b>skin the top bar</b> (hex + images), <b>mark items</b> allowed in the whirled, and <b>mark rooms</b>. See wiki Whirleds FAQ / Create Whirleds.</p>'
-        +   '<p class="meta">No payments here. Prototype below only tints this group page header on your browser (<code>whirled2.groupTheme.' + esc(g.id) + '</code>).</p>'
-        +   '<form id="group-theme-form" data-group-theme="' + esc(g.id) + '" class="group-theme-form">'
-        +     '<label>Draft header color <input type="color" name="hex" value="' + esc(gTheme.hex || "#3aa3e0") + '" /></label>'
-        +     '<button type="submit" class="action-btn">Save local draft</button>'
-        +   '</form></div>')
+    var logo = g.logo
+      ? '<img class="group-logo" src="' + g.logo + '" alt="" />'
+      : '<div class="group-logo group-logo-ph" aria-hidden="true">' + esc(String(g.name || "G").slice(0, 1).toUpperCase()) + '</div>';
+    var banner = '<div class="group-banner' + (g.banner ? "" : " is-ph") + '"'
+      + (g.banner ? (' style="background-image:url(' + g.banner + ')"') : "") + '></div>';
+    var adminTools = (isMgr && g.seed)
+      ? '<p class="meta">Seeded Dev group — admins can manage members (Me → Admin).</p>'
       : '';
     return '<section class="page group-page"' + headerStyle + '>'
       + '<button type="button" class="text-btn" data-group-back="1">← All groups</button>'
-      + '<div class="featured group-featured-head">Group</div>'
-      + '<h1 class="group-title-accent">' + esc(g.name) + '</h1>'
-      + '<p class="lobby-blurb">' + esc(g.blurb || "") + '</p>'
+      + banner
+      + '<div class="group-home-head">' + logo
+      +   '<div><div class="featured group-featured-head">Group</div>'
+      +   '<h1 class="group-title-accent">' + esc(g.name) + '</h1>'
+      +   '<p class="lobby-blurb">' + esc(g.blurb || "") + '</p></div></div>'
       + '<div class="group-actions">'
       +   joinBtn
       +   '<button type="button" class="action-btn" data-group-hall="' + esc(g.id) + '">Enter hall</button>'
+      +   (isMember ? ('<button type="button" class="action-btn" data-open-group-chat="' + esc(g.id) + '" data-group-chat-name="' + esc(g.name) + '">Group chat</button>') : '')
       + '</div>'
-      + '<p class="meta">Enter hall opens the Rooms lobby / Studio Loft (shared whirled halls come later).</p>'
-      + themePanel
-      + '<div class="section-label">Members</div>'
+      + adminTools
+      + '<p class="meta">Enter hall opens Rooms / Studio Loft (shared whirled halls later). Wiki: discussion forum + hall.</p>'
+      + '<div class="section-label">Members (' + members.length + ')</div>'
       + '<div class="panel">' + memberRows + '</div>'
       + '<div class="section-label">Discussion forum</div>'
-      + '<div class="panel">' + threadList
-      +   '<form id="group-thread-form" data-group-new-thread="' + esc(g.id) + '">'
-      +     '<input name="title" maxlength="120" placeholder="Thread title" required />'
-      +     '<textarea name="body" maxlength="800" rows="3" placeholder="Say something…" required></textarea>'
-      +     '<button type="submit">Start thread</button>'
-      +   '</form></div></section>';
+      + '<div class="panel">'
+      +   '<form id="group-discuss-search" class="group-discuss-search" data-group-search="' + esc(g.id) + '">'
+      +     '<input name="q" maxlength="80" placeholder="Search threads…" value="' + esc(groupDiscussQ) + '" />'
+      +     '<button type="submit">Search</button></form>'
+      +   threadList
+      +   (isMember
+        ? ('<form id="group-thread-form" data-group-new-thread="' + esc(g.id) + '">'
+          +   '<div class="section-label">Start thread</div>'
+          +   '<input name="title" maxlength="120" placeholder="Thread title" required />'
+          +   '<textarea name="body" maxlength="2000" rows="3" placeholder="Say something…" required></textarea>'
+          +   '<button type="submit" class="action-btn">Start thread</button></form>')
+        : '<p class="meta">Join to start a thread.</p>')
+      + '</div></section>';
   }
   function groupsListPage() {
+    // How this works (?v=20260906ba): Groups tab — real list/create/join (wiki Groups tab), pale-blue cards.
+    try { ensureWhirled2DevGroup(); } catch (eSeed) {}
     var list = loadGroups();
     var s = session();
     var meId = s && s.user ? s.user.id : "";
@@ -6990,24 +7504,28 @@
     } else {
       rows = '<div class="group-list">' + list.map(function (g) {
         var n = (g.members && g.members.length) || 0;
-        var joined = (g.members || []).some(function (m) { return m.id === meId; });
-        return '<button type="button" class="group-row" data-group-open="' + esc(g.id) + '">'
-          + '<h3>' + esc(g.name) + '</h3>'
+        var joined = (g.members || []).some(function (m) { return String(m.id) === String(meId); });
+        var seed = g.seed ? '<span class="group-seed-badge">Seeded</span>' : '';
+        return '<button type="button" class="group-row' + (g.seed ? " is-seed" : "") + '" data-group-open="' + esc(g.id) + '">'
+          + '<div class="group-row-logo" aria-hidden="true">' + esc(String(g.name || "G").slice(0, 1).toUpperCase()) + '</div>'
+          + '<div class="group-row-main"><h3>' + esc(g.name) + ' ' + seed + '</h3>'
           + '<p class="meta">' + esc(g.blurb || "") + '</p>'
-          + '<span class="meta">' + n + ' member' + (n === 1 ? "" : "s") + (joined ? " · joined" : "") + '</span>'
+          + '<span class="meta">' + n + ' member' + (n === 1 ? "" : "s") + (joined ? " · joined" : "") + '</span></div>'
           + '</button>';
       }).join("") + '</div>';
     }
     return '<section class="page group-page">'
       + '<div class="featured">Groups</div>'
-      + '<p class="lobby-blurb">Groups are social clubs with a discussion forum and a hall. Shared whirleds come later.</p>'
-      + '<div class="section-label">Your groups</div>'
+      + '<p class="lobby-blurb">Groups are social clubs with a discussion forum and a hall (wiki Group). '
+      + 'Themed Whirled shop branding stays Coming Soon — forums work now.</p>'
+      + '<div class="section-label">Your groups &amp; public list</div>'
       + rows
       + '<div class="section-label">Create group</div>'
-      + '<div class="panel"><form id="create-group-form">'
+      + '<div class="panel"><form id="create-group-form" class="create-group-form">'
       +   '<input name="name" maxlength="60" placeholder="Group name" required />'
       +   '<textarea name="blurb" maxlength="240" rows="2" placeholder="Short blurb" required></textarea>'
-      +   '<button type="submit">Create group</button>'
+      +   '<button type="submit" class="action-btn">Make your own Group!</button>'
+      +   '<p class="meta">Free on this mock (classic charged coins/bars). No invented catalog.</p>'
       + '</form></div></section>';
   }
   function groupsPage() {
@@ -7019,6 +7537,7 @@
     }
     return groupsListPage();
   }
+
   function roomOccupantChipsHtml(limit) {
     // How this works: show up to N real occupant names on lobby tiles / preview (never invent people).
     limit = limit || 3;
@@ -7276,10 +7795,15 @@
     return all.filter(function (it) { return allow[itemCat(it)]; });
   }
   function decorateChipHtml(it) {
-    // How this works (?v=20260906at): chips show green door badge when doorTo is set.
-    // Beginner: decorate mode = drag/select; outside = only doors capture clicks (travel).
+    // How this works (?v=20260906ba): chips show green door badge; optional scale + z-index (furniture polish).
+    // Beginner: decorate mode = drag/select/scale; outside = only doors capture clicks (travel).
     var x = Number(it.x) || 40;
     var y = Number(it.y) || 40;
+    var scale = Number(it.scale);
+    if (!(scale > 0)) scale = 1;
+    scale = Math.max(0.5, Math.min(2.5, scale));
+    var z = Number(it.z);
+    if (!isFinite(z)) z = 1;
     var isDoor = !!(it.doorTo);
     var selected = decorateMode && selectedDecId && selectedDecId === it.id;
     var thumb = it.thumb
@@ -7287,13 +7811,16 @@
       : '<span class="dec-chip-label">' + esc((it.name || "?").slice(0, 12)) + '</span>';
     var title = it.name || "item";
     if (isDoor) title = (it.doorLabel || title) + " — door → " + (it.doorLabel || it.doorTo);
+    if (scale !== 1) title += " · " + Math.round(scale * 100) + "%";
     var cls = "decorate-chip"
       + (isDoor ? " is-door" : "")
       + (selected ? " is-selected" : "")
       + (doorGlowPreview && isDoor ? " is-glowing" : "");
+    var style = "left:" + x + "px;top:" + y + "px;z-index:" + (10 + Math.round(z))
+      + ";transform:scale(" + scale + ");transform-origin:top left";
     return '<div class="' + cls + '" data-dec-id="' + esc(it.id) + '"'
       + (isDoor ? (' data-door-to="' + esc(it.doorTo) + '"') : "")
-      + ' style="left:' + x + 'px;top:' + y + 'px" title="' + esc(title) + '" role="button" tabindex="0">'
+      + ' style="' + style + '" title="' + esc(title) + '" role="button" tabindex="0">'
       + thumb
       + (isDoor ? '<span class="dec-door-badge" aria-hidden="true" title="Door">🚪</span>' : "")
       + (decorateMode
@@ -7344,12 +7871,20 @@
       + '</div></div>';
   }
   function decoratePanel() {
-    // How this works (?v=20260906at): inventory + placed list + Make Door on selected chip.
+    // How this works (?v=20260906ba): inventory filter, snap grid, scale/z tools + Make Door on selected chip.
+    // Beginner: Add furniture → drag on stage → Scale / Front-Back → Make Door if you want a doorway.
+    // ENGINE DEV: #decorate-layer is a sibling of #stage-slot — never place chips inside the Pixi canvas.
     try { ensureDoorStubFurniture(); } catch (eStub) {}
-    var inv = decorateInventory();
+    var invAll = decorateInventory();
+    var filt = decorateInvFilter || "all";
+    var inv = filt === "all" ? invAll : invAll.filter(function (it) { return itemCat(it) === filt; });
     var layout = loadRoomLayout();
     var placed = layout.items || [];
     var ridKey = roomLayoutStorageKey(currentRoomId || "loft");
+    var filterBtns = ["all", "furniture", "backdrops", "toys", "images"].map(function (f) {
+      var lab = f === "all" ? "All" : (f.charAt(0).toUpperCase() + f.slice(1));
+      return '<button type="button" class="action-btn dec-filter-btn' + (filt === f ? " is-on" : "") + '" data-dec-filter="' + f + '">' + lab + '</button>';
+    }).join("");
     var invRows = inv.length
       ? inv.map(function (it) {
           var thumb = it.thumb ? '<img class="dec-inv-thumb" src="' + it.thumb + '" alt="" />' : '<span class="dec-inv-swatch"></span>';
@@ -7359,14 +7894,15 @@
             + '<button type="button" class="action-btn" data-dec-add="' + esc(it.id) + '">Add to room</button>'
             + '</div>';
         }).join("")
-      : '<p class="meta">No furniture yet — a Doorframe stub will appear after refresh, or upload images.</p>';
+      : '<p class="meta">No items in this filter — try All, or upload furniture/images in Stuff.</p>';
     var placedRows = placed.length
       ? '<ul class="dec-placed-list">' + placed.map(function (it) {
           var doorNote = it.doorTo ? (' <span class="door-tag" title="Door">🚪 ' + esc(it.doorLabel || it.doorTo) + '</span>') : "";
           var sel = (selectedDecId === it.id) ? " is-selected" : "";
+          var sc = Number(it.scale); if (!(sc > 0)) sc = 1;
           return '<li class="dec-placed-row' + sel + '">'
             + '<button type="button" class="text-btn dec-select-btn" data-dec-select="' + esc(it.id) + '"><b>' + esc(it.name || "Item") + '</b></button>'
-            + ' <span class="meta">(' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span>'
+            + ' <span class="meta">(' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ') · ' + Math.round(sc * 100) + '%</span>'
             + doorNote
             + ' <button type="button" class="text-btn" data-dec-remove="' + esc(it.id) + '">Take</button>'
             + (it.doorTo
@@ -7375,17 +7911,39 @@
             + '</li>';
         }).join("") + '</ul>'
       : '<p class="meta">Nothing placed yet — Add to room, then Make Door.</p>';
-    var selHint = selectedDecId
-      ? '<p class="meta dec-sel-hint">Selected chip ready — open <b>Make Door</b> to create/link a room.</p>'
+    var selChip = null;
+    if (selectedDecId) {
+      for (var si = 0; si < placed.length; si++) {
+        if (placed[si].id === selectedDecId) { selChip = placed[si]; break; }
+      }
+    }
+    var selTools = "";
+    if (selChip) {
+      var sc2 = Number(selChip.scale); if (!(sc2 > 0)) sc2 = 1;
+      selTools = '<div class="dec-sel-tools">'
+        + '<p class="meta dec-sel-hint">Selected: <b>' + esc(selChip.name || "Item") + '</b> — drag on stage, or use tools:</p>'
+        + '<div class="dec-tool-row">'
+        +   '<button type="button" class="action-btn" data-dec-scale="-0.1" title="Smaller">−</button>'
+        +   '<span class="meta">Scale ' + Math.round(sc2 * 100) + '%</span>'
+        +   '<button type="button" class="action-btn" data-dec-scale="0.1" title="Bigger">+</button>'
+        +   '<button type="button" class="text-btn" data-dec-z="front">Bring front</button>'
+        +   '<button type="button" class="text-btn" data-dec-z="back">Send back</button>'
+        +   '<button type="button" class="text-btn" data-dec-dup="1">Duplicate</button>'
+        + '</div>'
         + '<button type="button" class="action-btn" data-open-make-door="1">Make Door…</button>'
-      : '<p class="meta">Tip: tap a chip on the stage (or a name below) to select it for Make Door.</p>';
+        + '</div>';
+    } else {
+      selTools = '<p class="meta">Tip: tap a chip on the stage (or a name below) to select it for scale / Make Door.</p>';
+    }
     return '<div class="room-side-panel decorate-panel" id="decorate-panel">'
       + '<div class="panel">'
       +   '<div class="room-side-head"><h2>Decorate Room</h2>'
       +     '<button type="button" class="text-btn" data-decorate-close="1">Close</button></div>'
-      +   '<p class="meta">Wiki Furniture — drag chips. Select → <b>Make Door</b> (create/link rooms). ENGINE DEV: layer sibling of #stage-slot.</p>'
-      +   selHint
+      +   '<p class="meta">Wiki Furniture — filter Stuff, drag chips, snap to grid, scale. Select → <b>Make Door</b>. ENGINE DEV: layer sibling of #stage-slot.</p>'
+      +   '<label class="dec-snap-row"><input type="checkbox" data-dec-snap="1"' + (decorateSnapGrid ? " checked" : "") + ' /> Snap to 8px grid</label>'
+      +   selTools
       +   '<div class="section-label">Your Stuff</div>'
+      +   '<div class="dec-filter-row" role="group" aria-label="Furniture filter">' + filterBtns + '</div>'
       +   '<div class="dec-inv-list">' + invRows + '</div>'
       +   '<div class="section-label">View items (layout)</div>'
       +   placedRows
@@ -7581,7 +8139,7 @@
       +   '<p><b>How to open this page:</b> Help → <b>Developers</b>, header <b>Developers</b>, hash <code>#dev</code> / <code>#docs</code>, or <code>?page=dev</code>. Mirror doc: <code>DEV-HUB.md</code>.</p>'
       +   '<p class="meta">Rules: coins/bars earn-only · never invent shop catalog · say <b>Profile look</b> (never the old social-network nickname) · engine mounts only in <code>#stage-slot</code>.</p>'
       +   '<nav class="dev-hub-toc" aria-label="Topics">'
-      +     '<a href="#dev-flash">Flash / old Whirled</a>'
+      +     '<a href="#dev-flash">Classic avatars (no Adobe Flash)</a>'
       +     '<a href="#dev-chrome">Chrome</a>'
       +     '<a href="#dev-engine">Engine bridge</a>'
       +     '<a href="#dev-avatars">PNG avatars</a>'
@@ -7594,22 +8152,27 @@
       + '</div>'
 
       + '<article class="dev-hub-card panel dev-hub-card-flash" id="dev-flash">'
-      + '<h2>Using old Whirled / Flash avatars</h2>'
-      + '<p><b>First-class path:</b> classic Flash/SWF avatars stay supported alongside modern PNG packs. '
-      + 'Upload / analyze / Ruffle playback is in progress on this build — use the docs below now; lab UI unlocks with <code>?avatarLab=1</code>.</p>'
+      + '<h2>Classic Whirled avatars — without Adobe Flash</h2>'
+      + '<div class="dev-hub-callout classic-ruffle-callout" role="note">'
+      +   '<p><b>Currently:</b> <b>Ruffle = YES (optional path)</b>. Default smooth room movement = <b>PNG hybrid</b> (Ruffle not required).</p>'
+      +   '<p class="meta">Browsers cannot run Flash Player anymore — and we never ask you to install it. '
+      +   'Whirled2 keeps the classic feel (Stuff → Wear → loft walk → emotes) with modern HTTPS Pages.</p>'
+      + '</div>'
       + '<ul class="help-tips">'
-      + '<li><b>Import notes</b> — how legacy Whirled SWFs map into Stuff / wardrobe: '
-      + '<a href="' + esc(devHubDocUrl("AVATAR-IMPORT.md")) + '" target="_blank" rel="noopener">AVATAR-IMPORT.md</a></li>'
-      + '<li><b>Creator guide</b> — Flash/Animate → Publish SWF <i>or</i> export PNG sequences for Wear: '
-      + '<a href="' + esc(devHubDocUrl("AVATAR-CREATOR-GUIDE.md")) + '" target="_blank" rel="noopener">AVATAR-CREATOR-GUIDE.md</a>'
-      + ' · <button type="button" class="text-btn" data-avatar-guide-open="1">In-site guide</button></li>'
-      + '<li><b>FLA lab</b> — .fla alone cannot play in browser; publish SWF / export PNGs: '
-      + '<a href="' + esc(devHubDocUrl("FLA-TEST-AVATAR.md")) + '" target="_blank" rel="noopener">FLA-TEST-AVATAR.md</a></li>'
-      + '<li><b>Stub</b> — SWF upload → analyze → Ruffle preview (chrome lab; does not remount Pixi in <code>#stage-slot</code>).</li>'
+      + '<li><b>Hybrid (smooth)</b> — PNG/WebP idle+walk(+emotes) drive click-to-walk in chrome (fast, mobile-friendly). Optional SWF stays for archive / Stuff preview.</li>'
+      + '<li><b>Ruffle (optional)</b> — open WASM Flash emulator (CDN) loads only when you opt into Classic Flash / Force Ruffle / Stuff SWF preview — to play real <code>.swf</code> files. Transparent stage + pointer-events none so the room stays clickable.</li>'
+      + '<li><b>Whirl-only users</b> — if you never upload a SWF, <b>Ruffle never loads</b>.</li>'
+      + '<li><b>One-flow</b> — Drop SWF (+ optional PNG) → Analyze → auto Experimental/Hybrid → Save → <b>Wear &amp; enter loft</b>.</li>'
+      + '<li><b>Honest limits</b> — full AvatarControl host (SWF walk anim) still evolving; Hybrid is the delightful path today.</li>'
       + '</ul>'
-      + '<p class="meta engine-note"><b>ENGINE DEV:</b> Lab Wear / Ruffle stay on chrome layers — never force Flash into <code>#stage-slot</code>. Pixi owns the stage mount; SWF path is parallel.</p>'
-      + '<p class="meta"><a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/web-mock/AVATAR-IMPORT.md" target="_blank" rel="noopener">GitHub AVATAR-IMPORT</a>'
-      + ' · <a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/web-mock/FLA-TEST-AVATAR.md" target="_blank" rel="noopener">GitHub FLA lab</a></p>'
+      + '<p><b>Read:</b> <a href="' + esc(devHubDocUrl("HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md")) + '" target="_blank" rel="noopener">HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md</a>'
+      + ' · <a href="' + esc(devHubDocUrl("AVATAR-IMPORT.md")) + '" target="_blank" rel="noopener">AVATAR-IMPORT.md</a>'
+      + ' · <a href="' + esc(devHubDocUrl("QA-FLASH.md")) + '" target="_blank" rel="noopener">QA-FLASH.md</a>'
+      + ' · <button type="button" class="text-btn" data-avatar-guide-open="1">In-site creator guide</button></p>'
+      + '<p class="meta engine-note"><b>ENGINE DEV:</b> Ruffle / Wear stay on chrome (<code>#avatar-wear-layer</code> / <code>#avatar-ruffle-host</code>) — never force Flash into <code>#stage-slot</code>. Pixi owns the stage mount later.</p>'
+      + '<p class="meta"><a href="https://github.com/whirledclassic/whirled2/blob/main/whirled2/web-mock/HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md" target="_blank" rel="noopener">GitHub how-without-Flash</a>'
+      + ' · <a href="' + esc(devHubDocUrl("AVATAR-CREATOR-GUIDE.md")) + '" target="_blank" rel="noopener">AVATAR-CREATOR-GUIDE.md</a>'
+      + ' · <a href="' + esc(devHubDocUrl("FLA-TEST-AVATAR.md")) + '" target="_blank" rel="noopener">FLA-TEST-AVATAR.md</a></p>'
       + '</article>'
 
       + devHubCard(
@@ -7655,7 +8218,7 @@
           "dev-cache",
           "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
           "STATUS.md",
-          "Current build: ?v=20260906ax (classic Flash upload + Ruffle experimental; chat visit-scope from av kept). Hard-refresh after pulls."
+          "Current build: ?v=20260906bb (Hybrid PNG walk fix + optional Ruffle; Wear&amp;enter loft). Hard-refresh after pulls."
         )
       + devHubCard(
           "FLA / SWF lab notes",
@@ -8636,6 +9199,7 @@
       + '<button type="button" class="me-link' + (meSub === "club" ? " is-on" : "") + '" data-me="club">Club</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "account" ? " is-on" : "") + '" data-me="account">Account</button>'
+      + (typeof isAdmin === "function" && isAdmin() ? ('<span class="sep">|</span><button type="button" class="me-link' + (meSub === "admin" ? " is-on" : "") + '" data-me="admin">Admin</button>') : '')
       + '</nav></div>';
   }
   function newsKindOf(n) {
@@ -8995,16 +9559,32 @@
   }
 
   function collectSearchablePeople() {
+    // How this works (?v=20260906ba): wiki Friend search — name, permaname, email, real name, interests.
+    // Beginner: only people already on this browser (occupants / friends / profiles / local users). No invented catalog.
     var map = {};
+    function enrich(id) {
+      var email = "", realName = "", interests = "";
+      try { email = localStorage.getItem("whirled2.email." + id) || ""; } catch (eE) {}
+      try { realName = localStorage.getItem("whirled2.realName." + id) || ""; } catch (eR) {}
+      try {
+        var info = loadInfo(id);
+        interests = (info && info.interests) || "";
+      } catch (eI) {}
+      return { email: email, realName: realName, interests: interests };
+    }
     function add(p) {
       if (!p || !p.id) return;
       if (session() && p.id === session().user.id) return;
       var prev = map[p.id];
+      var extra = enrich(p.id);
       map[p.id] = {
         id: p.id,
         name: p.name || (prev && prev.name) || p.id,
         online: !!(p.online || (prev && prev.online)),
-        room: p.room || (prev && prev.room) || ""
+        room: p.room || (prev && prev.room) || "",
+        email: p.email || (prev && prev.email) || extra.email || "",
+        realName: p.realName || (prev && prev.realName) || extra.realName || "",
+        interests: p.interests || (prev && prev.interests) || extra.interests || ""
       };
     }
     liveOccupants.forEach(function (p) {
@@ -9018,19 +9598,41 @@
       var users = JSON.parse(localStorage.getItem("whirled2.users") || "{}");
       Object.keys(users).forEach(function (uid) {
         var u = users[uid];
-        if (u) add({ id: u.id || uid, name: u.name || uid, online: false });
+        if (u) add({
+          id: u.id || uid,
+          name: u.name || uid,
+          online: false,
+          email: u.email || "",
+          realName: u.realName || ""
+        });
       });
     } catch (eU) {}
     return Object.keys(map).map(function (k) { return map[k]; });
   }
   function searchPeople(q) {
+    // How this works (?v=20260906ba): match Whirled name, permaname/id, email, real name, or interests (wiki Friend).
+    // Beginner: type any of those; results never invent players who are not already known on this browser.
     q = String(q || "").trim().toLowerCase();
     if (!q) return [];
     return collectSearchablePeople().filter(function (p) {
       if (isBlocked(p.id)) return false;
       var name = String(p.name || "").toLowerCase();
       var id = String(p.id || "").toLowerCase();
-      return name.indexOf(q) >= 0 || id.indexOf(q) >= 0;
+      var email = String(p.email || "").toLowerCase();
+      var real = String(p.realName || "").toLowerCase();
+      var interests = String(p.interests || "").toLowerCase();
+      var hit = name.indexOf(q) >= 0 || id.indexOf(q) >= 0
+        || (email && email.indexOf(q) >= 0)
+        || (real && real.indexOf(q) >= 0)
+        || (interests && interests.indexOf(q) >= 0);
+      if (!hit) return false;
+      // Annotate why it matched (UI hint) — not persisted.
+      if (id === q || id.indexOf(q) === 0) p.matchWhy = "permaname";
+      else if (email && email.indexOf(q) >= 0) p.matchWhy = "email";
+      else if (real && real.indexOf(q) >= 0) p.matchWhy = "real name";
+      else if (interests && interests.indexOf(q) >= 0) p.matchWhy = "interests";
+      else p.matchWhy = "name";
+      return true;
     }).slice(0, 40);
   }
   function meFriends() {
@@ -9751,6 +10353,42 @@
   // Beginner: Profile look = BG/font/modules on your profile page (not room stage).
   // ENGINE DEV: profile skins never apply to #stage-slot.
   // ---------------------------------------------------------------------------
+
+  function meAdmin() {
+    // How this works (?v=20260906ba): Admin panel — list local users, Make/Remove admin.
+    // Beginner: only visible when isAdmin(). Bootstrap: first user / Test / whirled2.forceAdmin=1.
+    if (!isAdmin()) {
+      return '<section class="page me-page">' + meSubnav()
+        + '<div class="panel"><h2>Admin</h2><p class="meta">Admins only. Ask a site admin to promote you.</p></div></section>';
+    }
+    var people = listLocalUsersForAdmin();
+    var rows = people.length
+      ? people.map(function (p) {
+          var adm = isAdmin(p.id);
+          return '<div class="admin-user-row">'
+            + '<div><b>' + esc(p.name) + '</b> ' + roleBadgeHtml(getRole(p.id))
+            + '<div class="meta">permaname ' + esc(p.id) + (adm ? " · admin" : "") + '</div></div>'
+            + '<div class="admin-user-actions">'
+            + (adm
+              ? ('<button type="button" class="action-btn" data-admin-remove="' + esc(p.id) + '"'
+                + (isPrivilegedName(p.id) || isPrivilegedName(p.name) ? " disabled" : "") + '>Remove admin</button>')
+              : ('<button type="button" class="action-btn" data-admin-make="' + esc(p.id) + '">Make admin</button>'))
+            + '</div></div>';
+        }).join("")
+      : '<p class="meta">No local users yet.</p>';
+    var bc = session() ? nextBroadcastCost(session().user.id) : { cost: 50, count: 0 };
+    return '<section class="page me-page admin-page">' + meSubnav()
+      + '<div class="panel"><h2>Admin</h2>'
+      + '<p class="meta">Local browser admins (<code>whirled2.admins</code> + <code>whirled2.roles</code>). '
+      + 'Bootstrap empty set: first account, name <b>Test</b>/<b>admin</b>, or set <code>localStorage.whirled2.forceAdmin=1</code> and reload (see Dev Hub).</p>'
+      + '<p class="meta">Seeded group <b>Whirled2 Developers</b> is managed by admins. /broadcast next cost: <b>'
+      + esc(String(bc.cost)) + '</b> coins (count today ' + esc(String(bc.count)) + ').</p>'
+      + '<div class="section-label">Local users</div>' + rows
+      + '<div class="stuff-detail-actions" style="margin-top:12px">'
+      +   '<button type="button" class="action-btn" data-tab="groups" data-group-open="' + esc(DEV_GROUP_ID) + '">Open Whirled2 Developers</button>'
+      + '</div></div></section>';
+  }
+
   function mePage() {
     if (viewingId && session() && viewingId !== session().user.id) {
       if (isBlocked(viewingId)) {
@@ -9766,6 +10404,7 @@
     if (meSub === "mail") return meMail(window.__mailCompose || null);
     if (meSub === "passport") return mePassport();
     if (meSub === "account") return meAccount();
+    if (meSub === "admin") return meAdmin();
     if (meSub === "profile") return meProfile();
     if (meSub === "blocklist") return meBlocklist();
     if (meSub === "galleries") return meGalleries();
@@ -9848,6 +10487,7 @@
       +       '<b>' + esc(me.name) + '</b>'
       +       '<span class="sep">|</span>'
       +       '<button type="button" class="text-btn" data-me="club" title="Membership">Club</button>'
+      +       (typeof isAdmin === "function" && isAdmin() ? ('<span class="sep">|</span><button type="button" class="text-btn" data-me="admin" title="Admin panel">Admin</button>') : '')
       +       '<span class="sep">|</span>'
       +       '<button type="button" class="text-btn" data-help-open="1">Help</button>'
       +       '<span class="sep">|</span>'
@@ -9958,6 +10598,9 @@
       return;
     }
     bootstrapRoles(); // ensure admin badges for test / first user before first paint
+    try { healStoredDisplayNames(); } catch (eHealBoot) {}
+    try { ensureWhirled2DevGroup(); } catch (eSeedG) {}
+    try { appendOvernightDevNotes(); } catch (eNotes) {}
     // How this works: daily login claim once per calendar day, then shell can show balances.
     try { claimDailyLogin(); } catch (eDaily) {}
     // 20260906q: phones force Overlay chat so Slide never opens a black slab under the stage.
@@ -10371,6 +11014,13 @@
       var moved = _decDrag.moved;
       var x = parseFloat(_decDrag.chip.style.left) || 0;
       var y = parseFloat(_decDrag.chip.style.top) || 0;
+      // How this works (?v=20260906ba): optional 8px snap — classic edit feel without engine physics.
+      if (decorateSnapGrid) {
+        x = Math.round(x / 8) * 8;
+        y = Math.round(y / 8) * 8;
+        _decDrag.chip.style.left = x + "px";
+        _decDrag.chip.style.top = y + "px";
+      }
       var layout = loadRoomLayout();
       for (var i = 0; i < layout.items.length; i++) {
         if (layout.items[i].id === id) {
@@ -10589,6 +11239,17 @@
       if (!tabsClr.activeTabId || tabsClr.activeTabId === "room") clearRoomChatDisplay(true);
       else clearActiveChatTab(true);
       pushNotice("blue", "Chat cleared.", { transient: true });
+      return;
+    }
+    // How this works (?v=20260906ba): wiki /broadcast — escalating coins (classic used Bars).
+    // Beginner: /broadcast hello pays coins and shows a highlighted room-wide line.
+    if (/^\/broadcast\b/i.test(text)) {
+      var bcText = text.replace(/^\/broadcast\s*/i, "").trim();
+      var bc = tryBroadcast(bcText);
+      if (!bc.ok) {
+        pushSystemChat(bc.error || "Broadcast failed.", { ephemeral: true });
+        pushNotice("orange", bc.error || "Broadcast failed.", { transient: true });
+      }
       return;
     }
     if (/^\/away$/i.test(text)) {
@@ -10816,16 +11477,18 @@
     if (!session()) { liveOccupants = []; return; }
     var result = await window.WhirledApi.heartbeat("loft");
     liveOccupants = (result.occupants || []).map(function (p) {
-      var isYou = !!(session() && session().user && p.id === session().user.id);
+      // How this works (?v=20260906ba): sanitize every presence name; self always uses healed session name.
+      var isYou = !!(session() && session().user && String(p.id) === String(session().user.id));
       var nm = isYou
-        ? sanitizeDisplayName(session().user.name, p.name)
-        : sanitizeDisplayName(p.name, p.id);
+        ? sanitizeDisplayName(session().user.name, "You")
+        : sanitizeDisplayName(p && p.name, (p && p.id) || "Player");
+      if (/NaN/i.test(nm)) nm = isYou ? "You" : String((p && p.id) || "Player").slice(0, 40);
       return {
         id: p.id,
         name: nm,
-        initials: (p.initials && !/NaN/i.test(String(p.initials)))
-          ? String(p.initials).slice(0, 2)
-          : String(nm).slice(0, 1).toUpperCase(),
+        initials: (/NaN/i.test(String(p.initials || "")) || !p.initials)
+          ? String(nm).slice(0, 1).toUpperCase()
+          : String(p.initials).slice(0, 2),
         online: true,
         room: p.room || ROOM,
         you: isYou
@@ -10988,6 +11651,10 @@
           paint: paint,
           pushNotice: pushNotice,
           wearStuffAvatar: wearStuffAvatar,
+          enterLoft: function () {
+            try { tryEnterLoft(); } catch (eEl) {}
+            paint("rooms");
+          },
           awardAction: typeof awardAction === "function" ? awardAction : function () {}
         });
         WhirledClassicAvatar.setOpenStuffDetail(function (id) {
@@ -10998,8 +11665,15 @@
           avatarWizard = null;
           paint("stuff");
         });
+        if (WhirledClassicAvatar.setEnterLoft) {
+          WhirledClassicAvatar.setEnterLoft(function () {
+            try { tryEnterLoft(); } catch (eEl2) {}
+            paint("rooms");
+          });
+        }
       }
     } catch (eClassicBind) {}
+    try { ensureDevUpdatesGroup(); } catch (eDevUp) {}
     try {
       var pageQ = new URL(location.href).searchParams.get("page");
       if (pageQ && /^(dev|docs|developers)$/i.test(pageQ)) devHubOpen = true;
@@ -11501,6 +12175,12 @@
       closeAvatarEmoteMenu();
       return;
     }
+    if (ev.target.closest("[data-avatar-emote-soon]")) {
+      // Coming Soon stubs — close menu, do not change walk state / frames.
+      closeAvatarEmoteMenu();
+      try { pushNotice("status", "Emote Coming Soon for this avatar — attach PNG frames (wave/sit/pose) or wait for AvatarControl. Walk still works.", { transient: true }); } catch (eSoon) {}
+      return;
+    }
     var emoteBtn = ev.target.closest("[data-avatar-emote]");
     if (emoteBtn) {
       var em = emoteBtn.getAttribute("data-avatar-emote");
@@ -11643,6 +12323,22 @@
     if (ev.target.closest("[data-set-role]") && session() && getRole(session().user.id) === "admin") {
       var sr = ev.target.closest("[data-set-role]");
       setRole(sr.getAttribute("data-set-role"), sr.getAttribute("data-role"));
+      paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-admin-make]") && session() && isAdmin()) {
+      var amid = ev.target.closest("[data-admin-make]").getAttribute("data-admin-make");
+      makeAdmin(amid);
+      pushNotice("green", "Made admin: " + amid, { transient: true });
+      meSub = "admin";
+      paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-admin-remove]") && session() && isAdmin()) {
+      var arid = ev.target.closest("[data-admin-remove]").getAttribute("data-admin-remove");
+      removeAdmin(arid);
+      pushNotice("orange", "Removed admin: " + arid, { transient: true });
+      meSub = "admin";
       paint("me");
       return;
     }
@@ -14312,6 +15008,12 @@
       stuffItemId = null;
       stuffMode = "browse";
       paint("stuff");
+      return;
+    }
+    if (ev.target.id === "group-discuss-search" && session()) {
+      var gsd = new FormData(ev.target);
+      groupDiscussQ = String(gsd.get("q") || "").trim().slice(0, 80);
+      paint("groups");
       return;
     }
     if (ev.target.id === "friend-search-form" && session()) {
