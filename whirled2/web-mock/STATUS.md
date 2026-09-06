@@ -2,30 +2,25 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906al)
+## What shipped (?v=20260906ao)
 
-**Hybrid auth + Discord return to Pages + boot resilience:**
+**Unified Cyan Hair avatar + chrome click-to-walk:**
 
-1. **Login fix:** When `WHIRLED_API` is set (demo tunnel / Pages), `WhirledApi.login` / `register` prefer the Node API; on credential/taken **or** network failure they **fall back to offline `localStorage` users** so Pages-created accounts still Logon on the tunnel. Clearer errors when both fail. Beginner comments: Pages offline vs demo API.
-2. **Boot/shell:** `finishBootAfterSession` / shell paint wrapped — a UI throw after successful session shows `#gate-err` or a recoverable shell (not a stuck empty gate). `bindGate` always runs when the gate is shown.
-3. **Discord → Pages:** `CLIENT_RETURN_ORIGIN` / `DISCORD_SUCCESS_ORIGIN` + allowlisted `?return=` on `/api/auth/discord`. Portal **Redirect URI stays the tunnel** (`DISCORD_REDIRECT_URI`). Success can redirect to Pages `/?discord_token=…&v=20260906al`. Pages `index.html` sets `WHIRLED_API` to the live tunnel; `discordAuthStartUrl` appends `?return=` when page origin ≠ API.
-4. Prior loft backdrop / tofu / chat SVG icons kept (`ak`). SWF lab stays **locked**. `#stage-slot` contract unchanged.
+1. **One Wearable pack** — `assets/avatars/user-pack/cyan-hair/` merges idle / walk / stand / pose from the four Aseprite part packs. `pack.json` exposes `states` for chrome + future Pixi. Stuff **Add Cyan Hair** seeds the unified item (optional “Also add part packs…”).
+2. **Click-to-walk** — until Pixi `mountWhirledEngine` owns `#stage-slot`, click the loft floor on `.stage-host` → `#avatar-wear-layer` billboard walks (walk frames) then idles; soft target marker; face flip. Yields when canvas / `[data-whirled-engine]` is present. No canvas in `#stage-slot` for chrome walk.
+3. **WhirledChrome** — `getWornAvatar()` includes `states`; `setAvatarState`, `getAvatarWalkTarget`, `isChromeWalkActive`.
+4. **Uploader** — Stuff Avatars multi-file idle + walk PNGs (optional .aseprite) → one inventory item with states.
+5. Docs: ENGINE-BRIDGE.md + AVATAR-STUFF-FIDELITY.md + STUFF-AVATARS.md updated for unified schema.
 
-**Restart demo server with:**
-`CLIENT_RETURN_ORIGIN=https://whirledclassic.github.io/whirled2/whirled2/web-mock`
-(`PUBLIC_ORIGIN` / `DISCORD_REDIRECT_URI` still tunnel.)
+SWF lab stays **locked**. `#stage-slot` contract unchanged.
 
-## Prior (?v=20260906ak)
+## Prior (?v=20260906ao)
 
-**Loft placeholder + Stuff Avatar viewer + chat-bar SVG icons** — see STUFF-AVATARS.md / AVATAR-STUFF-FIDELITY.md.
-
-## Prior (?v=20260906aj)
-
-- Discord create-account UX; QA pass ([QA-PAGES.md](./QA-PAGES.md)).
+**Hybrid auth + Discord return to Pages + boot resilience** — see prior STATUS / SOCIAL-LOGIN.md.
 
 ## Standing rules
 
 - Coins/Bars earn-only; never invent fake catalog.
 - Never say MySpace; say Profile look.
-- `#stage-slot` = engine mount; Wear on `#avatar-wear-layer` sibling.
+- `#stage-slot` = engine mount; Wear / chrome walk on `#avatar-wear-layer` sibling.
 - No secrets in client — only `WHIRLED_API` origin.
