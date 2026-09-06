@@ -1,3 +1,11 @@
+## What shipped (?v=20260906bw)
+
+- **Flash Wear RELIABILITY:** IDB `blob:` avatars skip broken companion nest → **DIRECT outer Ruffle** (always visible) + chrome bob walk. Nested `Loader.load(blob|data)` rejected by Ruffle research.
+- Watchdog / bridge-error remount DIRECT kept for http companion attempts.
+- **Next:** `hostLoadBytes(base64)` in AvatarHost for real walk scenes via sharedEvents.
+- Preserve: bu host SWF, bt never-tofu, bs Hybrid gate, bg dual Wear, Whirl
+- Cache: **`?v=20260906bw`**. Push: `/tmp/push-bw.js`.
+
 ## What shipped (?v=20260906bu)
 
 - **Flash/Ruffle CRITICAL:** nested **companion host SWF** (`assets/avatar-host/avatar-host.swf`, ORIGINAL MIT from `tools/avatar-host/AvatarHost.hx` via Haxe `--swf`)

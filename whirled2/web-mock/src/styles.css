@@ -6492,6 +6492,16 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   transform-origin: center bottom;
   pointer-events: none !important;
 }
+/* (?v=20260906bw): companion host Body flips via orient — bob Y only (no CSS scaleX double-flip) */
+@keyframes whirled-swf-host-bob-y {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-4px); }
+  75% { transform: translateY(-2px); }
+}
+.avatar-wear-layer .avatar-ruffle-host.is-companion-facing.is-swf-walking,
+.avatar-wear-layer.is-swf-walking .avatar-ruffle-host.is-companion-facing {
+  animation: whirled-swf-host-bob-y 0.32s ease-in-out infinite;
+}
 
 .avatar-emote-btn.is-soon {
   opacity: 0.72;

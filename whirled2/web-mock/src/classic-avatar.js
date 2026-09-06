@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906bu
+ * Cache: ?v=20260906bw
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906bu";
+  var VERSION = "20260906bw";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -27,10 +27,13 @@
   var THUMB_MAX_BYTES = 1 * 1024 * 1024;
   var RUFFLE_CDN = "https://unpkg.com/@ruffle-rs/ruffle";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906bu): nested companion host SWF (sharedEvents) + dual Wear modes.
-  // CRITICAL bu: loft mounts assets/avatar-host/avatar-host.swf then hostLoadUrl(avatar);
-  // hostWalk/hostEmote drive in-SWF appearanceChanged_v2 — chrome puppet still runs as backup.
-  // CRITICAL bt: preserve stand thumb across mountRuffle; never silent-fail sha1-only Wear; SWF beats tofu.
+  // How this works (?v=20260906bw): Classic Flash reliability FIRST.
+  // ROOT BREAK (bu/bv): nested AS3 Loader cannot load blob:/data: under Ruffle → blank loft forever.
+  // FIX: outer Ruffle loads host.swf (http); avatar bytes via hostLoadBytes(base64) → Loader.loadBytes.
+  // blob:/IDB Wear: mount DIRECT primary FIRST (always visible + chrome bob). Companion only when
+  // we have base64 bytes for hostLoadBytes. http(s) avatars may use hostLoadUrl. Watchdog ~2s → DIRECT.
+  // Never set loftUsesCompanionHost until bridge "connected". Keep stand thumb (bt).
+  // LIVE whirled.club: ActorSprite → appearanceChanged_v2 → Body state_*_walking (+ gotControl_v1).
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
   // SWF-only: transparent Ruffle + synthesized bob/flip walk — never broken tofu.
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
@@ -690,14 +693,25 @@
     if (!layer) return;
     var bill = layer.querySelector(".avatar-wear-billboard");
     var host = layer.querySelector("#avatar-ruffle-host, .avatar-ruffle-host");
-    // (?v=20260906bt): copy --wear-face onto host so bob keyframes can flip SWF without flipping nameplate.
+    // (?v=20260906bw): Body (uravatar) flips via orient<180 → scaleX=-1. When companion host
+    // is connected, do NOT also CSS-flip the ruffle host (double-flip = moonwalk). Fallback
+    // direct-avatar path still uses --wear-face on host bob keyframes (bt).
+    var companionFacing = !!(loftUsesCompanionHost && loftHostState.connected);
     try {
       var face = (faceHint === -1 || faceHint === 1) ? faceHint
         : (bill && parseFloat(bill.style.getPropertyValue("--wear-face"))) || loftHostState._face || 1;
       if (face === -1 || face === 1) {
         loftHostState._face = face;
         if (bill) bill.style.setProperty("--wear-face", String(face));
-        if (host) host.style.setProperty("--wear-face", String(face));
+        if (host) {
+          if (companionFacing) {
+            host.classList.add("is-companion-facing");
+            host.style.setProperty("--wear-face", "1");
+          } else {
+            host.classList.remove("is-companion-facing");
+            host.style.setProperty("--wear-face", String(face));
+          }
+        }
       }
     } catch (eFace) {}
     if (on) {
@@ -780,13 +794,21 @@
    * logs what the SWF tries (?avatarDebug=1). Chrome always moves the billboard + bob.
    */
 
-  // (?v=20260906bu): companion host nest — outer Ruffle = host.swf; avatar via hostLoadUrl.
-  // Beginner: this is how stock Whirled SWFs get walk scenes without Adobe Flash Player.
-  // ENGINE DEV: host listens controlConnect on contentLoaderInfo.sharedEvents (see tools/avatar-host/).
+  // (?v=20260906bw): companion host nest — outer Ruffle = host.swf (http); avatar via hostLoadBytes.
+  // Beginner: host.swf is OUR tiny Flash wrapper — not your avatar. It rebuilds your SWF from base64 bytes.
+  // ENGINE DEV: nested Loader.load(blob:/data:) FAILS under Ruffle. Use Loader.loadBytes(ByteArray) only.
+  // EI cannot pass ByteArray — JS sends base64 (chunked if huge). http(s) may still use hostLoadUrl.
   var COMPANION_HOST_SWF = "./assets/avatar-host/avatar-host.swf?v=" + VERSION;
   var loftUsesCompanionHost = false;
+  var loftCompanionAttempted = false;
   var loftPendingAvatarUrl = null;
+  var loftPendingAvatarB64 = null;
   var loftHostBridgeLog = [];
+  var loftMountGeneration = 0;
+  var loftCompanionWatchTimer = 0;
+  var loftFallbackInFlight = false;
+  var HOST_B64_CHUNK = 240000; // EI-safe chunk size for hostLoadBytesChunk
+  var HOST_B64_MAX = 14 * 1024 * 1024; // ~10MB SWF as base64
 
   var loftActivePlayer = null;
   var loftHostState = {
@@ -842,7 +864,6 @@
       var name = list[i];
       if (!name) continue;
       tried.push(name);
-      // 1) Direct property on player (classic Flash embed style)
       try {
         if (typeof player[name] === "function") {
           var r1 = player[name].apply(player, args);
@@ -850,11 +871,10 @@
           return { ok: true, via: "player." + name, result: r1 };
         }
       } catch (e1) { logAvatarDebug("player." + name + " threw", e1 && e1.message); }
-      // 2) player.ruffle().call(name, ...args) when available
       try {
-        var api = player.ruffle && player.ruffle();
-        if (api && typeof api.call === "function") {
-          var r2 = api.call.apply(api, [name].concat(args));
+        var apiR = player.ruffle && player.ruffle();
+        if (apiR && typeof apiR.call === "function") {
+          var r2 = apiR.call.apply(apiR, [name].concat(args));
           rememberEi("js→swf", name + " (ruffle.call)", args);
           return { ok: true, via: "ruffle.call:" + name, result: r2 };
         }
@@ -863,7 +883,6 @@
     rememberEi("js→swf", "MISS:" + tried.join("|"), args);
     return { ok: false, reason: "no-callback", tried: tried };
   }
-
 
   /**
    * Resolve companion host SWF URL relative to this page (Pages subpath safe).
@@ -875,6 +894,229 @@
     } catch (e) {
       return COMPANION_HOST_SWF;
     }
+  }
+
+  /** ArrayBuffer → plain base64 (no data: prefix). ENGINE DEV: EI string for hostLoadBytes. */
+  function arrayBufferToBase64(arrayBuffer) {
+    var u8 = new Uint8Array(arrayBuffer);
+    var chunk = 0x8000;
+    var parts = [];
+    for (var i = 0; i < u8.length; i += chunk) {
+      parts.push(String.fromCharCode.apply(null, u8.subarray(i, i + chunk)));
+    }
+    return btoa(parts.join(""));
+  }
+
+  function dataUrlToBase64(dataUrl) {
+    var s = String(dataUrl || "");
+    var idx = s.indexOf("base64,");
+    if (idx < 0) return null;
+    return s.slice(idx + 7).replace(/\s+/g, "");
+  }
+
+  /**
+   * Resolve raw SWF bytes from Stuff / worn row (IDB / data URL / fetch blob|http).
+   * Beginner: this is the file you uploaded — we need the bytes so the host SWF can rebuild it.
+   * Returns Promise<{ buffer, mime, source }|null>
+   */
+  function resolveSwfBytes(item) {
+    if (!item) return Promise.resolve(null);
+    function fromBuffer(buf, mime, source) {
+      if (!buf) return null;
+      var ab = buf;
+      if (buf instanceof ArrayBuffer) ab = buf;
+      else if (buf.buffer && buf.byteLength != null) ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+      else return null;
+      return { buffer: ab, mime: mime || "application/x-shockwave-flash", source: source || "buffer" };
+    }
+    function fromBlob(blob, source) {
+      if (!blob || !blob.arrayBuffer) return Promise.resolve(null);
+      return blob.arrayBuffer().then(function (ab) {
+        return fromBuffer(ab, blob.type || "application/x-shockwave-flash", source || "blob");
+      });
+    }
+    if (item.swfDataUrl) {
+      try {
+        var b64d = dataUrlToBase64(item.swfDataUrl);
+        if (b64d) {
+          var bin = atob(b64d);
+          var u8 = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+          return Promise.resolve(fromBuffer(u8.buffer, "application/x-shockwave-flash", "swfDataUrl"));
+        }
+      } catch (eD) {}
+    }
+    var sha = item.swfSha1 || (item.pack && item.pack.swfSha1) || null;
+    if (sha) {
+      return idbGetBlob(sha).then(function (rec) {
+        if (!rec) return null;
+        if (rec.buffer) return fromBuffer(rec.buffer, rec.mime, "idb-buffer");
+        if (rec.blob) return fromBlob(rec.blob, "idb-blob");
+        if (rec.dataUrl) {
+          var b64 = dataUrlToBase64(rec.dataUrl);
+          if (!b64) return null;
+          var bin2 = atob(b64);
+          var u82 = new Uint8Array(bin2.length);
+          for (var j = 0; j < bin2.length; j++) u82[j] = bin2.charCodeAt(j);
+          return fromBuffer(u82.buffer, rec.mime || "application/x-shockwave-flash", "idb-dataUrl");
+        }
+        return null;
+      }).catch(function () { return null; });
+    }
+    var url = item.swfUrl || null;
+    if (url && (/^(blob:|https?:)/i.test(url) || url.indexOf("/") === 0 || url.indexOf("./") === 0)) {
+      return fetch(url).then(function (res) {
+        if (!res.ok) throw new Error("fetch " + res.status);
+        return res.arrayBuffer();
+      }).then(function (ab) {
+        return fromBuffer(ab, "application/x-shockwave-flash", "fetch:" + String(url).slice(0, 12));
+      }).catch(function () { return null; });
+    }
+    return Promise.resolve(null);
+  }
+
+  /**
+   * (?v=20260906bw) Decide companion load strategy.
+   * - blob:/data: → NEVER hostLoadUrl (nested Loader fails). Need base64 → hostLoadBytes, else skip companion.
+   * - http(s)/relative → hostLoadUrl OK.
+   * Returns { ok, mode: 'bytes'|'url'|'skip', b64?, url?, reason }
+   */
+  function prepareCompanionPayload(avatarUrl, item) {
+    var url = avatarUrl || "";
+    if (/^https?:/i.test(url) || (/^\.?\//.test(url) && url.indexOf("blob:") !== 0)) {
+      // relative or http — fine for hostLoadUrl; still prefer bytes if IDB has them
+      return resolveSwfBytes(item).then(function (got) {
+        if (got && got.buffer) {
+          var b64p = arrayBufferToBase64(got.buffer);
+          if (b64p && b64p.length <= HOST_B64_MAX) {
+            return { ok: true, mode: "bytes", b64: b64p, url: url, reason: "bytes-prefer:" + got.source };
+          }
+        }
+        return { ok: true, mode: "url", url: url, reason: "http-or-relative" };
+      });
+    }
+    if (url.indexOf("data:") === 0) {
+      var b64d = dataUrlToBase64(url);
+      if (b64d && b64d.length <= HOST_B64_MAX) {
+        return Promise.resolve({ ok: true, mode: "bytes", b64: b64d, url: url, reason: "dataurl-to-b64" });
+      }
+      return Promise.resolve({ ok: false, mode: "skip", reason: "data-too-large-or-bad", skipped: true });
+    }
+    // blob: or unknown — MUST use bytes path; never nested URL load
+    return resolveSwfBytes(item).then(function (got) {
+      if (!got || !got.buffer) {
+        // Fallback: fetch the blob: URL itself for bytes
+        if (url.indexOf("blob:") === 0) {
+          return fetch(url).then(function (res) {
+            if (!res.ok) throw new Error("blob fetch " + res.status);
+            return res.arrayBuffer();
+          }).then(function (ab) {
+            var b64f = arrayBufferToBase64(ab);
+            if (!b64f || b64f.length > HOST_B64_MAX) {
+              return { ok: false, mode: "skip", skipped: true, reason: "blob-b64-too-large:" + (b64f && b64f.length) };
+            }
+            return { ok: true, mode: "bytes", b64: b64f, url: url, reason: "blob-fetched-bytes" };
+          }).catch(function (err) {
+            return { ok: false, mode: "skip", skipped: true, reason: "blob-bytes-fail:" + (err && err.message) };
+          });
+        }
+        return { ok: false, mode: "skip", skipped: true, reason: "no-bytes-for-blob" };
+      }
+      var b64 = arrayBufferToBase64(got.buffer);
+      if (!b64 || b64.length > HOST_B64_MAX) {
+        return { ok: false, mode: "skip", skipped: true, reason: "b64-too-large:" + (b64 && b64.length) };
+      }
+      return { ok: true, mode: "bytes", b64: b64, url: url, reason: "idb-bytes:" + got.source };
+    });
+  }
+
+  function clearCompanionWatch() {
+    if (loftCompanionWatchTimer) {
+      try { clearTimeout(loftCompanionWatchTimer); } catch (eT) {}
+      loftCompanionWatchTimer = 0;
+    }
+  }
+
+  function remountDirectAvatar(slot, avatarUrl, worn, loftOpts, reason) {
+    return remountDirectAvatarImmediate(reason || "remountDirect", slot, avatarUrl, worn, loftOpts);
+  }
+
+  function remountDirectAvatarImmediate(reason, slotOpt, urlOpt, wornOpt, loftOptsOpt) {
+    // (?v=20260906bw) CRITICAL: empty companion host → remount the real avatar SWF (blob: OK for outer Ruffle).
+    if (loftFallbackInFlight) {
+      logAvatarDebug("remountDirect skipped (in flight)", reason);
+      return Promise.resolve(null);
+    }
+    var gen = loftMountGeneration;
+    var slot = slotOpt || document.getElementById("avatar-ruffle-host")
+      || document.getElementById("classic-wear-swf-slot");
+    var url = urlOpt || loftPendingAvatarUrl || loftHostState.avatarUrl;
+    if (!slot || !url) {
+      logAvatarDebug("remountDirect missing slot/url", reason);
+      return Promise.resolve(null);
+    }
+    loftFallbackInFlight = true;
+    clearCompanionWatch();
+    loftUsesCompanionHost = false;
+    loftHostState.hostMode = false;
+    loftHostState.connected = false;
+    logAvatarDebug("REMOUNT DIRECT avatar", reason, { gen: gen, urlKind: String(url).slice(0, 12) });
+    var worn = wornOpt || null;
+    if (!worn) {
+      try {
+        if (global.WhirledChrome && global.WhirledChrome.getWornAvatar) worn = global.WhirledChrome.getWornAvatar();
+      } catch (eW) {}
+    }
+    ensureStandFallback(slot, worn, "fallback:" + String(reason || "").slice(0, 80));
+    var loftOpts = loftOptsOpt || {
+      maxWidth: "140px",
+      maxHeight: "180px",
+      height: "160px",
+      loftMount: true,
+      pointerEvents: "none",
+      wmode: "transparent",
+      backgroundColor: null,
+      allowScriptAccess: true
+    };
+    return mountRuffle(slot, url, loftOpts).then(function (player) {
+      if (gen !== loftMountGeneration) {
+        logAvatarDebug("remountDirect stale gen", gen, loftMountGeneration);
+        return player;
+      }
+      loftUsesCompanionHost = false;
+      loftHostState.hostMode = false;
+      loftFallbackInFlight = false;
+      try {
+        slot.classList.remove("is-failed");
+        slot.classList.add("is-playing", "is-on");
+        slot.setAttribute("data-mount-mode", "direct");
+      } catch (eCl) {}
+      logAvatarDebug("remountDirect OK", { hasPlayer: !!player });
+      return player;
+    }).catch(function (err) {
+      loftFallbackInFlight = false;
+      ensureStandFallback(slot, worn, (err && err.message) || "direct-remount-failed");
+      logAvatarDebug("remountDirect FAILED", err && err.message);
+      return null;
+    });
+  }
+
+  function armCompanionWatchdog(gen, reasonTag) {
+    clearCompanionWatch();
+    loftCompanionWatchTimer = setTimeout(function () {
+      loftCompanionWatchTimer = 0;
+      if (gen !== loftMountGeneration) return;
+      if (loftHostState.connected) {
+        logAvatarDebug("watchdog OK — connected", reasonTag);
+        return;
+      }
+      // No loaded/connected in ~2s → blank host risk — remount DIRECT (outer blob works)
+      logAvatarDebug("watchdog FIRE — no connected → direct", reasonTag, {
+        lastBridge: loftHostState.lastBridge,
+        companionAttempted: loftCompanionAttempted
+      });
+      remountDirectAvatarImmediate("watchdog-no-connected");
+    }, 2000);
   }
 
   /**
@@ -891,13 +1133,28 @@
       rememberEi("swf→js", "bridge:" + kind, [payload]);
       logAvatarDebug("hostBridge", kind, payload);
 
-      if (kind === "ready" || kind === "loaded") {
+      if (kind === "ready") {
         tryFlushPendingAvatarLoad();
+      }
+      if (kind === "loaded") {
+        tryFlushPendingAvatarLoad();
+        logAvatarDebug("host loaded avatar bytes (await controlConnect)");
       }
       if (kind === "connected") {
         loftHostState.connected = true;
         loftHostState.hostMode = true;
-        loftUsesCompanionHost = true;
+        loftUsesCompanionHost = true; // ONLY now — not at host mount time
+        clearCompanionWatch();
+        loftFallbackInFlight = false;
+        logAvatarDebug("companion connected — keep nest; re-sync appearance", {
+          moving: loftHostState.moving,
+          orient: loftHostState.orient
+        });
+        setTimeout(function () {
+          try {
+            callHostWalk(!!loftHostState.moving, loftHostState.orient);
+          } catch (eSync) {}
+        }, 0);
       }
       if (kind === "actions") {
         try {
@@ -910,7 +1167,8 @@
         } catch (eS) { loftHostState.states = []; }
       }
       if (kind === "error" || kind === "ei_error" || kind === "appearance_error") {
-        logAvatarDebug("companion host error", kind, payload);
+        logAvatarDebug("companion host error → direct remount", kind, payload);
+        remountDirectAvatarImmediate("bridge:" + kind + ":" + String(payload || "").slice(0, 60));
       }
       return true;
     };
@@ -920,32 +1178,73 @@
     args = args || [];
     var player = loftActivePlayer;
     if (!player) return { ok: false, reason: "no-player" };
-    // Direct EI callback on Ruffle player
     try {
       if (typeof player[name] === "function") {
         var r = player[name].apply(player, args);
-        rememberEi("js→swf", name, args);
+        rememberEi("js→swf", name, args.length === 1 && typeof args[0] === "string" && args[0].length > 80
+          ? [String(args[0]).slice(0, 40) + "…(" + args[0].length + ")"]
+          : args);
         return { ok: true, via: "player." + name, result: r };
       }
     } catch (e1) { logAvatarDebug("host." + name + " threw", e1 && e1.message); }
-    // Fallback generic probe
     return tryCallIntoSwf([name], args);
   }
 
+  function callHostLoadBytes(b64) {
+    if (!b64) return { ok: false, reason: "empty-b64" };
+    loftPendingAvatarB64 = b64;
+    // Single shot if small; else chunk (EI string limits)
+    if (b64.length <= HOST_B64_CHUNK) {
+      var r = tryCallHostMethod("hostLoadBytes", [b64]);
+      logAvatarDebug("hostLoadBytes", { ok: r.ok, len: b64.length, via: r.via });
+      return r;
+    }
+    logAvatarDebug("hostLoadBytes chunked", { len: b64.length, chunk: HOST_B64_CHUNK });
+    var begin = tryCallHostMethod("hostLoadBytesBegin", []);
+    if (!begin.ok) {
+      // Fallback: try single call anyway
+      return tryCallHostMethod("hostLoadBytes", [b64]);
+    }
+    for (var i = 0; i < b64.length; i += HOST_B64_CHUNK) {
+      var piece = b64.slice(i, i + HOST_B64_CHUNK);
+      var cr = tryCallHostMethod("hostLoadBytesChunk", [piece]);
+      if (!cr.ok) {
+        logAvatarDebug("hostLoadBytesChunk fail", i);
+        return cr;
+      }
+    }
+    var commit = tryCallHostMethod("hostLoadBytesCommit", []);
+    logAvatarDebug("hostLoadBytesCommit", commit);
+    return commit;
+  }
+
   function tryFlushPendingAvatarLoad() {
-    var url = loftPendingAvatarUrl || loftHostState.avatarUrl;
-    if (!url || !loftActivePlayer) return { ok: false, reason: "no-pending" };
-    return callHostLoadUrl(url);
+    // Prefer base64 → hostLoadBytes; http(s) → hostLoadUrl. Never blob:/data: into hostLoadUrl.
+    if (loftPendingAvatarB64 && loftActivePlayer) {
+      return callHostLoadBytes(loftPendingAvatarB64);
+    }
+    var url = loftHostState._hostLoadUrl || null;
+    if (url && loftActivePlayer) {
+      if (String(url).indexOf("blob:") === 0 || String(url).indexOf("data:") === 0) {
+        logAvatarDebug("tryFlush skipped blob/data URL (need hostLoadBytes)", String(url).slice(0, 24));
+        return { ok: false, reason: "blob-data-not-for-hostLoadUrl" };
+      }
+      return callHostLoadUrl(url);
+    }
+    return { ok: false, reason: "no-pending" };
   }
 
   function callHostLoadUrl(url) {
     if (!url) return { ok: false, reason: "empty-url" };
-    loftPendingAvatarUrl = url;
-    loftHostState.avatarUrl = url;
+    if (String(url).indexOf("blob:") === 0 || String(url).indexOf("data:") === 0) {
+      logAvatarDebug("callHostLoadUrl REJECTED blob/data — use hostLoadBytes", String(url).slice(0, 24));
+      return { ok: false, reason: "blob-data-rejected" };
+    }
+    loftHostState._hostLoadUrl = url;
+    loftHostState.avatarUrl = loftPendingAvatarUrl || url;
     var r = tryCallHostMethod("hostLoadUrl", [url]);
     logAvatarDebug("hostLoadUrl", r);
     if (!r.ok) {
-      // EI callbacks sometimes appear a tick after player.load resolves
       setTimeout(function () {
         var r2 = tryCallHostMethod("hostLoadUrl", [url]);
         logAvatarDebug("hostLoadUrl-retry", r2);
@@ -959,11 +1258,27 @@
     return r;
   }
 
+  function syncHostLocationFromBillboard() {
+    try {
+      var layer = document.getElementById("avatar-wear-layer");
+      var bill = layer && layer.querySelector(".avatar-wear-billboard");
+      var xPct = bill && parseFloat(String(bill.style.getPropertyValue("--wear-x") || "").replace("%", ""));
+      if (typeof xPct === "number" && isFinite(xPct)) {
+        // Map chrome % to Whirled logical X (0..1). Y/Z stay floor-ish defaults.
+        loftHostState.location = [Math.max(0, Math.min(1, xPct / 100)), 0, 0.5];
+      }
+    } catch (eLoc) {}
+    return loftHostState.location;
+  }
+
   function callHostWalk(moving, orient) {
     loftHostState.moving = !!moving;
     if (typeof orient === "number" && isFinite(orient)) loftHostState.orient = orient;
     var o = loftHostState.orient;
-    var r = tryCallHostMethod("hostWalk", [!!moving, o]);
+    var loc = syncHostLocationFromBillboard();
+    var locX = (loc && typeof loc[0] === "number") ? loc[0] : 0.5;
+    logAvatarDebug("hostWalk", { moving: !!moving, orient: o, locX: locX, connected: loftHostState.connected });
+    var r = tryCallHostMethod("hostWalk", [!!moving, o, locX]);
     if (!r.ok) {
       // Legacy EI-only path
       return notifyLoftAppearance(!!moving, o);
@@ -1100,7 +1415,7 @@
   }
 
   function attachLoftAvatarHost(player, container) {
-    // (?v=20260906bu): attach after companion host OR direct-avatar mount.
+    // (?v=20260906bw): attach after companion host OR direct-avatar mount.
     loftActivePlayer = player;
     loftHostState.connected = false;
     installWhirledAvatarHostBridge();
@@ -1161,9 +1476,10 @@
   }
 
   function notifyLoftWalk(moving, orientHint) {
-    // (?v=20260906bu): chrome bob ALWAYS; companion hostWalk drives in-SWF walk scenes.
+    // (?v=20260906bw): chrome bob ALWAYS; companion hostWalk drives in-SWF walk scenes.
     // Beginner: floor click moves your billboard AND tells the SWF to play walking frames.
-    // ENGINE DEV: hostWalk → appearanceChanged_v2(loc, orient, moving, sleeping) inside Ruffle.
+    // ENGINE DEV: hostWalk → appearanceChanged_v2(loc, orient, moving, sleeping) → Body
+    // state_<state>_walking (fallback state_Default_walking). Orient: face±1 → 90/270.
     var faceForCss = (orientHint === -1 || orientHint === 1) ? orientHint : undefined;
     setLoftWalkMotion(!!moving, faceForCss);
     var orient = loftHostState.orient;
@@ -1214,7 +1530,7 @@
   }
 
   function notifyLoftEmote(actionName) {
-    // (?v=20260906bu): prefer companion hostEmote → messageReceived_v1(ACTION_TRIGGERED).
+    // (?v=20260906bw): prefer companion hostEmote → messageReceived_v1(ACTION_TRIGGERED).
     actionName = String(actionName || "wave");
     var pretty = actionName.charAt(0).toUpperCase() + actionName.slice(1);
     try {
@@ -1238,8 +1554,11 @@
       version: VERSION,
       hasPlayer: !!loftActivePlayer,
       companionHost: loftUsesCompanionHost || loftHostState.hostMode,
+      companionAttempted: loftCompanionAttempted,
+      companionConnected: !!loftHostState.connected,
       hostSwf: getCompanionHostSwfUrl(),
       avatarUrl: !!(loftPendingAvatarUrl || loftHostState.avatarUrl),
+      hostLoadUrlKind: loftHostState._hostLoadUrl ? String(loftHostState._hostLoadUrl).slice(0, 48) : null,
       state: {
         connected: loftHostState.connected,
         moving: loftHostState.moving,
@@ -1262,8 +1581,9 @@
   function describeAvatarControlNextSteps() {
     return {
       whyIdle: "Stock Whirled SWFs dispatch ConnectEvent type controlConnect on loaderInfo.sharedEvents (NOT ExternalInterface).",
-      protocol: "Nested host: Ruffle loads avatar-host.swf → hostLoadUrl(avatar) → Loader + sharedEvents controlConnect → hostProps → appearanceChanged_v2.",
-      whatWorksNow: "Companion host SWF (ORIGINAL MIT, tools/avatar-host) + chrome billboard puppet. Floor → hostWalk; click avatar → hostEmote. Fallback = direct Ruffle + thumb (bt).",
+      protocol: "Nested host: Ruffle loads avatar-host.swf → hostLoadUrl(avatar) → Loader + sharedEvents controlConnect → hostProps → gotControl_v1 → appearanceChanged_v2.",
+      liveClub: "whirled.club world-client: ActorSprite floor move → appearanceChanged_v2(loc,orient,moving,sleeping) → Body state_*_walking / towalking / fromwalking. Embed allowScriptAccess sameDomain; nested avatar inside host SWF (same nest as ours).",
+      whatWorksNow: "bv RELIABILITY: direct Ruffle avatar is the guaranteed path. Companion nest tried after blob→data:; 1.8s watchdog / bridge error → remount DIRECT. Floor chrome bob always; hostWalk bonus if connected.",
       hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
       hostShim: "assets/avatar-host/avatar-host.swf compiled from tools/avatar-host/AvatarHost.hx (Haxe --swf). No AGPL copy.",
       debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
@@ -1827,15 +2147,22 @@
           }
         }
       }
-      // (?v=20260906bu): nest companion host SWF → hostLoadUrl(avatar blob/url).
-      // Beginner: Ruffle plays OUR host first; host loads YOUR avatar and talks sharedEvents.
-      // ENGINE DEV: fallback = direct avatar Ruffle (bt chrome puppet) if host missing/fails.
+      // (?v=20260906bw) RELIABILITY: try companion nest, but NEVER leave a blank stage.
+      // ROOT BREAK: nested Loader rejects blob: → convert to data: OR skip to DIRECT Ruffle.
+      // Do NOT set loftUsesCompanionHost until bridge "connected". Watchdog → remount DIRECT.
       installWhirledAvatarHostBridge();
-      loftPendingAvatarUrl = url;
+      loftMountGeneration += 1;
+      var mountGen = loftMountGeneration;
+      loftPendingAvatarUrl = url; // keep ORIGINAL blob/url for direct remount
       loftHostState.avatarUrl = url;
       loftUsesCompanionHost = false;
+      loftCompanionAttempted = false;
       loftHostState.hostMode = false;
       loftHostState.connected = false;
+      loftFallbackInFlight = false;
+      clearCompanionWatch();
+      ensureStandFallback(slot, worn, "mounting");
+      try { slot.classList.remove("is-failed"); } catch (eSf) {}
       var hostUrl = getCompanionHostSwfUrl();
       var loftOpts = {
         maxWidth: "140px",
@@ -1847,23 +2174,56 @@
         backgroundColor: null,
         allowScriptAccess: true
       };
-      return mountRuffle(slot, hostUrl, loftOpts).then(function (player) {
-        loftUsesCompanionHost = true;
-        loftHostState.hostMode = true;
-        afterMountUi();
-        // Load avatar into host (bridge "ready" may also flush)
-        callHostLoadUrl(url);
-        setTimeout(function () { tryFlushPendingAvatarLoad(); }, 200);
-        setTimeout(function () { tryFlushPendingAvatarLoad(); }, 600);
-        return player;
-      }).catch(function (hostErr) {
-        logAvatarDebug("companion host mount failed — fallback direct avatar", hostErr && hostErr.message);
+
+      function mountDirectPrimary(why) {
+        logAvatarDebug("mount DIRECT primary", why);
         loftUsesCompanionHost = false;
         loftHostState.hostMode = false;
+        loftCompanionAttempted = false;
         return mountRuffle(slot, url, loftOpts).then(function (player) {
           afterMountUi();
+          try { slot.setAttribute("data-mount-mode", "direct"); } catch (eM) {}
           return player;
         });
+      }
+
+      return prepareUrlForHostLoader(url).then(function (prep) {
+        if (mountGen !== loftMountGeneration) return null;
+        if (!prep || prep.skipped || !prep.ok || !prep.url) {
+          return mountDirectPrimary(prep && prep.reason || "prep-skip");
+        }
+        loftCompanionAttempted = true;
+        logAvatarDebug("companion attempt", { reason: prep.reason, hostUrl: hostUrl, dataLen: prep.url.length });
+        return mountRuffle(slot, hostUrl, loftOpts).then(function (player) {
+          if (mountGen !== loftMountGeneration) return player;
+          // NOT loftUsesCompanionHost yet — only companionAttempted until connected
+          loftHostState.hostMode = false;
+          loftUsesCompanionHost = false;
+          afterMountUi();
+          try { slot.setAttribute("data-mount-mode", "companion-pending"); } catch (eM2) {}
+          var hostAvatarUrl = prep.url; // data: or http — safe for nested Loader
+          loftHostState._hostLoadUrl = hostAvatarUrl;
+          callHostLoadUrl(hostAvatarUrl);
+          setTimeout(function () {
+            if (mountGen !== loftMountGeneration || loftHostState.connected) return;
+            tryFlushPendingAvatarLoad();
+          }, 200);
+          setTimeout(function () {
+            if (mountGen !== loftMountGeneration || loftHostState.connected) return;
+            var r = tryCallHostMethod("hostLoadUrl", [hostAvatarUrl]);
+            logAvatarDebug("hostLoadUrl late retry", r);
+            if (!r.ok) {
+              remountDirectAvatarImmediate("hostLoadUrl-never-ok");
+            }
+          }, 700);
+          armCompanionWatchdog(mountGen, prep.reason);
+          return player;
+        }).catch(function (hostErr) {
+          logAvatarDebug("companion host mount failed — direct", hostErr && hostErr.message);
+          return mountDirectPrimary((hostErr && hostErr.message) || "host-mount-fail");
+        });
+      }).catch(function (prepErr) {
+        return mountDirectPrimary((prepErr && prepErr.message) || "prep-fail");
       });
     }).catch(function (err) {
       ensureStandFallback(slot, worn, (err && err.message) || "ruffle-mount-failed");

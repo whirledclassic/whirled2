@@ -16,5 +16,5 @@ haxe -main AvatarHost -swf ../../assets/avatar-host/avatar-host.swf -D swf-heade
 
 ## EI API
 
-`hostLoadUrl` · `hostWalk` · `hostEmote` · `hostSetState` · `hostIsConnected` · `hostGetDebug`  
+`hostLoadUrl` · `hostLoadBytes` · `hostWalk` · `hostEmote` · `hostSetState` · `hostIsConnected` · `hostGetDebug`  
 Bridge: `ExternalInterface.call("WhirledAvatarHostBridge", kind, payload)`.

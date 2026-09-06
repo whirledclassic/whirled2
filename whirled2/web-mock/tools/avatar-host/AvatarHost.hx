@@ -1,11 +1,13 @@
 /**
  * Whirled2 AvatarHost — ORIGINAL thin companion SWF (not AGPL copy).
- * Protocol studied from Grey Havens whirled-api / msoy ControlBackend behavior:
+ * Protocol studied from Grey Havens whirled-api / msoy ControlBackend + LIVE whirled.club
+ * world-client (ActorSprite → appearanceChanged_v2 → Body state_*_walking):
  * avatar dispatches "controlConnect" on loaderInfo.sharedEvents; host fills hostProps;
- * walk is driven by calling userProps.appearanceChanged_v2(loc, orient, moving, sleeping).
+ * walk = userProps.appearanceChanged_v2(loc, orient, moving, sleeping);
+ * after connect: gotControl_v1 (EntityBackend requestControl parity).
  *
  * JS bridge (ExternalInterface):
- *   hostLoadUrl(url) / hostWalk(moving, orient) / hostEmote(name) / hostSetState(state)
+ *   hostLoadUrl(url) / hostLoadBytes(b64) / hostWalk(moving, orient) / hostEmote(name) / hostSetState(state)
  *   callbacks via ExternalInterface.call("WhirledAvatarHostBridge", ...)
  */
 import flash.display.Loader;
@@ -18,6 +20,9 @@ import flash.external.ExternalInterface;
 import flash.net.URLRequest;
 import flash.system.ApplicationDomain;
 import flash.system.LoaderContext;
+import flash.utils.ByteArray;
+import haxe.crypto.Base64;
+import haxe.io.Bytes;
 
 class AvatarHost extends Sprite {
   var loader:Loader;
@@ -25,8 +30,9 @@ class AvatarHost extends Sprite {
   var connected:Bool = false;
   var orient:Float = 180;
   var moving:Bool = false;
-  var state:String = null;
+  var state:String = "Default";
   var location:Array<Dynamic>;
+  var pendingB64:String;
 
   static function main() {
     flash.Lib.current.addChild(new AvatarHost());
@@ -40,12 +46,18 @@ class AvatarHost extends Sprite {
       if (st != null) {
         st.align = StageAlign.TOP_LEFT;
         st.scaleMode = StageScaleMode.NO_SCALE;
+        // Loft mounts with Ruffle wmode=transparent; avoid painting an opaque stage fill.
+        try { untyped flash.Lib.current.opaqueBackground = null; } catch (eOb:Dynamic) {}
       }
     } catch (e:Dynamic) {}
 
     if (ExternalInterface.available) {
       try {
         ExternalInterface.addCallback("hostLoadUrl", hostLoadUrl);
+        ExternalInterface.addCallback("hostLoadBytes", hostLoadBytes);
+        ExternalInterface.addCallback("hostLoadBytesBegin", hostLoadBytesBegin);
+        ExternalInterface.addCallback("hostLoadBytesChunk", hostLoadBytesChunk);
+        ExternalInterface.addCallback("hostLoadBytesCommit", hostLoadBytesCommit);
         ExternalInterface.addCallback("hostWalk", hostWalk);
         ExternalInterface.addCallback("hostEmote", hostEmote);
         ExternalInterface.addCallback("hostSetState", hostSetState);
@@ -65,11 +77,7 @@ class AvatarHost extends Sprite {
     } catch (e:Dynamic) {}
   }
 
-  function hostLoadUrl(url:String):Bool {
-    if (url == null || url == "") {
-      bridge("error", "empty-url");
-      return false;
-    }
+  function resetLoader():Void {
     connected = false;
     userProps = null;
     if (loader != null) {
@@ -78,20 +86,106 @@ class AvatarHost extends Sprite {
       try { loader.unloadAndStop(true); } catch (e:Dynamic) {}
       loader = null;
     }
+  }
+
+  function prepareNestedLoader():Loader {
+    resetLoader();
     loader = new Loader();
     var li = loader.contentLoaderInfo;
     li.addEventListener(Event.COMPLETE, onLoaded);
     li.addEventListener(IOErrorEvent.IO_ERROR, onLoadError);
-    // Must listen before avatar AvatarControl ctor fires controlConnect
+    // CRITICAL: listen BEFORE load / loadBytes — AvatarControl ctor fires controlConnect immediately
     li.sharedEvents.addEventListener("controlConnect", onControlConnect, false, 0, true);
     addChild(loader);
-    var ctx = new LoaderContext(false, new ApplicationDomain(ApplicationDomain.currentDomain));
+    return loader;
+  }
+
+  function loaderContext():LoaderContext {
+    return new LoaderContext(false, new ApplicationDomain(ApplicationDomain.currentDomain));
+  }
+
+  /**
+   * http(s) / relative only. Do NOT pass blob: or data: — nested Loader fails under Ruffle.
+   * For IDB / blob avatars use hostLoadBytes(base64) → loadBytes.
+   */
+  function hostLoadUrl(url:String):Bool {
+    if (url == null || url == "") {
+      bridge("error", "empty-url");
+      return false;
+    }
+    // Reject schemes nested Loader cannot load under Ruffle
+    var u = url;
+    if (u.indexOf("blob:") == 0 || u.indexOf("data:") == 0) {
+      bridge("error", "url-scheme-unsupported-use-hostLoadBytes");
+      return false;
+    }
     try {
-      loader.load(new URLRequest(url), ctx);
+      prepareNestedLoader();
+      loader.load(new URLRequest(url), loaderContext());
       bridge("loading", url);
       return true;
     } catch (e:Dynamic) {
       bridge("error", Std.string(e));
+      return false;
+    }
+  }
+
+  /**
+   * ROOT FIX (?v=20260906bw): EI cannot pass ByteArray — JS sends base64 of SWF bytes.
+   * Decode → ByteArray → Loader.loadBytes. Same controlConnect handshake as hostLoadUrl.
+   * Beginner: your avatar file lives in IndexedDB; chrome turns it into base64 text; host rebuilds bytes.
+   */
+  function hostLoadBytes(b64:String):Bool {
+    if (b64 == null || b64 == "") {
+      bridge("error", "empty-b64");
+      return false;
+    }
+    pendingB64 = null;
+    return decodeAndLoadBytes(b64);
+  }
+
+  function hostLoadBytesBegin():Bool {
+    pendingB64 = "";
+    bridge("bytes_begin", null);
+    return true;
+  }
+
+  function hostLoadBytesChunk(chunk:String):Bool {
+    if (pendingB64 == null) pendingB64 = "";
+    if (chunk != null && chunk != "") pendingB64 += chunk;
+    return true;
+  }
+
+  function hostLoadBytesCommit():Bool {
+    var b64 = pendingB64;
+    pendingB64 = null;
+    if (b64 == null || b64 == "") {
+      bridge("error", "empty-b64-commit");
+      return false;
+    }
+    return decodeAndLoadBytes(b64);
+  }
+
+  function decodeAndLoadBytes(b64:String):Bool {
+    try {
+      // Strip whitespace / data-URL prefix if a caller accidentally passes one
+      var s = StringTools.trim(b64);
+      var comma = s.indexOf("base64,");
+      if (comma >= 0) s = s.substr(comma + 7);
+      s = StringTools.replace(s, "\n", "");
+      s = StringTools.replace(s, "\r", "");
+      s = StringTools.replace(s, " ", "");
+      var bytes:Bytes = Base64.decode(s);
+      // Copy into a fresh flash ByteArray (do not reuse Bytes backing store)
+      var ba = new ByteArray();
+      ba.writeBytes(bytes.getData(), 0, bytes.length);
+      ba.position = 0;
+      prepareNestedLoader();
+      loader.loadBytes(ba, loaderContext());
+      bridge("loading", "bytes");
+      return true;
+    } catch (e:Dynamic) {
+      bridge("error", "loadBytes:" + Std.string(e));
       return false;
     }
   }
@@ -161,6 +255,8 @@ class AvatarHost extends Sprite {
     Reflect.setField(initProps, "isMoving", moving);
     Reflect.setField(initProps, "location", location);
     Reflect.setField(initProps, "env", "room");
+    // AvatarBackend populateControlInitProperties parity (sleeping/idle)
+    Reflect.setField(initProps, "isSleeping", false);
     Reflect.setField(hostProps, "initProps", initProps);
 
     try {
@@ -171,17 +267,26 @@ class AvatarHost extends Sprite {
     }
 
     connected = true;
-    bridge("connected", null);
-    // Grant control so registerActions/ticks behave like a real room host
+    // EntityBackend requests control after connect; AvatarControl expects gotControl_v1
+    // so registerActions / ticks / hasControl behave like a real room host.
     try {
-      if (Reflect.hasField(userProps, "gotControl_v1")) {
-        Reflect.callMethod(userProps, Reflect.field(userProps, "gotControl_v1"), []);
+      var gc:Dynamic = Reflect.field(userProps, "gotControl_v1");
+      if (gc != null) {
+        Reflect.callMethod(userProps, gc, []);
+        bridge("gotControl", true);
+      } else {
+        bridge("gotControl", false);
       }
-    } catch (eCtrl:Dynamic) {}
+    } catch (eCtrl:Dynamic) {
+      bridge("gotControl_error", Std.string(eCtrl));
+    }
     // Idle appearance so Body/MovieClipBody paints default standing scene
     callAppearance(false);
     // Pull registered actions/states for chrome menus
     tryPullLists();
+    // Notify JS LAST so a floor-click already in progress can re-apply hostWalk(true)
+    // without being overwritten by the idle callAppearance above.
+    bridge("connected", null);
   }
 
   function tryPullLists():Void {
@@ -215,9 +320,17 @@ class AvatarHost extends Sprite {
     }
   }
 
-  function hostWalk(isMoving:Bool, newOrient:Float):Bool {
+  function hostWalk(isMoving:Bool, newOrient:Float, locX:Dynamic = null):Bool {
     if (newOrient == newOrient) orient = newOrient; // not NaN
+    // Optional chrome billboard X (0..1 logical) — Body mainly keys off moving, but keep loc fresh.
+    try {
+      if (locX != null && locX == locX) {
+        var lx:Float = Std.parseFloat(Std.string(locX));
+        if (lx == lx) location = [lx, location[1], location[2]];
+      }
+    } catch (eLoc:Dynamic) {}
     callAppearance(isMoving);
+    bridge("walk", { moving: moving, orient: orient, connected: connected, location: location });
     return connected;
   }
 
