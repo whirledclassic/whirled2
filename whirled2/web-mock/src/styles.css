@@ -531,6 +531,7 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 .notice-row.kind-blue { color: #1e6fa8; }
 .notice-row.kind-gray { color: #4a6a80; }
 .notice-row.kind-green { color: #2f7a3a; }
+.notice-row.notice-toast { opacity: 0.95; }
 .notice-empty { padding: 10px; color: #4a6a80; }
 .invite-banner {
   background: linear-gradient(#e8f4fb, #d7ebf6); color: #1e6fa8; font-weight: 700;

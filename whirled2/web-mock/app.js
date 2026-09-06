@@ -208,6 +208,7 @@
     if (orphanParty && !document.querySelector(".workspace #party-panel")) orphanParty.remove();
     var buddy = document.getElementById("buddy-invite-modal");
     if (buddy) buddy.remove();
+    clearTransientNotices();
   }
 
   function loadRoomLayout() {
@@ -1388,16 +1389,65 @@
     return "";
   }
 
+  function persistNotices() {
+    try { localStorage.setItem(NOTE_KEY, JSON.stringify(notices)); } catch (e) {}
+  }
+  function isEphemeralNotice(n) {
+    if (!n) return false;
+    if (n.transient) return true;
+    var t = n.text != null ? String(n.text) : "";
+    return /^Room layout saved/.test(t);
+  }
   function loadNotices() {
     try { notices = JSON.parse(localStorage.getItem(NOTE_KEY) || "[]"); } catch (e) { notices = []; }
+    if (!Array.isArray(notices)) notices = [];
+    var now = Date.now();
+    var kept = notices.filter(function (n) {
+      if (!isEphemeralNotice(n)) return true;
+      var ts = n.at ? Date.parse(n.at) : 0;
+      return !!(ts && (now - ts) < 3500);
+    });
+    if (kept.length !== notices.length) {
+      notices = kept;
+      persistNotices();
+    }
     return notices;
   }
-  function pushNotice(kind, text) {
+  function dismissNoticeId(id) {
+    if (!id) return;
     loadNotices();
-    notices.unshift({ kind: kind || "gray", text: text, at: new Date().toISOString() });
-    notices = notices.slice(0, 30);
-    try { localStorage.setItem(NOTE_KEY, JSON.stringify(notices)); } catch (e) {}
+    var next = notices.filter(function (n) { return n.id !== id; });
+    if (next.length === notices.length) return;
+    notices = next;
+    persistNotices();
     renderNotices();
+  }
+  function clearTransientNotices() {
+    loadNotices();
+    var next = notices.filter(function (n) { return !isEphemeralNotice(n); });
+    if (next.length === notices.length) return;
+    notices = next;
+    persistNotices();
+    renderNotices();
+  }
+  function pushNotice(kind, text, opts) {
+    opts = opts || {};
+    loadNotices();
+    var notice = {
+      id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      kind: kind || "gray",
+      text: text,
+      at: new Date().toISOString()
+    };
+    if (opts.transient) notice.transient = true;
+    notices.unshift(notice);
+    notices = notices.slice(0, 30);
+    persistNotices();
+    renderNotices();
+    if (notice.transient) {
+      var nid = notice.id;
+      setTimeout(function () { dismissNoticeId(nid); }, 3000);
+    }
   }
   function renderNotices() {
     loadNotices();
@@ -1409,7 +1459,7 @@
       : "";
     if (!notices.length && !partyRow) { el.innerHTML = '<div class="notice-empty">No notifications</div>'; return; }
     el.innerHTML = partyRow + notices.slice(0, 8).map(function (n) {
-      return '<div class="notice-row kind-' + esc(n.kind) + '">' + esc(n.text) + '</div>';
+      return '<div class="notice-row kind-' + esc(n.kind) + (n.transient ? " notice-toast" : "") + '">' + esc(n.text) + '</div>';
     }).join("");
   }
   function ensureNoticeBar() {
@@ -2696,7 +2746,7 @@
     if (ev.target.closest("[data-dec-save]") && session()) {
       // positions already written during drag; confirm persist
       saveRoomLayout(loadRoomLayout());
-      pushNotice("green", "Room layout saved.");
+      pushNotice("green", "Room layout saved.", { transient: true });
       paint("rooms");
       if (decorateMode) bindDecorateDrag();
       return;
@@ -3345,7 +3395,7 @@
         stuffItemId = nid;
         stuffMode = "detail";
         appendTransaction({ kind: "upload", label: "Uploaded Stuff “" + sname + "” (" + stype + ")", coins: 0 });
-        pushNotice("green", "Saved “" + sname + "” to Stuff.");
+        pushNotice("green", "Saved “" + sname + "” to Stuff.", { transient: true });
         paint("stuff");
       }
       if (!file) { finishSave(""); return; }
@@ -3421,7 +3471,7 @@
       saveShop(shop);
       stuffListMode = false;
       appendTransaction({ kind: "list", label: "Listed “" + (src.name || "item") + "” in Shop", coins: coins });
-      pushNotice("green", "Listed “" + (src.name || "item") + "” in Shop at " + coins + " coins (label).");
+      pushNotice("green", "Listed “" + (src.name || "item") + "” in Shop at " + coins + " coins (label).", { transient: true });
       paint("stuff");
       return;
     }
