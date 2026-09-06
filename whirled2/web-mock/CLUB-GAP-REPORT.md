@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bo` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bp` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,22 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bo`)
+## Closed this pass (`?v=20260906bp`)
+
+| Item | Notes |
+|------|--------|
+| /friends | Opens Friends Online toolbar in loft (else Me → Friends) |
+| /who | Lists In this room occupants with away/zzz tags |
+| /home | Go home (same as Go… → home; respects lock) |
+| Complain modal | Wiki Report Coming Soon reasons + Block instead (no fake mod) |
+| Double-click name | Chat name → Whisper (respects blocklist) |
+| /help topics | friends / who / home / complain/report |
+| Preserve | bl/bm Flash loft interact (`classic-avatar.js` untouched); bo Block; bn action/whisper; bg dual Wear; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bo`)
+
 
 | Item | Notes |
 |------|--------|
@@ -279,7 +294,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 |------|----------|-----|
 | Bottom chat bar + room messages | **Working** (local / demo API when set) | — |
 | Chat tabs (group/private) | **Improved** (`at`) Room vs Private labels/colors; Show/Hide occupants (`bj`); /e /em + /state stub (`bk`) | Group tabs still limited |
-| Name click menu | **Improved** (`bh`/`bk`/`bo`) Invite + Send Mail + party + Block/Unblock + Boot/Complain Coming Soon | Boot/Complain moderation **P2** |
+| Name click menu | **Improved** (`bh`/`bk`/`bo`/`bp`) Invite + Send Mail + party + Block/Unblock + Boot Soon + Complain modal stub | Boot/Complain moderation **P2** |
 | Speak/thought/shout + /broadcast | Modes + **broadcast** (`ba`); mode tints (`be`); `/dnd` + `/bleepall` (`bj`); `/e`/`/em` + `/state` stub (`bk`) | — |
 | “Too chatty” throttle | **Working** (`be`) classic wiki copy | — |
 

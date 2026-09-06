@@ -7077,3 +7077,17 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 .occ-menu-item[data-self-back] {
   font-weight: 600;
 }
+
+/* ?v=20260906bp — Complain / Report Coming Soon modal (wiki Report; no fake mod) */
+.complain-modal .complain-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+.complain-modal .complain-reason {
+  text-align: left;
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+.complain-modal .complain-reason .soon-tag { margin-left: 6px; }

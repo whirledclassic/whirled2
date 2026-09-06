@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bo";
+  var LOGO_V = "20260906bp";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1515,6 +1515,93 @@
       +     '<button type="button" class="text-btn" data-snapshot-close="1">Close</button>'
       +   '</div>'
       + '</div></div>';
+  }
+
+  function complainModalHtml(id, name) {
+    // How this works (?v=20260906bp): wiki Report/Complain — Coming Soon categories (no fake mod queue).
+    // Beginner: reason buttons are disabled stubs; Block still works from the name menu.
+    name = name || "Player";
+    id = id || "";
+    var reasons = [
+      ["Harassment / bullying", "harass"],
+      ["Spam / flooding", "spam"],
+      ["Inappropriate content", "content"],
+      ["Other / Terms of Service", "other"]
+    ];
+    var reasonBtns = reasons.map(function (r) {
+      return '<button type="button" class="action-btn complain-reason" disabled title="Coming Soon" data-complain-reason="' + r[1] + '">'
+        + esc(r[0]) + ' <span class="soon-tag">Soon</span></button>';
+    }).join("");
+    return '<div class="modal-backdrop" id="complain-modal" data-complain-close="1">'
+      + '<div class="modal-card complain-modal" role="dialog" aria-label="Complain about player" onclick="event.stopPropagation()">'
+      +   '<div class="room-side-head"><h2>Complain about ' + esc(name) + '</h2>'
+      +     '<button type="button" class="text-btn" data-complain-close="1">Close</button></div>'
+      +   '<p class="meta">Wiki Report — classic Whirled opened a complain form from a player name menu. Whirled2 keeps this honest:</p>'
+      +   '<p class="meta"><span class="soon-tag">Coming Soon</span> — no fake moderation queue yet. Use <b>Block</b> to hide their chat for you.</p>'
+      +   '<div class="section-label">Reason (stubs)</div>'
+      +   '<div class="complain-reasons">' + reasonBtns + '</div>'
+      +   '<div class="stuff-detail-actions">'
+      +     (id ? ('<button type="button" class="action-btn" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '" data-complain-close="1">Block instead</button>') : '')
+      +     '<button type="button" class="text-btn" data-complain-close="1">Close</button>'
+      +   '</div>'
+      + '</div></div>';
+  }
+  function openComplainModal(id, name) {
+    var old = document.getElementById("complain-modal");
+    if (old) old.remove();
+    var tmp = document.createElement("div");
+    tmp.innerHTML = complainModalHtml(id, name);
+    if (tmp.firstChild) document.body.appendChild(tmp.firstChild);
+  }
+  function openFriendsToolbarFromChat() {
+    // How this works (?v=20260906bp): /friends opens wiki Friends Online toolbar popup when in loft.
+    friendsPopupOpen = true;
+    var pop = document.getElementById("friends-toolbar-pop");
+    if (pop) return true;
+    var fw = document.querySelector(".tb-friends-wrap");
+    if (!fw) return false;
+    var tmp = document.createElement("div");
+    tmp.innerHTML = friendsToolbarPopupHtml();
+    if (tmp.firstChild) fw.appendChild(tmp.firstChild);
+    return !!document.getElementById("friends-toolbar-pop");
+  }
+  function goHomeFromChat() {
+    // How this works (?v=20260906bp): /home — same as Go… → Go home (respects room lock).
+    goMenuOpen = false;
+    var gm = document.getElementById("go-menu");
+    if (gm) gm.hidden = true;
+    if (!tryEnterLoft()) {
+      paint("rooms");
+      return false;
+    }
+    clearRoomChatDisplay(true);
+    paint("rooms");
+    loadOccupants();
+    try { awardAction("enterRoom"); } catch (e) {}
+    return true;
+  }
+  function whoInRoomLines() {
+    // How this works (?v=20260906bp): /who — list In this room (local occupants).
+    var here = [];
+    try {
+      here = (liveOccupants || []).slice();
+    } catch (e) { here = []; }
+    var s = session();
+    if (s && s.user && !here.some(function (p) { return p && String(p.id) === String(s.user.id); })) {
+      here = [{ id: s.user.id, name: s.user.name, you: true }].concat(here);
+    }
+    if (!here.length) return ["In this room: (empty)"];
+    var lines = ["In this room (" + here.length + "):"];
+    here.forEach(function (p) {
+      if (!p) return;
+      var nm = sanitizeDisplayName(p.name || p.id, p.id || "Player");
+      var tags = [];
+      if (p.you || (s && s.user && String(p.id) === String(s.user.id))) tags.push("you");
+      try { if (isAway(p.id)) tags.push("away"); } catch (eA) {}
+      try { if (typeof isIdleUser === "function" && isIdleUser(p.id)) tags.push("zzz"); } catch (eZ) {}
+      lines.push("· " + nm + (tags.length ? " (" + tags.join(", ") + ")" : ""));
+    });
+    return lines;
   }
 
   var loftVisitOccupants = []; // session occupants seen this loft visit
@@ -4919,7 +5006,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm/bn + bo) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm/bn/bo + bp) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4962,6 +5049,9 @@
       "• bo: club gaps after bn — Block hides room/group chat + stage bubbles; Block/Unblock toggle on",
       "  name + occupant menus; whisper/PM refuse when blocked; /help clear|/help back topics;",
       "  blocklist copy + Go Games soon-tag polish — classic-avatar.js Flash loft interact UNTOUCHED",
+      "• bp: club gaps after bo — /friends opens Friends Online toolbar; /who lists occupants; /home Go home;",
+      "  Complain Coming Soon modal (wiki Report reasons stub + Block instead); double-click chat name → Whisper;",
+      "  /help friends|who|home|complain — classic-avatar.js Flash loft interact UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -5094,10 +5184,10 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Club polish after bm: /action|/ac plays PNG/chrome emotes (prefix; bare opens menu)\n"
-        + "• /msg|/tell|/w whisper aliases; Club ★ name legend stub; self-menu Away/Back\n"
-        + "• Shortcuts/help lines refreshed for action + whisper\n"
-        + "Preserve: bl/bm Flash loft interact (classic-avatar.js untouched), bg dual Wear, bk–bj club, Whirl, visit-since.",
+        + "• Club polish after bo: /friends Friends Online toolbar; /who occupants; /home Go home\n"
+        + "• Complain Coming Soon modal (wiki Report reason stubs + Block instead)\n"
+        + "• Double-click chat name → Whisper (respects blocklist); /help friends|who|home|complain\n"
+        + "Preserve: bl/bm Flash loft interact (classic-avatar.js untouched), bo Block, bn action/whisper, bg dual Wear, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -6301,6 +6391,8 @@
       +     '<li><b>/bleepall</b> — hide/unhide all room items for you (session)</li>'
       +     '<li><b>/action</b> <i>name</i> (/ac) — play emote (bare opens menu) · <b>/state</b>|/st Coming Soon</li>'
       +     '<li><b>/msg</b>|/tell|/w <i>name</i> [text] — open whisper / send PM</li>'
+      +     '<li><b>/friends</b> — Friends Online toolbar · <b>/who</b> — occupants · <b>/home</b> — Go home</li>'
+      +     '<li><b>Double-click</b> chat name — Whisper · <b>Complain…</b> Coming Soon modal</li>'
       +     '<li><b>Block</b> — name or occupant menu; hides their chat for you · Unblock restores</li>'
       +   '</ul></div></div>';
   }
@@ -8885,7 +8977,7 @@
           "dev-cache",
           "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
           "STATUS.md",
-          "Current build: ?v=20260906bo (club Block chat hide + Unblock toggle after bn). Hard-refresh after pulls."
+          "Current build: ?v=20260906bp (club /friends /who /home + Complain modal after bo). Hard-refresh after pulls."
         )
       + devHubCard(
           "FLA / SWF lab notes",
@@ -12016,8 +12108,9 @@
         "/bleepall — hide all room items (you)",
         "/action|/ac [name] — emote (bare = menu) · /state|/st Coming Soon",
         "/msg|/tell|/w <name> [text] — whisper (not if blocked)",
+        "/friends · /who · /home — Friends Online / occupants / Go home",
         "/clear — clear active chat tab",
-        "Block — name menu (hides their chat for you)"
+        "Block — name menu (hides their chat for you) · Complain Coming Soon"
       ];
       if (helpTopic === "away" || helpTopic === "afk") {
         helpLines = ["/away [message] — mark yourself away (yellow name). Default: I'm away from the keyboard. /back returns."];
@@ -12043,8 +12136,39 @@
         helpLines = ["/back — clear /away or /dnd; name returns to blue (wiki Chat)."];
       } else if (helpTopic === "block") {
         helpLines = ["Block — name/occ menu Block hides their chat + bubbles for you. Unblock restores. Me → My Blocklist."];
+      } else if (helpTopic === "friends") {
+        helpLines = ["/friends — open Friends Online toolbar (wiki Chat). Whisper / Profile / Join when in loft."];
+      } else if (helpTopic === "who") {
+        helpLines = ["/who — list players In this room (local occupants; away/zzz tags)."];
+      } else if (helpTopic === "home") {
+        helpLines = ["/home — Go home to your loft (same as Go… → Go home; respects room lock)."];
+      } else if (helpTopic === "complain" || helpTopic === "report") {
+        helpLines = ["Complain… — name menu opens Coming Soon report modal (no fake mod queue). Block hides chat now."];
       }
       pushSystemChat(helpLines.join(" · "), { ephemeral: true });
+      return;
+    }
+    if (/^\/friends$/i.test(text)) {
+      // How this works (?v=20260906bp): wiki Friends Online — open toolbar popup from chat.
+      if (!inRoom) {
+        meSub = "friends"; viewingId = null; paint("me");
+        pushSystemChat("Friends — opened Me → Friends (enter loft for Friends Online toolbar).", { ephemeral: true });
+        return;
+      }
+      if (openFriendsToolbarFromChat()) {
+        pushNotice("blue", "Friends Online", { transient: true });
+      } else {
+        pushSystemChat("Friends toolbar not ready — try the Friends button on the room bar.", { ephemeral: true });
+      }
+      return;
+    }
+    if (/^\/who$/i.test(text)) {
+      pushSystemChat(whoInRoomLines().join(" "), { ephemeral: true });
+      return;
+    }
+    if (/^\/home$/i.test(text)) {
+      if (goHomeFromChat()) pushNotice("blue", "Home loft.", { transient: true });
+      else pushSystemChat("Could not enter home loft (lock or gate).", { ephemeral: true });
       return;
     }
     if (/^\/(away|afk)(?:\s|$)/i.test(text)) {
@@ -13122,12 +13246,40 @@
     var chatWho = ev.target.closest("[data-chat-who]");
     if (chatWho) {
       ev.preventDefault();
-      openChatNameMenu(
-        chatWho.getAttribute("data-chat-who") || "",
-        chatWho.getAttribute("data-chat-who-name") || "",
-        ev.clientX,
-        ev.clientY
-      );
+      var whoId = chatWho.getAttribute("data-chat-who") || "";
+      var whoName = chatWho.getAttribute("data-chat-who-name") || "";
+      // How this works (?v=20260906bp): double-click chat name → Whisper (wiki-adjacent; respects Block).
+      var nowClk = Date.now();
+      var last = window.__whirledChatNameClick || { id: "", t: 0 };
+      window.__whirledChatNameClick = { id: whoId, t: nowClk };
+      var sidSelf = session() && session().user ? session().user.id : "";
+      if (whoId && last.id === whoId && (nowClk - last.t) < 450 && sidSelf !== whoId) {
+        var cnmDbl = document.getElementById("chat-name-menu");
+        if (cnmDbl) cnmDbl.remove();
+        if (isBlocked(whoId)) {
+          pushNotice("orange", "Unblock " + (whoName || "player") + " before whispering.", { transient: true });
+          return;
+        }
+        openPmTab(whoId, whoName || whoId);
+        friendsPopupOpen = false;
+        var fpopDbl = document.getElementById("friends-toolbar-pop");
+        if (fpopDbl) fpopDbl.remove();
+        if (!inRoom) {
+          if (tryEnterLoft()) {
+            clearRoomChatDisplay(true);
+            paint("rooms");
+            loadOccupants();
+          }
+        } else {
+          refreshChatLog();
+          applyChatInputTint();
+          var cinDbl = document.getElementById("chat-input");
+          if (cinDbl) cinDbl.focus();
+        }
+        pushNotice("blue", "Whisper " + (whoName || "player"), { transient: true });
+        return;
+      }
+      openChatNameMenu(whoId, whoName, ev.clientX, ev.clientY);
       return;
     }
     // --- Fidelity upgrade handlers (friend requests, chat tabs, palette, gifts) ---
@@ -13393,10 +13545,13 @@
     }
     if (ev.target.closest("[data-block-chat]")) {
       // How this works (?v=20260906bo): wiki Block — hide their chat locally; Unblock restores.
+      // How this works (?v=20260906bp): also closes Complain modal when using Block instead.
       var blk = ev.target.closest("[data-block-chat]");
       addBlocked({ id: blk.getAttribute("data-block-chat"), name: blk.getAttribute("data-block-name") });
       var cnm0 = document.getElementById("chat-name-menu");
       if (cnm0) cnm0.remove();
+      var cmBlk = document.getElementById("complain-modal");
+      if (cmBlk) cmBlk.remove();
       chatNameMenu = null;
       occMenuId = null;
       pushNotice("status", "Blocked " + (blk.getAttribute("data-block-name") || "player") + " — their chat is hidden for you.", { transient: true });
@@ -14227,9 +14382,23 @@
       return;
     }
     if (ev.target.closest("[data-complain-stub]") && session()) {
+      // How this works (?v=20260906bp): wiki Report — open Coming Soon complain modal (no fake mod queue).
+      var stubC = ev.target.closest("[data-complain-stub]");
+      var cidC = stubC.getAttribute("data-complain-stub") || "";
       var cnmC = document.getElementById("chat-name-menu");
-      if (cnmC) cnmC.remove();
-      pushNotice("orange", "Complain / report — Coming Soon. No fake moderation queue yet.", { transient: true });
+      var cnameC = (chatNameMenu && chatNameMenu.name) || cidC;
+      if (cnmC) {
+        var headC = cnmC.querySelector(".chat-name-menu-head");
+        if (headC) cnameC = headC.textContent || cnameC;
+        cnmC.remove();
+      }
+      occMenuId = null;
+      openComplainModal(cidC, cnameC);
+      return;
+    }
+    if (ev.target.closest("[data-complain-close]")) {
+      var cmClose = document.getElementById("complain-modal");
+      if (cmClose) cmClose.remove();
       return;
     }
     // How this works (?v=20260906bn): self occ-menu Away / Back (wiki /away /back).
@@ -15173,7 +15342,8 @@
     }
     var plRep = ev.target.closest("[data-playlist-report]");
     if (plRep && session()) {
-      pushNotice("orange", "Report music item — Coming Soon (no fake moderation queue). Use Block on chat names for now.", { transient: true });
+      // How this works (?v=20260906bp): Music Report stub stays honest Coming Soon (same as Complain).
+      pushNotice("orange", "Report music — Coming Soon (no fake mod queue). Use Block on chat names for players.", { transient: true });
       return;
     }
     var roomRateBtn = ev.target.closest("[data-room-rate]");

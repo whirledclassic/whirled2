@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bp)
+
+- **Club gaps + polish (after bo):** wiki **/friends** opens Friends Online toolbar (or Me→Friends); **/who** lists In this room occupants (away/zzz); **/home** Go home; **Complain…** Coming Soon modal (Report reason stubs + Block instead); **double-click** chat name → Whisper (respects blocklist); `/help friends|who|home|complain`
+- **Preserve:** bl/bm Flash loft interact (`classic-avatar.js` UNTOUCHED), bo Block/Unblock + chat hide, bn /action whisper Club★, bg dual Wear, bk–bj club, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bp`**. Push: `/tmp/push-bp.js` (dry-run default).
+
 ## What shipped (?v=20260906bo)
 
 - **Club gaps + polish (after bn):** wiki **Block** hides room/group chat lines + stage bubbles for blocked players; **Block/Unblock** toggle on chat name + occupant menus; whisper + `/msg|/tell|/w` refuse when blocked; `/help clear` `/help back` `/help block` topics; blocklist copy + Go **Games awaiting** Soon tag
