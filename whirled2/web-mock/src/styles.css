@@ -128,7 +128,7 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 .chat-row b { color: #7ec8f0; margin-right: 6px; }
 .chat-row time { color: #6a8292; font-size: 10px; }
 
-.page { flex: 1; overflow: auto; padding: 18px 22px 70px; background: var(--paper); }
+.page { flex: 1; overflow: auto; padding: 18px 22px 70px; background-color: var(--paper); }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px; }
 .page-head h1, .page h1 { margin: 0; font-size: 22px; color: #1e6fa8; }
 .page-head p, .meta { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
@@ -607,13 +607,14 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 
 /* Classic Whirled profile layout */
 /* ---- Classic profile layout ---- */
-/* How this works: skin fills entire .page.profile-page (MySpace body BG), modules translucent.
+/* How this works: skin fills entire .page.profile-page (Profile look body BG), modules translucent.
    ENGINE DEV: profile page chrome only; not #stage-slot — engine ignores profile skins. */
 .page.profile-page {
   min-height: calc(100vh - 120px);
   background-color: var(--paper);
   background-position: center top;
   box-sizing: border-box;
+  padding: 18px 22px 70px;
 }
 .page.profile-page.has-profile-skin {
   /* override --paper fill so gradient/image/color shows across the whole profile page */
@@ -628,11 +629,21 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   z-index: 2;
 }
 .profile-skin {
-  min-height: 520px;
+  min-height: 560px;
   border-radius: 0;
-  padding: 4px 0 24px;
+  padding: 12px 10px 28px;
   box-sizing: border-box;
   background: transparent;
+}
+.profile-skin.has-profile-skin {
+  min-height: 560px;
+}
+.skin-presets-always { margin: 6px 0 10px; }
+.has-profile-skin .cp-header,
+.has-profile-skin .cp-section,
+.has-profile-skin .cp-meta-box,
+.has-profile-skin .cp-edit-panel {
+  /* default panelAlpha ~0.72 — BG peeks around modules */
 }
 .profile-skin .classic-profile {
   max-width: 920px;
@@ -641,12 +652,12 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 .has-profile-skin .cp-section,
 .has-profile-skin .cp-meta-box,
 .has-profile-skin .cp-edit-panel {
-  background: var(--profile-panel, rgba(255, 255, 255, 0.82));
+  background: var(--profile-panel, rgba(255, 255, 255, 0.72));
   border-color: color-mix(in srgb, var(--profile-accent, #1e6fa8) 35%, #c5deee);
   color: var(--profile-text, #16324a);
 }
 .has-profile-skin .cp-header {
-  background: var(--profile-panel, rgba(255, 255, 255, 0.82));
+  background: var(--profile-panel, rgba(255, 255, 255, 0.72));
 }
 .has-profile-skin .cp-name,
 .has-profile-skin .cp-section h2,
@@ -2088,7 +2099,7 @@ body > .party-panel {
   border-radius: 16px;
 }
 
-/* === Fidelity + modern upgrade (?v=20260906m) === */
+/* === Fidelity + modern upgrade (?v=20260906n) === */
 /* How this works: Room (blue) + Private (orange) tabs; unread glimmer; PM input tint. */
 .chat-tabs {
   display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
@@ -2232,3 +2243,44 @@ body > .party-panel {
 
 .friend-list-row { position: relative; }
 .friend-online-dot { position: absolute; left: 36px; top: 36px; width: 10px; height: 10px; border-radius: 50%; }
+
+/* ---- 20260906n: Profile look + Notices + group chat tabs ---- */
+.chat-tab-group {
+  background: linear-gradient(#7a8a9a, #5a6a7a);
+  color: #e8eef4;
+  border: 1px solid #4a5a6a;
+}
+.chat-tab-group.is-on {
+  background: linear-gradient(#9aabb8, #7a8a98);
+  color: #102030;
+}
+.chat-tab.has-unread::after {
+  content: "";
+  display: inline-block;
+  width: 7px; height: 7px; margin-left: 5px;
+  border-radius: 50%;
+  background: #7ec8f0;
+  box-shadow: 0 0 6px #7ec8f0;
+  vertical-align: middle;
+}
+.chat-tab-group.has-unread::after { background: #b8d0e8; box-shadow: 0 0 6px #b8d0e8; }
+#chat-input.is-group { background: #e8eef4; }
+.notice-bell-btn {
+  border: 0; background: transparent; cursor: pointer;
+  color: #1e6fa8; font: 700 13px var(--ui); padding: 0 4px;
+}
+.notice-page-row {
+  display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline;
+  padding: 8px 0; border-bottom: 1px solid #c5deee; font-size: 13px;
+}
+.notice-page-row.is-unread { background: rgba(126, 200, 240, 0.12); margin: 0 -8px; padding: 8px; border-radius: 4px; }
+.notice-page-row time { color: var(--muted); font-size: 11px; margin-left: auto; }
+.notice-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #4a6a80; }
+.hangout-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; max-height: 220px; overflow: auto; }
+.hangout-row { font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.room-items-list { margin: 0; padding-left: 18px; font-size: 13px; }
+.room-item-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  background: #e8f4fb; border: 1px solid #b7d3e8; font-weight: 700;
+}
+.chat-opts-group { display: block; width: calc(100% - 16px); margin: 4px 8px; text-align: left; }

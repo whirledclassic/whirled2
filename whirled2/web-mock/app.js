@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906m";
+  var LOGO_V = "20260906n";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -262,8 +262,11 @@
   var roomMenuOpen = false;
   var roomPanelOpen = false;
   var playlistPanelOpen = false; // Room menu → View room playlist
+  var roomItemsPanelOpen = false; // Room menu → View items
   var decorateMode = false;
   var partyPanelOpen = false;
+  var hangoutInvitePending = null; // [{id,name},…] after leave loft (real occupants only)
+  var loftVisitOccupants = []; // session occupants seen this loft visit
   var helpOpen = false;
   var legalOpen = false; // Help → Legal / Disclaimer
   var musicGestureNeeded = false; // browser blocked autoplay — show Click to play
@@ -274,7 +277,7 @@
   var FAV_KEY = "whirled2.favorites";
   var SHOP_RATINGS_KEY = "whirled2.shopRatings";
   var ROOM_LOCK_KEY = "whirled2.roomLock.loft";
-  var PROFILE_SKIN_KEY = "whirled2.profileSkin."; // + userId — MySpace-like look (no music)
+  var PROFILE_SKIN_KEY = "whirled2.profileSkin."; // + userId — Profile look / Whirled profile themes (no music)
   var ROOM_RATING_KEY = "whirled2.roomRating.loft";
   var ROOM_COMMENTS_KEY = "whirled2.roomComments.loft";
   var GAMES_KEY = "whirled2.games";
@@ -418,11 +421,13 @@
     roomMenuOpen = false;
     partyPanelOpen = false;
     playlistPanelOpen = false;
+    roomItemsPanelOpen = false;
     helpOpen = false;
     legalOpen = false;
     invitePanelOpen = false;
     occMenuId = null;
     friendInvitePending = null;
+    hangoutInvitePending = null;
     chatOptsOpen = false;
     chatNameMenu = null;
     profileEditSection = null;
@@ -1057,7 +1062,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + modern upgrade (?v=20260906m)
+  // Fidelity + modern upgrade (?v=20260906n)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -1183,7 +1188,19 @@
     // For multi-account same browser, keep a per-user friends key overlay.
     addFriendForUser(hit.fromId, { id: s.user.id, name: s.user.name });
     addFriendForUser(s.user.id, { id: hit.fromId, name: hit.fromName });
-    pushNotice("blue", hit.fromName + " is now your friend!");
+    pushNotice("friending", hit.fromName + " is now your friend!");
+    // How this works: friend-accepted shows under My News → Friendings.
+    try {
+      var wallAcc = loadWall(s.user.id);
+      wallAcc.unshift({
+        who: hit.fromName || hit.fromId,
+        fromId: hit.fromId,
+        text: "accepted your friend request.",
+        kind: "friending",
+        at: new Date().toISOString()
+      });
+      saveWall(s.user.id, wallAcc);
+    } catch (eNews) {}
     sendMail({
       toId: hit.fromId,
       toName: hit.fromName,
@@ -1262,11 +1279,12 @@
         return {
           activeTabId: t.activeTabId || "room",
           openPMs: Array.isArray(t.openPMs) ? t.openPMs : [],
+          openGroups: Array.isArray(t.openGroups) ? t.openGroups : [],
           unread: t.unread && typeof t.unread === "object" ? t.unread : {}
         };
       }
     } catch (e) {}
-    return { activeTabId: "room", openPMs: [], unread: {} };
+    return { activeTabId: "room", openPMs: [], openGroups: [], unread: {} };
   }
   function saveChatTabs(t) {
     try { localStorage.setItem(CHAT_TABS_KEY, JSON.stringify(t)); } catch (e) {}
@@ -1322,17 +1340,65 @@
     t.unread[tabId] = true;
     saveChatTabs(t);
   }
+  // How this works: group chat tabs = bluish-gray tabs for local groups you joined.
+  // ENGINE DEV: chrome-only; stored as whirled2.groupChat.{groupId} — not engine.
+  function groupChatKey(gid) { return "whirled2.groupChat." + String(gid || ""); }
+  function loadGroupChat(gid) {
+    try { return JSON.parse(localStorage.getItem(groupChatKey(gid)) || "[]"); } catch (e) { return []; }
+  }
+  function saveGroupChat(gid, msgs) {
+    try { localStorage.setItem(groupChatKey(gid), JSON.stringify((msgs || []).slice(-120))); } catch (e) {}
+  }
+  function myJoinedGroups() {
+    var s = session();
+    if (!s || !s.user) return [];
+    var meId = s.user.id;
+    return loadGroups().filter(function (g) {
+      return g && (g.members || []).some(function (m) { return m && m.id === meId; });
+    });
+  }
+  function openGroupChatTab(groupId, name) {
+    groupId = String(groupId || "");
+    if (!groupId) return;
+    var t = loadChatTabs();
+    t.openGroups = t.openGroups || [];
+    if (!t.openGroups.some(function (g) { return String(g.groupId) === groupId; })) {
+      t.openGroups.push({ groupId: groupId, name: name || groupId });
+    } else {
+      t.openGroups = t.openGroups.map(function (g) {
+        if (String(g.groupId) === groupId) return { groupId: groupId, name: name || g.name || groupId };
+        return g;
+      });
+    }
+    t.activeTabId = "group:" + groupId;
+    if (t.unread) t.unread[t.activeTabId] = false;
+    saveChatTabs(t);
+  }
+  function closeGroupChatTab(groupId) {
+    var t = loadChatTabs();
+    t.openGroups = (t.openGroups || []).filter(function (g) { return String(g.groupId) !== String(groupId); });
+    if (t.activeTabId === "group:" + groupId) t.activeTabId = "room";
+    if (t.unread) delete t.unread["group:" + groupId];
+    saveChatTabs(t);
+  }
   function chatTabsHtml() {
     var t = loadChatTabs();
     var roomUnread = !!(t.unread && t.unread.room);
     var html = '<div class="chat-tabs" id="chat-tabs" role="tablist">'
-      + '<button type="button" class="chat-tab chat-tab-room' + (t.activeTabId === "room" ? " is-on" : "") + (roomUnread ? " has-unread" : "") + '" data-chat-tab="room" role="tab">Room</button>';
+      + '<button type="button" class="chat-tab chat-tab-room' + (t.activeTabId === "room" || !t.activeTabId ? " is-on" : "") + (roomUnread ? " has-unread" : "") + '" data-chat-tab="room" role="tab">Room</button>';
     (t.openPMs || []).forEach(function (p) {
       var tid = "pm:" + p.userId;
       var un = !!(t.unread && t.unread[tid]);
       html += '<button type="button" class="chat-tab chat-tab-pm' + (t.activeTabId === tid ? " is-on" : "") + (un ? " has-unread" : "") + '" data-chat-tab="' + esc(tid) + '" role="tab">'
         + '<span>' + esc(p.name || p.userId) + '</span>'
         + '<span class="chat-tab-x" data-chat-tab-close="' + esc(p.userId) + '" title="Close">×</span></button>';
+    });
+    (t.openGroups || []).forEach(function (g) {
+      var tid = "group:" + g.groupId;
+      var un = !!(t.unread && t.unread[tid]);
+      html += '<button type="button" class="chat-tab chat-tab-group' + (t.activeTabId === tid ? " is-on" : "") + (un ? " has-unread" : "") + '" data-chat-tab="' + esc(tid) + '" role="tab">'
+        + '<span>' + esc(g.name || g.groupId) + '</span>'
+        + '<span class="chat-tab-x" data-chat-tab-close-group="' + esc(g.groupId) + '" title="Close">×</span></button>';
     });
     html += '</div>';
     return html;
@@ -1484,6 +1550,7 @@
       ["me", "Me home", "tab:me:home"],
       ["profile", "My Profile", "tab:me:profile"],
       ["mail", "Mail", "tab:me:mail"],
+      ["notices", "Notices", "tab:me:notices"],
       ["friends", "Friends", "tab:me:friends"],
       ["stuff", "Stuff", "tab:stuff"],
       ["rooms", "Rooms lobby", "tab:rooms-lobby"],
@@ -1600,12 +1667,21 @@
       var oid = t.activeTabId.slice(3);
       if (clearStorage !== false) savePmChat(oid, []);
       refreshChatLog();
+      return;
+    }
+    if (t.activeTabId.indexOf("group:") === 0) {
+      var gid = t.activeTabId.slice(6);
+      if (clearStorage !== false) saveGroupChat(gid, []);
+      refreshChatLog();
     }
   }
   function activeChatMessages() {
     var t = loadChatTabs();
     if (t.activeTabId && t.activeTabId.indexOf("pm:") === 0) {
       return loadPmChat(t.activeTabId.slice(3));
+    }
+    if (t.activeTabId && t.activeTabId.indexOf("group:") === 0) {
+      return loadGroupChat(t.activeTabId.slice(6));
     }
     return chat;
   }
@@ -1614,8 +1690,10 @@
     if (!input) return;
     var t = loadChatTabs();
     var pm = !!(t.activeTabId && t.activeTabId.indexOf("pm:") === 0);
+    var grp = !!(t.activeTabId && t.activeTabId.indexOf("group:") === 0);
     input.classList.toggle("is-pm", pm);
-    input.placeholder = pm ? "Private whisper…" : "Type here to chat!";
+    input.classList.toggle("is-group", grp);
+    input.placeholder = pm ? "Private whisper…" : (grp ? "Group chat…" : "Type here to chat!");
   }
   function presenceCheckNotices() {
     // How this works: approximate friend login/logout via occupant list diffs.
@@ -1737,7 +1815,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906m";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906n";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -1760,6 +1838,24 @@
       + '</div>'
       + '<p class="meta" id="invite-copy-msg"></p>'
       + '</div>';
+  }
+  function hangoutInvitePopup() {
+    // How this works: after leaving loft, invite people you hung out with (real occupants only).
+    if (!hangoutInvitePending || !hangoutInvitePending.length) return "";
+    var rows = hangoutInvitePending.map(function (p) {
+      return '<label class="hangout-row"><input type="checkbox" class="hangout-pick" data-hangout-id="' + esc(p.id) + '" data-hangout-name="' + esc(p.name || p.id) + '" checked /> '
+        + esc(p.name || p.id) + '</label>';
+    }).join("");
+    return '<div class="modal-backdrop" id="hangout-invite-modal" data-hangout-skip="1">'
+      + '<div class="modal-card" role="dialog" aria-label="Invite hangout friends" onclick="event.stopPropagation()">'
+      +   '<h2>Invite people you hung out with?</h2>'
+      +   '<p class="meta">Send friend requests to players from this loft visit. Skip if you prefer.</p>'
+      +   '<div class="hangout-list">' + rows + '</div>'
+      +   '<div class="invite-them-actions">'
+      +     '<button type="button" class="action-btn" data-hangout-send="1">Invite selected</button>'
+      +     '<button type="button" class="text-btn" data-hangout-skip="1">Skip</button>'
+      +   '</div>'
+      + '</div></div>';
   }
   function friendInvitePopup() {
     if (!friendInvitePending) return "";
@@ -2424,6 +2520,34 @@
       + layout.items.map(decorateChipHtml).join("")
       + '</div>';
   }
+
+  // How this works: Room menu → View items lists decorate-layer chips + playlist track names (local data).
+  // ENGINE DEV: chrome overlay only; not #stage-slot contents.
+  function roomItemsPanel() {
+    var layout = loadRoomLayout();
+    var placed = layout.items || [];
+    var pl = loadPlaylist();
+    var tracks = (pl && pl.tracks) ? pl.tracks : [];
+    var placedRows = placed.length
+      ? '<ul class="room-items-list">' + placed.map(function (it) {
+          return '<li><span class="room-item-chip">' + esc(it.name || "Item") + '</span> <span class="meta">(' + Math.round(it.x || 0) + ',' + Math.round(it.y || 0) + ')</span></li>';
+        }).join("") + '</ul>'
+      : '<p class="meta">No decorate items placed yet.</p>';
+    var trackRows = tracks.length
+      ? '<ul class="room-items-list">' + tracks.map(function (t, i) {
+          var nm = (t && (t.name || t.title)) || ("Track " + (i + 1));
+          return '<li>♪ ' + esc(nm) + '</li>';
+        }).join("") + '</ul>'
+      : '<p class="meta">Playlist empty — add Music from Stuff.</p>';
+    return '<div class="room-side-panel room-items-panel" id="room-items-panel">'
+      + '<div class="panel">'
+      +   '<div class="room-side-head"><h2>Room View items</h2>'
+      +     '<button type="button" class="text-btn" data-room-items-close="1">Close</button></div>'
+      +   '<p class="meta">Decorate-layer chips and playlist tracks from local data (no invented catalog).</p>'
+      +   '<div class="section-label">Decorate items</div>' + placedRows
+      +   '<div class="section-label">Playlist</div>' + trackRows
+      + '</div></div>';
+  }
   function decoratePanel() {
     var inv = decorateInventory();
     var layout = loadRoomLayout();
@@ -2523,6 +2647,8 @@ function helpPage() {
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
       + '<li><b>Room playlist</b> — Room menu → View room playlist. Add from My Music; owner can remove/next. Soft autoplay with Click-to-play if blocked.</li>'
       + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
+      + '<li><b>Profile look</b> — Me → My Profile → presets (Classic / Night / Sunset…) publish instantly; Edit look for fine-tune.</li>'
+      + '<li><b>Ctrl+K</b> — command palette to jump Me / Mail / Rooms / … Press <b>?</b> for shortcuts.</li>'
       + '<li><b>Mail</b> — header count; compose from Me → Mail or profiles.</li>'
       + '<li><b>Groups</b> — local clubs with discussion + Enter hall (lobby meta).</li>'
       + '<li><b>Games lobby</b> — genre filters and local tables from <code>whirled2.games</code> only — never invented titles.</li>'
@@ -2532,7 +2658,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: friend requests, Room/PM chat tabs, Ctrl+K palette, gift mail, recent rooms. Cache <code>?v=20260906m</code>. Press <b>?</b> for shortcuts.</p>'
+      + '<p class="meta">This pass: Profile look presets, chat name menu, Notices, group chat tabs, hash routes, hangout invites. Cache <code>?v=20260906n</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -2616,15 +2742,21 @@ function helpPage() {
       +     '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
       +     (playlistPanelOpen ? playlistPanel() : '')
+      +     (roomItemsPanelOpen ? roomItemsPanel() : '')
       +     (decorateMode ? decoratePanel() : '')
       +     (partyPanelOpen ? partyPanel() : '')
       +     '<button type="button" class="music-gesture-fab" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
       +   '</section>'
       + '</div>'
-      + friendInvitePopup();
+      + friendInvitePopup()
+      + hangoutInvitePopup();
   }
   function rooms() {
-    return inRoom ? roomView() : roomsLobby();
+    var html = inRoom ? roomView() : roomsLobby();
+    if (!inRoom && hangoutInvitePending && hangoutInvitePending.length) {
+      html += hangoutInvitePopup();
+    }
+    return html;
   }
 
 
@@ -2642,13 +2774,13 @@ function helpPage() {
     localStorage.setItem(STATUS_KEY + userId, String(text || "").slice(0, 140));
   }
   // ---------------------------------------------------------------------------
-  // Profile skins (MySpace-like background / accent) — chrome only, NO profile music
+  // Profile skins (Whirled profile themes — background / accent) — chrome only, NO profile music
   // How this works: each user stores whirled2.profileSkin.{userId} JSON in localStorage.
   // Visitors see that skin when opening otherProfile. Room playlists already cover audio.
   // ENGINE DEV: profile chrome ≠ #stage-slot. The engine ignores profile skins entirely;
   // do not read these keys from Pixi / WhirledChrome.
   // ---------------------------------------------------------------------------
-  // How this works: presets + schema for MySpace-like Customize Profile (BG/modules/text/links).
+  // How this works: presets + schema for Profile look / Customize look (BG/modules/text/links).
   // ENGINE DEV: profile page chrome only; not #stage-slot — engine ignores profile skins.
   var PROFILE_SKIN_TILE_SOFT = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%23e8f4fb'/%3E%3Ccircle cx='4' cy='4' r='1.5' fill='%23a8c8e0' opacity='0.55'/%3E%3Ccircle cx='16' cy='14' r='1.2' fill='%2390b8d8' opacity='0.4'/%3E%3C/svg%3E";
   var PROFILE_SKIN_PRESETS = {
@@ -2656,19 +2788,19 @@ function helpPage() {
       bgType: "gradient", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
       accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
-      panelAlpha: 0.82, motto: ""
+      panelAlpha: 0.72, motto: ""
     },
     night: {
       bgType: "gradient", bgColor: "#1a2433", bgColor2: "#2c3e55", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
-      accent: "#1a6a9a", textColor: "#16324a", linkColor: "#1e6fa8",
-      panelAlpha: 0.78, motto: ""
+      accent: "#7ec8f0", textColor: "#e8f0f8", linkColor: "#7ec8f0",
+      panelAlpha: 0.60, motto: ""
     },
     sunset: {
       bgType: "gradient", bgColor: "#ffb347", bgColor2: "#ff6b8a", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
-      accent: "#b33b1e", textColor: "#3a1a12", linkColor: "#8a2810",
-      panelAlpha: 0.80, motto: ""
+      accent: "#7a2410", textColor: "#2a120c", linkColor: "#6b1f0c",
+      panelAlpha: 0.72, motto: ""
     },
     paper: {
       bgType: "color", bgColor: "#f4efe6", bgColor2: "#ffffff", bgImage: "",
@@ -2680,13 +2812,13 @@ function helpPage() {
       bgType: "image", bgColor: "#e8f4fb", bgColor2: "#ffffff", bgImage: PROFILE_SKIN_TILE_SOFT,
       bgRepeat: "repeat", bgAttachment: "scroll",
       accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
-      panelAlpha: 0.82, motto: ""
+      panelAlpha: 0.72, motto: ""
     },
     clear: {
       bgType: "none", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
       accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
-      panelAlpha: 0.82, motto: ""
+      panelAlpha: 0.72, motto: ""
     }
   };
   var PROFILE_BG_MAX_WARN = 400 * 1024;   // soft warn ~400KB
@@ -2703,7 +2835,7 @@ function helpPage() {
       accent: "#1e6fa8",
       textColor: "#16324a",
       linkColor: "#1e6fa8",
-      panelAlpha: 0.82,
+      panelAlpha: 0.72,
       motto: ""
     };
   }
@@ -2718,7 +2850,7 @@ function helpPage() {
   }
   function clampPanelAlpha(alpha, fallback) {
     alpha = Number(alpha);
-    if (!(alpha >= 0.55 && alpha <= 1)) return fallback != null ? fallback : 0.82;
+    if (!(alpha >= 0.55 && alpha <= 1)) return fallback != null ? fallback : 0.72;
     return alpha;
   }
   function normalizeProfileSkin(s) {
@@ -2765,51 +2897,49 @@ function helpPage() {
     return out;
   }
   function applyProfileSkinDom(userId, draftSkin) {
-    // How this works: set BG + CSS vars on .page.profile-page via el.style (not HTML esc / data-URL attrs).
+    // How this works: set full background shorthand + CSS vars on .page.profile-page (and .profile-skin).
     // ENGINE DEV: profile page chrome only; not #stage-slot.
     var skin = draftSkin ? normalizeProfileSkin(draftSkin) : loadProfileSkin(userId);
-    var page = document.querySelector(".page.profile-page") || document.querySelector(".profile-skin");
+    var page = document.querySelector(".page.profile-page");
+    var wrap = document.querySelector(".profile-skin");
+    if (!page && wrap) page = wrap;
     if (!page) return;
-    var alpha = clampPanelAlpha(skin.panelAlpha, 0.82);
-    page.style.setProperty("--profile-accent", String(skin.accent || "#1e6fa8"));
-    page.style.setProperty("--profile-panel", "rgba(255,255,255," + alpha + ")");
-    page.style.setProperty("--profile-text", String(skin.textColor || "#16324a"));
-    page.style.setProperty("--profile-link", String(skin.linkColor || "#1e6fa8"));
-    // Reset BG props first
-    page.style.backgroundColor = "";
-    page.style.backgroundImage = "";
-    page.style.backgroundSize = "";
-    page.style.backgroundRepeat = "";
-    page.style.backgroundAttachment = "";
-    page.style.backgroundPosition = "";
+    var alpha = clampPanelAlpha(skin.panelAlpha, 0.72);
+    var targets = [page];
+    if (wrap && wrap !== page) targets.push(wrap);
     var has = skin.bgType && skin.bgType !== "none";
-    page.classList.toggle("has-profile-skin", !!has);
-    if (!has) return;
-    page.style.backgroundAttachment = skin.bgAttachment === "fixed" ? "fixed" : "scroll";
-    page.style.backgroundPosition = "center top";
+    var bgShorthand = "";
     if (skin.bgType === "color") {
-      page.style.backgroundColor = String(skin.bgColor || "#cfe6f5");
-      page.style.backgroundImage = "none";
+      bgShorthand = String(skin.bgColor || "#cfe6f5");
     } else if (skin.bgType === "gradient") {
-      page.style.backgroundColor = String(skin.bgColor || "#cfe6f5");
-      page.style.backgroundImage = "linear-gradient(160deg," + String(skin.bgColor || "#cfe6f5") + "," + String(skin.bgColor2 || "#ffffff") + ")";
-      page.style.backgroundSize = "cover";
-      page.style.backgroundRepeat = "no-repeat";
+      bgShorthand = "linear-gradient(160deg," + String(skin.bgColor || "#cfe6f5") + "," + String(skin.bgColor2 || "#ffffff") + ")";
     } else if (skin.bgType === "image" && skin.bgImage) {
-      // JSON-safe url() — never HTML-escape huge data URLs into attributes
-      // How this works: set image BG via el.style — never put huge data-URLs through HTML esc().
       var rawUrl = String(skin.bgImage).replace(/\\/g, "").replace(/"/g, "").replace(/'/g, "");
-      page.style.backgroundImage = 'url("' + rawUrl + '")';
       var rep = normalizeBgRepeat(skin.bgRepeat);
+      var attach = skin.bgAttachment === "fixed" ? "fixed" : "scroll";
       if (rep === "cover") {
-        page.style.backgroundSize = "cover";
-        page.style.backgroundRepeat = "no-repeat";
+        bgShorthand = String(skin.bgColor || "#cfe6f5") + ' url("' + rawUrl + '") center top / cover no-repeat ' + attach;
       } else {
-        page.style.backgroundSize = "auto";
-        page.style.backgroundRepeat = rep;
+        bgShorthand = String(skin.bgColor || "#cfe6f5") + ' url("' + rawUrl + '") center top / auto ' + rep + ' ' + attach;
       }
-      page.style.backgroundColor = String(skin.bgColor || "#cfe6f5");
     }
+    targets.forEach(function (el) {
+      el.style.setProperty("--profile-accent", String(skin.accent || "#1e6fa8"));
+      el.style.setProperty("--profile-panel", "rgba(255,255,255," + alpha + ")");
+      el.style.setProperty("--profile-text", String(skin.textColor || "#16324a"));
+      el.style.setProperty("--profile-link", String(skin.linkColor || "#1e6fa8"));
+      el.classList.toggle("has-profile-skin", !!has);
+      // Reset then apply full shorthand (beats .page background-color: var(--paper))
+      el.style.background = "";
+      el.style.backgroundColor = "";
+      el.style.backgroundImage = "";
+      el.style.backgroundSize = "";
+      el.style.backgroundRepeat = "";
+      el.style.backgroundAttachment = "";
+      el.style.backgroundPosition = "";
+      if (!has) return;
+      el.style.background = bgShorthand;
+    });
   }
   function readSkinFormDraft(form) {
     // How this works: live preview draft from open Customize look form (not persisted until Save / preset).
@@ -2853,9 +2983,9 @@ function helpPage() {
     var a = Number(preset.panelAlpha);
     if (form.panelAlpha) {
       if (a >= 0.95) form.panelAlpha.value = "1";
-      else if (a >= 0.85) form.panelAlpha.value = "0.88";
-      else if (a >= 0.7) form.panelAlpha.value = "0.82";
-      else form.panelAlpha.value = "0.65";
+      else if (a >= 0.80) form.panelAlpha.value = "0.88";
+      else if (a >= 0.68) form.panelAlpha.value = "0.72";
+      else form.panelAlpha.value = "0.60";
     }
     if (preset.bgType === "image" && preset.bgImage) {
       window.__skinBgPending = preset.bgImage;
@@ -2970,9 +3100,10 @@ function helpPage() {
       id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       kind: kind || "gray",
       text: text,
-      at: new Date().toISOString()
+      at: new Date().toISOString(),
+      read: !!opts.read
     };
-    if (opts.transient) notice.transient = true;
+    if (opts.transient) { notice.transient = true; notice.read = true; }
     notices.unshift(notice);
     notices = notices.slice(0, 30);
     persistNotices();
@@ -3028,6 +3159,47 @@ function helpPage() {
         renderNotices();
       }
     });
+  }
+
+  function unreadNoticesCount() {
+    loadNotices();
+    return notices.filter(function (n) { return n && !n.read && !isEphemeralNotice(n); }).length;
+  }
+  function markNoticeRead(id) {
+    loadNotices();
+    var changed = false;
+    notices.forEach(function (n) {
+      if (n && n.id === id && !n.read) { n.read = true; changed = true; }
+    });
+    if (changed) { persistNotices(); renderNotices(); }
+  }
+  function markAllNoticesRead() {
+    loadNotices();
+    notices.forEach(function (n) { if (n) n.read = true; });
+    persistNotices();
+    renderNotices();
+  }
+  // How this works: Me → Notices lists friend login, mail, friend request with mark-read.
+  function meNotices() {
+    loadNotices();
+    var rows = notices.filter(function (n) { return n && !isEphemeralNotice(n); });
+    var list = rows.length
+      ? rows.map(function (n) {
+          return '<div class="notice-page-row' + (n.read ? "" : " is-unread") + '" data-notice-mark="' + esc(n.id) + '">'
+            + '<span class="notice-kind kind-' + esc(n.kind || "gray") + '">' + esc(n.kind || "notice") + '</span> '
+            + '<span class="notice-text">' + esc(n.text) + '</span>'
+            + '<time>' + esc((n.at || "").slice(0, 16).replace("T", " ")) + '</time>'
+            + (n.read ? "" : ' <button type="button" class="text-btn" data-notice-mark="' + esc(n.id) + '">Mark read</button>')
+            + '</div>';
+        }).join("")
+      : '<p class="meta">No notices yet. Friend logins, mail, and friend requests show up here.</p>';
+    return '<section class="page me-page">' + meSubnav()
+      + '<div class="panel"><h2>Notices</h2>'
+      +   '<div class="mail-toolbar">'
+      +     '<button type="button" class="action-btn" data-notices-mark-all="1">Mark all read</button>'
+      +     '<button type="button" class="action-btn" data-notice-clear-all="1">Clear all</button>'
+      +   '</div>'
+      +   list + '</div></section>';
   }
   function ensureNoticeBar() {
     stripStuckPokeNotices();
@@ -3111,6 +3283,10 @@ function helpPage() {
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "mail" ? " is-on" : "") + '" data-me="mail">Mail</button>'
       + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link' + (meSub === "notices" ? " is-on" : "") + '" data-me="notices">Notices'
+      +   (unreadNoticesCount() ? (' <span class="me-badge">' + unreadNoticesCount() + '</span>') : '')
+      + '</button>'
+      + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "passport" ? " is-on" : "") + '" data-me="passport">My Passport</button>'
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "themes" ? " is-on" : "") + '" data-me="themes">Themes</button>'
@@ -3138,12 +3314,20 @@ function helpPage() {
       items.push({ kind: newsKindOf(n), text: n.text, who: "", at: n.at || "" });
     });
     loadWall(sid).forEach(function (w) {
-      var k = w.kind === "status" ? "status" : "comment";
+      var k = w.kind === "status" ? "status" : (w.kind === "friending" ? "friending" : "comment");
       items.push({ kind: k, text: w.text, who: w.who || "", at: w.at || "" });
     });
     loadFriends().forEach(function (f) {
       if (!f || !f.at) return;
       items.push({ kind: "friending", text: "You friended " + (f.name || f.id) + ".", who: f.name || "", at: f.at });
+    });
+    loadFriendRequests().forEach(function (r) {
+      if (!r || r.status !== "accepted") return;
+      if (String(r.toId) === String(sid)) {
+        items.push({ kind: "friending", text: "Friend accepted — " + (r.fromName || r.fromId) + " is now your friend.", who: r.fromName || "", at: r.at || "" });
+      } else if (String(r.fromId) === String(sid)) {
+        items.push({ kind: "friending", text: (r.toName || r.toId) + " accepted your friend request.", who: r.toName || "", at: r.at || "" });
+      }
     });
     function rowsFor(kind) {
       var rows = items.filter(function (it) { return it.kind === kind; })
@@ -3210,6 +3394,7 @@ function helpPage() {
       +       '<button type="button" class="text-btn" data-enter-room="loft">My Rooms</button>'
       +       '<button type="button" class="text-btn" data-me="passport">My Passport</button>'
       +       '<button type="button" class="text-btn" data-me="mail">Mail' + (unread ? ' (' + unread + ')' : '') + '</button>'
+      +       '<button type="button" class="text-btn" data-me="notices">Notices' + (unreadNoticesCount() ? ' (' + unreadNoticesCount() + ')' : '') + '</button>'
       +       '<button type="button" class="text-btn" data-me="account">Account</button>'
       +       '<button type="button" class="text-btn" data-me="themes">Themes</button>'
       +       '<button type="button" class="text-btn" data-me="club">Club / Membership</button>'
@@ -3239,7 +3424,7 @@ function helpPage() {
     var info = loadInfo(sid);
     if (!info.about && me.bio) info.about = me.bio;
     var pokes = (loadPokes()[sid] || []).slice(0, 8);
-    // How this works: load this user's MySpace-like skin (background / accent / motto).
+    // How this works: load this user's Profile look skin (background / accent / motto).
     // ENGINE DEV: profile skins stay in Me chrome — never applied to #stage-slot.
     var skin = loadProfileSkin(sid);
     var photoHtml = photo
@@ -3310,22 +3495,22 @@ function helpPage() {
           : '')
       +   '<div class="cp-section cp-customize"><div class="cp-section-head"><h2>Customize look</h2>'
       +     editToggle("skin", "look") + '</div>'
-      +     '<p class="meta">MySpace-style themes for visitors: background, module boxes, text &amp; link colors. Preview live, then Publish. No profile music — use room playlists.</p>'
+      +     '<p class="meta">Whirled profile themes for visitors: background, module boxes, text &amp; link colors. Presets publish instantly. Open Edit look for fine-tune, then Publish. No profile music — use room playlists.</p>'
       +     (skin.motto ? ('<p class="cp-motto-preview"><i>' + esc(skin.motto) + '</i></p>') : '')
+      +     '<div class="section-label">Profile look presets (publish immediately)</div>'
+      +     '<div class="skin-presets skin-presets-always">'
+      +       '<button type="button" class="action-btn" data-skin-preset="classic">Classic</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="night">Night</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="sunset">Sunset</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="paper">Paper</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="tileSoft">Tile Soft</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="clear">Clear</button>'
+      +     '</div>'
       +     (editSkin
             ? ('<div class="cp-edit-panel is-open" id="edit-skin-panel">'
-              +   '<div class="cp-edit-head"><b>Customize Profile</b>'
+              +   '<div class="cp-edit-head"><b>Profile look</b>'
               +     '<button type="button" class="text-btn" data-profile-edit-cancel="1">Cancel</button></div>'
               +   '<form class="skin-form" id="skin-form">'
-              +     '<div class="section-label">Presets (publish immediately)</div>'
-              +     '<div class="skin-presets">'
-              +       '<button type="button" class="action-btn" data-skin-preset="classic">Classic</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="night">Night</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="sunset">Sunset</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="paper">Paper</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="tileSoft">Tile Soft</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="clear">Clear</button>'
-              +     '</div>'
               +     '<label>Background type <select name="bgType">'
               +       '<option value="none"' + (skin.bgType === "none" ? " selected" : "") + '>None</option>'
               +       '<option value="color"' + (skin.bgType === "color" ? " selected" : "") + '>Solid color</option>'
@@ -3355,9 +3540,9 @@ function helpPage() {
               +       '<input name="linkColor" maxlength="32" value="' + esc(skin.linkColor || "#1e6fa8") + '" /></label>'
               +     '<label>Panel opacity <select name="panelAlpha">'
               +       '<option value="1"' + (Number(skin.panelAlpha) >= 0.95 ? " selected" : "") + '>Solid</option>'
-              +       '<option value="0.88"' + (Number(skin.panelAlpha) < 0.95 && Number(skin.panelAlpha) >= 0.85 ? " selected" : "") + '>Soft</option>'
-              +       '<option value="0.82"' + (Number(skin.panelAlpha) < 0.85 && Number(skin.panelAlpha) >= 0.72 ? " selected" : "") + '>Airy (default)</option>'
-              +       '<option value="0.65"' + (Number(skin.panelAlpha) < 0.72 ? " selected" : "") + '>Very clear</option>'
+              +       '<option value="0.88"' + (Number(skin.panelAlpha) < 0.95 && Number(skin.panelAlpha) >= 0.80 ? " selected" : "") + '>Soft</option>'
+              +       '<option value="0.72"' + (Number(skin.panelAlpha) < 0.80 && Number(skin.panelAlpha) >= 0.68 ? " selected" : "") + '>Airy (default)</option>'
+              +       '<option value="0.60"' + (Number(skin.panelAlpha) < 0.68 ? " selected" : "") + '>Very clear</option>'
               +     '</select></label>'
               +     '<label>Motto <input name="motto" maxlength="80" placeholder="Short blurb under status" value="' + esc(skin.motto || "") + '" /></label>'
               +     '<label class="skin-bg-file">Background image (png/jpg/gif/webp)'
@@ -3591,7 +3776,8 @@ function helpPage() {
     var listHtml = inbox.length ? inbox.map(function (m) {
       var mine = m.fromId === me.id;
       var unread = !m.read && m.toId === me.id;
-      var replyBtn = mine ? "" : ('<button type="button" class="action-btn" data-mail-reply="' + esc(m.id) + '">Reply</button>');
+      var replyBtn = mine ? "" : ('<button type="button" class="action-btn" data-mail-reply="' + esc(m.id) + '">Reply</button>'
+        + '<button type="button" class="action-btn" data-mail-followup="' + esc(m.id) + '">Follow up</button>');
       var giftNote = "";
       if (m.giftItem) {
         giftNote = m.giftClaimed
@@ -4010,6 +4196,7 @@ function helpPage() {
     }
     if (viewingId && session() && viewingId === session().user.id) { meSub = "profile"; viewingId = null; }
     if (meSub === "friends") return meFriends();
+    if (meSub === "notices") return meNotices();
     if (meSub === "mail") return meMail(window.__mailCompose || null);
     if (meSub === "passport") return mePassport();
     if (meSub === "account") return meAccount();
@@ -4064,6 +4251,9 @@ function helpPage() {
       +   '<div class="who">'
       +     '<div class="row who-links">'
       +       '<button type="button" class="mail mail-btn" data-me="mail" title="Mail">&#9993; <u>(' + unreadCount() + ')</u></button>'
+      +       '<button type="button" class="notice-bell-btn" data-me="notices" title="Notices">&#128276;'
+      +         (unreadNoticesCount() ? (' <u>(' + unreadNoticesCount() + ')</u>') : '')
+      +       '</button>'
       +       '<b>' + esc(me.name) + '</b>'
       +       '<span class="sep">|</span>'
       +       '<button type="button" class="text-btn" data-me="club" title="Membership">Club</button>'
@@ -4193,9 +4383,18 @@ function helpPage() {
         var skinUid = null;
         if (viewingId && viewingId !== session().user.id) skinUid = viewingId;
         else if (meSub === "profile") skinUid = session().user.id;
-        if (skinUid) applyProfileSkinDom(skinUid);
+        if (skinUid) {
+          applyProfileSkinDom(skinUid);
+          // How this works: double rAF re-apply beats layout flash / competing CSS.
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              try { applyProfileSkinDom(skinUid); } catch (e2) {}
+            });
+          });
+        }
       }
     } catch (eSkin) {}
+    try { syncHashRoute(tab); } catch (eHash) {}
     try { applyChatInputTint(); } catch (eTint) {}
     try {
       if (friendsPopupOpen) {
@@ -4542,6 +4741,7 @@ function helpPage() {
       thought = true;
       sendText = text;
     }
+    var isGroup = !!(tabs.activeTabId && tabs.activeTabId.indexOf("group:") === 0);
     if (isPm) {
       var oid = tabs.activeTabId.slice(3);
       var s = session();
@@ -4570,6 +4770,26 @@ function helpPage() {
       }
       refreshChatLog();
       try { awardAction("chat"); } catch (e) {}
+      return;
+    }
+    if (isGroup) {
+      var gidChat = tabs.activeTabId.slice(6);
+      var sG = session();
+      var msgG = {
+        id: "gc" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        who: sG && sG.user ? sG.user.name : "Guest",
+        userId: sG && sG.user ? sG.user.id : "guest",
+        text: String(sendText).slice(0, 240),
+        at: new Date().toISOString(),
+        group: true
+      };
+      if (emote) msgG.emote = true;
+      if (thought) msgG.thought = true;
+      var gList = loadGroupChat(gidChat);
+      gList.push(msgG);
+      saveGroupChat(gidChat, gList);
+      refreshChatLog();
+      try { awardAction("chat"); } catch (eG) {}
       return;
     }
     var result = await window.WhirledApi.postChat("loft", sendText);
@@ -4604,7 +4824,16 @@ function helpPage() {
       +   '<button type="button" class="action-btn' + (ui.bubbleDuration === "long" ? " is-on" : "") + '" data-chat-bubble-dur="long">Long</button>'
       + '</div>'
       + '<p class="meta" style="margin:4px 8px 8px;font-size:11px">Stage bubble duration (above avatars)</p>'
-      + '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear all chat</button>';
+      + '<div class="chat-opts-title">Groups</div>';
+    var joined = myJoinedGroups();
+    if (joined.length) {
+      menu.innerHTML += joined.map(function (g) {
+        return '<button type="button" class="action-btn chat-opts-group" data-open-group-chat="' + esc(g.id) + '" data-group-chat-name="' + esc(g.name || g.id) + '">' + esc(g.name || g.id) + '</button>';
+      }).join("");
+    } else {
+      menu.innerHTML += '<p class="meta" style="margin:4px 8px 8px;font-size:11px">Join a local group to open a group chat tab.</p>';
+    }
+    menu.innerHTML += '<button type="button" class="action-btn chat-opts-clear" data-chat-clear="1">Clear all chat</button>';
   }
   function openChatNameMenu(id, name, x, y) {
     var existing = document.getElementById("chat-name-menu");
@@ -4617,11 +4846,11 @@ function helpPage() {
     menu.style.top = Math.max(8, Math.min(window.innerHeight - 160, y)) + "px";
     var sid = session() && session().user ? session().user.id : "";
     var self = sid && id && sid === id;
+    // How this works: classic chat name context menu — Profile / Whisper / Invite friend / Block.
     menu.innerHTML = ''
-      + '<button type="button" data-profile="' + esc(id) + '">View profile</button>'
+      + '<button type="button" data-profile="' + esc(id) + '">Profile</button>'
       + (self ? '' : '<button type="button" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(name) + '">Whisper</button>')
       + (self ? '' : '<button type="button" data-add-friend="' + esc(id) + '" data-friend-name="' + esc(name) + '">Invite friend</button>')
-      + (self ? '' : '<button type="button" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name) + '">Send mail</button>')
       + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>');
     document.body.appendChild(menu);
   }
@@ -4664,6 +4893,19 @@ function helpPage() {
       };
     });
     liveOccupants.forEach(function (p) { rememberProfile({ id: p.id, name: p.name }); });
+    // How this works: remember real session occupants for optional leave-loft friend invites.
+    try {
+      if (inRoom && session()) {
+        var meIdV = session().user.id;
+        loftVisitOccupants = loftVisitOccupants || [];
+        liveOccupants.forEach(function (p) {
+          if (!p || !p.id || p.id === meIdV || p.you) return;
+          if (!loftVisitOccupants.some(function (x) { return x.id === p.id; })) {
+            loftVisitOccupants.push({ id: p.id, name: p.name || p.id });
+          }
+        });
+      }
+    } catch (eV) {}
     refreshOccupantRail();
     try { presenceCheckNotices(); } catch (eP) {}
   }
@@ -4693,6 +4935,76 @@ function helpPage() {
   // ---------------------------------------------------------------------------
   // Boot + presence / chat polling timers
   // ---------------------------------------------------------------------------
+
+  // How this works: deep links #me/profile, #rooms, #mail etc. — read on boot, update on tab change.
+  // ENGINE DEV: chrome navigation only; hash does not mount the engine.
+  function syncHashRoute(tab) {
+    if (!session()) return;
+    var hash = "";
+    if (helpOpen || tab === "help") hash = "help";
+    else if (legalOpen || tab === "legal") hash = "legal";
+    else if (tab === "me") {
+      if (viewingId) hash = "me/player/" + encodeURIComponent(viewingId);
+      else if (meSub && meSub !== "home") hash = "me/" + meSub;
+      else hash = "me";
+    } else if (tab === "rooms") hash = inRoom ? "rooms/loft" : "rooms";
+    else if (tab === "stuff") hash = "stuff";
+    else if (tab === "shop") hash = "shop";
+    else if (tab === "games") hash = "games";
+    else if (tab === "groups") hash = "groups";
+    else hash = tab || "rooms";
+    try {
+      var next = "#" + hash;
+      if (location.hash !== next) history.replaceState(null, "", next);
+    } catch (e) {}
+  }
+  function applyHashRoute() {
+    if (!session()) return false;
+    var raw = "";
+    try { raw = String(location.hash || "").replace(/^#/, ""); } catch (e) { return false; }
+    if (!raw) return false;
+    var parts = raw.split("/").filter(Boolean);
+    var head = (parts[0] || "").toLowerCase();
+    helpOpen = false;
+    legalOpen = false;
+    if (head === "help") { helpOpen = true; paint("help"); return true; }
+    if (head === "legal") { legalOpen = true; paint("legal"); return true; }
+    if (head === "me") {
+      var sub = (parts[1] || "home").toLowerCase();
+      if (sub === "player" && parts[2]) {
+        viewingId = decodeURIComponent(parts[2]);
+        meSub = "home";
+      } else {
+        viewingId = null;
+        meSub = sub === "profile" || sub === "mail" || sub === "friends" || sub === "passport"
+          || sub === "account" || sub === "themes" || sub === "club" || sub === "notices"
+          || sub === "blocklist" || sub === "galleries" || sub === "transactions"
+          || sub === "contests" || sub === "share" ? sub : "home";
+      }
+      paint("me");
+      return true;
+    }
+    if (head === "mail") { meSub = "mail"; viewingId = null; paint("me"); return true; }
+    if (head === "rooms") {
+      if ((parts[1] || "") === "loft") {
+        if (tryEnterLoft()) {
+          clearRoomChatDisplay(true);
+          loftVisitOccupants = [];
+          paint("rooms");
+          loadOccupants();
+        } else paint("rooms");
+      } else {
+        inRoom = false;
+        paint("rooms");
+      }
+      return true;
+    }
+    if (head === "stuff" || head === "shop" || head === "games" || head === "groups") {
+      paint(head);
+      return true;
+    }
+    return false;
+  }
   function boot() {
     applyBrowserTheme();
     if (session()) {
@@ -4705,7 +5017,12 @@ function helpPage() {
     // chat from earlier. Do not loadHistory() on boot (that rehydrated old chats).
     clearRoomChatDisplay(true);
     paint(session() ? "rooms" : "");
-    if (session()) { startPoll(); startOccPoll(); ensureNoticeBar(); }
+    if (session()) {
+      startPoll();
+      startOccPoll();
+      ensureNoticeBar();
+      try { applyHashRoute(); } catch (eH) {}
+    }
     try { window.__whirledBoot = true; } catch (e) {}
   }
 
@@ -4741,6 +5058,11 @@ function helpPage() {
   });
 
   var app = document.getElementById("app");
+  try {
+    window.addEventListener("hashchange", function () {
+      if (session()) applyHashRoute();
+    });
+  } catch (eHc) {}
   boot();
   // ---------------------------------------------------------------------------
   // Event delegation: one click listener + one submit listener on #app
@@ -4835,6 +5157,14 @@ function helpPage() {
       return;
     }
     // --- Fidelity upgrade handlers (friend requests, chat tabs, palette, gifts) ---
+    var chatTabCloseG = ev.target.closest("[data-chat-tab-close-group]");
+    if (chatTabCloseG) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      closeGroupChatTab(chatTabCloseG.getAttribute("data-chat-tab-close-group"));
+      refreshChatLog();
+      return;
+    }
     var chatTabClose = ev.target.closest("[data-chat-tab-close]");
     if (chatTabClose) {
       ev.preventDefault();
@@ -4844,9 +5174,25 @@ function helpPage() {
       return;
     }
     var chatTabBtn = ev.target.closest("[data-chat-tab]");
-    if (chatTabBtn && !ev.target.closest("[data-chat-tab-close]")) {
+    if (chatTabBtn && !ev.target.closest("[data-chat-tab-close]") && !ev.target.closest("[data-chat-tab-close-group]")) {
       setActiveChatTab(chatTabBtn.getAttribute("data-chat-tab") || "room");
       refreshChatLog();
+      return;
+    }
+    var openGChat = ev.target.closest("[data-open-group-chat]");
+    if (openGChat && session()) {
+      openGroupChatTab(openGChat.getAttribute("data-open-group-chat"), openGChat.getAttribute("data-group-chat-name"));
+      var comG = document.getElementById("chat-opts-menu");
+      if (comG) { comG.hidden = true; chatOptsOpen = false; }
+      if (!inRoom) {
+        if (tryEnterLoft()) {
+          clearRoomChatDisplay(true);
+          paint("rooms");
+          loadOccupants();
+        }
+      } else {
+        refreshChatLog();
+      }
       return;
     }
     var whisperBtn = ev.target.closest("[data-whisper]");
@@ -5015,17 +5361,24 @@ function helpPage() {
       }
       // Fresh visit: empty room chat (old sessions stay wiped).
       clearRoomChatDisplay(true);
+      loftVisitOccupants = [];
       paint("rooms");
       loadOccupants();
       try { awardAction("enterRoom"); } catch (e) {}
       return;
     }
     if (ev.target.closest("[data-leave-room]")) {
+      var leavePeople = (loftVisitOccupants || []).slice();
       inRoom = false;
       decorateMode = false;
       roomPanelOpen = false;
       playlistPanelOpen = false;
+      roomItemsPanelOpen = false;
       leaveRoomResetChat();
+      loftVisitOccupants = [];
+      // How this works: optional batch invite after hanging out — only real visit occupants.
+      if (leavePeople.length) hangoutInvitePending = leavePeople;
+      else hangoutInvitePending = null;
       paint("rooms");
       return;
     }
@@ -5663,13 +6016,13 @@ function helpPage() {
         syncRoomAudio();
       } else if (rm === "view-items") {
         if (!inRoom) { inRoom = true; }
-        decorateMode = true;
+        roomItemsPanelOpen = true;
+        decorateMode = false;
         roomPanelOpen = false;
         playlistPanelOpen = false;
+        partyPanelOpen = false;
         paint("rooms");
         loadOccupants();
-        bindDecorateDrag();
-        pushNotice("gray", "View items — decorate layout list.", { transient: true });
       } else if (rm === "snapshot") {
         pushNotice("orange", "Snapshot stub — engine will capture the stage later.");
       } else if (rm === "zoom") {
@@ -5692,6 +6045,11 @@ function helpPage() {
     }
     if (ev.target.closest("[data-room-panel-close]") && session()) {
       roomPanelOpen = false;
+      paint("rooms");
+      return;
+    }
+    if (ev.target.closest("[data-room-items-close]") && session()) {
+      roomItemsPanelOpen = false;
       paint("rooms");
       return;
     }
@@ -5867,6 +6225,28 @@ function helpPage() {
       }
       return;
     }
+    var mailFollow = ev.target.closest("[data-mail-followup]");
+    if (mailFollow && session()) {
+      ev.stopPropagation();
+      var fid = mailFollow.getAttribute("data-mail-followup");
+      var fmsg = loadMail().filter(function (m) { return m.id === fid; })[0];
+      if (fmsg) {
+        var fsubj = String(fmsg.subject || "");
+        if (!/^follow\s*up:/i.test(fsubj) && !/^re:\s/i.test(fsubj)) fsubj = "Follow up: " + fsubj;
+        else if (!/^follow\s*up:/i.test(fsubj)) fsubj = "Follow up: " + fsubj.replace(/^re:\s*/i, "");
+        // How this works: Follow up prefills compose like Reply (classic mail).
+        window.__mailCompose = {
+          id: fmsg.fromId,
+          name: fmsg.fromName || fmsg.fromId,
+          subject: fsubj,
+          body: "\n\n---\n" + (fmsg.fromName || "Them") + " wrote:\n" + String(fmsg.body || "")
+        };
+        meSub = "mail";
+        viewingId = null;
+        paint("me");
+      }
+      return;
+    }
     var mailDel = ev.target.closest("[data-mail-delete]");
     if (mailDel && session()) {
       ev.stopPropagation();
@@ -5879,7 +6259,7 @@ function helpPage() {
       return;
     }
     var mailRow = ev.target.closest("[data-mail-id]");
-    if (mailRow && session() && !ev.target.closest("form") && !ev.target.closest("[data-mail-reply]") && !ev.target.closest("[data-mail-delete]") && !ev.target.closest(".mail-check")) {
+    if (mailRow && session() && !ev.target.closest("form") && !ev.target.closest("[data-mail-reply]") && !ev.target.closest("[data-mail-followup]") && !ev.target.closest("[data-mail-delete]") && !ev.target.closest(".mail-check")) {
       var midOpen = mailRow.getAttribute("data-mail-id");
       markMailRead(midOpen);
       claimGiftFromMail(midOpen);
@@ -5897,7 +6277,7 @@ function helpPage() {
     }
     var skinPreset = ev.target.closest("[data-skin-preset]");
     if (skinPreset && session()) {
-      // How this works: preset click = Publish immediately (save + repaint), MySpace-style.
+      // How this works: preset click = Publish immediately (save + repaint), Profile look.
       // ENGINE DEV: profile page chrome only; not #stage-slot.
       var pid = skinPreset.getAttribute("data-skin-preset");
       var preset = PROFILE_SKIN_PRESETS[pid];
@@ -5911,9 +6291,13 @@ function helpPage() {
         meSub = "profile";
         viewingId = null;
         profileEditSection = "skin";
-        pushNotice("green", "Look published — visitors see this on your profile.", { transient: true });
+        pushNotice("green", "Look published.", { transient: true });
         paint("me");
         try { applyProfileSkinDom(session().user.id, published); } catch (eP) {}
+        try {
+          var sm = document.getElementById("skin-msg");
+          if (sm) sm.textContent = "Look published.";
+        } catch (eMsg) {}
       }
       return;
     }
@@ -5941,6 +6325,50 @@ function helpPage() {
       if (meSub !== "profile") profileEditSection = null;
       if (meSub !== "mail") window.__mailCompose = null;
       paint("me");
+      return;
+    }
+    var nMark = ev.target.closest("[data-notice-mark]");
+    if (nMark && session()) {
+      markNoticeRead(nMark.getAttribute("data-notice-mark"));
+      if (meSub === "notices") paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-notices-mark-all]") && session()) {
+      markAllNoticesRead();
+      if (meSub === "notices") paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-notice-clear-all]") && session()) {
+      loadNotices();
+      notices = [];
+      persistNotices();
+      renderNotices();
+      if (meSub === "notices") paint("me");
+      return;
+    }
+    var hangSkip = ev.target.closest("[data-hangout-skip]");
+    if (hangSkip) {
+      hangoutInvitePending = null;
+      var hm = document.getElementById("hangout-invite-modal");
+      if (hm) hm.remove();
+      return;
+    }
+    var hangSend = ev.target.closest("[data-hangout-send]");
+    if (hangSend && session()) {
+      var picks = document.querySelectorAll(".hangout-pick:checked");
+      var n = 0;
+      picks.forEach(function (cb) {
+        var hid = cb.getAttribute("data-hangout-id");
+        var hname = cb.getAttribute("data-hangout-name") || hid;
+        if (hid) {
+          createFriendRequest(hid, hname, "Hey — we hung out in the loft. Let's be buddies!");
+          n++;
+        }
+      });
+      hangoutInvitePending = null;
+      var hm2 = document.getElementById("hangout-invite-modal");
+      if (hm2) hm2.remove();
+      pushNotice("friending", n ? ("Sent " + n + " friend request" + (n === 1 ? "" : "s") + ".") : "No one selected.");
       return;
     }
     var pokeSelfBtn = ev.target.closest("#poke-self-demo");

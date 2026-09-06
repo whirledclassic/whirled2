@@ -28,7 +28,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## How to bump cache-bust `?v=`
 
-1. Pick a new token, e.g. `20260906m`.
+1. Pick a new token, e.g. `20260906n`.
 2. Replace in `index.html` (CSS + JS `href`/`src`, and the “reload fresh” links).
 3. Replace `LOGO_V` in `app.js`.
 4. Replace in repo root `index.html` redirect (Pages) if present.
@@ -89,12 +89,13 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - Temporary `#stage-bubbles` for avatar speech/thought until Pixi owns nametags.
 - `window.WhirledChrome` v0.4: `getStageEl`, `getSession`, `getRoom`, `onChat`, `sendChat`, `onOccupants`, `getChatUi`. See `ENGINE-BRIDGE.md`.
 
-## Profile skins
+## Profile look (Whirled profile themes)
 
 - Key: `whirled2.profileSkin.{userId}` JSON — `{ bgType, bgColor, bgColor2, bgImage, bgRepeat, bgAttachment, accent, textColor, linkColor, panelAlpha, motto }`.
-- Apply: `applyProfileSkinDom(userId)` sets CSS vars + background on `.page.profile-page` (class `has-profile-skin`). Do **not** put huge data-URL BGs through HTML `esc()` attributes.
-- UI: Me → My Profile → **Customize look** (near top). Presets publish immediately; form changes live-preview; Publish persists. Clear = `bgType:none`.
-- **No profile music.** Room playlist covers audio.
+- Apply: `applyProfileSkinDom(userId)` sets CSS vars + **full `background` shorthand** on `.page.profile-page` and `.profile-skin` (class `has-profile-skin`). `.page` uses `background-color` only so shorthand wins. Double rAF re-apply after paint.
+- Night preset: text `#e8f0f8`, link/accent `#7ec8f0`, panelAlpha ~0.60. Default panelAlpha ~0.72.
+- UI: Me → My Profile → **Customize look** — presets **always visible** (no Edit look required). Edit look opens fine-tune form (“Profile look”). Preset publish keeps panel open → “Look published.”
+- Clear = `bgType:none`. **No profile music.** Room playlist covers audio.
 - ENGINE DEV: profile page chrome only; not `#stage-slot`.
 
 ## Room lock (local)
@@ -102,7 +103,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - Key: `whirled2.roomLock.loft` = `{ mode: "unlocked"|"friends"|"locked", ownerId }`.
 - `canEnterLoft(viewerId)` gates enter / Join them / Go home. Owner always enters. Legacy bare-string values migrate on load.
 
-## Friend requests (20260906m)
+## Friend requests (20260906n)
 
 - Key: `whirled2.friendRequests` — `{id, fromId, fromName, toId, toName, message, status, at}`.
 - Status: `pending|accepted|declined|retracted`. Invite does **not** call `addFriend` until Accept.
@@ -117,12 +118,20 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## LocalStorage keys (common)
 
-`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.chatTabs`, `whirled2.pm.*`, `whirled2.friendRequests`, `whirled2.friends.*`, `whirled2.recentRooms`, `whirled2.chatReactions`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.profileSkin.*`, `whirled2.roomLock.loft`, `whirled2.notices`, `whirled2.chatUi`, …
+`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.chatTabs`, `whirled2.pm.*`, `whirled2.groupChat.*`, `whirled2.friendRequests`, `whirled2.friends.*`, `whirled2.recentRooms`, `whirled2.chatReactions`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.profileSkin.*`, `whirled2.roomLock.loft`, `whirled2.notices`, `whirled2.chatUi`, …
 
 
-## Modern shortcuts (20260906m)
+## Modern shortcuts (20260906n)
 
 - Ctrl/Cmd+K → command palette (`ensureModernOverlays`).
 - `?` (when not in an input) → shortcuts overlay.
 - `/` in room focuses chat input. Esc closes palette/popups.
 - Gift mail: Stuff → Send as Gift removes item; open mail claims once (`giftClaimed`).
+
+
+## Hash routes / Notices / Group chat (20260906n)
+
+- Hash: `#me/profile`, `#me/mail`, `#me/notices`, `#rooms`, `#rooms/loft`, `#stuff`, … — `applyHashRoute` on boot; `syncHashRoute` on paint.
+- Notices: Me → Notices + header bell; `read` flag on `whirled2.notices`.
+- Group tabs: Chat Options → Groups; `whirled2.groupChat.{groupId}`; bluish-gray `.chat-tab-group`.
+- Leave loft hangout invite: real `loftVisitOccupants` only.

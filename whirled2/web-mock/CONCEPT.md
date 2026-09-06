@@ -6,7 +6,7 @@ Whirled = social network + virtual world. Chrome tabs: **Me, Stuff, Games, Rooms
 - **Shop** (wiki Shop): main page = Popular selections per major category; category browse + sort by rating / price / popularity / date; item comments & ratings; listings come from creator **List Item** into `whirled2.shop`. Coins are **labels only** — purchases disabled (“Coins are labels only — no payments”). Never invent catalog listings.
 - **Mail**: header count; Me→Mail inbox/compose; unread blue highlight; **Select All** + **Delete Selected**; **Reply** + **Delete**; Send Mail from profiles/friends; Stuff **Send as Gift** attaches item (removed from sender; claim once on open).
 - **Friends**: search by name/permaname (occupants + friends + known profiles + other local `whirled2.users`); online first (alpha), then recent; actions Invite / Send Mail / Whisper / Visit Home / Remove / **Join them!**. **Invite** opens Let’s be buddies! → creates **pending** `whirled2.friendRequests` (Accept/Decline/Retract; badge on Me→Friends). Multi-local-user: second account on this browser can Accept. **Invite Them!** share link + mailto. Occupant buddy invite = same modal path.
-- **Profile skins** (MySpace vibe): own profile → Customize look (near top) — presets publish instantly; body BG (color/gradient/image, repeat, fixed), module translucency, text/link colors, live preview then Publish. Stored as `whirled2.profileSkin.{userId}`; applied on full `.page.profile-page` via `applyProfileSkinDom`. Visitors see skins on other profiles. **No profile music** — room playlists already cover audio. ENGINE DEV: profile page chrome only; not `#stage-slot`.
+- **Profile look** (Whirled profile themes): own profile → Customize look — **presets always visible** (Classic / Night / Sunset / Paper / Tile Soft / Clear) publish instantly; Edit look for fine-tune (BG color/gradient/image, panel opacity, text/link colors). Stored as `whirled2.profileSkin.{userId}`; applied on full `.page.profile-page` via `applyProfileSkinDom`. Visitors see skins on other profiles. **No profile music** — room playlists already cover audio. ENGINE DEV: profile page chrome only; not `#stage-slot`.
 - **Me**: My News (Comments / Friendings / Status + empty Announcements / Trophies / Updated Rooms), People Online Now, My Friends Online; **Passport** (earnable stamps in Mingle/Play/Create/Shop via local actions + Group Medals shell; Go! jumps to tab); **Account** (permaname / display / member since); sidebar classics — **My Blocklist** (`whirled2.blocklist`), **My Galleries** (`whirled2.galleries`), **My Transactions** (label-only ledger `whirled2.transactions`), **Contests** (none running), **Share Whirled** (copy Pages URL). Coins labels only — no payments / no “Get Bars”.
 - **Rooms**: Featured / Active / Hot New / My Rooms tiles; Comment or rate + **room lock enforced locally** (`whirled2.roomLock.loft` `{ mode, ownerId }` — unlocked / friends / locked via `canEnterLoft`); **Decorate Room** shell places Stuff chips on a decorate layer (sibling of `#stage-slot`); layout in `whirled2.roomLayout.loft`. Take the Whirled Tour = local tips, not fake players.
 - **Groups** (wiki Group): local clubs with discussion forum + Enter hall (lobby/loft meta); create/join/leave; no fake default groups.
@@ -71,9 +71,11 @@ Stuff → Music accepts audio (MP3/WAV/OGG/WebM) as data URLs in `whirled2.stuff
 Help / gate / Club point to **Legal / Disclaimer**: no unauthorized copyrighted uploads; Whirled2 is inspired by public research / open-source references — not a redistribution of whirled.club / Three Rings proprietary assets; logos/UI are Whirled2 originals or user-supplied; prototypes subject to change; coins labels only.
 
 
-## Modern chrome (20260906m)
+## Modern chrome (20260906n)
 
-- **Ctrl/Cmd+K** command palette — jump Me/Mail/Friends/Stuff/Rooms/…, Enter loft, Clear chat, Themes.
+- **Ctrl/Cmd+K** command palette — jump Me/Mail/Notices/Friends/Stuff/Rooms/…, Enter loft, Clear chat, Themes.
 - **?** shortcuts overlay — F9, /, Esc, Ctrl+K, `/think` `/me` `/speak` `/away` `/back`.
+- Hash deep links: `#me/profile`, `#rooms`, `#mail`, `#stuff`, …
+- Chat name context menu; group chat tabs; Me → Notices.
 - Chat **reactions** (👍😂❤️🎉) on message id in `whirled2.chatReactions`.
 - Copy invite link (room + profile). Recently visited strip on Rooms lobby. Presence pulse on online dots.

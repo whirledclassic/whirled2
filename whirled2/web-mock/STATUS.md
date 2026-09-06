@@ -2,20 +2,21 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906m)
+## What shipped (?v=20260906n)
 
-- **Friend requests lifecycle**: `whirled2.friendRequests` pending → Accept (mutual friends via per-user `whirled2.friends.{id}`) / Decline / Retract. Profile + Me→Friends Requests section + badge. Multi-local-user: register a second account on this browser to Accept. Still mails “Let’s be buddies!” — does **not** auto-add until Accept.
-- **Chat tabs**: Room (blue) + Private (orange) PM tabs; unread glimmer; Friends toolbar popup → Whisper / Profile / Join; `/clear` per tab; orange PM input tint; `whirled2.chatTabs` + `whirled2.pm.{a}:{b}`.
-- **Notices**: login/logout / friend presence approx / blue mail & friend-accepted.
-- **Go menu**: recent rooms (`whirled2.recentRooms`, max 8) + Home + Friends online shortcuts.
-- **Mail**: unread blue highlight; Select All + Delete Selected; Stuff **Send as Gift** moves item once (`giftItem` / `giftClaimed`).
-- **Modern**: Ctrl/Cmd+K command palette; `?` shortcuts overlay; chat reactions; copy invite link; recently visited strip; presence pulse; tab fade (reduced-motion safe); `/away` `/back` stubs.
-- Room menu: View items / snapshot stub / zoom stub.
-- Prior: profile skins (no music), room lock, stage bubbles, passport.
+- **Profile look fix**: presets (Classic / Night / Sunset / Paper / Tile Soft / Clear) always visible on My Profile — instant publish without opening Edit look. Night uses light text/links on dark gradient; Clear restores plain paper. `.page` uses `background-color` so skin shorthand wins; double `requestAnimationFrame` re-apply after paint. Profile look naming only (no third-party skin branding).
+- **Chat name menu**: click underlined speaker → Profile / Whisper / Invite friend / Block.
+- **Notices page**: Me → Notices (+ header bell count); mark-read / mark-all; friend login, mail, friend request kinds.
+- **Group chat tabs**: Chat Options → Groups opens bluish-gray group tab (`whirled2.groupChat.{groupId}`); unread glimmer.
+- **Hangout invites**: leaving loft (when others visited) → optional "Invite people you hung out with?" (real occupants only).
+- **Room View items**: decorate chips + playlist track names from local data.
+- **Hash routes**: `#me/profile`, `#rooms`, `#mail`, etc. on boot + tab change.
+- **Mail Follow up** compose prefill; My News friend-accepted rows.
+- Prior: friend requests, Room/PM tabs, Ctrl+K, gift mail, room lock, passport.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906m
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906n
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
