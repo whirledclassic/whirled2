@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906e";
+  var LOGO_V = "20260906f";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1770,7 +1770,6 @@ function helpPage() {
       +     '<div class="stage-host">'
       +       '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
       +       decorateLayerHtml()
-      +       '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       +     '</div>'
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
       +     '</div>'
@@ -2848,6 +2847,10 @@ function helpPage() {
       +   '</div>'
       + '</header>'
       + '<div id="main"></div>'
+      // How this works: chat overlay sits on #app (not inside #main). Phones scroll #main;
+      // fixed bubbles inside a scrolling main become a clipped thin strip. Sibling of the
+      // send bar keeps the hood readable above the keyboard/input.
+      + '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       + '<form class="bar" id="chat-form">'
       +   '<div class="chat-opts-wrap">'
       +   '<button type="button" class="chat-opts" id="chat-opts-btn" title="Chat options" aria-label="Chat options" data-chat-opts="1">&#9679;</button>'
@@ -3020,6 +3023,14 @@ function helpPage() {
     var show = !!(session() && tab === "rooms" && inRoom);
     var bar = document.getElementById("chat-form");
     if (bar) bar.style.display = show ? "" : "none";
+    // How this works: overlay lives on #app now — hide it whenever the chat bar is off
+    // (lobby / Me / Stuff) so bubbles don't float over other pages.
+    var ov = document.getElementById("chat-overlay");
+    if (ov && !show) {
+      ov.hidden = true;
+      ov.classList.add("is-empty");
+      ov.innerHTML = "";
+    }
     var menu = document.getElementById("chat-opts-menu");
     if (menu && !show) { menu.hidden = true; chatOptsOpen = false; }
   }
