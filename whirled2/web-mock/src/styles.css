@@ -607,44 +607,80 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 
 /* Classic Whirled profile layout */
 /* ---- Classic profile layout ---- */
-/* How this works: .profile-skin wraps .classic-profile for MySpace-like BGs.
-   ENGINE DEV: profile chrome ≠ #stage-slot — engine ignores profile skins.
-   Pale-blue topbar/tabs stay on the outer chrome; only the profile card area skins. */
-.profile-skin {
-  min-height: 420px;
-  border-radius: 10px;
-  padding: 12px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+/* How this works: skin fills entire .page.profile-page (MySpace body BG), modules translucent.
+   ENGINE DEV: profile page chrome only; not #stage-slot — engine ignores profile skins. */
+.page.profile-page {
+  min-height: calc(100vh - 120px);
+  background-color: var(--paper);
+  background-position: center top;
   box-sizing: border-box;
+}
+.page.profile-page.has-profile-skin {
+  /* override --paper fill so gradient/image/color shows across the whole profile page */
+  background-color: transparent;
+  --paper: transparent;
+}
+.page.profile-page .me-subnav {
+  /* stay readable over busy BGs */
+  background: linear-gradient(#4a90b8, #2f6f96);
+  box-shadow: 0 2px 8px rgba(10, 40, 70, 0.25);
+  position: relative;
+  z-index: 2;
+}
+.profile-skin {
+  min-height: 520px;
+  border-radius: 0;
+  padding: 4px 0 24px;
+  box-sizing: border-box;
+  background: transparent;
 }
 .profile-skin .classic-profile {
   max-width: 920px;
 }
-.profile-skin .cp-header,
-.profile-skin .cp-section,
-.profile-skin .cp-meta-box,
-.profile-skin .cp-edit-panel {
-  background: var(--profile-panel, rgba(255, 255, 255, 0.92));
+.has-profile-skin .cp-header,
+.has-profile-skin .cp-section,
+.has-profile-skin .cp-meta-box,
+.has-profile-skin .cp-edit-panel {
+  background: var(--profile-panel, rgba(255, 255, 255, 0.82));
   border-color: color-mix(in srgb, var(--profile-accent, #1e6fa8) 35%, #c5deee);
+  color: var(--profile-text, #16324a);
 }
-.profile-skin .cp-header {
-  background: var(--profile-panel, rgba(255, 255, 255, 0.92));
+.has-profile-skin .cp-header {
+  background: var(--profile-panel, rgba(255, 255, 255, 0.82));
 }
-.profile-skin .cp-name,
-.profile-skin .cp-section h2,
-.profile-skin .cp-edit-head,
-.profile-skin .edit-link {
+.has-profile-skin .cp-name,
+.has-profile-skin .cp-section h2,
+.has-profile-skin .cp-edit-head,
+.has-profile-skin .edit-link {
   color: var(--profile-accent, #1e6fa8);
 }
-.profile-skin .cp-motto {
+.has-profile-skin .cp-status,
+.has-profile-skin .cp-motto,
+.has-profile-skin .info-preview,
+.has-profile-skin .meta,
+.has-profile-skin .wall-row,
+.has-profile-skin .news-row {
+  color: var(--profile-text, #16324a);
+}
+.has-profile-skin a,
+.has-profile-skin .text-btn,
+.has-profile-skin .edit-link {
+  color: var(--profile-link, #1e6fa8);
+}
+.has-profile-skin .cp-motto {
+  margin: 2px 0 8px;
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.95;
+}
+.cp-motto {
   margin: 2px 0 8px;
   font-size: 13px;
   font-style: italic;
   color: #16324a;
   opacity: 0.9;
 }
+.cp-customize { margin-top: 4px; }
 .skin-form {
   display: grid;
   grid-template-columns: 1fr 1fr;

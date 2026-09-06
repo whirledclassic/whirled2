@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906k";
+  var LOGO_V = "20260906l";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1996,68 +1996,114 @@ function helpPage() {
   // ENGINE DEV: profile chrome ≠ #stage-slot. The engine ignores profile skins entirely;
   // do not read these keys from Pixi / WhirledChrome.
   // ---------------------------------------------------------------------------
+  // How this works: presets + schema for MySpace-like Customize Profile (BG/modules/text/links).
+  // ENGINE DEV: profile page chrome only; not #stage-slot — engine ignores profile skins.
+  var PROFILE_SKIN_TILE_SOFT = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%23e8f4fb'/%3E%3Ccircle cx='4' cy='4' r='1.5' fill='%23a8c8e0' opacity='0.55'/%3E%3Ccircle cx='16' cy='14' r='1.2' fill='%2390b8d8' opacity='0.4'/%3E%3C/svg%3E";
   var PROFILE_SKIN_PRESETS = {
-    classic: { bgType: "gradient", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "", accent: "#1e6fa8", panelAlpha: 0.92, motto: "" },
-    night:   { bgType: "gradient", bgColor: "#1a2433", bgColor2: "#2c3e55", bgImage: "", accent: "#7ec8f0", panelAlpha: 0.88, motto: "" },
-    sunset:  { bgType: "gradient", bgColor: "#ffb347", bgColor2: "#ff6b8a", bgImage: "", accent: "#b33b1e", panelAlpha: 0.90, motto: "" },
-    paper:   { bgType: "color", bgColor: "#f4efe6", bgColor2: "#ffffff", bgImage: "", accent: "#6b5b4a", panelAlpha: 0.95, motto: "" },
-    clear:   { bgType: "none", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "", accent: "#1e6fa8", panelAlpha: 0.92, motto: "" }
+    classic: {
+      bgType: "gradient", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
+      panelAlpha: 0.82, motto: ""
+    },
+    night: {
+      bgType: "gradient", bgColor: "#1a2433", bgColor2: "#2c3e55", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#1a6a9a", textColor: "#16324a", linkColor: "#1e6fa8",
+      panelAlpha: 0.78, motto: ""
+    },
+    sunset: {
+      bgType: "gradient", bgColor: "#ffb347", bgColor2: "#ff6b8a", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#b33b1e", textColor: "#3a1a12", linkColor: "#8a2810",
+      panelAlpha: 0.80, motto: ""
+    },
+    paper: {
+      bgType: "color", bgColor: "#f4efe6", bgColor2: "#ffffff", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#6b5b4a", textColor: "#3a3228", linkColor: "#6b5b4a",
+      panelAlpha: 0.88, motto: ""
+    },
+    tileSoft: {
+      bgType: "image", bgColor: "#e8f4fb", bgColor2: "#ffffff", bgImage: PROFILE_SKIN_TILE_SOFT,
+      bgRepeat: "repeat", bgAttachment: "scroll",
+      accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
+      panelAlpha: 0.82, motto: ""
+    },
+    clear: {
+      bgType: "none", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
+      panelAlpha: 0.82, motto: ""
+    }
   };
   var PROFILE_BG_MAX_WARN = 400 * 1024;   // soft warn ~400KB
   var PROFILE_BG_MAX_HARD = 900 * 1024;   // reject huge uploads
   function defaultProfileSkin() {
+    // How this works: demos show Classic Blue so the page isn't blank; Clear preset → none.
     return {
-      bgType: "none",
+      bgType: "gradient",
       bgColor: "#cfe6f5",
       bgColor2: "#ffffff",
       bgImage: "",
+      bgRepeat: "cover",
+      bgAttachment: "scroll",
       accent: "#1e6fa8",
-      panelAlpha: 0.92,
+      textColor: "#16324a",
+      linkColor: "#1e6fa8",
+      panelAlpha: 0.82,
       motto: ""
     };
   }
+  function normalizeBgRepeat(v) {
+    v = String(v || "cover");
+    if (v === "cover" || v === "no-repeat" || v === "repeat" || v === "repeat-x" || v === "repeat-y") return v;
+    return "cover";
+  }
+  function normalizeBgAttachment(v) {
+    v = String(v || "scroll");
+    return v === "fixed" ? "fixed" : "scroll";
+  }
+  function clampPanelAlpha(alpha, fallback) {
+    alpha = Number(alpha);
+    if (!(alpha >= 0.55 && alpha <= 1)) return fallback != null ? fallback : 0.82;
+    return alpha;
+  }
+  function normalizeProfileSkin(s) {
+    var d = defaultProfileSkin();
+    s = s || {};
+    var bgType = s.bgType || d.bgType;
+    if (bgType !== "none" && bgType !== "color" && bgType !== "gradient" && bgType !== "image") bgType = "none";
+    return {
+      bgType: bgType,
+      bgColor: String(s.bgColor || d.bgColor).slice(0, 32),
+      bgColor2: String(s.bgColor2 || d.bgColor2).slice(0, 32),
+      bgImage: String(s.bgImage || "").slice(0, 1200000),
+      bgRepeat: normalizeBgRepeat(s.bgRepeat != null ? s.bgRepeat : d.bgRepeat),
+      bgAttachment: normalizeBgAttachment(s.bgAttachment != null ? s.bgAttachment : d.bgAttachment),
+      accent: String(s.accent || d.accent).slice(0, 32),
+      textColor: String(s.textColor || d.textColor).slice(0, 32),
+      linkColor: String(s.linkColor || d.linkColor).slice(0, 32),
+      panelAlpha: clampPanelAlpha(s.panelAlpha, d.panelAlpha),
+      motto: String(s.motto || "").slice(0, 80)
+    };
+  }
   function loadProfileSkin(userId) {
-    // How this works: missing / bad JSON → default (no custom background).
+    // How this works: missing / bad JSON → Classic demo default (visible BG); Clear stores none.
     try {
       var raw = localStorage.getItem(PROFILE_SKIN_KEY + userId);
       if (!raw) return defaultProfileSkin();
       var s = JSON.parse(raw);
       if (!s || typeof s !== "object") return defaultProfileSkin();
-      var d = defaultProfileSkin();
-      var bgType = s.bgType || d.bgType;
-      if (bgType !== "none" && bgType !== "color" && bgType !== "gradient" && bgType !== "image") bgType = "none";
-      var alpha = Number(s.panelAlpha);
-      if (!(alpha >= 0.7 && alpha <= 1)) alpha = d.panelAlpha;
-      return {
-        bgType: bgType,
-        bgColor: String(s.bgColor || d.bgColor).slice(0, 32),
-        bgColor2: String(s.bgColor2 || d.bgColor2).slice(0, 32),
-        bgImage: String(s.bgImage || "").slice(0, 1200000),
-        accent: String(s.accent || d.accent).slice(0, 32),
-        panelAlpha: alpha,
-        motto: String(s.motto || "").slice(0, 80)
-      };
+      return normalizeProfileSkin(s);
     } catch (e) { return defaultProfileSkin(); }
   }
   function saveProfileSkin(userId, skin) {
     // How this works: normalize + cap motto; drop huge bgImage if somehow oversized.
-    var d = defaultProfileSkin();
-    skin = skin || d;
-    var bgType = skin.bgType || "none";
-    if (bgType !== "none" && bgType !== "color" && bgType !== "gradient" && bgType !== "image") bgType = "none";
-    var alpha = Number(skin.panelAlpha);
-    if (!(alpha >= 0.7 && alpha <= 1)) alpha = 0.92;
-    var out = {
-      bgType: bgType,
-      bgColor: String(skin.bgColor || d.bgColor).slice(0, 32),
-      bgColor2: String(skin.bgColor2 || d.bgColor2).slice(0, 32),
-      bgImage: bgType === "image" ? String(skin.bgImage || "").slice(0, 1200000) : "",
-      accent: String(skin.accent || d.accent).slice(0, 32),
-      panelAlpha: alpha,
-      motto: String(skin.motto || "").slice(0, 80)
-    };
+    var out = normalizeProfileSkin(skin);
+    if (out.bgType !== "image") out.bgImage = "";
+    else out.bgImage = String(out.bgImage || "").slice(0, 1200000);
     try { localStorage.setItem(PROFILE_SKIN_KEY + userId, JSON.stringify(out)); } catch (e) {
-      // Quota — retry without image
       try {
         out.bgImage = "";
         if (out.bgType === "image") out.bgType = "color";
@@ -2066,27 +2112,110 @@ function helpPage() {
     }
     return out;
   }
-  function profileSkinStyleAttr(skin) {
-    // How this works: inline style for .profile-skin wrapper (CSS vars + background).
-    skin = skin || defaultProfileSkin();
-    var alpha = Number(skin.panelAlpha);
-    if (!(alpha >= 0.7 && alpha <= 1)) alpha = 0.92;
-    var parts = [];
-    parts.push("--profile-accent:" + String(skin.accent || "#1e6fa8"));
-    parts.push("--profile-panel:rgba(255,255,255," + alpha + ")");
+  function applyProfileSkinDom(userId, draftSkin) {
+    // How this works: set BG + CSS vars on .page.profile-page via el.style (not HTML esc / data-URL attrs).
+    // ENGINE DEV: profile page chrome only; not #stage-slot.
+    var skin = draftSkin ? normalizeProfileSkin(draftSkin) : loadProfileSkin(userId);
+    var page = document.querySelector(".page.profile-page") || document.querySelector(".profile-skin");
+    if (!page) return;
+    var alpha = clampPanelAlpha(skin.panelAlpha, 0.82);
+    page.style.setProperty("--profile-accent", String(skin.accent || "#1e6fa8"));
+    page.style.setProperty("--profile-panel", "rgba(255,255,255," + alpha + ")");
+    page.style.setProperty("--profile-text", String(skin.textColor || "#16324a"));
+    page.style.setProperty("--profile-link", String(skin.linkColor || "#1e6fa8"));
+    // Reset BG props first
+    page.style.backgroundColor = "";
+    page.style.backgroundImage = "";
+    page.style.backgroundSize = "";
+    page.style.backgroundRepeat = "";
+    page.style.backgroundAttachment = "";
+    page.style.backgroundPosition = "";
+    var has = skin.bgType && skin.bgType !== "none";
+    page.classList.toggle("has-profile-skin", !!has);
+    if (!has) return;
+    page.style.backgroundAttachment = skin.bgAttachment === "fixed" ? "fixed" : "scroll";
+    page.style.backgroundPosition = "center top";
     if (skin.bgType === "color") {
-      parts.push("background-color:" + String(skin.bgColor || "#cfe6f5"));
+      page.style.backgroundColor = String(skin.bgColor || "#cfe6f5");
+      page.style.backgroundImage = "none";
     } else if (skin.bgType === "gradient") {
-      parts.push("background-image:linear-gradient(160deg," + String(skin.bgColor || "#cfe6f5") + "," + String(skin.bgColor2 || "#ffffff") + ")");
+      page.style.backgroundColor = String(skin.bgColor || "#cfe6f5");
+      page.style.backgroundImage = "linear-gradient(160deg," + String(skin.bgColor || "#cfe6f5") + "," + String(skin.bgColor2 || "#ffffff") + ")";
+      page.style.backgroundSize = "cover";
+      page.style.backgroundRepeat = "no-repeat";
     } else if (skin.bgType === "image" && skin.bgImage) {
-      // Data URLs are base64 — escape double quotes only for the url("…") form.
-      var url = String(skin.bgImage).replace(/\\/g, "").replace(/"/g, "");
-      parts.push("background-image:url(\"" + url + "\")");
-      parts.push("background-size:cover");
-      parts.push("background-position:center");
-      parts.push("background-repeat:no-repeat");
+      // JSON-safe url() — never HTML-escape huge data URLs into attributes
+      // How this works: set image BG via el.style — never put huge data-URLs through HTML esc().
+      var rawUrl = String(skin.bgImage).replace(/\\/g, "").replace(/"/g, "").replace(/'/g, "");
+      page.style.backgroundImage = 'url("' + rawUrl + '")';
+      var rep = normalizeBgRepeat(skin.bgRepeat);
+      if (rep === "cover") {
+        page.style.backgroundSize = "cover";
+        page.style.backgroundRepeat = "no-repeat";
+      } else {
+        page.style.backgroundSize = "auto";
+        page.style.backgroundRepeat = rep;
+      }
+      page.style.backgroundColor = String(skin.bgColor || "#cfe6f5");
     }
-    return parts.join(";");
+  }
+  function readSkinFormDraft(form) {
+    // How this works: live preview draft from open Customize look form (not persisted until Save / preset).
+    if (!form) return null;
+    var prev = session() ? loadProfileSkin(session().user.id) : defaultProfileSkin();
+    var bgType = String((form.bgType && form.bgType.value) || "none");
+    var bgImage = "";
+    if (bgType === "image") {
+      if (window.__skinBgPending) bgImage = String(window.__skinBgPending);
+      else if (form.keepImage && String(form.keepImage.value) === "1") bgImage = prev.bgImage || "";
+    }
+    return normalizeProfileSkin({
+      bgType: bgType,
+      bgColor: form.bgColor ? form.bgColor.value : prev.bgColor,
+      bgColor2: form.bgColor2 ? form.bgColor2.value : prev.bgColor2,
+      bgImage: bgImage,
+      bgRepeat: form.bgRepeat ? form.bgRepeat.value : prev.bgRepeat,
+      bgAttachment: form.bgAttachment ? form.bgAttachment.value : prev.bgAttachment,
+      accent: form.accent ? form.accent.value : prev.accent,
+      textColor: form.textColor ? form.textColor.value : prev.textColor,
+      linkColor: form.linkColor ? form.linkColor.value : prev.linkColor,
+      panelAlpha: form.panelAlpha ? form.panelAlpha.value : prev.panelAlpha,
+      motto: form.motto ? form.motto.value : prev.motto
+    });
+  }
+  function fillSkinFormFromPreset(form, preset) {
+    if (!form || !preset) return;
+    form.bgType.value = preset.bgType;
+    form.bgColor.value = preset.bgColor;
+    form.bgColor2.value = preset.bgColor2;
+    form.accent.value = preset.accent;
+    if (form.textColor) form.textColor.value = preset.textColor || "#16324a";
+    if (form.linkColor) form.linkColor.value = preset.linkColor || "#1e6fa8";
+    if (form.bgColorPicker) form.bgColorPicker.value = preset.bgColor;
+    if (form.bgColor2Picker) form.bgColor2Picker.value = preset.bgColor2;
+    if (form.accentPicker) form.accentPicker.value = preset.accent;
+    if (form.textColorPicker) form.textColorPicker.value = preset.textColor || "#16324a";
+    if (form.linkColorPicker) form.linkColorPicker.value = preset.linkColor || "#1e6fa8";
+    if (form.bgRepeat) form.bgRepeat.value = normalizeBgRepeat(preset.bgRepeat);
+    if (form.bgAttachment) form.bgAttachment.value = normalizeBgAttachment(preset.bgAttachment);
+    var a = Number(preset.panelAlpha);
+    if (form.panelAlpha) {
+      if (a >= 0.95) form.panelAlpha.value = "1";
+      else if (a >= 0.85) form.panelAlpha.value = "0.88";
+      else if (a >= 0.7) form.panelAlpha.value = "0.82";
+      else form.panelAlpha.value = "0.65";
+    }
+    if (preset.bgType === "image" && preset.bgImage) {
+      window.__skinBgPending = preset.bgImage;
+      if (form.keepImage) form.keepImage.value = "0";
+      var hidP = document.getElementById("skin-bg-data");
+      if (hidP) hidP.value = "pending";
+    } else if (preset.bgType === "none" || preset.bgType !== "image") {
+      window.__skinBgPending = "";
+      if (form.keepImage) form.keepImage.value = "0";
+      var hidC = document.getElementById("skin-bg-data");
+      if (hidC) hidC.value = "";
+    }
   }
   function loadPokes() {
     try { return JSON.parse(localStorage.getItem(POKE_KEY) || "{}"); } catch (e) { return {}; }
@@ -2484,7 +2613,7 @@ function helpPage() {
         + (open ? "Done" : ("Edit " + label)) + '</button>';
     }
     return '<section class="page me-page profile-page">' + meSubnav()
-      + '<div class="profile-skin" style="' + esc(profileSkinStyleAttr(skin)) + '">'
+      + '<div class="profile-skin">'
       + '<div class="classic-profile">'
       +   '<div class="cp-header">'
       +     '<div class="cp-photo">' + photoHtml
@@ -2522,6 +2651,71 @@ function helpPage() {
             +     '<input type="file" id="photo-input" accept="image/*" hidden /></label>'
             +   '<p class="meta" id="photo-edit-msg"></p></div>')
           : '')
+      +   '<div class="cp-section cp-customize"><div class="cp-section-head"><h2>Customize look</h2>'
+      +     editToggle("skin", "look") + '</div>'
+      +     '<p class="meta">MySpace-style themes for visitors: background, module boxes, text &amp; link colors. Preview live, then Publish. No profile music — use room playlists.</p>'
+      +     (skin.motto ? ('<p class="cp-motto-preview"><i>' + esc(skin.motto) + '</i></p>') : '')
+      +     (editSkin
+            ? ('<div class="cp-edit-panel is-open" id="edit-skin-panel">'
+              +   '<div class="cp-edit-head"><b>Customize Profile</b>'
+              +     '<button type="button" class="text-btn" data-profile-edit-cancel="1">Cancel</button></div>'
+              +   '<form class="skin-form" id="skin-form">'
+              +     '<div class="section-label">Presets (publish immediately)</div>'
+              +     '<div class="skin-presets">'
+              +       '<button type="button" class="action-btn" data-skin-preset="classic">Classic</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="night">Night</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="sunset">Sunset</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="paper">Paper</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="tileSoft">Tile Soft</button>'
+              +       '<button type="button" class="action-btn" data-skin-preset="clear">Clear</button>'
+              +     '</div>'
+              +     '<label>Background type <select name="bgType">'
+              +       '<option value="none"' + (skin.bgType === "none" ? " selected" : "") + '>None</option>'
+              +       '<option value="color"' + (skin.bgType === "color" ? " selected" : "") + '>Solid color</option>'
+              +       '<option value="gradient"' + (skin.bgType === "gradient" ? " selected" : "") + '>Gradient</option>'
+              +       '<option value="image"' + (skin.bgType === "image" ? " selected" : "") + '>Image</option>'
+              +     '</select></label>'
+              +     '<label>Background color <input type="color" name="bgColorPicker" value="' + esc(skin.bgColor || "#cfe6f5") + '" />'
+              +       '<input name="bgColor" maxlength="32" value="' + esc(skin.bgColor || "#cfe6f5") + '" /></label>'
+              +     '<label>Gradient end <input type="color" name="bgColor2Picker" value="' + esc(skin.bgColor2 || "#ffffff") + '" />'
+              +       '<input name="bgColor2" maxlength="32" value="' + esc(skin.bgColor2 || "#ffffff") + '" /></label>'
+              +     '<label>Background repeat <select name="bgRepeat">'
+              +       '<option value="cover"' + (skin.bgRepeat === "cover" ? " selected" : "") + '>Cover</option>'
+              +       '<option value="no-repeat"' + (skin.bgRepeat === "no-repeat" ? " selected" : "") + '>No repeat</option>'
+              +       '<option value="repeat"' + (skin.bgRepeat === "repeat" ? " selected" : "") + '>Tile</option>'
+              +       '<option value="repeat-x"' + (skin.bgRepeat === "repeat-x" ? " selected" : "") + '>Tile horizontal</option>'
+              +       '<option value="repeat-y"' + (skin.bgRepeat === "repeat-y" ? " selected" : "") + '>Tile vertical</option>'
+              +     '</select></label>'
+              +     '<label>Background scroll <select name="bgAttachment">'
+              +       '<option value="scroll"' + (skin.bgAttachment !== "fixed" ? " selected" : "") + '>Scroll with page</option>'
+              +       '<option value="fixed"' + (skin.bgAttachment === "fixed" ? " selected" : "") + '>Fixed</option>'
+              +     '</select></label>'
+              +     '<label>Accent <input type="color" name="accentPicker" value="' + esc(skin.accent || "#1e6fa8") + '" />'
+              +       '<input name="accent" maxlength="32" value="' + esc(skin.accent || "#1e6fa8") + '" /></label>'
+              +     '<label>Text color <input type="color" name="textColorPicker" value="' + esc(skin.textColor || "#16324a") + '" />'
+              +       '<input name="textColor" maxlength="32" value="' + esc(skin.textColor || "#16324a") + '" /></label>'
+              +     '<label>Link color <input type="color" name="linkColorPicker" value="' + esc(skin.linkColor || "#1e6fa8") + '" />'
+              +       '<input name="linkColor" maxlength="32" value="' + esc(skin.linkColor || "#1e6fa8") + '" /></label>'
+              +     '<label>Panel opacity <select name="panelAlpha">'
+              +       '<option value="1"' + (Number(skin.panelAlpha) >= 0.95 ? " selected" : "") + '>Solid</option>'
+              +       '<option value="0.88"' + (Number(skin.panelAlpha) < 0.95 && Number(skin.panelAlpha) >= 0.85 ? " selected" : "") + '>Soft</option>'
+              +       '<option value="0.82"' + (Number(skin.panelAlpha) < 0.85 && Number(skin.panelAlpha) >= 0.72 ? " selected" : "") + '>Airy (default)</option>'
+              +       '<option value="0.65"' + (Number(skin.panelAlpha) < 0.72 ? " selected" : "") + '>Very clear</option>'
+              +     '</select></label>'
+              +     '<label>Motto <input name="motto" maxlength="80" placeholder="Short blurb under status" value="' + esc(skin.motto || "") + '" /></label>'
+              +     '<label class="skin-bg-file">Background image (png/jpg/gif/webp)'
+              +       '<input type="file" id="skin-bg-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+              +     '<p class="meta">Only upload images you have rights to (same spirit as Stuff). ~400KB warn; huge files rejected. Stored as a data URL in this browser.</p>'
+              +     (skin.bgImage ? '<p class="meta">Current image saved. Choose Clear or Background type → None to remove.</p>' : '')
+              +     '<input type="hidden" name="bgImage" id="skin-bg-data" value="" />'
+              +     '<input type="hidden" name="keepImage" value="' + (skin.bgImage ? "1" : "0") + '" />'
+              +     '<div class="cp-edit-actions"><button type="submit">Publish look</button>'
+              +       '<button type="button" class="text-btn" data-profile-edit-cancel="1">Done</button></div>'
+              +     '<p class="meta" id="skin-msg"></p>'
+              +   '</form></div>')
+            : '')
+      +   '</div>'
+
       +   '<div class="cp-section"><div class="cp-section-head"><h2>Information</h2>'
       +     editToggle("info", "information") + '</div>'
       +     '<div class="info-preview">' + infoRows(Object.assign({}, info, { about: info.about || me.bio })) + '</div>'
@@ -2551,53 +2745,6 @@ function helpPage() {
       +   '<div class="cp-section"><h2>Comments</h2>'
       +     '<form class="wall-form" id="wall-form"><input name="text" maxlength="240" placeholder="Leave a comment" required /><button type="submit">Post</button></form>'
       +     '<div id="wall-list">' + wallHtml + '</div></div>'
-      +   '<div class="cp-section"><div class="cp-section-head"><h2>Look &amp; background</h2>'
-      +     editToggle("skin", "look") + '</div>'
-      +     '<p class="meta">MySpace-style profile background for visitors. No profile music — use room playlists for audio.</p>'
-      +     (skin.motto ? ('<p class="cp-motto-preview"><i>' + esc(skin.motto) + '</i></p>') : '<p class="meta">No motto set.</p>')
-      +     (editSkin
-            ? ('<div class="cp-edit-panel is-open" id="edit-skin-panel">'
-              +   '<div class="cp-edit-head"><b>Edit look &amp; background</b>'
-              +     '<button type="button" class="text-btn" data-profile-edit-cancel="1">Cancel</button></div>'
-              +   '<form class="skin-form" id="skin-form">'
-              +     '<div class="section-label">Presets</div>'
-              +     '<div class="skin-presets">'
-              +       '<button type="button" class="action-btn" data-skin-preset="classic">Classic Blue</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="night">Night</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="sunset">Sunset</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="paper">Soft Paper</button>'
-              +       '<button type="button" class="action-btn" data-skin-preset="clear">Clear (none)</button>'
-              +     '</div>'
-              +     '<label>Background type <select name="bgType">'
-              +       '<option value="none"' + (skin.bgType === "none" ? " selected" : "") + '>None</option>'
-              +       '<option value="color"' + (skin.bgType === "color" ? " selected" : "") + '>Solid color</option>'
-              +       '<option value="gradient"' + (skin.bgType === "gradient" ? " selected" : "") + '>Gradient</option>'
-              +       '<option value="image"' + (skin.bgType === "image" ? " selected" : "") + '>Image</option>'
-              +     '</select></label>'
-              +     '<label>Background color <input type="color" name="bgColorPicker" value="' + esc(skin.bgColor || "#cfe6f5") + '" />'
-              +       '<input name="bgColor" maxlength="32" value="' + esc(skin.bgColor || "#cfe6f5") + '" /></label>'
-              +     '<label>Gradient end <input type="color" name="bgColor2Picker" value="' + esc(skin.bgColor2 || "#ffffff") + '" />'
-              +       '<input name="bgColor2" maxlength="32" value="' + esc(skin.bgColor2 || "#ffffff") + '" /></label>'
-              +     '<label>Accent <input type="color" name="accentPicker" value="' + esc(skin.accent || "#1e6fa8") + '" />'
-              +       '<input name="accent" maxlength="32" value="' + esc(skin.accent || "#1e6fa8") + '" /></label>'
-              +     '<label>Panel opacity <select name="panelAlpha">'
-              +       '<option value="1"' + (Number(skin.panelAlpha) >= 0.98 ? " selected" : "") + '>Solid</option>'
-              +       '<option value="0.92"' + (Number(skin.panelAlpha) < 0.98 && Number(skin.panelAlpha) >= 0.85 ? " selected" : "") + '>Soft</option>'
-              +       '<option value="0.78"' + (Number(skin.panelAlpha) < 0.85 ? " selected" : "") + '>Airy</option>'
-              +     '</select></label>'
-              +     '<label>Motto <input name="motto" maxlength="80" placeholder="Short blurb under status" value="' + esc(skin.motto || "") + '" /></label>'
-              +     '<label class="skin-bg-file">Background image (png/jpg/gif/webp)'
-              +       '<input type="file" id="skin-bg-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
-              +     '<p class="meta">Only upload images you have rights to (same spirit as Stuff). ~400KB warn; huge files rejected. Stored as a data URL in this browser.</p>'
-              +     (skin.bgImage ? '<p class="meta">Current image saved. Choose Clear preset or Background type → None to remove.</p>' : '')
-              +     '<input type="hidden" name="bgImage" id="skin-bg-data" value="" />'
-              +     '<input type="hidden" name="keepImage" value="' + (skin.bgImage ? "1" : "0") + '" />'
-              +     '<div class="cp-edit-actions"><button type="submit">Save look</button>'
-              +       '<button type="button" class="text-btn" data-profile-edit-cancel="1">Done</button></div>'
-              +     '<p class="meta" id="skin-msg"></p>'
-              +   '</form></div>')
-            : '')
-      +   '</div>'
       +   '<div class="cp-section"><h2>Pokes</h2>' + (pokes.length ? pokes.map(function (p) {
             return '<div class="meta">Poked by <b>' + esc(p.from) + '</b> · ' + esc((p.at || "").slice(0, 16).replace("T", " ")) + '</div>';
           }).join("") : '<p class="meta">No pokes yet.</p>') + '</div>'
@@ -2873,8 +3020,8 @@ function helpPage() {
     var photo = localStorage.getItem("whirled2.photo." + id) || "";
     var wall = loadWall(id);
     var info = loadInfo(id);
-    // How this works: visitors see this player's saved profile skin immediately.
-    // ENGINE DEV: still Me chrome only — engine ignores profile skins.
+    // How this works: visitors see this player's saved profile skin via applyProfileSkinDom after paint.
+    // ENGINE DEV: profile page chrome only; not #stage-slot.
     var skin = loadProfileSkin(id);
     var photoHtml = photo
       ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
@@ -2887,7 +3034,7 @@ function helpPage() {
     var member = "";
     try { member = localStorage.getItem("whirled2.since." + id) || ""; } catch (e) {}
     return '<section class="page me-page profile-page">' + meSubnav()
-      + '<div class="profile-skin" style="' + esc(profileSkinStyleAttr(skin)) + '">'
+      + '<div class="profile-skin">'
       + '<div class="classic-profile">'
       +   '<div class="cp-header">'
       +     '<div class="cp-photo">' + photoHtml + '</div>'
@@ -3312,6 +3459,16 @@ function helpPage() {
     try { ensureStagePlaceholder(); } catch (e) {}
     try { if (decorateMode) bindDecorateDrag(); } catch (e) {}
     try { syncRoomAudio(); } catch (e) {}
+    // How this works: after paint, apply profile skin on .page.profile-page via DOM styles.
+    // ENGINE DEV: profile page chrome only; not #stage-slot.
+    try {
+      if (tab === "me" && session()) {
+        var skinUid = null;
+        if (viewingId && viewingId !== session().user.id) skinUid = viewingId;
+        else if (meSub === "profile") skinUid = session().user.id;
+        if (skinUid) applyProfileSkinDom(skinUid);
+      }
+    } catch (eSkin) {}
   }
   function ensureStagePlaceholder() {
     var slot = document.getElementById("stage-slot");
@@ -4757,30 +4914,23 @@ function helpPage() {
     }
     var skinPreset = ev.target.closest("[data-skin-preset]");
     if (skinPreset && session()) {
-      // How this works: preset buttons fill the Look & background form (Save still required).
+      // How this works: preset click = Publish immediately (save + repaint), MySpace-style.
+      // ENGINE DEV: profile page chrome only; not #stage-slot.
       var pid = skinPreset.getAttribute("data-skin-preset");
       var preset = PROFILE_SKIN_PRESETS[pid];
-      var formP = document.getElementById("skin-form");
-      if (preset && formP) {
-        formP.bgType.value = preset.bgType;
-        formP.bgColor.value = preset.bgColor;
-        formP.bgColor2.value = preset.bgColor2;
-        formP.accent.value = preset.accent;
-        if (formP.bgColorPicker) formP.bgColorPicker.value = preset.bgColor;
-        if (formP.bgColor2Picker) formP.bgColor2Picker.value = preset.bgColor2;
-        if (formP.accentPicker) formP.accentPicker.value = preset.accent;
-        var a = String(preset.panelAlpha);
-        if (a === "1" || Number(preset.panelAlpha) >= 0.98) formP.panelAlpha.value = "1";
-        else if (Number(preset.panelAlpha) < 0.85) formP.panelAlpha.value = "0.78";
-        else formP.panelAlpha.value = "0.92";
-        if (preset.bgType === "none" || preset.bgType !== "image") {
-          window.__skinBgPending = "";
-          if (formP.keepImage) formP.keepImage.value = "0";
-          var hidP = document.getElementById("skin-bg-data");
-          if (hidP) hidP.value = "";
-        }
-        var smsgP = document.getElementById("skin-msg");
-        if (smsgP) smsgP.textContent = "Preset applied — click Save look.";
+      if (preset) {
+        var formP = document.getElementById("skin-form");
+        if (formP) fillSkinFormFromPreset(formP, preset);
+        var published = saveProfileSkin(session().user.id, Object.assign({}, preset, {
+          motto: formP && formP.motto ? String(formP.motto.value || "").trim().slice(0, 80) : (loadProfileSkin(session().user.id).motto || "")
+        }));
+        window.__skinBgPending = "";
+        meSub = "profile";
+        viewingId = null;
+        profileEditSection = "skin";
+        pushNotice("green", "Look published — visitors see this on your profile.", { transient: true });
+        paint("me");
+        try { applyProfileSkinDom(session().user.id, published); } catch (eP) {}
       }
       return;
     }
@@ -4829,6 +4979,26 @@ function helpPage() {
       paint(t);
     }
   });
+  // How this works: live preview while typing hex / motto in Customize look (draft, not saved).
+  // ENGINE DEV: profile page chrome only; not #stage-slot.
+  app.addEventListener("input", function (ev) {
+    if (!session() || !ev.target || !ev.target.closest) return;
+    var formIn = ev.target.closest("#skin-form");
+    if (!formIn) return;
+    var n = ev.target.name || "";
+    if (n === "bgColor" || n === "bgColor2" || n === "accent" || n === "textColor" || n === "linkColor" || n === "motto") {
+      // sync pickers when hex typed
+      if (n === "bgColor" && formIn.bgColorPicker) formIn.bgColorPicker.value = ev.target.value;
+      if (n === "bgColor2" && formIn.bgColor2Picker) formIn.bgColor2Picker.value = ev.target.value;
+      if (n === "accent" && formIn.accentPicker) formIn.accentPicker.value = ev.target.value;
+      if (n === "textColor" && formIn.textColorPicker) formIn.textColorPicker.value = ev.target.value;
+      if (n === "linkColor" && formIn.linkColorPicker) formIn.linkColorPicker.value = ev.target.value;
+      try {
+        var draftIn = readSkinFormDraft(formIn);
+        if (draftIn) applyProfileSkinDom(session().user.id, draftIn);
+      } catch (eIn) {}
+    }
+  });
   app.addEventListener("change", function (ev) {
     if (ev.target.matches("[data-playlist-owner-only]") && session() && isLoftOwner()) {
       var plO = loadPlaylist();
@@ -4836,15 +5006,35 @@ function helpPage() {
       savePlaylist(plO);
       return;
     }
-    // How this works: color pickers in Look & background sync the text hex fields.
-    if (ev.target.name === "bgColorPicker" || ev.target.name === "bgColor2Picker" || ev.target.name === "accentPicker") {
+    // How this works: color pickers sync hex fields + live preview on .profile-page (no Save needed).
+    if (ev.target.name === "bgColorPicker" || ev.target.name === "bgColor2Picker" || ev.target.name === "accentPicker"
+        || ev.target.name === "textColorPicker" || ev.target.name === "linkColorPicker") {
       var formSync = ev.target.closest("#skin-form");
       if (formSync) {
-        var mapName = { bgColorPicker: "bgColor", bgColor2Picker: "bgColor2", accentPicker: "accent" };
+        var mapName = {
+          bgColorPicker: "bgColor", bgColor2Picker: "bgColor2", accentPicker: "accent",
+          textColorPicker: "textColor", linkColorPicker: "linkColor"
+        };
         var field = formSync.querySelector('[name="' + mapName[ev.target.name] + '"]');
         if (field) field.value = ev.target.value;
+        try {
+          var draftC = readSkinFormDraft(formSync);
+          if (draftC && session()) applyProfileSkinDom(session().user.id, draftC);
+        } catch (ePrev) {}
       }
       return;
+    }
+    // How this works: live preview when selects / text colors change while Customize form is open.
+    if (ev.target.closest && ev.target.closest("#skin-form") && session()) {
+      var formLive = ev.target.closest("#skin-form");
+      if (formLive && (ev.target.name === "bgType" || ev.target.name === "bgRepeat" || ev.target.name === "bgAttachment"
+          || ev.target.name === "panelAlpha" || ev.target.name === "bgColor" || ev.target.name === "bgColor2"
+          || ev.target.name === "accent" || ev.target.name === "textColor" || ev.target.name === "linkColor")) {
+        try {
+          var draftL = readSkinFormDraft(formLive);
+          if (draftL) applyProfileSkinDom(session().user.id, draftL);
+        } catch (eL) {}
+      }
     }
     // How this works: profile background image → data URL (cap ~400KB warn / reject huge).
     if (ev.target.id === "skin-bg-input" && session()) {
@@ -4874,7 +5064,12 @@ function helpPage() {
         if (keep) keep.value = "0";
         var typeSel = document.querySelector('#skin-form [name="bgType"]');
         if (typeSel) typeSel.value = "image";
-        if (smsg) smsg.textContent = "Image ready — click Save look.";
+        if (smsg) smsg.textContent = "Image ready — previewing; click Publish look to save.";
+        try {
+          var formImg = document.getElementById("skin-form");
+          var draftImg = readSkinFormDraft(formImg);
+          if (draftImg && session()) applyProfileSkinDom(session().user.id, draftImg);
+        } catch (eImg) {}
       };
       sreader.readAsDataURL(sfile);
       return;
@@ -4936,7 +5131,8 @@ function helpPage() {
       return;
     }
     if (ev.target.id === "skin-form" && session()) {
-      // How this works: Save look → whirled2.profileSkin.{userId}, then repaint profile.
+      // How this works: Publish look → whirled2.profileSkin.{userId}, then repaint + applyProfileSkinDom.
+      // ENGINE DEV: profile page chrome only; not #stage-slot.
       var sd = new FormData(ev.target);
       var sidSkin = session().user.id;
       var prevSkin = loadProfileSkin(sidSkin);
@@ -4951,8 +5147,12 @@ function helpPage() {
         bgColor: String(sd.get("bgColor") || "#cfe6f5").slice(0, 32),
         bgColor2: String(sd.get("bgColor2") || "#ffffff").slice(0, 32),
         bgImage: bgImage,
+        bgRepeat: String(sd.get("bgRepeat") || "cover"),
+        bgAttachment: String(sd.get("bgAttachment") || "scroll"),
         accent: String(sd.get("accent") || "#1e6fa8").slice(0, 32),
-        panelAlpha: Number(sd.get("panelAlpha") || 0.92),
+        textColor: String(sd.get("textColor") || "#16324a").slice(0, 32),
+        linkColor: String(sd.get("linkColor") || "#1e6fa8").slice(0, 32),
+        panelAlpha: Number(sd.get("panelAlpha") || 0.82),
         motto: String(sd.get("motto") || "").trim().slice(0, 80)
       };
       if (bgType === "image" && !nextSkin.bgImage) {
@@ -4960,13 +5160,14 @@ function helpPage() {
         if (sm) sm.textContent = "Pick an image or choose another background type.";
         return;
       }
-      saveProfileSkin(sidSkin, nextSkin);
+      var savedSkin = saveProfileSkin(sidSkin, nextSkin);
       window.__skinBgPending = "";
       meSub = "profile";
       viewingId = null;
       profileEditSection = null;
-      pushNotice("green", "Profile look saved.", { transient: true });
+      pushNotice("green", "Look published — visitors see this on your profile.", { transient: true });
       paint("me");
+      try { applyProfileSkinDom(sidSkin, savedSkin); } catch (eSav) {}
       return;
     }
     if (ev.target.id === "status-form" && session()) {

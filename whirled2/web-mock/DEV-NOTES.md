@@ -91,10 +91,11 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## Profile skins
 
-- Key: `whirled2.profileSkin.{userId}` JSON — `{ bgType, bgColor, bgColor2, bgImage, accent, panelAlpha, motto }`.
-- UI: Me → My Profile → Look & background. Wrapper `.profile-skin` around `.classic-profile` (own + other).
+- Key: `whirled2.profileSkin.{userId}` JSON — `{ bgType, bgColor, bgColor2, bgImage, bgRepeat, bgAttachment, accent, textColor, linkColor, panelAlpha, motto }`.
+- Apply: `applyProfileSkinDom(userId)` sets CSS vars + background on `.page.profile-page` (class `has-profile-skin`). Do **not** put huge data-URL BGs through HTML `esc()` attributes.
+- UI: Me → My Profile → **Customize look** (near top). Presets publish immediately; form changes live-preview; Publish persists. Clear = `bgType:none`.
 - **No profile music.** Room playlist covers audio.
-- ENGINE DEV: profile skins are Me chrome only — do not apply to `#stage-slot`.
+- ENGINE DEV: profile page chrome only; not `#stage-slot`.
 
 ## Room lock (local)
 

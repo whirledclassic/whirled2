@@ -2,15 +2,14 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906k)
+## What shipped (?v=20260906l)
 
-- **Profile skins** (MySpace-like): per-user `whirled2.profileSkin.{userId}` — background color/gradient/image, accent, panel opacity, optional motto. Edit on own profile (Look & background). Visitors see skins on other profiles. **No profile music** (room playlists cover audio). Profile chrome ≠ `#stage-slot`; engine ignores skins.
-- **Room lock enforcement** (local mock): `whirled2.roomLock.loft = { mode, ownerId }` — unlocked / friends / locked gate `[data-enter-room]`, Join them!, Go home/recent via `canEnterLoft`. Owner always enters. Legacy string lock values migrate on load.
-- Prior: ENGINE-BRIDGE runbook, stage bubbles, passport, mail Reply/Delete, Join them!, Add Friend modal, visit-scoped chat.
+- **Profile skins (fixed)**: MySpace-like Customize look — presets **publish immediately**; BG fills entire `.page.profile-page` via `applyProfileSkinDom` (CSS vars + `el.style`, not HTML-escaped data-URLs). Schema adds `bgRepeat` / `bgAttachment` / `textColor` / `linkColor` / translucent `panelAlpha` (~0.82). Live preview while form open; Clear keeps an empty option. Visitors see otherProfile skins. **No profile music**. ENGINE DEV: profile chrome ≠ `#stage-slot`.
+- Prior: room lock enforcement, ENGINE-BRIDGE runbook, stage bubbles, passport, mail Reply/Delete, Join them!, Add Friend modal, visit-scoped chat.
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906k
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906l
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
