@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bl";
+  var LOGO_V = "20260906bm";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1451,6 +1451,72 @@
   var makeDoorPanelOpen = false; // side panel when linking/creating via a door chip
   var partyPanelOpen = false;
   var hangoutInvitePending = null; // [{id,name},…] after leave loft (real occupants only)
+  // How this works (?v=20260906bm): wiki Room Zoom — local CSS scale on .stage-host (chrome only).
+  // Beginner: Room menu → Zoom opens a slider; 100% = normal. ENGINE DEV: does not remount Pixi.
+  var ROOM_ZOOM_KEY = "whirled2.roomZoom";
+  var roomZoomPanelOpen = false;
+  var roomSnapshotModalOpen = false;
+  function loadRoomZoom() {
+    try {
+      var z = parseFloat(localStorage.getItem(ROOM_ZOOM_KEY) || "1");
+      if (!isFinite(z)) return 1;
+      return Math.max(1, Math.min(1.75, Math.round(z * 100) / 100));
+    } catch (e) { return 1; }
+  }
+  function saveRoomZoom(z) {
+    var v = parseFloat(z);
+    if (!isFinite(v)) v = 1;
+    v = Math.max(1, Math.min(1.75, Math.round(v * 100) / 100));
+    try { localStorage.setItem(ROOM_ZOOM_KEY, String(v)); } catch (e) {}
+    return v;
+  }
+  function applyRoomZoom() {
+    var z = loadRoomZoom();
+    try {
+      var host = document.querySelector(".stage-host");
+      if (host) {
+        host.style.transform = z === 1 ? "" : ("scale(" + z + ")");
+        host.style.transformOrigin = "center top";
+        host.classList.toggle("is-zoomed", z > 1);
+      }
+      var wrap = document.querySelector(".stage-wrap");
+      if (wrap) wrap.classList.toggle("room-zoomed", z > 1);
+    } catch (eAz) {}
+  }
+  function roomZoomPanelHtml() {
+    if (!roomZoomPanelOpen) return "";
+    var z = loadRoomZoom();
+    var pct = Math.round(z * 100);
+    return '<div class="room-side-panel room-zoom-panel" id="room-zoom-panel">'
+      + '<div class="panel">'
+      +   '<div class="room-side-head"><h2>Zoom room view</h2>'
+      +     '<button type="button" class="text-btn" data-room-zoom-close="1">Close</button></div>'
+      +   '<p class="meta">Wiki Room Zoom — scale the loft stage on this device. Best when the room is taller than the window. Engine camera later.</p>'
+      +   '<label class="room-zoom-label">Zoom <b id="room-zoom-pct">' + pct + '%</b>'
+      +     '<input type="range" id="room-zoom-range" min="100" max="175" step="5" value="' + pct + '" data-room-zoom-range="1" /></label>'
+      +   '<div class="stuff-detail-actions">'
+      +     '<button type="button" class="action-btn" data-room-zoom-reset="1">Reset 100%</button>'
+      +   '</div>'
+      + '</div></div>';
+  }
+  function roomSnapshotModalHtml() {
+    // How this works (?v=20260906bm): wiki Take snapshot — preview popup stub (no fake photo file).
+    return '<div class="modal-backdrop" id="room-snapshot-modal" data-snapshot-close="1">'
+      + '<div class="modal-card snapshot-modal" role="dialog" aria-label="Room snapshot" onclick="event.stopPropagation()">'
+      +   '<div class="room-side-head"><h2>Take a snapshot</h2>'
+      +     '<button type="button" class="text-btn" data-snapshot-close="1">Close</button></div>'
+      +   '<div class="snapshot-preview" aria-hidden="true">'
+      +     '<div class="snapshot-preview-stage"><span>Loft preview</span></div>'
+      +   '</div>'
+      +   '<p class="meta">Classic Whirled showed a snapshot preview with save/share options after you clicked the camera.</p>'
+      +   '<p class="meta"><span class="soon-tag">Coming Soon</span> — engine stage capture (Pixi / canvas). Chrome cannot honestly save a real loft photo yet.</p>'
+      +   '<div class="stuff-detail-actions">'
+      +     '<button type="button" class="action-btn" disabled title="Coming Soon">Save snapshot…</button>'
+      +     '<button type="button" class="text-btn" data-snapshot-close="1">Close</button>'
+      +   '</div>'
+      + '</div></div>';
+  }
+
   var loftVisitOccupants = []; // session occupants seen this loft visit
   var helpOpen = false;
   var legalOpen = false; // Help → Legal / Disclaimer
@@ -3623,6 +3689,8 @@
     occMenuId = null;
     friendInvitePending = null;
     hangoutInvitePending = null;
+    roomZoomPanelOpen = false;
+    roomSnapshotModalOpen = false;
     chatOptsOpen = false;
     chatNameMenu = null;
     profileEditSection = null;
@@ -4851,7 +4919,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj + bk) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl + bm) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4885,6 +4953,9 @@
       "  classic-avatar.js dual Wear UNTOUCHED (Flash/Ruffle parallel bl)",
       "• bl: Classic Flash loft interactivity — floor click-to-walk + bob, nameplate/hitbox emotes",
       "  (chrome bubble + EI try), minimal WhirledAvatarHost shim (?avatarDebug=1), Smooth PNG intact",
+      "• bm: club gaps after bl — /st alias, bare /speak|/think|/shout mode switch, room Zoom slider,",
+      "  snapshot Coming Soon modal, party Follow-host stub, hangout invite blue notice, AVR name legend —",
+      "  classic-avatar.js Flash loft interact UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -5017,10 +5088,10 @@
     updates.replies.unshift({
       who: "Whirled2 Bot", whoId: "system", tag: tag,
       text: "Ship note " + LOGO_V + "\n"
-        + "• Classic Flash loft: floor click moves avatar; nameplate/hitbox opens emotes (bubble + EI try)\n"
-        + "• Minimal WhirledAvatarHost EI shim (allowScriptAccess loft; ?avatarDebug=1)\n"
-        + "• Smooth PNG dual Wear intact; stock SWFs still need Phase-2 sharedEvents for true walk anim\n"
-        + "Preserve: bg dual Wear cards, bk idle Zzz, bj /dnd /bleepall, bi/bh/bf/bc, Whirl, visit-since.",
+        + "• Club polish after bl Flash loft: /st alias, bare /speak|/think|/shout switches compose mode\n"
+        + "• Room Zoom slider (local CSS on .stage-host); Snapshot preview modal (Coming Soon capture)\n"
+        + "• Parties Follow host Coming Soon; hangout batch invite → blue notice; AVR name legend stub\n"
+        + "Preserve: bl Flash loft interact (classic-avatar.js untouched), bg dual Wear, bk–bj club, Whirl, visit-since.",
       at: new Date().toISOString()
     });
     // How this works (?v=20260906bf): refresh sticky OP body so Developers see the full overnight list.
@@ -5055,6 +5126,28 @@
   }
   function saveChatUi(cfg) {
     try { localStorage.setItem(CHAT_UI_KEY, JSON.stringify(cfg || loadChatUi())); } catch (e) {}
+  }
+  // How this works (?v=20260906bm): wiki Chat /speak /think /shout alone switch compose mode (no message).
+  // Beginner: type /think then Enter (no text) to flip the Speak button — same as tapping Speak→Think.
+  function applySpeakModeUi(sm) {
+    sm = sm === "think" || sm === "shout" ? sm : "speak";
+    var btn = document.getElementById("chat-speak-mode");
+    var cin = document.getElementById("chat-input");
+    if (btn) {
+      btn.textContent = sm === "think" ? "Think" : (sm === "shout" ? "Shout" : "Speak");
+      btn.className = "chat-speak-mode" + (sm === "think" ? " is-think" : (sm === "shout" ? " is-shout" : " is-speak"));
+      btn.setAttribute("aria-label", "Chat mode: " + btn.textContent);
+    }
+    if (cin) {
+      cin.placeholder = sm === "think" ? "Think something…" : (sm === "shout" ? "Shout to the room…" : "Type here to chat!");
+      cin.setAttribute("data-speak-mode", sm);
+    }
+  }
+  function setSpeakMode(sm) {
+    var ui = loadChatUi();
+    ui.speakMode = sm === "think" || sm === "shout" ? sm : "speak";
+    saveChatUi(ui);
+    applySpeakModeUi(ui.speakMode);
   }
   // How this works (20260906q): on phones, Slide's dark panel eats the green stage.
   // Auto-switch to Overlay once for the session preference so the black slab never returns.
@@ -6544,6 +6637,7 @@
     // How this works (?v=20260906bi): wiki Room name colors — blue here, yellow /away, gray Zzz, peach clone stub.
     // How this works (?v=20260906bj): /dnd and /away both drive yellow; rail can be hidden via Chat options.
     // How this works (?v=20260906bk): local idle (~2 min) drives gray Zzz; white = pets (Coming Soon).
+    // How this works (?v=20260906bm): AVR icon-over-name Coming Soon (wiki Room); peach clone stub stays.
     // Beginner: peach = logged-out greeting clone (classic under development) — Coming Soon here.
     return '<div class="occ-legend" title="Presence + classic name colors">'
       + '<span><i class="lg green"></i> Here</span>'
@@ -6552,6 +6646,7 @@
       + '<span><i class="lg orange"></i> In game</span>'
       + '<span title="Pets use white names in classic Whirled — Coming Soon"><i class="lg white"></i> Pet <span class="soon-tag">Soon</span></span>'
       + '<span title="Logged-out greeting clone — Coming Soon"><i class="lg peach"></i> Clone <span class="soon-tag">Soon</span></span>'
+      + '<span title="AVR game icon over name — Coming Soon (wiki Room)"><i class="lg avr"></i> AVR <span class="soon-tag">Soon</span></span>'
       + '</div>';
   }
   function occupantRailHtml(here) {
@@ -8507,6 +8602,7 @@
             + '<div class="party-row-actions">'
             + (joined
               ? '<button type="button" class="action-btn" data-party-leave="' + esc(p.id) + '">Leave party</button>'
+                + '<button type="button" class="text-btn" data-party-follow-host="1" title="Follow the host — Coming Soon">Follow host <span class="soon-tag">Soon</span></button>'
               : '<button type="button" class="action-btn" data-party-join="' + esc(p.id) + '">Join party</button>')
             + '</div>'
             + '</div>';
@@ -8890,19 +8986,22 @@
       +     (decorateMode ? decoratePanel() : '')
       +     (makeDoorPanelOpen ? makeDoorPanelHtml() : '')
       +     (partyPanelOpen ? partyPanel() : '')
+      +     (roomZoomPanelOpen ? roomZoomPanelHtml() : '')
       +     '<button type="button" class="music-gesture-fab" id="music-gesture-btn"' + (musicGestureNeeded ? "" : " hidden") + ' data-music-gesture="1">Click to play room music</button>'
       +     furnitureGlowLegendHtml()
       +     presenceFeedHtml()
       +   '</section>'
       + '</div>'
       + friendInvitePopup()
-      + hangoutInvitePopup();
+      + hangoutInvitePopup()
+      + (roomSnapshotModalOpen ? roomSnapshotModalHtml() : '');
   }
   function rooms() {
     var html = inRoom ? roomView() : roomsLobby();
     if (!inRoom && hangoutInvitePending && hangoutInvitePending.length) {
       html += hangoutInvitePopup();
     }
+    if (roomSnapshotModalOpen) html += roomSnapshotModalHtml();
     return html;
   }
 
@@ -11129,7 +11228,7 @@
       +         '<button type="button" data-room-menu="clickable">View clickable furniture</button>'
       +         '<div class="go-menu-section meta">Capture &amp; share</div>'
       +         '<button type="button" data-room-menu="snapshot">📸 Take snapshot <span class="soon-tag">Coming Soon</span></button>'
-      +         '<button type="button" data-room-menu="zoom">🔍 Zoom room view <span class="soon-tag">Coming Soon</span></button>'
+      +         '<button type="button" data-room-menu="zoom">🔍 Zoom room view</button>'
       +         '<button type="button" data-room-share="1">Share / embed room…</button>'
       +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
       // How this works (20260906af): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
@@ -11260,6 +11359,7 @@
     try { ensureStagePlaceholder(); } catch (e) {}
     try { if (decorateMode) bindDecorateDrag(); } catch (e) {}
     try { bindDoorLayerClicks(); } catch (eDoorBind) {}
+    try { if (inRoom) applyRoomZoom(); } catch (eZoom) {}
     try { syncRoomAudio(); } catch (e) {}
     try { ensurePlaylistPanel(); } catch (ePl) {}
     try { if (roomPreviewOpen && !inRoom) ensureRoomPreviewPanel(); } catch (eRp) {}
@@ -11498,6 +11598,8 @@
     roomChatVisitSince = "";
     roomChatRoomId = "";
     occFilterQ = "";
+    roomZoomPanelOpen = false;
+    roomSnapshotModalOpen = false;
     roomEmbedExpanded = false;
     try { removeRoomEmbedDock(); } catch (eD) {}
     try {
@@ -11873,11 +11975,11 @@
       var helpLines = [
         "Chat commands:",
         "/help [cmd] — this list",
-        "/speak /think /shout /me (/e /em) — modes",
+        "/speak /think /shout /me (/e /em) — modes (bare cmd switches mode)",
         "/broadcast <msg> — highlighted (coins)",
         "/away|/afk [msg] · /dnd [msg] · /back — yellow name",
         "/bleepall — hide all room items (you)",
-        "/action <name> · /state <name> — avatar stubs",
+        "/action <name> · /state|/st <name> — avatar stubs",
         "/clear — clear active chat tab"
       ];
       if (helpTopic === "away" || helpTopic === "afk") {
@@ -11890,8 +11992,10 @@
         helpLines = ["/broadcast <msg> — room-wide highlight; escalating coin cost (earn-only)."];
       } else if (helpTopic === "action" || helpTopic === "ac") {
         helpLines = ["/action <name> (/ac) — trigger avatar action. Full AvatarControl Coming Soon."];
-      } else if (helpTopic === "state") {
-        helpLines = ["/state <name> — avatar state change. Full AvatarControl Coming Soon."];
+      } else if (helpTopic === "state" || helpTopic === "st") {
+        helpLines = ["/state <name> (/st) — avatar state change. Full AvatarControl Coming Soon."];
+      } else if (helpTopic === "speak" || helpTopic === "sp" || helpTopic === "think" || helpTopic === "th" || helpTopic === "shout" || helpTopic === "sh") {
+        helpLines = ["/speak|/think|/shout (or /sp /th /sh) — with text sends in that mode; alone switches the Speak button."];
       } else if (helpTopic === "me" || helpTopic === "emote" || helpTopic === "em" || helpTopic === "e") {
         helpLines = ["/me <text> (/emote /em /e) — emote line: YourName text"];
       }
@@ -11967,11 +12071,20 @@
       pushNotice("orange", "Avatar /action — Coming Soon.", { transient: true });
       return;
     }
-    if (/^\/state(?:\s|$)/i.test(text)) {
+    if (/^\/(state|st)(?:\s|$)/i.test(text)) {
       // How this works (?v=20260906bk): wiki Chat /state — AvatarControl states need engine; honest stub.
-      var stName = text.replace(/^\/state\s*/i, "").trim() || "(list)";
+      // How this works (?v=20260906bm): wiki /st alias for /state.
+      var stName = text.replace(/^\/(state|st)\s*/i, "").trim() || "(list)";
       pushSystemChat("Avatar /state “" + stName + "” — Coming Soon (SWF AvatarControl / engine).", { ephemeral: true });
       pushNotice("orange", "Avatar /state — Coming Soon.", { transient: true });
+      return;
+    }
+    // How this works (?v=20260906bm): bare /speak /think /shout (wiki) switch compose mode when no message.
+    if (/^\/(speak|sp|think|th|shout|sh)$/i.test(text)) {
+      var bare = text.slice(1).toLowerCase();
+      var modeBare = (bare === "think" || bare === "th") ? "think" : ((bare === "shout" || bare === "sh") ? "shout" : "speak");
+      setSpeakMode(modeBare);
+      pushSystemChat("Chat mode: " + (modeBare === "think" ? "Think" : (modeBare === "shout" ? "Shout" : "Speak")) + ".", { ephemeral: true });
       return;
     }
     if (/^\/speak\s+/i.test(text) || /^\/sp\s+/i.test(text)) {
@@ -12725,18 +12838,7 @@
       var ix = order.indexOf(uiSp.speakMode || "speak");
       uiSp.speakMode = order[(ix + 1) % order.length];
       saveChatUi(uiSp);
-      var btn = document.getElementById("chat-speak-mode");
-      var cin = document.getElementById("chat-input");
-      var sm2 = uiSp.speakMode;
-      if (btn) {
-        btn.textContent = sm2 === "think" ? "Think" : (sm2 === "shout" ? "Shout" : "Speak");
-        btn.className = "chat-speak-mode" + (sm2 === "think" ? " is-think" : (sm2 === "shout" ? " is-shout" : " is-speak"));
-        btn.setAttribute("aria-label", "Chat mode: " + btn.textContent);
-      }
-      if (cin) {
-        cin.placeholder = sm2 === "think" ? "Think something…" : (sm2 === "shout" ? "Shout to the room…" : "Type here to chat!");
-        cin.setAttribute("data-speak-mode", sm2);
-      }
+      applySpeakModeUi(uiSp.speakMode);
       return;
     }
     if (ev.target.closest("[data-chat-mode]")) {
@@ -14161,6 +14263,32 @@
       renderNotices();
       return;
     }
+    if (ev.target.closest("[data-party-follow-host]") && session()) {
+      // How this works (?v=20260906bm): wiki Parties follow-host — Coming Soon (shared presence).
+      pushNotice("orange", "Follow the host — Coming Soon (shared party travel).", { transient: true });
+      return;
+    }
+    if (ev.target.closest("[data-room-zoom-close]")) {
+      roomZoomPanelOpen = false;
+      if (inRoom) paint("rooms");
+      return;
+    }
+    if (ev.target.closest("[data-room-zoom-reset]")) {
+      saveRoomZoom(1);
+      applyRoomZoom();
+      var pctEl = document.getElementById("room-zoom-pct");
+      var rangeEl = document.getElementById("room-zoom-range");
+      if (pctEl) pctEl.textContent = "100%";
+      if (rangeEl) rangeEl.value = "100";
+      pushNotice("green", "Zoom reset to 100%.", { transient: true });
+      return;
+    }
+    if (ev.target.closest("[data-snapshot-close]")) {
+      roomSnapshotModalOpen = false;
+      var sm = document.getElementById("room-snapshot-modal");
+      if (sm) sm.remove();
+      return;
+    }
     var prof = ev.target.closest("[data-profile]");
     if (prof && session()) {
       viewingId = prof.getAttribute("data-profile") || null;
@@ -14526,9 +14654,27 @@
         if (inRoom) paint("rooms");
         try { bindDoorLayerClicks(); } catch (eGl) {}
       } else if (rm === "snapshot") {
-        pushNotice("orange", "Take snapshot — Coming Soon (engine stage capture).", { transient: true });
+        // How this works (?v=20260906bm): wiki Take snapshot — preview modal stub (honest Coming Soon capture).
+        roomSnapshotModalOpen = true;
+        roomZoomPanelOpen = false;
+        if (inRoom) paint("rooms");
+        else {
+          var hostSnap = document.getElementById("app") || document.body;
+          if (hostSnap && !document.getElementById("room-snapshot-modal")) {
+            hostSnap.insertAdjacentHTML("beforeend", roomSnapshotModalHtml());
+          }
+        }
       } else if (rm === "zoom") {
-        pushNotice("orange", "Zoom room view — Coming Soon (scrollable rooms / engine camera).", { transient: true });
+        // How this works (?v=20260906bm): wiki Zoom — local CSS scale panel (not engine camera).
+        if (!inRoom) { inRoom = true; }
+        roomZoomPanelOpen = true;
+        roomSnapshotModalOpen = false;
+        decorateMode = false;
+        roomPanelOpen = false;
+        playlistPanelOpen = false;
+        partyPanelOpen = false;
+        paint("rooms");
+        applyRoomZoom();
       }
       return;
     }
@@ -15108,7 +15254,8 @@
       hangoutInvitePending = null;
       var hm2 = document.getElementById("hangout-invite-modal");
       if (hm2) hm2.remove();
-      pushNotice("friending", n ? ("Sent " + n + " friend request" + (n === 1 ? "" : "s") + ".") : "No one selected.");
+      // How this works (?v=20260906bm): wiki Friend batch invite — blue notification bar message.
+      pushNotice("blue", n ? ("Invitations sent — " + n + " friend request" + (n === 1 ? "" : "s") + ".") : "No one selected.");
       return;
     }
     var pokeSelfBtn = ev.target.closest("#poke-self-demo");
@@ -15138,6 +15285,16 @@
   // ENGINE DEV: profile page chrome only; not #stage-slot.
   app.addEventListener("input", function (ev) {
     if (!session() || !ev.target || !ev.target.closest) return;
+    // How this works (?v=20260906bm): wiki Room Zoom slider — live CSS scale on .stage-host.
+    if (ev.target.getAttribute && ev.target.getAttribute("data-room-zoom-range") === "1") {
+      var zp = parseInt(ev.target.value, 10);
+      if (!isFinite(zp)) zp = 100;
+      var zf = saveRoomZoom(zp / 100);
+      applyRoomZoom();
+      var pctLive = document.getElementById("room-zoom-pct");
+      if (pctLive) pctLive.textContent = Math.round(zf * 100) + "%";
+      return;
+    }
     // How this works (20260906af): live volume slider — persist + apply to local <audio>.
     // Beginner: drag the slider; music gets quieter/louder. Mute still unloads media safely.
     if (ev.target.getAttribute && ev.target.getAttribute("data-vol-slider") === "1") {

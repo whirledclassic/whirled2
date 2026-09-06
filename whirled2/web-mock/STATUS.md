@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bm)
+
+- **Club gaps + polish (after bl):** wiki **/st** alias for /state; bare **/speak|/think|/shout** (and /sp /th /sh) switch compose mode; **Room Zoom** local CSS slider on `.stage-host`; **Snapshot** Coming Soon preview modal; Parties **Follow host** Coming Soon; hangout batch invite → **blue** notice; **AVR** name-color legend stub
+- **Preserve:** bl Flash loft interact (`classic-avatar.js` UNTOUCHED), bg dual Wear cards, bk idle Zzz /e /em /state Boot, bj /dnd /bleepall /occupants, bi/bh/bf/bc, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bm`**. Push: `/tmp/push-bm.js` (dry-run default).
+
 ## What shipped (?v=20260906bl)
 
 - **Combined ship (bk club + Flash loft interactivity):**

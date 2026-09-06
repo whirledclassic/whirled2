@@ -1,6 +1,6 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906bk` (`LOGO_V`)  
+**Cache:** `?v=20260906bm` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
@@ -67,7 +67,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bk` — local idle Zzz + /e /em + /state + Boot stubs on bj club polish / bg dual Wear (see `STATUS.md`). **Do not edit** `classic-avatar.js` (Flash/Ruffle = parallel **bl**).
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bm` — club Zoom/snapshot/mode-slash polish after **bl** Flash loft (see `STATUS.md`). **Do not edit** `classic-avatar.js` unless fixing a clear bug (preserve bl Flash loft interact).
 
 ---
 

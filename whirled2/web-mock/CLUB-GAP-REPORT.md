@@ -1,7 +1,7 @@
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bk` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bm` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -17,7 +17,23 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bk`)
+## Closed this pass (`?v=20260906bm`)
+
+| Item | Notes |
+|------|--------|
+| /st alias | Wiki Chat `/state (/st)` |
+| Bare mode slash | `/speak` `/think` `/shout` (+ shorts) alone switch Speak button |
+| Room Zoom | Local CSS scale slider on `.stage-host` (wiki Zoom; engine camera later) |
+| Snapshot modal | Wiki-faithful preview popup; capture still Coming Soon |
+| Follow host | Parties board Coming Soon stub (shared presence later) |
+| Hangout invite blue | Wiki Friend batch invite → blue notification bar |
+| AVR name legend | Wiki Room AVR icon-over-name Coming Soon swatch |
+| Preserve | bl Flash loft interact (`classic-avatar.js` untouched); bg dual Wear; bk–bj club; Whirl; visit-since |
+
+---
+
+## Closed earlier (`?v=20260906bk`)
+
 
 | Item | Notes |
 |------|--------|
@@ -219,7 +235,7 @@ Quick upload (`#skin-bg-input-quick`) outside Edit look set `window.__skinBgPend
 | Decorate / place | Partial | Full furniture edit **P1** |
 | Lock / share / embed | Working chrome + pale-blue dock (ax) | Lock triad + preview blurbs `bd`; share/embed `be`; clickable glow legend `bf` |
 | Make Door / door travel | **Working** (`at`) — decorate chip → Make Door → travel | — |
-| Parties | **Improved** (`be`) board create/join/invite; follow-host Coming Soon | Follow-host presence **P1** |
+| Parties | **Improved** (`be`/`bm`) board + Follow host Coming Soon stub | Follow-host presence **P1** |
 | Go / Friends toolbar | **Improved** (`bi`/`bk`) Go halls + Friends + Invite-to-Join blurb | Server presence **P1** |
 | Clickable furniture glow | **Improved** (`bh`) legend + stub clicks; View items Bleep (`bi`) | Full link/game travel later **P2** |
 | Click-to-walk chrome | Present until Pixi mounts (`am` notes) | Yield to engine **P0** |

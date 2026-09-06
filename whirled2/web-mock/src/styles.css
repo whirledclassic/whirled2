@@ -6998,3 +6998,60 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   font-style: normal;
   opacity: 1;
 }
+
+
+/* === ?v=20260906bm club polish === */
+.occ-legend .lg.avr {
+  background: linear-gradient(135deg, #7ec8f0 0%, #3aa3e0 55%, #1e6fa8 100%);
+  box-shadow: 0 0 0 1px #1e6fa8;
+  position: relative;
+}
+.occ-legend .lg.avr::after {
+  content: "A";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.stage-host.is-zoomed {
+  will-change: transform;
+}
+.stage-wrap.room-zoomed {
+  overflow: auto;
+}
+.room-zoom-panel .room-zoom-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.room-zoom-panel input[type="range"] {
+  width: 100%;
+  accent-color: #3aa3e0;
+}
+.snapshot-modal .snapshot-preview {
+  background: #d7ebf8;
+  border: 1px solid #9ec4de;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.snapshot-modal .snapshot-preview-stage {
+  min-height: 140px;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, #b8d8f0 0%, #e8f4fb 55%, #cfe6f5 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4a6a80;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.party-row-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
