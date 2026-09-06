@@ -74,9 +74,10 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 ## Room music / playlist
 
 1. Stuff → Music → Upload… accepts `audio/mpeg|mp3|wav|ogg|webm` (~2MB warn, ~4MB reject). Copyright checkbox **required**. Stored as `dataUrl` on the stuff item in `whirled2.stuff`.
-2. Playlist: `whirled2.playlist.loft` = `{ tracks:[{id,stuffId,name,by,at,dataUrl}], currentIndex, ownerOnlyAdd }`. Max 99.
-3. Room menu → **View room playlist**. Owner (first user id in `whirled2.firstUserId`) can Play / Remove / Next and toggle owner-only adds. Classic default = anyone may add.
-4. Hidden `<audio id="room-audio">` plays current; `ended` advances. Soft autoplay on enter room; if blocked, **Click to play room music**. Volume toolbar toggles mute.
+2. Playlist: `whirled2.playlist.loft` = `{ source, tracks, current, ownerOnlyAdd, ownerControlsMusic, embedUrl, embedSrc, embedTitle }`. Legacy `currentIndex` migrates to `current`. Max 99 local tracks.
+3. Room menu → **View room music**. Sources: **My uploads** | **YouTube** | **Spotify**. YouTube → `youtube-nocookie.com/embed/…`; Spotify → `open.spotify.com/embed/{type}/{id}`. Hosts validated (https only).
+4. **Owner hard rule**: only loft owner switches source / pastes embeds / ownerOnlyAdd / remove-next. Guests listen; may add local tracks only when `ownerOnlyAdd === false`. Never guest yt/spotify URL changes. Defaults `ownerOnlyAdd: true`, `ownerControlsMusic: true`.
+5. Local: hidden `<audio id="room-audio">`; soft autoplay + Click-to-play. Embed: `#room-embed-dock` iframe under stage (not `#stage-slot`); user presses play. Leaving room clears/hides dock, keeps storage.
 
 ## Legal
 
@@ -91,11 +92,10 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## Profile look (Whirled profile themes)
 
-- Key: `whirled2.profileSkin.{userId}` JSON — `{ bgType, bgColor, bgColor2, bgImage, bgRepeat, bgAttachment, accent, textColor, linkColor, panelAlpha, motto }`.
-- Apply: `applyProfileSkinDom(userId)` sets CSS vars + **full `background` shorthand** on `.page.profile-page` and `.profile-skin` (class `has-profile-skin`). `.page` uses `background-color` only so shorthand wins. Double rAF re-apply after paint.
-- Night preset: text `#e8f0f8`, link/accent `#7ec8f0`, panelAlpha ~0.60. Default panelAlpha ~0.72.
-- UI: Me → My Profile → **Customize look** — presets **always visible** (no Edit look required). Edit look opens fine-tune form (“Profile look”). Preset publish keeps panel open → “Look published.”
-- Clear = `bgType:none`. **No profile music.** Room playlist covers audio.
+- Key: `whirled2.profileSkin.{userId}` JSON — `{ bgType, bgColor, bgColor2, bgImage, bgRepeat, bgAttachment, accent, textColor, linkColor, panelAlpha, motto, tagline, fontScale, radius, moduleStyle, headerStyle, bannerImage }`.
+- Apply: `applyProfileSkinDom(userId)` sets CSS vars (`--profile-font-scale`, `--profile-radius`, …) + **full `background` shorthand** on `.page.profile-page` / `.profile-skin`. Classes: `profile-mod-*`, `profile-header-*`, `profile-radius-*`. Optional `#profile-banner` under me-subnav.
+- Presets always visible: Classic / Night / Sunset / Paper / Tile Soft / **Ocean / Forest / Candy / Mono** / Clear. Edit look: font 0.9|1|1.1, radius sharp|soft|round, module frosted|solid|outline, header band|minimal|accent-bar, banner (same size caps as BG).
+- Clear = `bgType:none`. **No profile music.** Room music covers audio.
 - ENGINE DEV: profile page chrome only; not `#stage-slot`.
 
 ## Room lock (local)
@@ -146,4 +146,10 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - Bars earn-only (streak 7/14/21/30 + weekly). Never Buy Bars / payments UI.
 - Shop: Buy disabled; `formatShopPrice` adds optional “or N bars” (10000 coins = 1 bar display).
 - ENGINE DEV: wallet is chrome localStorage; optional `WhirledChrome.getWallet()`.
-- Cache-bust: `?v=20260906o` (local ship; do not push unless asked).
+- Cache-bust: `?v=20260906p` (local ship; do not push unless asked).
+
+
+## Occupant rail (20260906p)
+
+- `occupantRailHtml` / `personRow`: you-first sort, presence dots (green here / yellow away / orange in-game stub), friend highlight, loft-owner ♛, optional filter when >5.
+- Real `liveOccupants` only — no fake NPCs. Click opens existing occ menu.

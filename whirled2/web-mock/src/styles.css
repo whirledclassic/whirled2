@@ -2304,3 +2304,203 @@ body > .party-panel {
 
 /* ---- 20260906o: Coins + Bars wallet ---- */
 /* Soft gold bars accent only on wallet chips — keep chrome pale-blue overall. */
+
+
+/* ---- 20260906p: Profile look extras + room music embeds + occupant rail ---- */
+/* ENGINE DEV: #room-embed-dock is chrome under/beside stage — not inside #stage-slot. */
+
+.page.profile-page,
+.profile-skin {
+  font-size: calc(14px * var(--profile-font-scale, 1));
+}
+.page.profile-page .cp-header,
+.page.profile-page .cp-section,
+.page.profile-page .cp-meta-box,
+.page.profile-page .cp-edit-panel,
+.has-profile-skin .cp-header,
+.has-profile-skin .cp-section,
+.has-profile-skin .cp-meta-box,
+.has-profile-skin .cp-edit-panel {
+  border-radius: var(--profile-radius, 8px);
+}
+.profile-mod-frosted .cp-header,
+.profile-mod-frosted .cp-section,
+.profile-mod-frosted .cp-meta-box,
+.profile-mod-frosted .cp-edit-panel {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.profile-mod-solid .cp-header,
+.profile-mod-solid .cp-section,
+.profile-mod-solid .cp-meta-box,
+.profile-mod-solid .cp-edit-panel {
+  background: var(--profile-panel, rgba(255,255,255,0.92)) !important;
+  backdrop-filter: none;
+}
+.profile-mod-outline .cp-header,
+.profile-mod-outline .cp-section,
+.profile-mod-outline .cp-meta-box,
+.profile-mod-outline .cp-edit-panel {
+  background: transparent !important;
+  border: 2px solid color-mix(in srgb, var(--profile-accent, #1e6fa8) 55%, #c5deee);
+  box-shadow: none;
+}
+.profile-header-band .cp-header {
+  border-top: 4px solid var(--profile-accent, #1e6fa8);
+}
+.profile-header-minimal .cp-header {
+  border-top: 0;
+  box-shadow: none;
+}
+.profile-header-accent-bar .cp-header {
+  position: relative;
+  padding-top: 14px;
+}
+.profile-header-accent-bar .cp-header::before {
+  content: "";
+  position: absolute; left: 12px; right: 12px; top: 6px; height: 4px;
+  border-radius: 999px;
+  background: var(--profile-accent, #1e6fa8);
+}
+.profile-banner {
+  height: 72px;
+  margin: 0 0 10px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid #b7d3e8;
+  box-shadow: 0 2px 8px rgba(10, 40, 70, 0.12);
+}
+.cp-tagline {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--profile-text, #16324a);
+  opacity: 0.92;
+}
+.skin-presets-always {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Room music embed dock — sibling under stage, Pixi stays clear */
+.room-embed-dock {
+  margin: 8px 10px 4px;
+  padding: 8px 10px;
+  background: rgba(8, 18, 28, 0.88);
+  border: 1px solid #2a4560;
+  border-radius: 8px;
+  color: #d5e6f0;
+}
+.room-embed-dock[hidden] { display: none !important; }
+.room-embed-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin-bottom: 6px;
+}
+.room-embed-frame {
+  width: 100%;
+  min-height: 152px;
+  height: 152px;
+  border: 0;
+  border-radius: 6px;
+  background: #000;
+}
+.playlist-embed-preview .room-embed-frame { min-height: 180px; height: 180px; }
+.playlist-source-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.playlist-source-tabs .action-btn.is-on {
+  outline: 2px solid #1e6fa8;
+  background: #e8f4fb;
+}
+.playlist-embed-form {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0;
+}
+.playlist-embed-form input[type="url"] {
+  flex: 1; min-width: 180px; padding: 6px 8px;
+  border: 1px solid #b7d3e8; border-radius: 4px;
+}
+.owner-music-note { color: #8ab0c4; }
+.legal-embed-note { font-size: 11px; margin-top: 10px; }
+
+/* Occupant rail — modern hub polish, classic dark teal */
+.rail.occ-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 8px;
+}
+.occ-rail-head {
+  padding: 8px 10px 4px;
+  border-bottom: 1px solid rgba(122, 160, 181, 0.25);
+  flex-shrink: 0;
+}
+.rail.occ-rail h2 {
+  padding: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #9ec4d8;
+}
+.occ-count { color: #7ec8f0; font-weight: 700; letter-spacing: 0; }
+.occ-legend {
+  display: flex; flex-wrap: wrap; gap: 6px 10px;
+  margin: 6px 0 4px; font-size: 10px; color: #7aa0b5;
+}
+.occ-legend .lg {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 4px; vertical-align: middle;
+}
+.occ-legend .lg.green { background: #7ad36a; }
+.occ-legend .lg.yellow { background: #e6c84a; }
+.occ-legend .lg.orange { background: #e07a28; }
+.occ-filter { display: block; margin: 6px 0 2px; }
+.occ-filter input {
+  width: 100%; box-sizing: border-box;
+  padding: 5px 8px; border-radius: 6px;
+  border: 1px solid #2a4560; background: #0f1820; color: #d5e6f0;
+  font-size: 12px;
+}
+.occ-list {
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0 8px;
+  max-height: min(58vh, 520px);
+  scroll-behavior: smooth;
+}
+.occ-empty { padding: 10px; color: #7aa0b5; }
+.person-wrap {
+  border-radius: 6px;
+  margin: 2px 4px;
+}
+.person-wrap.is-you { background: rgba(224, 122, 40, 0.12); }
+.person-wrap.is-friend { box-shadow: inset 3px 0 0 #7ec8f0; }
+.person-wrap.is-owner .ava.owner {
+  box-shadow: 0 0 0 1px #7ec8f0;
+}
+.person {
+  width: 100%;
+  gap: 7px;
+  padding: 7px 8px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.person-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; text-align: left; }
+.person-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.person-status { color: #7aa0b5; }
+.owner-crown { color: #7ec8f0; font-size: 11px; margin-left: 2px; }
+.friend-mark { color: #7ec8f0; font-size: 10px; margin-left: 2px; }
+.dot.away { background: #e6c84a; }
+.dot.in-game { background: #e07a28; }
+.ava.owner { background: #1e6fa8; }
+
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; }
+  .rail.occ-rail {
+    max-height: 180px;
+    border-right: 0;
+    border-bottom: 1px solid #000;
+  }
+  .occ-list { max-height: 120px; }
+  .room-embed-frame { min-height: 120px; height: 120px; }
+}

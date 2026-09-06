@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906o1";
+  var LOGO_V = "20260906p";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -96,8 +96,10 @@
   // ---------------------------------------------------------------------------
   // Room music / playlist (wiki Music) — offline Pages-safe
   // How this works: MP3/etc upload → Stuff (type music, data URL). Room menu opens
-  // playlist panel. Tracks live in localStorage whirled2.playlist.loft. HTML5
-  // <audio id="room-audio"> plays current; onended advances. Max 99 tracks.
+  // playlist panel. Tracks live in localStorage whirled2.playlist.loft.
+  // source: local | youtube | spotify. Local uses HTML5 <audio id="room-audio">;
+  // embeds use #room-embed-dock iframe (chrome sibling under stage — not #stage-slot).
+  // ENGINE DEV: keep embed dock outside Pixi mount so stage stays clear.
   // ---------------------------------------------------------------------------
   var PLAYLIST_KEY = "whirled2.playlist.loft";
   var MUSIC_WARN_BYTES = 2 * 1024 * 1024; // soft warn ~2MB
@@ -113,25 +115,141 @@
     return true;
   }
   function defaultPlaylist() {
-    return { tracks: [], currentIndex: 0, ownerOnlyAdd: false };
+    // How this works: current = track index (legacy currentIndex migrated on load).
+    // ownerControlsMusic: only loft owner may switch source / paste embeds (hard).
+    // ownerOnlyAdd: guests may add local tracks only when false; never change yt/spotify.
+    return {
+      source: "local",
+      tracks: [],
+      current: 0,
+      ownerOnlyAdd: true,
+      ownerControlsMusic: true,
+      embedUrl: "",
+      embedSrc: "",
+      embedTitle: ""
+    };
+  }
+  function normalizePlaylistSource(v) {
+    v = String(v || "local").toLowerCase();
+    if (v === "youtube" || v === "spotify" || v === "local") return v;
+    return "local";
   }
   function loadPlaylist() {
     try {
       var p = JSON.parse(localStorage.getItem(PLAYLIST_KEY) || "null");
-      if (!p || !Array.isArray(p.tracks)) return defaultPlaylist();
-      if (typeof p.currentIndex !== "number") p.currentIndex = 0;
-      if (typeof p.ownerOnlyAdd !== "boolean") p.ownerOnlyAdd = false;
+      if (!p || typeof p !== "object") return defaultPlaylist();
+      if (!Array.isArray(p.tracks)) p.tracks = [];
+      // migrate legacy currentIndex → current
+      if (typeof p.current !== "number") {
+        p.current = typeof p.currentIndex === "number" ? p.currentIndex : 0;
+      }
+      delete p.currentIndex;
+      if (typeof p.ownerOnlyAdd !== "boolean") p.ownerOnlyAdd = true;
+      if (typeof p.ownerControlsMusic !== "boolean") p.ownerControlsMusic = true;
+      p.source = normalizePlaylistSource(p.source);
+      p.embedUrl = String(p.embedUrl || "");
+      p.embedSrc = String(p.embedSrc || "");
+      p.embedTitle = String(p.embedTitle || "").slice(0, 120);
       return p;
     } catch (e) { return defaultPlaylist(); }
   }
   function savePlaylist(p) {
-    try { localStorage.setItem(PLAYLIST_KEY, JSON.stringify(p)); } catch (e) {}
+    try {
+      if (p && typeof p === "object") {
+        if (typeof p.current !== "number" && typeof p.currentIndex === "number") p.current = p.currentIndex;
+        delete p.currentIndex;
+      }
+      localStorage.setItem(PLAYLIST_KEY, JSON.stringify(p));
+    } catch (e) {}
   }
   function myMusicStuff() {
     return loadStuff().filter(function (it) {
       var k = String(it.kind || it.type || it.category || "").toLowerCase();
       return k === "music" && (it.dataUrl || it.audio || it.thumb);
     });
+  }
+  // How this works: parse pasted YouTube / Spotify URLs into safe nocookie / embed iframe src.
+  // Only https youtube / youtu.be / youtube-nocookie and open.spotify.com hosts allowed.
+  function parseYouTubeEmbed(raw) {
+    raw = String(raw || "").trim();
+    if (!raw) return { ok: false, error: "Paste a YouTube video or playlist URL." };
+    var u;
+    try { u = new URL(raw); } catch (e) { return { ok: false, error: "That does not look like a valid URL." }; }
+    if (u.protocol !== "https:") return { ok: false, error: "Use https:// YouTube links only." };
+    var host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+    if (host !== "youtube.com" && host !== "m.youtube.com" && host !== "youtu.be" && host !== "youtube-nocookie.com") {
+      return { ok: false, error: "Only youtube.com / youtu.be links are allowed." };
+    }
+    var list = u.searchParams.get("list") || "";
+    var vid = "";
+    if (host === "youtu.be") {
+      vid = (u.pathname || "").replace(/^\//, "").split("/")[0] || "";
+    } else if ((u.pathname || "").indexOf("/embed/") === 0) {
+      vid = (u.pathname || "").split("/")[2] || "";
+      if (!list && u.searchParams.get("list")) list = u.searchParams.get("list");
+    } else if ((u.pathname || "").indexOf("/playlist") === 0) {
+      list = list || u.searchParams.get("list") || "";
+    } else {
+      vid = u.searchParams.get("v") || "";
+      if (!vid && (u.pathname || "").indexOf("/shorts/") === 0) {
+        vid = (u.pathname || "").split("/")[2] || "";
+      }
+      if (!vid && (u.pathname || "").indexOf("/live/") === 0) {
+        vid = (u.pathname || "").split("/")[2] || "";
+      }
+    }
+    if (!/^[A-Za-z0-9_-]{6,64}$/.test(vid || "x") && vid) {
+      return { ok: false, error: "Could not read a YouTube video id." };
+    }
+    if (list && !/^[A-Za-z0-9_-]{6,64}$/.test(list)) {
+      return { ok: false, error: "Could not read a YouTube playlist id." };
+    }
+    var src = "";
+    var title = "YouTube";
+    if (list && (!vid || (u.pathname || "").indexOf("/playlist") === 0)) {
+      src = "https://www.youtube-nocookie.com/embed/videoseries?list=" + encodeURIComponent(list);
+      title = "YouTube playlist";
+    } else if (vid) {
+      src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(vid);
+      title = "YouTube video";
+    } else if (list) {
+      src = "https://www.youtube-nocookie.com/embed/videoseries?list=" + encodeURIComponent(list);
+      title = "YouTube playlist";
+    } else {
+      return { ok: false, error: "Need a watch, youtu.be, or playlist URL." };
+    }
+    return { ok: true, embedUrl: raw, embedSrc: src, embedTitle: title };
+  }
+  function parseSpotifyEmbed(raw) {
+    raw = String(raw || "").trim();
+    if (!raw) return { ok: false, error: "Paste a Spotify track, album, playlist, or episode URL." };
+    var u;
+    try { u = new URL(raw); } catch (e) { return { ok: false, error: "That does not look like a valid URL." }; }
+    if (u.protocol !== "https:") return { ok: false, error: "Use https:// open.spotify.com links only." };
+    var host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+    if (host !== "open.spotify.com") {
+      return { ok: false, error: "Only open.spotify.com links are allowed." };
+    }
+    var parts = (u.pathname || "").split("/").filter(Boolean);
+    // international paths: /intl-xx/track/id
+    if (parts[0] && parts[0].indexOf("intl-") === 0) parts = parts.slice(1);
+    var type = parts[0] || "";
+    var id = (parts[1] || "").split("?")[0];
+    var allowed = { track: 1, album: 1, playlist: 1, episode: 1 };
+    if (!allowed[type] || !/^[A-Za-z0-9]{10,64}$/.test(id)) {
+      return { ok: false, error: "Need open.spotify.com/{track|album|playlist|episode}/{id}." };
+    }
+    return {
+      ok: true,
+      embedUrl: raw,
+      embedSrc: "https://open.spotify.com/embed/" + type + "/" + encodeURIComponent(id),
+      embedTitle: "Spotify " + type
+    };
+  }
+  function parseRoomEmbed(source, raw) {
+    if (source === "youtube") return parseYouTubeEmbed(raw);
+    if (source === "spotify") return parseSpotifyEmbed(raw);
+    return { ok: false, error: "Pick YouTube or Spotify." };
   }
   function ensureRoomAudioEl() {
     var a = document.getElementById("room-audio");
@@ -144,16 +262,74 @@
     a.addEventListener("ended", function () { playlistNext(true); });
     return a;
   }
+  function removeRoomEmbedDock() {
+    // How this works: hide/clear dock (placeholder may stay in roomView HTML). Leaving room pauses embed.
+    var dock = document.getElementById("room-embed-dock");
+    if (!dock) return;
+    dock.hidden = true;
+    dock.innerHTML = "";
+    dock.removeAttribute("data-embed-src");
+  }
+  function ensureRoomEmbedDock(pl) {
+    // How this works: compact iframe dock under the stage (sibling of #stage-slot host).
+    // ENGINE DEV: not inside #stage-slot — Pixi stays clear. User presses play in embed (autoplay policy).
+    if (!inRoom || !pl || (pl.source !== "youtube" && pl.source !== "spotify") || !pl.embedSrc) {
+      removeRoomEmbedDock();
+      return null;
+    }
+    var host = document.querySelector(".stage-wrap .stage-body") || document.querySelector(".stage-wrap");
+    if (!host) return null;
+    var dock = document.getElementById("room-embed-dock");
+    if (!dock) {
+      dock = document.createElement("div");
+      dock.id = "room-embed-dock";
+      dock.className = "room-embed-dock";
+      var after = document.querySelector(".stage-wrap .stage-host");
+      if (after && after.parentNode === host) {
+        if (after.nextSibling) host.insertBefore(dock, after.nextSibling);
+        else host.appendChild(dock);
+      } else {
+        host.appendChild(dock);
+      }
+    }
+    dock.hidden = false;
+    dock.className = "room-embed-dock";
+    var title = esc(pl.embedTitle || (pl.source === "spotify" ? "Spotify" : "YouTube"));
+    var src = String(pl.embedSrc || "");
+    if (dock.getAttribute("data-embed-src") !== src) {
+      dock.setAttribute("data-embed-src", src);
+      dock.innerHTML = '<div class="room-embed-head"><span class="meta">Room music · ' + title + '</span>'
+        + '<button type="button" class="text-btn" data-playlist-open-panel="1">Room music</button></div>'
+        + '<iframe class="room-embed-frame" title="' + title + '" src="' + esc(src) + '" '
+        + 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" '
+        + 'allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+        + '<p class="meta room-embed-note">Press play in the embed. Spotify playlists must be public; YouTube must allow embedding.</p>';
+    }
+    return dock;
+  }
   function syncRoomAudio() {
-    // How this works: keep <audio> pointed at playlist current track; try play when in room.
+    // How this works: local → <audio>; youtube/spotify → #room-embed-dock iframe; pause local when not local.
     var a = ensureRoomAudioEl();
     a.muted = !!roomAudioMuted;
+    var pl = loadPlaylist();
+    var src = normalizePlaylistSource(pl.source);
     if (!inRoom) {
       try { a.pause(); } catch (e) {}
+      removeRoomEmbedDock();
       return;
     }
-    var pl = loadPlaylist();
-    var track = pl.tracks[pl.currentIndex];
+    if (src !== "local") {
+      try { a.pause(); a.removeAttribute("src"); a.removeAttribute("data-track-id"); } catch (eHide) {}
+      a.style.display = "none";
+      ensureRoomEmbedDock(pl);
+      musicGestureNeeded = false;
+      var btnHide = document.getElementById("music-gesture-btn");
+      if (btnHide) btnHide.hidden = true;
+      return;
+    }
+    removeRoomEmbedDock();
+    a.style.display = "none";
+    var track = pl.tracks[pl.current];
     if (!track || !track.dataUrl) {
       try { a.pause(); a.removeAttribute("src"); } catch (e2) {}
       return;
@@ -177,20 +353,25 @@
   }
   function playlistNext(fromEnded) {
     var pl = loadPlaylist();
+    if (normalizePlaylistSource(pl.source) !== "local") return;
     if (!pl.tracks.length) return;
-    pl.currentIndex = (pl.currentIndex + 1) % pl.tracks.length;
+    pl.current = (pl.current + 1) % pl.tracks.length;
     savePlaylist(pl);
     if (playlistPanelOpen && inRoom) paint("rooms");
     else syncRoomAudio();
   }
   function playlistPanel() {
+    // How this works: Room music panel — My uploads / YouTube / Spotify.
+    // Hard rule: only loft owner switches source / pastes embeds / locks. Guests may listen;
+    // optional guest local-track adds when ownerOnlyAdd is false. Never guest yt/spotify edits.
     var pl = loadPlaylist();
     var owner = isLoftOwner();
-    var canAdd = owner || !pl.ownerOnlyAdd;
+    var canAddLocal = owner || !pl.ownerOnlyAdd;
+    var src = normalizePlaylistSource(pl.source);
     var music = myMusicStuff();
     var rows = pl.tracks.length
       ? pl.tracks.map(function (t, i) {
-          var now = i === pl.currentIndex;
+          var now = i === pl.current;
           return '<div class="playlist-row' + (now ? " is-playing" : "") + '">'
             + (now ? "<b>" : "") + esc(t.name || "Track") + (now ? "</b>" : "")
             + ' <span class="meta">by ' + esc(t.by || "?") + '</span>'
@@ -204,14 +385,19 @@
           return '<option value="' + esc(m.id) + '">' + esc(m.name || "Untitled") + '</option>';
         }).join("")
       : "";
-    return '<div class="room-side-panel" id="room-playlist-panel">'
-      + '<div class="panel">'
-      +   '<div class="room-side-head"><h2>Room playlist</h2>'
-      +     '<button type="button" class="text-btn" data-playlist-close="1">Close</button></div>'
-      +   '<p class="meta">Classic wiki Music vibe: anyone can add (unless owner locks). Max 99. Offline localStorage only — no shared server yet.</p>'
+    var sourceTabs = '<div class="section-label">Music source</div>'
+      + '<div class="playlist-source-tabs" role="tablist">'
+      +   '<button type="button" class="action-btn' + (src === "local" ? " is-on" : "") + '" data-playlist-source="local"' + (owner ? "" : " disabled") + '>My uploads</button>'
+      +   '<button type="button" class="action-btn' + (src === "youtube" ? " is-on" : "") + '" data-playlist-source="youtube"' + (owner ? "" : " disabled") + '>YouTube</button>'
+      +   '<button type="button" class="action-btn' + (src === "spotify" ? " is-on" : "") + '" data-playlist-source="spotify"' + (owner ? "" : " disabled") + '>Spotify</button>'
+      + '</div>'
+      + (owner
+          ? ""
+          : '<p class="meta owner-music-note">Owner controls room music — you can listen, but only the loft owner changes source or embeds.</p>');
+    var localBody = ''
       +   '<div class="playlist-now">'
-      +     (pl.tracks[pl.currentIndex]
-            ? ('Now playing: <b>' + esc(pl.tracks[pl.currentIndex].name || "Track") + '</b>')
+      +     (pl.tracks[pl.current]
+            ? ('Now playing: <b>' + esc(pl.tracks[pl.current].name || "Track") + '</b>')
             : "Nothing playing.")
       +   '</div>'
       +   '<div class="playlist-controls">'
@@ -222,16 +408,41 @@
       +   '<div class="section-label">Queue (' + pl.tracks.length + '/99)</div>'
       +   '<div class="playlist-list">' + rows + '</div>'
       +   (owner
-          ? ('<label class="check-row"><input type="checkbox" data-playlist-owner-only="1"' + (pl.ownerOnlyAdd ? " checked" : "") + ' /> Only owner may add tracks</label>')
-          : ('<p class="meta">' + (pl.ownerOnlyAdd ? "Owner locked adds — only loft owner can add." : "Anyone in the room may add (classic default).") + '</p>'))
-      +   (canAdd
+          ? ('<label class="check-row"><input type="checkbox" data-playlist-owner-only="1"' + (pl.ownerOnlyAdd ? " checked" : "") + ' /> Only owner may add local tracks</label>'
+            + '<p class="meta">YouTube / Spotify source &amp; URLs stay owner-only even if guests may add uploads.</p>')
+          : ('<p class="meta">' + (pl.ownerOnlyAdd ? "Owner locked local adds." : "Guests may add local tracks (uploads only).") + '</p>'))
+      +   (canAddLocal && src === "local"
           ? ('<div class="section-label">Add from My Music</div>'
             + (music.length
               ? ('<form id="playlist-add-form" class="playlist-add-form">'
                 + '<select name="stuffId" required><option value="">— pick a track —</option>' + addOpts + '</select>'
                 + '<button type="submit">Add to playlist</button></form>')
               : '<p class="meta">No Music in Stuff yet. Stuff → Music → Upload… (MP3/WAV/OGG; copyright checkbox required).</p>'))
-          : '<p class="meta">Adds locked to loft owner.</p>')
+          : (src === "local" ? '<p class="meta">Local adds locked to loft owner.</p>' : ""));
+    var embedBody = ''
+      + '<p class="meta">' + (src === "youtube"
+          ? "Paste a youtube.com watch / youtu.be / playlist URL. Embeds use youtube-nocookie. Video must allow embedding."
+          : "Paste an open.spotify.com track / album / playlist / episode URL. Playlists must be <b>public</b>.") + '</p>'
+      + (owner
+          ? ('<form id="playlist-embed-form" class="playlist-embed-form">'
+            + '<input name="embedUrl" type="url" required placeholder="' + (src === "youtube" ? "https://www.youtube.com/watch?v=…" : "https://open.spotify.com/playlist/…") + '" value="' + esc(pl.embedUrl || "") + '" />'
+            + '<button type="submit">Set embed</button></form>')
+          : '<p class="meta">Owner controls room music — embed URL is read-only for guests.</p>')
+      + (pl.embedSrc
+          ? ('<div class="playlist-embed-preview">'
+            + '<p class="meta">Preview · ' + esc(pl.embedTitle || src) + ' — press play in the player.</p>'
+            + '<iframe class="room-embed-frame" title="' + esc(pl.embedTitle || "embed") + '" src="' + esc(pl.embedSrc) + '" '
+            + 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" '
+            + 'allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>')
+          : '<p class="meta">No embed set yet.</p>')
+      + '<p class="meta legal-embed-note">Embedded players use YouTube/Spotify’s own embeds. Respect their ToS; Whirled2 does not host that audio. Local uploads still require you own the rights.</p>';
+    return '<div class="room-side-panel" id="room-playlist-panel">'
+      + '<div class="panel">'
+      +   '<div class="room-side-head"><h2>Room music</h2>'
+      +     '<button type="button" class="text-btn" data-playlist-close="1">Close</button></div>'
+      +   '<p class="meta">Classic wiki Music vibe, plus optional YouTube / Spotify embeds. Offline localStorage — no shared server yet.</p>'
+      +   sourceTabs
+      +   (src === "local" ? localBody : embedBody)
       + '</div></div>';
   }
 
@@ -263,7 +474,8 @@
   var groupThreadId = null;
   var roomMenuOpen = false;
   var roomPanelOpen = false;
-  var playlistPanelOpen = false; // Room menu → View room playlist
+  var playlistPanelOpen = false; // Room menu → View room music
+  var occFilterQ = ""; // optional occupant rail filter when >5 people
   var roomItemsPanelOpen = false; // Room menu → View items
   var decorateMode = false;
   var partyPanelOpen = false;
@@ -1477,7 +1689,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + dual currency / streaks (?v=20260906o1)
+  // Fidelity + dual currency / streaks (?v=20260906p)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -2209,9 +2421,50 @@
     }
     return { name: "Guest", initials: "?", bio: "", coins: 0, bars: 0, streakDays: 0, room: ROOM };
   }
+  function isLoftOwnerId(uid) {
+    // How this works: loft owner ≈ first registered user on this browser (same as isLoftOwner).
+    if (!uid) return false;
+    try {
+      var first = localStorage.getItem(FIRST_USER_KEY);
+      if (first) return String(uid) === String(first);
+    } catch (e) {}
+    return false;
+  }
+  function sortOccupantsYouFirst(list) {
+    // How this works: you first, then owner, then friends, then alpha — real session occupants only.
+    var friends = {};
+    try {
+      loadFriends().forEach(function (f) { if (f && f.id) friends[f.id] = true; });
+    } catch (eF) {}
+    return list.slice().sort(function (a, b) {
+      var ay = a.you ? 0 : 1;
+      var by = b.you ? 0 : 1;
+      if (ay !== by) return ay - by;
+      var ao = isLoftOwnerId(a.id) ? 0 : 1;
+      var bo = isLoftOwnerId(b.id) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      var af = friends[a.id] ? 0 : 1;
+      var bf = friends[b.id] ? 0 : 1;
+      if (af !== bf) return af - bf;
+      return String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
+    });
+  }
+  function presenceDotClass(p) {
+    // green = here, yellow = /away, orange = in-game stub
+    if (p && p.inGame) return "dot in-game";
+    if (p && p.id && isAway(p.id)) return "dot away";
+    if (p && (p.online || p.you)) return "dot on pulse";
+    return "dot";
+  }
   function personRow(p) {
+    // How this works: compact rail row — initials, name, role, presence; click opens occ menu.
     var id = p.id || "";
     var open = occMenuId && occMenuId === id;
+    var isFriend = false;
+    try {
+      if (!p.you) isFriend = loadFriends().some(function (f) { return f && f.id === id; });
+    } catch (eFr) {}
+    var isOwner = isLoftOwnerId(id);
     var menu;
     if (p.you) {
       menu = '<div class="occ-menu" role="menu">'
@@ -2221,32 +2474,72 @@
     } else {
       menu = '<div class="occ-menu" role="menu">'
         + '<button type="button" class="occ-menu-item" data-profile="' + esc(id) + '">View Profile</button>'
+        + '<button type="button" class="occ-menu-item" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(p.name || id) + '">Whisper</button>'
         + '<button type="button" class="occ-menu-item" data-invite-buddy="' + esc(id) + '" data-friend-name="' + esc(p.name || id) + '">Invite to be your friend</button>'
         + '<button type="button" class="occ-menu-item" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(p.name || id) + '">Send Mail</button>'
+        + '<button type="button" class="occ-menu-item" data-block-chat="' + esc(id) + '" data-block-name="' + esc(p.name || id) + '">Block</button>'
         + '<button type="button" class="occ-menu-item" data-enter-room="loft">Visit Home</button>'
         + '</div>';
     }
-    return '<div class="person-wrap' + (open ? " is-open" : "") + '">'
-      + '<button type="button" class="person" data-occ-menu="' + esc(id) + '">'
-      + '<span class="ava' + (p.you ? " you" : "") + '">' + esc(p.initials || "?") + '</span>'
-      + '<span class="person-name">' + esc(p.name) + roleBadgeHtml(getRole(id)) + (p.you ? " <span class=\"sub\">(you)</span>" : "") + '</span>'
-      + '<span class="dot' + (p.online ? " on pulse" : "") + '"></span>'
-      + '<span class="sub">' + esc(p.you ? "you" : (p.room || "")) + '</span></button>'
+    var wrapCls = "person-wrap"
+      + (open ? " is-open" : "")
+      + (p.you ? " is-you" : "")
+      + (isFriend ? " is-friend" : "")
+      + (isOwner ? " is-owner" : "");
+    var statusLabel = p.you ? "you" : (p.inGame ? "in game" : (isAway(id) ? "away" : "here"));
+    return '<div class="' + wrapCls + '">'
+      + '<button type="button" class="person" data-occ-menu="' + esc(id) + '" title="' + esc(p.name || id) + '">'
+      + '<span class="' + presenceDotClass(p) + '" aria-hidden="true"></span>'
+      + '<span class="ava' + (p.you ? " you" : "") + (isOwner ? " owner" : "") + '">' + esc(p.initials || "?") + '</span>'
+      + '<span class="person-meta">'
+      +   '<span class="person-name">' + esc(p.name)
+      +     + roleBadgeHtml(getRole(id))
+      +     + (isOwner ? ' <span class="owner-crown" title="Loft owner">♛</span>' : "")
+      +     + (p.you ? ' <span class="sub">(you)</span>' : "")
+      +     + (isFriend && !p.you ? ' <span class="friend-mark" title="Friend">★</span>' : "")
+      +   '</span>'
+      +   '<span class="sub person-status">' + esc(statusLabel) + '</span>'
+      + '</span></button>'
       + (open ? menu : "")
       + '</div>';
   }
   function occLegend() {
-    return '<div class="occ-legend" title="Starting out glow colors — legend only">'
-      + '<span><i class="lg green"></i> Green door</span>'
-      + '<span><i class="lg white"></i> White game</span>'
-      + '<span><i class="lg blue"></i> Blue player</span>'
+    return '<div class="occ-legend" title="Presence + classic glow legend">'
+      + '<span><i class="lg green"></i> Here</span>'
+      + '<span><i class="lg yellow"></i> Away</span>'
+      + '<span><i class="lg orange"></i> In game</span>'
       + '</div>';
+  }
+  function occupantRailHtml(here) {
+    // How this works: modernized left rail — count, you-first, optional filter, real occupants only.
+    here = sortOccupantsYouFirst(here || []);
+    var n = here.length;
+    var q = String(occFilterQ || "").trim().toLowerCase();
+    var shown = here;
+    if (q && n > 5) {
+      shown = here.filter(function (p) {
+        return String(p.name || "").toLowerCase().indexOf(q) >= 0
+          || String(p.id || "").toLowerCase().indexOf(q) >= 0;
+      });
+    }
+    var filter = n > 5
+      ? ('<label class="occ-filter"><span class="sr-only">Filter occupants</span>'
+        + '<input type="search" id="occ-filter-input" placeholder="Filter…" value="' + esc(occFilterQ || "") + '" data-occ-filter="1" autocomplete="off" /></label>')
+      : "";
+    return '<div class="occ-rail-head"><h2>In this room <span class="occ-count">(' + n + ')</span></h2>'
+      + occLegend()
+      + filter
+      + '</div>'
+      + '<div class="occ-list">'
+      + (shown.length ? shown.map(personRow).join("") : '<p class="sub occ-empty">Nobody here yet.</p>')
+      + '</div>'
+      + '<button type="button" class="text-btn leave-room" data-leave-room="1">Back to Rooms</button>';
   }
   function shareInviteUrl() {
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906o1";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906p";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3077,9 +3370,9 @@ function helpPage() {
       + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname), Transactions (Coins &amp; Bars).</li>'
       + '<li><b>Rooms</b> — enter Studio Loft; chat in the bar; Room menu for comment/rate, decorate, lock (visual).</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
-      + '<li><b>Room playlist</b> — Room menu → View room playlist. Add from My Music; owner can remove/next. Soft autoplay with Click-to-play if blocked.</li>'
+      + '<li><b>Room music</b> — Room menu → View room music. Owner picks My uploads / YouTube / Spotify. Guests listen; owner controls embeds. Soft autoplay for local.</li>'
       + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
-      + '<li><b>Profile look</b> — Me → My Profile → presets (Classic / Night / Sunset…) publish instantly; Edit look for fine-tune.</li>'
+      + '<li><b>Profile look</b> — Me → My Profile → presets (Classic / Night / Ocean / Forest / Candy / Mono…) publish instantly; Edit look for font/corners/modules/banner.</li>'
       + '<li><b>Ctrl+K</b> — command palette to jump Me / Mail / Rooms / … Press <b>?</b> for shortcuts.</li>'
       + '<li><b>Mail</b> — header count; compose from Me → Mail or profiles.</li>'
       + '<li><b>Groups</b> — local clubs with discussion + Enter hall (lobby meta).</li>'
@@ -3091,7 +3384,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Coins + Bars dual currency, daily/weekly streaks, Transactions filters. Cache <code>?v=20260906o1</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Profile look extras, room music embeds (owner-controlled), occupant rail polish. Cache <code>?v=20260906p</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -3142,15 +3435,14 @@ function helpPage() {
         return p;
       });
     }
+    here = sortOccupantsYouFirst(here);
     var empty = here.length === 0;
     var lock = loadRoomLock();
     var lockMode = lock.mode || "unlocked";
     return ''
       + '<div class="workspace">'
-      +   '<aside class="rail"><h2>In this room</h2>'
-      +     occLegend()
-      +     (empty ? '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>' : here.map(personRow).join(''))
-      +     '<button type="button" class="text-btn leave-room" data-leave-room="1">Back to Rooms</button>'
+      +   '<aside class="rail occ-rail">'
+      +     occupantRailHtml(here)
       +   '</aside>'
       +   '<section class="stage-wrap">'
       +     '<div class="room-strip"><span class="room-name">' + esc(ROOM) + '</span>'
@@ -3169,6 +3461,9 @@ function helpPage() {
       // dark panel. Bottom #chat-form input stays in the chrome either way.
       +       '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       +     '</div>'
+      // How this works: #room-embed-dock is chrome UI under the stage (sibling of .stage-host), not inside #stage-slot.
+      // ENGINE DEV: prefer this dock so Pixi stays clear; syncRoomAudio fills/removes it for yt/spotify.
+      +     '<div id="room-embed-dock" class="room-embed-dock" hidden></div>'
       +     chatTabsHtml()
       +     '<div class="chat-log" id="chat-log">' + activeChatMessages().map(chatRow).join('') + '</div>'
       +     '<div class="room-invite-row"><button type="button" class="text-btn" data-copy-invite="room">Copy room invite link</button></div>'
@@ -3216,46 +3511,103 @@ function helpPage() {
   // How this works: presets + schema for Profile look / Customize look (BG/modules/text/links).
   // ENGINE DEV: profile page chrome only; not #stage-slot — engine ignores profile skins.
   var PROFILE_SKIN_TILE_SOFT = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%23e8f4fb'/%3E%3Ccircle cx='4' cy='4' r='1.5' fill='%23a8c8e0' opacity='0.55'/%3E%3Ccircle cx='16' cy='14' r='1.2' fill='%2390b8d8' opacity='0.4'/%3E%3C/svg%3E";
+  // How this works: Profile look presets — always-visible buttons publish instantly.
+  // Beginner: pick Ocean etc. to change BG/accent; Edit look for font/radius/module/header/banner.
+  // ENGINE DEV: profile page chrome only; not #stage-slot — no profile music.
   var PROFILE_SKIN_PRESETS = {
     classic: {
       bgType: "gradient", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
       accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
-      panelAlpha: 0.72, motto: ""
+      panelAlpha: 0.72, motto: "", tagline: "",
+      fontScale: 1, radius: "soft", moduleStyle: "frosted", headerStyle: "band", bannerImage: ""
     },
     night: {
       bgType: "gradient", bgColor: "#1a2433", bgColor2: "#2c3e55", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
       accent: "#7ec8f0", textColor: "#e8f0f8", linkColor: "#7ec8f0",
-      panelAlpha: 0.60, motto: ""
+      panelAlpha: 0.60, motto: "", tagline: "",
+      fontScale: 1, radius: "soft", moduleStyle: "solid", headerStyle: "minimal", bannerImage: ""
     },
     sunset: {
       bgType: "gradient", bgColor: "#ffb347", bgColor2: "#ff6b8a", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
       accent: "#7a2410", textColor: "#2a120c", linkColor: "#6b1f0c",
-      panelAlpha: 0.72, motto: ""
+      panelAlpha: 0.72, motto: "", tagline: "",
+      fontScale: 1, radius: "round", moduleStyle: "frosted", headerStyle: "accent-bar", bannerImage: ""
     },
     paper: {
       bgType: "color", bgColor: "#f4efe6", bgColor2: "#ffffff", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
       accent: "#6b5b4a", textColor: "#3a3228", linkColor: "#6b5b4a",
-      panelAlpha: 0.88, motto: ""
+      panelAlpha: 0.88, motto: "", tagline: "",
+      fontScale: 1, radius: "sharp", moduleStyle: "outline", headerStyle: "minimal", bannerImage: ""
     },
     tileSoft: {
       bgType: "image", bgColor: "#e8f4fb", bgColor2: "#ffffff", bgImage: PROFILE_SKIN_TILE_SOFT,
       bgRepeat: "repeat", bgAttachment: "scroll",
       accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
-      panelAlpha: 0.72, motto: ""
+      panelAlpha: 0.72, motto: "", tagline: "",
+      fontScale: 1, radius: "soft", moduleStyle: "frosted", headerStyle: "band", bannerImage: ""
     },
     clear: {
       bgType: "none", bgColor: "#cfe6f5", bgColor2: "#ffffff", bgImage: "",
       bgRepeat: "cover", bgAttachment: "scroll",
       accent: "#1e6fa8", textColor: "#16324a", linkColor: "#1e6fa8",
-      panelAlpha: 0.72, motto: ""
+      panelAlpha: 0.72, motto: "", tagline: "",
+      fontScale: 1, radius: "soft", moduleStyle: "frosted", headerStyle: "band", bannerImage: ""
+    },
+    ocean: {
+      bgType: "gradient", bgColor: "#0b4f6c", bgColor2: "#01baef", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#dff6ff", textColor: "#e8f7fc", linkColor: "#b8ecff",
+      panelAlpha: 0.66, motto: "", tagline: "",
+      fontScale: 1, radius: "round", moduleStyle: "frosted", headerStyle: "accent-bar", bannerImage: ""
+    },
+    forest: {
+      bgType: "gradient", bgColor: "#1b4332", bgColor2: "#95d5b2", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#d8f3dc", textColor: "#f1faee", linkColor: "#b7e4c7",
+      panelAlpha: 0.70, motto: "", tagline: "",
+      fontScale: 1, radius: "soft", moduleStyle: "solid", headerStyle: "band", bannerImage: ""
+    },
+    candy: {
+      bgType: "gradient", bgColor: "#ffafcc", bgColor2: "#a2d2ff", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#c9184a", textColor: "#3d0c20", linkColor: "#9d174d",
+      panelAlpha: 0.78, motto: "", tagline: "",
+      fontScale: 1.1, radius: "round", moduleStyle: "frosted", headerStyle: "accent-bar", bannerImage: ""
+    },
+    mono: {
+      bgType: "gradient", bgColor: "#2b2d42", bgColor2: "#edf2f4", bgImage: "",
+      bgRepeat: "cover", bgAttachment: "scroll",
+      accent: "#111111", textColor: "#1a1a1a", linkColor: "#333333",
+      panelAlpha: 0.88, motto: "", tagline: "",
+      fontScale: 0.9, radius: "sharp", moduleStyle: "outline", headerStyle: "minimal", bannerImage: ""
     }
   };
   var PROFILE_BG_MAX_WARN = 400 * 1024;   // soft warn ~400KB
   var PROFILE_BG_MAX_HARD = 900 * 1024;   // reject huge uploads
+  function normalizeFontScale(v) {
+    v = Number(v);
+    if (v === 0.9 || v === 1.1) return v;
+    return 1;
+  }
+  function normalizeRadius(v) {
+    v = String(v || "soft");
+    if (v === "sharp" || v === "soft" || v === "round") return v;
+    return "soft";
+  }
+  function normalizeModuleStyle(v) {
+    v = String(v || "frosted");
+    if (v === "frosted" || v === "solid" || v === "outline") return v;
+    return "frosted";
+  }
+  function normalizeHeaderStyle(v) {
+    v = String(v || "band");
+    if (v === "band" || v === "minimal" || v === "accent-bar") return v;
+    return "band";
+  }
   function defaultProfileSkin() {
     // How this works: demos show Classic Blue so the page isn't blank; Clear preset → none.
     return {
@@ -3269,7 +3621,13 @@ function helpPage() {
       textColor: "#16324a",
       linkColor: "#1e6fa8",
       panelAlpha: 0.72,
-      motto: ""
+      motto: "",
+      tagline: "",
+      fontScale: 1,
+      radius: "soft",
+      moduleStyle: "frosted",
+      headerStyle: "band",
+      bannerImage: ""
     };
   }
   function normalizeBgRepeat(v) {
@@ -3302,7 +3660,13 @@ function helpPage() {
       textColor: String(s.textColor || d.textColor).slice(0, 32),
       linkColor: String(s.linkColor || d.linkColor).slice(0, 32),
       panelAlpha: clampPanelAlpha(s.panelAlpha, d.panelAlpha),
-      motto: String(s.motto || "").slice(0, 80)
+      motto: String(s.motto || "").slice(0, 80),
+      tagline: String(s.tagline || "").slice(0, 100),
+      fontScale: normalizeFontScale(s.fontScale != null ? s.fontScale : d.fontScale),
+      radius: normalizeRadius(s.radius != null ? s.radius : d.radius),
+      moduleStyle: normalizeModuleStyle(s.moduleStyle != null ? s.moduleStyle : d.moduleStyle),
+      headerStyle: normalizeHeaderStyle(s.headerStyle != null ? s.headerStyle : d.headerStyle),
+      bannerImage: String(s.bannerImage || "").slice(0, 1200000)
     };
   }
   function loadProfileSkin(userId) {
@@ -3316,13 +3680,15 @@ function helpPage() {
     } catch (e) { return defaultProfileSkin(); }
   }
   function saveProfileSkin(userId, skin) {
-    // How this works: normalize + cap motto; drop huge bgImage if somehow oversized.
+    // How this works: normalize + cap motto/tagline; drop huge images if oversized.
     var out = normalizeProfileSkin(skin);
     if (out.bgType !== "image") out.bgImage = "";
     else out.bgImage = String(out.bgImage || "").slice(0, 1200000);
+    out.bannerImage = String(out.bannerImage || "").slice(0, 1200000);
     try { localStorage.setItem(PROFILE_SKIN_KEY + userId, JSON.stringify(out)); } catch (e) {
       try {
         out.bgImage = "";
+        out.bannerImage = "";
         if (out.bgType === "image") out.bgType = "color";
         localStorage.setItem(PROFILE_SKIN_KEY + userId, JSON.stringify(out));
       } catch (e2) {}
@@ -3356,12 +3722,21 @@ function helpPage() {
         bgShorthand = String(skin.bgColor || "#cfe6f5") + ' url("' + rawUrl + '") center top / auto ' + rep + ' ' + attach;
       }
     }
+    var radiusPx = skin.radius === "sharp" ? "2px" : (skin.radius === "round" ? "16px" : "8px");
     targets.forEach(function (el) {
       el.style.setProperty("--profile-accent", String(skin.accent || "#1e6fa8"));
       el.style.setProperty("--profile-panel", "rgba(255,255,255," + alpha + ")");
       el.style.setProperty("--profile-text", String(skin.textColor || "#16324a"));
       el.style.setProperty("--profile-link", String(skin.linkColor || "#1e6fa8"));
+      el.style.setProperty("--profile-font-scale", String(normalizeFontScale(skin.fontScale)));
+      el.style.setProperty("--profile-radius", radiusPx);
       el.classList.toggle("has-profile-skin", !!has);
+      el.classList.remove("profile-radius-sharp", "profile-radius-soft", "profile-radius-round");
+      el.classList.add("profile-radius-" + normalizeRadius(skin.radius));
+      el.classList.remove("profile-mod-frosted", "profile-mod-solid", "profile-mod-outline");
+      el.classList.add("profile-mod-" + normalizeModuleStyle(skin.moduleStyle));
+      el.classList.remove("profile-header-band", "profile-header-minimal", "profile-header-accent-bar");
+      el.classList.add("profile-header-" + normalizeHeaderStyle(skin.headerStyle));
       // Reset then apply full shorthand (beats .page background-color: var(--paper))
       el.style.background = "";
       el.style.backgroundColor = "";
@@ -3373,6 +3748,17 @@ function helpPage() {
       if (!has) return;
       el.style.background = bgShorthand;
     });
+    // Thin banner under me-subnav / above profile header
+    var banner = document.getElementById("profile-banner");
+    if (banner) {
+      if (skin.bannerImage) {
+        banner.hidden = false;
+        banner.style.backgroundImage = 'url("' + String(skin.bannerImage).replace(/\\/g, "").replace(/"/g, "").replace(/'/g, "") + '")';
+      } else {
+        banner.hidden = true;
+        banner.style.backgroundImage = "";
+      }
+    }
   }
   function readSkinFormDraft(form) {
     // How this works: live preview draft from open Customize look form (not persisted until Save / preset).
@@ -3384,6 +3770,11 @@ function helpPage() {
       if (window.__skinBgPending) bgImage = String(window.__skinBgPending);
       else if (form.keepImage && String(form.keepImage.value) === "1") bgImage = prev.bgImage || "";
     }
+    var bannerImage = "";
+    if (window.__skinBannerPending) bannerImage = String(window.__skinBannerPending);
+    else if (form.keepBanner && String(form.keepBanner.value) === "1") bannerImage = prev.bannerImage || "";
+    else if (form.clearBanner && form.clearBanner.checked) bannerImage = "";
+    else bannerImage = prev.bannerImage || "";
     return normalizeProfileSkin({
       bgType: bgType,
       bgColor: form.bgColor ? form.bgColor.value : prev.bgColor,
@@ -3395,7 +3786,13 @@ function helpPage() {
       textColor: form.textColor ? form.textColor.value : prev.textColor,
       linkColor: form.linkColor ? form.linkColor.value : prev.linkColor,
       panelAlpha: form.panelAlpha ? form.panelAlpha.value : prev.panelAlpha,
-      motto: form.motto ? form.motto.value : prev.motto
+      motto: form.motto ? form.motto.value : prev.motto,
+      tagline: form.tagline ? form.tagline.value : prev.tagline,
+      fontScale: form.fontScale ? form.fontScale.value : prev.fontScale,
+      radius: form.radius ? form.radius.value : prev.radius,
+      moduleStyle: form.moduleStyle ? form.moduleStyle.value : prev.moduleStyle,
+      headerStyle: form.headerStyle ? form.headerStyle.value : prev.headerStyle,
+      bannerImage: bannerImage
     });
   }
   function fillSkinFormFromPreset(form, preset) {
@@ -3413,6 +3810,11 @@ function helpPage() {
     if (form.linkColorPicker) form.linkColorPicker.value = preset.linkColor || "#1e6fa8";
     if (form.bgRepeat) form.bgRepeat.value = normalizeBgRepeat(preset.bgRepeat);
     if (form.bgAttachment) form.bgAttachment.value = normalizeBgAttachment(preset.bgAttachment);
+    if (form.fontScale) form.fontScale.value = String(normalizeFontScale(preset.fontScale));
+    if (form.radius) form.radius.value = normalizeRadius(preset.radius);
+    if (form.moduleStyle) form.moduleStyle.value = normalizeModuleStyle(preset.moduleStyle);
+    if (form.headerStyle) form.headerStyle.value = normalizeHeaderStyle(preset.headerStyle);
+    if (form.tagline && preset.tagline != null) form.tagline.value = preset.tagline || "";
     var a = Number(preset.panelAlpha);
     if (form.panelAlpha) {
       if (a >= 0.95) form.panelAlpha.value = "1";
@@ -3431,6 +3833,8 @@ function helpPage() {
       var hidC = document.getElementById("skin-bg-data");
       if (hidC) hidC.value = "";
     }
+    window.__skinBannerPending = preset.bannerImage || "";
+    if (form.keepBanner) form.keepBanner.value = preset.bannerImage ? "1" : "0";
   }
   function loadPokes() {
     try { return JSON.parse(localStorage.getItem(POKE_KEY) || "{}"); } catch (e) { return {}; }
@@ -3886,6 +4290,7 @@ function helpPage() {
         + (open ? "Done" : ("Edit " + label)) + '</button>';
     }
     return '<section class="page me-page profile-page">' + meSubnav()
+      + (skin.bannerImage ? ('<div id="profile-banner" class="profile-banner" style="background-image:url(\'' + String(skin.bannerImage).replace(/'/g, '') + '\')"></div>') : '<div id="profile-banner" class="profile-banner" hidden></div>')
       + '<div class="profile-skin">'
       + '<div class="classic-profile">'
       +   '<div class="cp-header">'
@@ -3896,6 +4301,7 @@ function helpPage() {
       +       '<div class="cp-status-block">'
       +         '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
       +         (skin.motto ? ('<div class="cp-motto">' + esc(skin.motto) + '</div>') : '')
+      +         (skin.tagline ? ('<div class="cp-tagline">' + esc(skin.tagline) + '</div>') : '')
       +         editToggle("status", "status")
       +       '</div>'
       +       profileActionRow({
@@ -3928,7 +4334,7 @@ function helpPage() {
           : '')
       +   '<div class="cp-section cp-customize"><div class="cp-section-head"><h2>Customize look</h2>'
       +     editToggle("skin", "look") + '</div>'
-      +     '<p class="meta">Whirled profile themes for visitors: background, module boxes, text &amp; link colors. Presets publish instantly. Open Edit look for fine-tune, then Publish. No profile music — use room playlists.</p>'
+      +     '<p class="meta">Whirled profile themes for visitors: background, modules, font scale, corners, header style, optional banner &amp; tagline. Presets publish instantly. Open Edit look for fine-tune, then Publish. No profile music — use room music.</p>'
       +     (skin.motto ? ('<p class="cp-motto-preview"><i>' + esc(skin.motto) + '</i></p>') : '')
       +     '<div class="section-label">Profile look presets (publish immediately)</div>'
       +     '<div class="skin-presets skin-presets-always">'
@@ -3937,6 +4343,10 @@ function helpPage() {
       +       '<button type="button" class="action-btn" data-skin-preset="sunset">Sunset</button>'
       +       '<button type="button" class="action-btn" data-skin-preset="paper">Paper</button>'
       +       '<button type="button" class="action-btn" data-skin-preset="tileSoft">Tile Soft</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="ocean">Ocean</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="forest">Forest</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="candy">Candy</button>'
+      +       '<button type="button" class="action-btn" data-skin-preset="mono">Mono</button>'
       +       '<button type="button" class="action-btn" data-skin-preset="clear">Clear</button>'
       +     '</div>'
       +     (editSkin
@@ -3978,12 +4388,38 @@ function helpPage() {
               +       '<option value="0.60"' + (Number(skin.panelAlpha) < 0.68 ? " selected" : "") + '>Very clear</option>'
               +     '</select></label>'
               +     '<label>Motto <input name="motto" maxlength="80" placeholder="Short blurb under status" value="' + esc(skin.motto || "") + '" /></label>'
+              +     '<label>Tagline <input name="tagline" maxlength="100" placeholder="Optional line (uses text color)" value="' + esc(skin.tagline || "") + '" /></label>'
+              +     '<label>Font scale <select name="fontScale">'
+              +       '<option value="0.9"' + (Number(skin.fontScale) === 0.9 ? " selected" : "") + '>Small (0.9)</option>'
+              +       '<option value="1"' + (Number(skin.fontScale) !== 0.9 && Number(skin.fontScale) !== 1.1 ? " selected" : "") + '>Normal</option>'
+              +       '<option value="1.1"' + (Number(skin.fontScale) === 1.1 ? " selected" : "") + '>Large (1.1)</option>'
+              +     '</select></label>'
+              +     '<label>Corners <select name="radius">'
+              +       '<option value="sharp"' + (skin.radius === "sharp" ? " selected" : "") + '>Sharp</option>'
+              +       '<option value="soft"' + (skin.radius !== "sharp" && skin.radius !== "round" ? " selected" : "") + '>Soft</option>'
+              +       '<option value="round"' + (skin.radius === "round" ? " selected" : "") + '>Round</option>'
+              +     '</select></label>'
+              +     '<label>Module style <select name="moduleStyle">'
+              +       '<option value="frosted"' + (skin.moduleStyle !== "solid" && skin.moduleStyle !== "outline" ? " selected" : "") + '>Frosted</option>'
+              +       '<option value="solid"' + (skin.moduleStyle === "solid" ? " selected" : "") + '>Solid</option>'
+              +       '<option value="outline"' + (skin.moduleStyle === "outline" ? " selected" : "") + '>Outline</option>'
+              +     '</select></label>'
+              +     '<label>Header style <select name="headerStyle">'
+              +       '<option value="band"' + (skin.headerStyle !== "minimal" && skin.headerStyle !== "accent-bar" ? " selected" : "") + '>Band</option>'
+              +       '<option value="minimal"' + (skin.headerStyle === "minimal" ? " selected" : "") + '>Minimal</option>'
+              +       '<option value="accent-bar"' + (skin.headerStyle === "accent-bar" ? " selected" : "") + '>Accent bar</option>'
+              +     '</select></label>'
               +     '<label class="skin-bg-file">Background image (png/jpg/gif/webp)'
               +       '<input type="file" id="skin-bg-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
               +     '<p class="meta">Only upload images you have rights to (same spirit as Stuff). ~400KB warn; huge files rejected. Stored as a data URL in this browser.</p>'
               +     (skin.bgImage ? '<p class="meta">Current image saved. Choose Clear or Background type → None to remove.</p>' : '')
+              +     '<label class="skin-bg-file">Banner image (thin strip under Me nav)'
+              +       '<input type="file" id="skin-banner-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+              +     '<label class="check-row"><input type="checkbox" name="clearBanner" /> Clear banner</label>'
+              +     (skin.bannerImage ? '<p class="meta">Banner saved. Check Clear banner or publish a new one to replace.</p>' : '')
               +     '<input type="hidden" name="bgImage" id="skin-bg-data" value="" />'
               +     '<input type="hidden" name="keepImage" value="' + (skin.bgImage ? "1" : "0") + '" />'
+              +     '<input type="hidden" name="keepBanner" value="' + (skin.bannerImage ? "1" : "0") + '" />'
               +     '<div class="cp-edit-actions"><button type="submit">Publish look</button>'
               +       '<button type="button" class="text-btn" data-profile-edit-cancel="1">Done</button></div>'
               +     '<p class="meta" id="skin-msg"></p>'
@@ -4377,6 +4813,7 @@ function helpPage() {
     var member = "";
     try { member = localStorage.getItem("whirled2.since." + id) || ""; } catch (e) {}
     return '<section class="page me-page profile-page">' + meSubnav()
+      + (skin.bannerImage ? ('<div id="profile-banner" class="profile-banner" style="background-image:url(\'' + String(skin.bannerImage).replace(/'/g, '') + '\')"></div>') : '<div id="profile-banner" class="profile-banner" hidden></div>')
       + '<div class="profile-skin">'
       + '<div class="classic-profile">'
       +   '<div class="cp-header">'
@@ -4385,6 +4822,7 @@ function helpPage() {
       +       '<div class="cp-name-row"><span class="cp-name">' + esc(name) + '</span>' + roleBadgeHtml(getRole(id)) + '<span class="level-badge">Level 1</span></div>'
       +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
       +       (skin.motto ? ('<div class="cp-motto">' + esc(skin.motto) + '</div>') : '')
+      +       (skin.tagline ? ('<div class="cp-tagline">' + esc(skin.tagline) + '</div>') : '')
       +       profileActionRow({
             poke: isSelf ? '' : ('data-poke="' + esc(id) + '" data-poke-name="' + esc(name) + '"'),
             friendHtml: isSelf ? '' : friendActionButtonsHtml(id, name),
@@ -4753,7 +5191,7 @@ function helpPage() {
       +         '<button type="button" data-room-menu="view-items">View items</button>'
       +         '<button type="button" data-room-menu="snapshot">Take snapshot (stub)</button>'
       +         '<button type="button" data-room-menu="zoom">Zoom (stub)</button>'
-      +         '<button type="button" data-room-menu="playlist">View room playlist</button>'
+      +         '<button type="button" data-room-menu="playlist">View room music</button>'
       +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
       +         '<div class="room-lock-row meta">Lock (enforced locally)</div>'
       +         '<button type="button" data-room-lock="unlocked"' + ((loadRoomLock().mode || "unlocked") === "unlocked" ? ' class="is-on"' : '') + '>🔓 Unlocked</button>'
@@ -4963,6 +5401,12 @@ function helpPage() {
   function leaveRoomResetChat() {
     // Baby step: exiting Studio Loft ends this room visit → empty the chat.
     clearRoomChatDisplay(true);
+    occFilterQ = "";
+    try { removeRoomEmbedDock(); } catch (eD) {}
+    try {
+      var a = document.getElementById("room-audio");
+      if (a) a.pause();
+    } catch (eA) {}
   }
   function bindGate() {
     var err = document.getElementById("gate-err");
@@ -5335,14 +5779,13 @@ function helpPage() {
       here.unshift({ id: session().user.id, name: me.name, initials: me.initials, online: true, room: ROOM, you: true });
     } else {
       here = here.map(function (p) {
-        if (session() && p.id === session().user.id) return Object.assign({}, p, { you: true });
+        if (session() && p.id === session().user.id) return Object.assign({}, p, { you: true, initials: p.initials || me.initials });
         return p;
       });
     }
-    var leave = '<button type="button" class="text-btn leave-room" data-leave-room="1">Back to Rooms</button>';
-    rail.innerHTML = "<h2>In this room</h2>" + occLegend()
-      + (here.length ? here.map(personRow).join("") : '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>')
-      + leave;
+    here = sortOccupantsYouFirst(here);
+    rail.classList.add("occ-rail");
+    rail.innerHTML = occupantRailHtml(here);
     listeners.occupants.forEach(function (fn) { try { fn(here); } catch (e) {} });
   }
   async function loadOccupants() {
@@ -6547,6 +6990,36 @@ function helpPage() {
       paint("rooms");
       return;
     }
+    if (ev.target.closest("[data-playlist-open-panel]") && session()) {
+      // How this works: compact dock button opens Room music side panel.
+      if (!inRoom) inRoom = true;
+      playlistPanelOpen = true;
+      roomPanelOpen = false;
+      decorateMode = false;
+      partyPanelOpen = false;
+      paint("rooms");
+      syncRoomAudio();
+      return;
+    }
+    var plSrcBtn = ev.target.closest("[data-playlist-source]");
+    if (plSrcBtn && session()) {
+      // Hard rule: only loft owner may switch music source (local / youtube / spotify).
+      if (!isLoftOwner()) {
+        pushNotice("orange", "Owner controls room music.");
+        return;
+      }
+      var nextSrc = normalizePlaylistSource(plSrcBtn.getAttribute("data-playlist-source"));
+      var plS = loadPlaylist();
+      plS.source = nextSrc;
+      plS.ownerControlsMusic = true;
+      // When switching to embeds, keep local tracks but prefer owner-only adds.
+      if (nextSrc !== "local" && typeof plS.ownerOnlyAdd !== "boolean") plS.ownerOnlyAdd = true;
+      savePlaylist(plS);
+      playlistPanelOpen = true;
+      paint("rooms");
+      syncRoomAudio();
+      return;
+    }
     // How this works: playlist controls — owner play/remove/next; mute; gesture unlock for autoplay.
     if (ev.target.closest("[data-music-gesture]") && session()) {
       musicGestureNeeded = false;
@@ -6571,7 +7044,7 @@ function helpPage() {
     var plPlay = ev.target.closest("[data-playlist-play]");
     if (plPlay && session() && isLoftOwner()) {
       var pl = loadPlaylist();
-      pl.currentIndex = Math.max(0, Number(plPlay.getAttribute("data-playlist-play")) || 0);
+      pl.current = Math.max(0, Number(plPlay.getAttribute("data-playlist-play")) || 0);
       savePlaylist(pl);
       paint("rooms");
       syncRoomAudio();
@@ -6583,7 +7056,7 @@ function helpPage() {
       var ri = Number(plRem.getAttribute("data-playlist-remove"));
       if (ri >= 0 && ri < pl2.tracks.length) {
         pl2.tracks.splice(ri, 1);
-        if (pl2.currentIndex >= pl2.tracks.length) pl2.currentIndex = Math.max(0, pl2.tracks.length - 1);
+        if (pl2.current >= pl2.tracks.length) pl2.current = Math.max(0, pl2.tracks.length - 1);
         savePlaylist(pl2);
       }
       paint("rooms");
@@ -6773,10 +7246,13 @@ function helpPage() {
       if (preset) {
         var formP = document.getElementById("skin-form");
         if (formP) fillSkinFormFromPreset(formP, preset);
+        var prevLook = loadProfileSkin(session().user.id);
         var published = saveProfileSkin(session().user.id, Object.assign({}, preset, {
-          motto: formP && formP.motto ? String(formP.motto.value || "").trim().slice(0, 80) : (loadProfileSkin(session().user.id).motto || "")
+          motto: formP && formP.motto ? String(formP.motto.value || "").trim().slice(0, 80) : (prevLook.motto || ""),
+          tagline: formP && formP.tagline ? String(formP.tagline.value || "").trim().slice(0, 100) : (prevLook.tagline || "")
         }));
         window.__skinBgPending = "";
+        window.__skinBannerPending = "";
         meSub = "profile";
         viewingId = null;
         profileEditSection = "skin";
@@ -6883,10 +7359,17 @@ function helpPage() {
   // ENGINE DEV: profile page chrome only; not #stage-slot.
   app.addEventListener("input", function (ev) {
     if (!session() || !ev.target || !ev.target.closest) return;
+    if (ev.target.getAttribute && ev.target.getAttribute("data-occ-filter") === "1") {
+      occFilterQ = String(ev.target.value || "").slice(0, 40);
+      try { refreshOccupantRail(); } catch (eOcc) {}
+      var fi = document.getElementById("occ-filter-input");
+      if (fi) { try { fi.focus(); fi.selectionStart = fi.selectionEnd = fi.value.length; } catch (eF) {} }
+      return;
+    }
     var formIn = ev.target.closest("#skin-form");
     if (!formIn) return;
     var n = ev.target.name || "";
-    if (n === "bgColor" || n === "bgColor2" || n === "accent" || n === "textColor" || n === "linkColor" || n === "motto") {
+    if (n === "bgColor" || n === "bgColor2" || n === "accent" || n === "textColor" || n === "linkColor" || n === "motto" || n === "tagline") {
       // sync pickers when hex typed
       if (n === "bgColor" && formIn.bgColorPicker) formIn.bgColorPicker.value = ev.target.value;
       if (n === "bgColor2" && formIn.bgColor2Picker) formIn.bgColor2Picker.value = ev.target.value;
@@ -6929,7 +7412,9 @@ function helpPage() {
       var formLive = ev.target.closest("#skin-form");
       if (formLive && (ev.target.name === "bgType" || ev.target.name === "bgRepeat" || ev.target.name === "bgAttachment"
           || ev.target.name === "panelAlpha" || ev.target.name === "bgColor" || ev.target.name === "bgColor2"
-          || ev.target.name === "accent" || ev.target.name === "textColor" || ev.target.name === "linkColor")) {
+          || ev.target.name === "accent" || ev.target.name === "textColor" || ev.target.name === "linkColor"
+          || ev.target.name === "fontScale" || ev.target.name === "radius" || ev.target.name === "moduleStyle"
+          || ev.target.name === "headerStyle" || ev.target.name === "clearBanner")) {
         try {
           var draftL = readSkinFormDraft(formLive);
           if (draftL) applyProfileSkinDom(session().user.id, draftL);
@@ -6972,6 +7457,39 @@ function helpPage() {
         } catch (eImg) {}
       };
       sreader.readAsDataURL(sfile);
+      return;
+    }
+    // How this works: optional thin banner image (same size caps as BG) under me-subnav.
+    if (ev.target.id === "skin-banner-input" && session()) {
+      var bfile = ev.target.files && ev.target.files[0];
+      var bmsg = document.getElementById("skin-msg");
+      if (!bfile) return;
+      var okB = /image\/(png|jpeg|jpg|gif|webp)/i.test(bfile.type) || /\.(png|jpe?g|gif|webp)$/i.test(bfile.name || "");
+      if (!okB) {
+        if (bmsg) bmsg.textContent = "Use png, jpg, gif, or webp for banner.";
+        return;
+      }
+      if (bfile.size > PROFILE_BG_MAX_HARD) {
+        if (bmsg) bmsg.textContent = "Banner too large (keep under ~900KB).";
+        alert("Banner image too large. Keep under ~900KB.");
+        return;
+      }
+      if (bfile.size > PROFILE_BG_MAX_WARN && bmsg) bmsg.textContent = "Warning: large banner (~400KB+).";
+      var breader = new FileReader();
+      breader.onload = function () {
+        window.__skinBannerPending = String(breader.result || "");
+        var keepB = document.querySelector('#skin-form [name="keepBanner"]');
+        if (keepB) keepB.value = "0";
+        var clearB = document.querySelector('#skin-form [name="clearBanner"]');
+        if (clearB) clearB.checked = false;
+        if (bmsg) bmsg.textContent = "Banner ready — previewing; click Publish look to save.";
+        try {
+          var formB = document.getElementById("skin-form");
+          var draftB = readSkinFormDraft(formB);
+          if (draftB && session()) applyProfileSkinDom(session().user.id, draftB);
+        } catch (eB) {}
+      };
+      breader.readAsDataURL(bfile);
       return;
     }
     if (ev.target.id !== "photo-input" || !session()) return;
@@ -7042,6 +7560,10 @@ function helpPage() {
         if (window.__skinBgPending) bgImage = String(window.__skinBgPending);
         else if (String(sd.get("keepImage") || "") === "1") bgImage = prevSkin.bgImage || "";
       }
+      var bannerImage = "";
+      if (sd.get("clearBanner")) bannerImage = "";
+      else if (window.__skinBannerPending) bannerImage = String(window.__skinBannerPending);
+      else if (String(sd.get("keepBanner") || "") === "1") bannerImage = prevSkin.bannerImage || "";
       var nextSkin = {
         bgType: bgType,
         bgColor: String(sd.get("bgColor") || "#cfe6f5").slice(0, 32),
@@ -7053,7 +7575,13 @@ function helpPage() {
         textColor: String(sd.get("textColor") || "#16324a").slice(0, 32),
         linkColor: String(sd.get("linkColor") || "#1e6fa8").slice(0, 32),
         panelAlpha: Number(sd.get("panelAlpha") || 0.82),
-        motto: String(sd.get("motto") || "").trim().slice(0, 80)
+        motto: String(sd.get("motto") || "").trim().slice(0, 80),
+        tagline: String(sd.get("tagline") || "").trim().slice(0, 100),
+        fontScale: Number(sd.get("fontScale") || 1),
+        radius: String(sd.get("radius") || "soft"),
+        moduleStyle: String(sd.get("moduleStyle") || "frosted"),
+        headerStyle: String(sd.get("headerStyle") || "band"),
+        bannerImage: bannerImage
       };
       if (bgType === "image" && !nextSkin.bgImage) {
         var sm = document.getElementById("skin-msg");
@@ -7062,6 +7590,7 @@ function helpPage() {
       }
       var savedSkin = saveProfileSkin(sidSkin, nextSkin);
       window.__skinBgPending = "";
+      window.__skinBannerPending = "";
       meSub = "profile";
       viewingId = null;
       profileEditSection = null;
@@ -7533,12 +8062,45 @@ function helpPage() {
       paint("rooms");
       return;
     }
+    if (ev.target.id === "playlist-embed-form" && session()) {
+      // Hard rule: only loft owner may paste/change YouTube or Spotify embed URLs.
+      if (!isLoftOwner()) {
+        pushNotice("orange", "Owner controls room music.");
+        return;
+      }
+      var em = new FormData(ev.target);
+      var plE = loadPlaylist();
+      var srcE = normalizePlaylistSource(plE.source);
+      if (srcE !== "youtube" && srcE !== "spotify") {
+        pushNotice("orange", "Switch Music source to YouTube or Spotify first.");
+        return;
+      }
+      var parsed = parseRoomEmbed(srcE, String(em.get("embedUrl") || ""));
+      if (!parsed.ok) {
+        pushNotice("orange", parsed.error || "Invalid embed URL.");
+        return;
+      }
+      plE.embedUrl = parsed.embedUrl;
+      plE.embedSrc = parsed.embedSrc;
+      plE.embedTitle = parsed.embedTitle;
+      plE.ownerControlsMusic = true;
+      if (typeof plE.ownerOnlyAdd !== "boolean") plE.ownerOnlyAdd = true;
+      savePlaylist(plE);
+      playlistPanelOpen = true;
+      paint("rooms");
+      syncRoomAudio();
+      return;
+    }
     if (ev.target.id === "playlist-add-form" && session()) {
       var plAdd = new FormData(ev.target);
       var stuffId = String(plAdd.get("stuffId") || "");
       var item = findStuff(stuffId);
       if (!item) return;
       var plA = loadPlaylist();
+      if (normalizePlaylistSource(plA.source) !== "local") {
+        pushNotice("orange", "Switch to My uploads to add local tracks.");
+        return;
+      }
       if (!isLoftOwner() && plA.ownerOnlyAdd) {
         pushNotice("orange", "Only the loft owner may add tracks right now.");
         return;
@@ -7560,7 +8122,7 @@ function helpPage() {
         at: new Date().toISOString(),
         dataUrl: dataUrl
       });
-      if (plA.tracks.length === 1) plA.currentIndex = 0;
+      if (plA.tracks.length === 1) plA.current = 0;
       savePlaylist(plA);
       playlistPanelOpen = true;
       paint("rooms");
