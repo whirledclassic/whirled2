@@ -731,7 +731,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905y";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905z";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -1466,7 +1466,7 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Whirled2 branding, Club/Membership Coming Soon, roles/badges, chat Slide/Overlay. Cache <code>?v=20260905y</code>.</p>'
+      + '<p class="meta">This pass: Whirled2 branding, Club/Membership Coming Soon, roles/badges, chat Slide/Overlay. Cache <code>?v=20260905z</code>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta">Live docs live in-repo as CONCEPT.md / STATUS.md — no external secrets.</p>'
       + '</div></section>';
@@ -1534,7 +1534,7 @@
       +     '<div class="stage-host">'
       +       '<div id="stage-slot"><div class="stage-copy"><strong>Your room — engine mounts here</strong>Empty classic stage for now. Decorate with Room menu — click-to-walk arrives with the engine track.<code>#stage-slot</code></div></div>'
       +       decorateLayerHtml()
-      +       '<div class="chat-overlay" id="chat-overlay" aria-live="polite"></div>'
+      +       '<div class="chat-overlay is-empty" id="chat-overlay" aria-live="polite" hidden></div>'
       +     '</div>'
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
       +     '</div>'
@@ -1567,6 +1567,15 @@
     try { return JSON.parse(localStorage.getItem(POKE_KEY) || "{}"); } catch (e) { return {}; }
   }
   function addPoke(fromId, toId) {
+    if (fromId == null || toId == null) return null;
+    if (String(fromId) === String(toId)) return null;
+    try {
+      var s = session();
+      if (s && s.user && String(toId) === String(s.user.id)
+          && (String(fromId) === String(s.user.id) || String(fromId) === String(s.user.name))) {
+        return null;
+      }
+    } catch (e) {}
     var map = loadPokes();
     var key = toId;
     if (!map[key]) map[key] = [];
@@ -1590,11 +1599,31 @@
   function persistNotices() {
     try { localStorage.setItem(NOTE_KEY, JSON.stringify(notices)); } catch (e) {}
   }
+  function isPokeNoticeText(t) {
+    t = t != null ? String(t) : "";
+    return /poked you/i.test(t) || /You poked/.test(t);
+  }
   function isEphemeralNotice(n) {
     if (!n) return false;
     if (n.transient) return true;
     var t = n.text != null ? String(n.text) : "";
-    return /^Room layout saved/.test(t);
+    if (/^Room layout saved/.test(t)) return true;
+    if (isPokeNoticeText(t)) return true;
+    return false;
+  }
+  function stripStuckPokeNotices() {
+    loadNotices();
+    var me = null;
+    try { me = session() && session().user; } catch (e) { me = null; }
+    var next = notices.filter(function (n) {
+      var t = n && n.text != null ? String(n.text) : "";
+      if (isPokeNoticeText(t)) return false;
+      if (me && me.name && t === (me.name + " poked you.")) return false;
+      return true;
+    });
+    if (next.length === notices.length) return;
+    notices = next;
+    persistNotices();
   }
   function loadNotices() {
     try { notices = JSON.parse(localStorage.getItem(NOTE_KEY) || "[]"); } catch (e) { notices = []; }
@@ -1656,18 +1685,46 @@
       ? '<div class="notice-row kind-blue party-notice">Party: ' + esc(party.name) + ' <span class="meta">(follow-leader — shared server later)</span></div>'
       : "";
     if (!notices.length && !partyRow) { el.innerHTML = '<div class="notice-empty">No notifications</div>'; return; }
-    el.innerHTML = partyRow + notices.slice(0, 8).map(function (n) {
-      return '<div class="notice-row kind-' + esc(n.kind) + (n.transient ? " notice-toast" : "") + '">' + esc(n.text) + '</div>';
+    var clearBtn = notices.length
+      ? '<div class="notice-toolbar"><button type="button" class="notice-clear-all" data-notice-clear-all="1">Clear all</button></div>'
+      : "";
+    el.innerHTML = clearBtn + partyRow + notices.slice(0, 8).map(function (n) {
+      return '<div class="notice-row kind-' + esc(n.kind) + (n.transient ? " notice-toast" : "") + '" data-notice-id="' + esc(n.id) + '">'
+        + '<span class="notice-text">' + esc(n.text) + '</span>'
+        + '<button type="button" class="notice-dismiss" data-dismiss-notice="' + esc(n.id) + '" aria-label="Dismiss">×</button>'
+        + '</div>';
     }).join("");
   }
+  function bindNoticeBarClicks(box) {
+    if (!box || box._noticeBound) return;
+    box._noticeBound = true;
+    box.addEventListener("click", function (ev) {
+      var d = ev.target.closest("[data-dismiss-notice]");
+      if (d) {
+        ev.preventDefault();
+        dismissNoticeId(d.getAttribute("data-dismiss-notice"));
+        return;
+      }
+      if (ev.target.closest("[data-notice-clear-all]")) {
+        ev.preventDefault();
+        loadNotices();
+        notices = [];
+        persistNotices();
+        renderNotices();
+      }
+    });
+  }
   function ensureNoticeBar() {
-    if (document.getElementById("notice-bar")) { renderNotices(); return; }
+    stripStuckPokeNotices();
+    var existing = document.getElementById("notice-bar");
+    if (existing) { bindNoticeBarClicks(existing); renderNotices(); return; }
     if (!session()) return;
     var box = document.createElement("aside");
     box.id = "notice-bar";
     box.className = "notice-bar";
     box.setAttribute("aria-label", "Notifications");
     document.body.appendChild(box);
+    bindNoticeBarClicks(box);
     renderNotices();
   }
 
@@ -1892,7 +1949,7 @@
       +         '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
       +         editToggle("status", "status")
       +       '</div>'
-      +       profileActionRow({ poke: 'id="poke-self-demo"' })
+      +       profileActionRow({})
       +     '</div>'
       +     '<aside class="cp-meta-box">'
       +       '<div><span class="k">Permaname</span><span class="v">' + esc(sid) + '</span></div>'
@@ -2620,14 +2677,17 @@
     }
     var ov = document.getElementById("chat-overlay");
     if (ov) {
-      if (ui.mode === "overlay" && !ui.hideHistory) {
+      var showOv = ui.mode === "overlay" && !ui.hideHistory && chat.length > 0;
+      if (showOv) {
         ov.hidden = false;
+        ov.classList.remove("is-empty");
         var nearB = (ov.scrollHeight - ov.scrollTop - ov.clientHeight) < 48;
         var stickO = !chatPinnedScroll || nearB;
         ov.innerHTML = html;
         if (stickO) ov.scrollTop = ov.scrollHeight;
       } else {
         ov.hidden = true;
+        ov.classList.add("is-empty");
         ov.innerHTML = "";
       }
     }
@@ -2865,8 +2925,9 @@
   // Boot + presence / chat polling timers
   // ---------------------------------------------------------------------------
   function boot() {
+    if (session()) stripStuckPokeNotices();
     paint(session() ? "rooms" : "");
-    if (session()) { loadHistory(); startPoll(); startOccPoll(); }
+    if (session()) { loadHistory(); startPoll(); startOccPoll(); ensureNoticeBar(); }
     try { window.__whirledBoot = true; } catch (e) {}
   }
 
@@ -3379,8 +3440,9 @@
     if (pokeOther && session()) {
       var pid = pokeOther.getAttribute("data-poke");
       var pname = pokeOther.getAttribute("data-poke-name") || pid;
+      if (!pid || pid === session().user.id) return;
       addPoke(session().user.name, pid);
-      pushNotice("orange", "You poked " + pname + ".");
+      pushNotice("orange", "You poked " + pname + ".", { transient: true });
       return;
     }
     var remF = ev.target.closest("[data-remove-friend]");
@@ -3749,13 +3811,9 @@
       paint("me");
       return;
     }
-    if (ev.target.id === "poke-self-demo" && session()) {
-      var sid = session().user.id;
-      addPoke(session().user.name, sid);
-      pushNotice("orange", session().user.name + " poked you.");
-      meSub = "profile";
-      viewingId = null;
-      paint("me");
+    var pokeSelfBtn = ev.target.closest("#poke-self-demo");
+    if (pokeSelfBtn) {
+      // Own profile must never poke self — leftover demo id is a no-op.
       return;
     }
     var tab = ev.target.closest("[data-tab]");

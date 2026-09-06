@@ -25,7 +25,11 @@ The original Whirled server/client lived in **[greyhavens/msoy](https://github.c
 
 ## Chat UI (Slide vs Overlay)
 
-Classic Chat Options (wiki Chat): **Slide chat** = own dark panel beside the room stage; **Overlay chat** = semi-transparent log over the left of the room (default here for “chats on the screen of the room”). Preference in `whirled2.chatUi` (`mode`, `hideHistory`, `textSize`). Hide history is overlay-only (F9). Bottom input bar stays in both modes when you are in a room.
+Classic Chat Options (wiki Chat): **Slide chat** = own dark panel beside the room stage; **Overlay chat** = message bubbles over the room only (classic Whirled never showed an empty chrome slab). Prefer hide-when-empty: `#chat-overlay` stays `hidden` / `.is-empty` until there are messages; soft semi-transparent background only when bubbles exist. Preference in `whirled2.chatUi` (`mode`, `hideHistory`, `textSize`). Hide history is overlay-only (F9). Bottom input bar stays in both modes when you are in a room.
+
+## Pokes
+
+Pokes are **other-player only**. Own profile never offers Poke; handlers abort when the target id matches the session user. Poke toasts are transient (~3s) or dismissible via × / Clear all on the notice bar.
 
 ## Roles
 
