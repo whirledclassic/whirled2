@@ -1,3 +1,13 @@
+## ?v=20260906cn — ENGINE REPLACEMENT (chrome only)
+
+- **Homemade loft tofu/PNG walk is no longer the default playable room engine.**
+- Without `engineSrc`: soft loft placeholder + clear “Pixi engine mounts here” / waiting note.
+- When `engineSrc` mounts (or `data-engine-owns-avatar-walk=1` / `isEngineMounted()`): chrome does **not** animate loft avatars; Wear layer hidden.
+- `WhirledChrome` **v0.5**: `getWornAvatar`, `getWardrobeAppearance`, `onFloorClick` / `whirled:floorClick`, `engineOwnsAvatarWalk`, `tryMountEngine` kept.
+- Classic Flash/Ruffle sidelined (experimental / `?flashQa=1` / `?chromeWalk=1` QA only) — never in `#stage-slot`.
+- ENGINE-BRIDGE.md rewritten for Nabir: he owns avatars; never publish engine into Pages.
+- No private engine files in public tree. Cache: **`?v=20260906cn`**.
+
 ## ?v=20260906cm
 - Chrome-only engineSrc mount; no private engine in repo; Nabir repo untouched.
 

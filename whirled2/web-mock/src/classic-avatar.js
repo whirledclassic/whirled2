@@ -9,17 +9,18 @@
  *    (A) Classic Flash (Ruffle) — real .swf via Ruffle in loft (transparent, PE none).
  *    (B) Whirled2 Smooth (png-hybrid) — PNG idle/walk chrome walk like Whirl (no Ruffle).
  *    Default: hybrid if PNGs, else ruffle if SWF. One Stuff item may hold swfUrl + PNG states.
- * 4) ENGINE DEV: Ruffle lives in chrome overlay (#classic-swf-slot / billboard), NOT inside
- *    #stage-slot. Pixi still owns the room. Study community Ruffle+host-shim architecture —
- *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
+ * 4) ENGINE DEV (?v=20260906cn): Nabir's Pixi owns room + avatars + walk in #stage-slot.
+ *    Homemade loft tofu/PNG walk is OFF by default (chrome ?chromeWalk=1 / flashQa only).
+ *    Ruffle stays experimental on #avatar-ruffle-host — NEVER inside #stage-slot.
+ *    Study community Ruffle+host-shim architecture — do NOT copy AGPL code.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906cm
+ * Cache: ?v=20260906cn
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906cm";
+  var VERSION = "20260906cn";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -1996,7 +1997,9 @@
     var xPct = Math.max(8, Math.min(92, x * 100));
     var started = false;
     try {
-      if (global.WhirledChrome && typeof global.WhirledChrome.chromeWalkTo === "function") {
+      if (global.WhirledChrome && typeof global.WhirledChrome.engineOwnsAvatarWalk === "function" && global.WhirledChrome.engineOwnsAvatarWalk()) {
+        // Pixi owns walk — do not drive chrome loft billboard.
+      } else if (global.WhirledChrome && typeof global.WhirledChrome.chromeWalkTo === "function") {
         global.WhirledChrome.chromeWalkTo(xPct, 78);
         started = true;
       }
@@ -2890,7 +2893,22 @@
 
   function mountWearIfNeeded() {
     // Prefer shared #avatar-ruffle-host; loft mounts only when shouldMountRuffleInLoft (hybrid default = skip).
-    // (?v=20260906bt): sha1-only Wear must resolve via IDB; never silent-return when URL missing.
+    // (?v=20260906cn) ENGINE REPLACEMENT: skip loft Ruffle when Pixi owns avatars / default waiting mode.
+    // Beginner: Classic Flash loft is experimental — not the site room engine.
+    // ENGINE DEV: never put Ruffle in #stage-slot.
+    try {
+      if (global.WhirledChrome) {
+        if (typeof global.WhirledChrome.engineOwnsAvatarWalk === "function" && global.WhirledChrome.engineOwnsAvatarWalk()) return;
+        if (typeof global.WhirledChrome.isEngineMounted === "function" && global.WhirledChrome.isEngineMounted()) return;
+        if (typeof global.WhirledChrome.chromeHomemadeWalkEnabled === "function" && !global.WhirledChrome.chromeHomemadeWalkEnabled()) {
+          // Default chrome: no loft Ruffle player (Stuff viewer still mounts separately).
+          var waitLayer = document.getElementById("avatar-wear-layer");
+          if (waitLayer && (waitLayer.getAttribute("data-loft-mode") === "engine-waiting" || waitLayer.classList.contains("is-engine-waiting") || waitLayer.classList.contains("is-engine-owned"))) {
+            return;
+          }
+        }
+      }
+    } catch (eGate) {}
     var slot = document.getElementById("avatar-ruffle-host")
       || document.getElementById("classic-wear-swf-slot");
     var worn = null;

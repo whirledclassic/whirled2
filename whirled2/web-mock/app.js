@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906cm";
+  var LOGO_V = "20260906cn";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2215,6 +2215,27 @@
   }
 
   function avatarWearLayerHtml() {
+    // ---------------------------------------------------------------------------
+    // (?v=20260906cn) ENGINE REPLACEMENT — in-room avatar playback is Pixi's job.
+    // Beginner: Stuff → Wear still saves appearance (getWornAvatar). This layer is NOT
+    // the playable tofu/PNG loft walker anymore unless ?chromeWalk=1 (QA/legacy).
+    // ENGINE DEV: when mountWhirledEngine owns #stage-slot, layer is empty/hidden.
+    // Classic Flash/Ruffle stays opt-in experimental — never default loft path; never in #stage-slot.
+    // ---------------------------------------------------------------------------
+    if (engineOwnsAvatarPlayback()) {
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-engine-owned" aria-hidden="true" data-engine-owned="1" data-loft-mode="engine" data-playback="engine"></div>';
+    }
+    // Default: soft waiting strip (inventory Wear stays; no playable homemade walk).
+    if (!chromeHomemadeWalkEnabled()) {
+      var wornWait = loadWornAvatar();
+      var wearLabel = (wornWait && wornWait.name) ? wornWait.name : "none yet";
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-engine-waiting" aria-label="Waiting for Pixi engine" data-loft-mode="engine-waiting" data-playback="waiting">'
+        + '<div class="avatar-engine-waiting-note">'
+        +   '<p class="avatar-engine-waiting-title">Avatars play in the Pixi engine</p>'
+        +   '<p class="avatar-engine-waiting-meta">Wear is saved in Stuff (“' + esc(wearLabel) + '”). Mount with <code>?engineSrc=</code> (local Vite). Chrome does not walk loft avatars by default.</p>'
+        + '</div></div>';
+    }
+    // ---- Legacy / QA path (?chromeWalk=1 or ?flashQa=1) — homemade loft billboard ----
     // How this works: billboard sprite in the room chrome (like item in your space).
     // Beginner: if nothing Worn yet, show classic default tofu so the loft isn’t empty.
     // ENGINE DEV: layer stays pointer-events none; billboard is clickable for emotes (?v=20260906aq).
@@ -2336,9 +2357,11 @@
   }
   function startAvatarWearAnim() {
     // Beginner: if the pack has multiple PNG frames, flip them like a tiny GIF.
-    // ENGINE DEV: chrome walk may swap data-wear-frames between idle/walk via setAvatarState.
+    // (?v=20260906cn) Skip when engine owns / waiting placeholder (no homemade loft sprite).
     var layer = document.getElementById("avatar-wear-layer");
     if (!layer || !layer.classList.contains("is-on")) return;
+    if (layer.classList.contains("is-engine-waiting") || layer.classList.contains("is-engine-owned")) return;
+    if (engineOwnsAvatarPlayback()) return;
     var bill = layer.querySelector(".avatar-wear-billboard");
     var img = layer.querySelector(".avatar-wear-sprite");
     if (!bill || !img) return;
@@ -2371,10 +2394,71 @@
   var chromeWalkRaf = 0;
   var chromeWalkBound = false;
 
-  function isEngineMountedOnStage() {
+  // ---------------------------------------------------------------------------
+  // ENGINE REPLACEMENT (?v=20260906cn)
+  // Beginner: Nabir's Pixi engine is THE room engine (avatars + walk). Chrome is the website shell.
+  // Homemade tofu/PNG loft walk is OFF by default — only ?chromeWalk=1 / whirled2.chromeWalk=1 for QA.
+  // Classic Flash/Ruffle stays experimental (flashQa / Wear opt-in), never the default loft player.
+  // ENGINE DEV: when mountWhirledEngine succeeds OR data-engine-owns-avatar-walk=1, chrome does not animate loft avatars.
+  // ---------------------------------------------------------------------------
+  var floorClickListeners = [];
+  function chromeHomemadeWalkEnabled() {
+    // Opt-in legacy loft walk only — not the playable site default.
+    try {
+      var q = (globalThis.location && location.search) || "";
+      if (/(?:\?|&)chromeWalk=1(?:&|$)/.test(q)) return true;
+      if (/(?:\?|&)flashQa=1(?:&|$)/.test(q)) return true; // Flash QA still needs chrome billboard walk
+    } catch (eQ) {}
+    try {
+      if (localStorage.getItem("whirled2.chromeWalk") === "1") return true;
+    } catch (eL) {}
+    return false;
+  }
+  function engineOwnsAvatarPlayback() {
+    // True when Pixi owns room avatars / walk (mounted or marked).
+    try {
+      if (typeof engineMounted !== "undefined" && engineMounted) return true;
+    } catch (eE) {}
     var slot = document.getElementById("stage-slot");
     if (!slot) return false;
-    return !!(slot.querySelector("canvas") || slot.querySelector("[data-whirled-engine]"));
+    if (slot.getAttribute("data-engine-owns-avatar-walk") === "1") return true;
+    if (slot.getAttribute("data-whirled-engine") === "1") return true;
+    if (slot.querySelector("canvas") || slot.querySelector("[data-whirled-engine]")) return true;
+    return false;
+  }
+  function hideChromeLoftAvatarLayer() {
+    // Beginner: once Pixi mounts, hide the chrome Wear billboard so two avatars do not fight.
+    // ENGINE DEV: Stuff/Wear data still available via WhirledChrome.getWornAvatar().
+    var layer = document.getElementById("avatar-wear-layer");
+    if (!layer) return;
+    try {
+      layer.classList.remove("is-on", "is-walking", "is-tofu", "is-swf", "is-swf-hybrid", "is-hybrid-smooth");
+      layer.classList.add("is-engine-owned");
+      layer.setAttribute("data-engine-owned", "1");
+      layer.setAttribute("aria-hidden", "true");
+      layer.innerHTML = "";
+    } catch (eH) {}
+    try {
+      if (chromeWalkRaf) { cancelAnimationFrame(chromeWalkRaf); chromeWalkRaf = 0; }
+    } catch (eR) {}
+  }
+  function emitFloorClick(detail) {
+    // Forward floor intent to engine subscribers + DOM event.
+    // ENGINE DEV: prefer listening to canvas pointer events once mounted; this is a chrome fallback.
+    var payload = detail || {};
+    try {
+      floorClickListeners.slice().forEach(function (fn) {
+        try { fn(payload); } catch (eF) {}
+      });
+    } catch (eL) {}
+    try {
+      document.dispatchEvent(new CustomEvent("whirled:floorClick", { detail: payload }));
+    } catch (eD) {}
+  }
+
+  function isEngineMountedOnStage() {
+    // (?v=20260906cn) Alias — engine owns stage when mounted / marked.
+    return engineOwnsAvatarPlayback();
   }
   function setAvatarState(stateName) {
     // How this works: swap billboard frames to idle / walk / stand / pose without full paint.
@@ -2451,12 +2535,11 @@
   }
   function chromeWalkTo(xPct, yPct) {
     // Animate billboard toward floor click. Walk frames while moving; idle on arrive.
-    // How this works (?v=20260906bb): Hybrid PNG swaps walk frames (Whirl path). SWF-only MOVES the
-    // billboard + synthesized bob/flip (Ruffle PE none). (?v=20260906cj): tofu walks via CSS legs.
-    // (?v=20260906cd): notifyLoftWalk(true) at START keeps loftHostState.moving until arrive → hostWalk(false).
-    // Beginner: Flash walk plays the whole floor trek. ENGINE DEV: classic-avatar ticks locX ~100ms.
-    // (?v=20260906cj): do not abort when Pixi canvas exists — Wear overlay still walks.
-    // ENGINE DEV: opt out with #stage-slot[data-engine-owns-avatar-walk="1"].
+    // (?v=20260906cn) ENGINE REPLACEMENT: homemade loft walk is OFF unless ?chromeWalk=1 / flashQa.
+    // When engine owns avatars, never animate the chrome Wear layer — Pixi owns walk.
+    // ENGINE DEV: set data-engine-owns-avatar-walk=1 on mount (chrome + your bridge both do this).
+    if (engineOwnsAvatarPlayback()) return;
+    if (!chromeHomemadeWalkEnabled()) return;
     var slotOwn = document.getElementById("stage-slot");
     if (slotOwn && slotOwn.getAttribute("data-engine-owns-avatar-walk") === "1") return;
     var layer = document.getElementById("avatar-wear-layer");
@@ -2568,39 +2651,59 @@
   }
   function onStageHostWalkClick(ev) {
     // Beginner: tap the floor (lower stage), not the chat strip / buttons.
-    // (?v=20260906cj): keep Wear walk even when Pixi canvas is in #stage-slot.
-    if (document.getElementById("stage-slot")
-        && document.getElementById("stage-slot").getAttribute("data-engine-owns-avatar-walk") === "1") return;
+    // (?v=20260906cn) Once Pixi mounts, canvas owns clicks; chrome only forwards intent.
     if (decorateMode) return;
     var host = ev.currentTarget;
     if (!host || !host.classList.contains("stage-host")) return;
     // Ignore UI chrome inside the host (overlay history, buttons, decorate chips).
     // Beginner (?v=20260906aq): tapping the avatar opens emotes — do not start a walk.
-    if (ev.target.closest("#chat-overlay, #stage-bubbles, .decorate-chip, button, a, input, textarea, select, .chrome-walk-target, [data-avatar-hit], .avatar-emote-menu")) return;
+    if (ev.target.closest("#chat-overlay, #stage-bubbles, .decorate-chip, button, a, input, textarea, select, .chrome-walk-target, [data-avatar-hit], .avatar-emote-menu, .avatar-engine-waiting-note")) return;
     var rect = host.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     var xPct = ((ev.clientX - rect.left) / rect.width) * 100;
     var yPct = ((ev.clientY - rect.top) / rect.height) * 100;
     // Floor band ~ lower 45% of stage (classic loft floor).
     if (yPct < 52) return;
+    // Engine owns walk: record target + emit; do not animate chrome loft avatars.
+    if (engineOwnsAvatarPlayback()) {
+      chromeWalkTarget = { xPct: xPct, yPct: yPct, at: new Date().toISOString() };
+      emitFloorClick({ xPct: xPct, yPct: yPct, clientX: ev.clientX, clientY: ev.clientY, source: "chrome-forward" });
+      return;
+    }
+    // Homemade walk only for QA/legacy (?chromeWalk=1 / flashQa).
+    if (!chromeHomemadeWalkEnabled()) return;
     ev.preventDefault();
     chromeWalkTo(xPct, yPct);
   }
   function bindChromeClickToWalk() {
-    // How this works (?v=20260906cj): ALWAYS bind chrome floor-click for #avatar-wear-layer.
-    // Beginner: tofu / PNG / Classic Flash Wear must walk even if a Pixi canvas sits in #stage-slot.
-    // ENGINE DEV: old yield-to-Pixi unbound the listener whenever canvas existed → zero walk anim.
-    // Pixi still reads getAvatarWalkTarget(); set data-engine-owns-avatar-walk on #stage-slot to opt out.
+    // (?v=20260906cn) ENGINE REPLACEMENT:
+    // - Engine mounted: bind only to forward floor intent (no chrome avatar animation).
+    // - Default without engine: do NOT enable homemade loft walk (no tofu toy).
+    // - Legacy QA: ?chromeWalk=1 / flashQa enables chrome-walk-ready + billboard walk.
+    // ENGINE DEV: once your canvas is in #stage-slot, prefer pointer events on the canvas itself.
     var host = document.querySelector(".stage-host");
     if (!host) return;
-    var slot = document.getElementById("stage-slot");
-    var engineOwnsAvatar = !!(slot && slot.getAttribute("data-engine-owns-avatar-walk") === "1");
-    if (engineOwnsAvatar) {
+    var engineOwns = engineOwnsAvatarPlayback();
+    var homemade = chromeHomemadeWalkEnabled();
+    if (engineOwns) {
+      // Keep a light forwarder so getAvatarWalkTarget / onFloorClick still work if canvas misses the click.
+      if (!host._chromeWalkBound) {
+        host.addEventListener("click", onStageHostWalkClick);
+        host._chromeWalkBound = true;
+      }
+      host.classList.remove("chrome-walk-ready");
+      host.classList.add("engine-floor-forward");
+      chromeWalkBound = true;
+      try { hideChromeLoftAvatarLayer(); } catch (eHide) {}
+      return;
+    }
+    if (!homemade) {
       if (host._chromeWalkBound) {
         host.removeEventListener("click", onStageHostWalkClick);
         host._chromeWalkBound = false;
-        host.classList.remove("chrome-walk-ready");
       }
+      host.classList.remove("chrome-walk-ready", "engine-floor-forward");
+      chromeWalkBound = false;
       return;
     }
     if (!host._chromeWalkBound) {
@@ -2608,6 +2711,7 @@
       host._chromeWalkBound = true;
     }
     host.classList.add("chrome-walk-ready");
+    host.classList.remove("engine-floor-forward");
     chromeWalkBound = true;
   }
   // ---------------------------------------------------------------------------
@@ -2913,15 +3017,22 @@
     };
   }
   function loftBackdropHtml(opts) {
-    // How this works (?v=20260906ax): soft classic loft wall+floor — no green outdoor grass.
-    // ENGINE DEV: pure CSS/HTML inside #stage-slot until Pixi replaceChildren.
+    // How this works (?v=20260906cn): soft classic loft wall+floor until Pixi replaceChildren.
+    // Beginner: clear message that the Pixi engine must mount — not a playable tofu walk toy.
+    // ENGINE DEV: host.replaceChildren(app.canvas) clears this placeholder.
     opts = opts || {};
-    // Beginner: when an avatar is worn, hide the developer "engine mounts here" hint entirely.
     var hint = "";
     if (!opts.hideHint) {
-      hint = opts.subtle
-        ? '<div class="loft-hint loft-hint-subtle" hidden>engine mounts here</div>'
-        : '<div class="loft-hint">Your room</div>';
+      if (opts.engineWaiting) {
+        hint = '<div class="loft-hint loft-hint-engine-waiting" role="status">'
+          + '<strong>Pixi engine mounts here</strong>'
+          + '<span class="loft-hint-sub">Room + avatars + walk live in the engine. Use ?engineSrc=… (local Vite). Chrome is the website shell only.</span>'
+          + '</div>';
+      } else if (opts.subtle) {
+        hint = '<div class="loft-hint loft-hint-subtle" hidden>engine mounts here</div>';
+      } else {
+        hint = '<div class="loft-hint">Your room</div>';
+      }
     }
     return '<div class="loft-backdrop" aria-hidden="true">'
       +   '<div class="loft-sky"></div>'
@@ -2935,11 +3046,12 @@
       + '</div>';
   }
   function stagePlaceholderHtml() {
-    // How this works (?v=20260906ax): hide engine placeholder junk when Whirl/tofu/SWF is on stage.
-    var worn = loadWornAvatar();
-    var hasWear = !!(worn && (worn.isTofu || worn.preview || worn.swfUrl || worn.swfDataUrl
-      || (worn.frames && worn.frames.length) || (worn.states && worn.states.idle)));
-    return loftBackdropHtml({ subtle: true, hideHint: hasWear });
+    // (?v=20260906cn) Always show soft loft + engine-waiting message when Pixi is not mounted.
+    // Homemade Wear billboard is no longer the playable room avatar.
+    if (engineOwnsAvatarPlayback()) {
+      return ""; // engine already drew into #stage-slot
+    }
+    return loftBackdropHtml({ engineWaiting: true, hideHint: false });
   }
   function applyWearBillboardScale() {
     // How this works: CSS --wear-scale on the loft billboard from per-item scale.
@@ -9320,8 +9432,8 @@
       // ENGINE DEV: when Pixi mounts, host.replaceChildren(canvas) clears this HTML.
       +       '<div id="stage-slot">' + stagePlaceholderHtml() + '</div>'
       +       decorateLayerHtml()
-      // How this works: #avatar-wear-layer = worn Stuff avatar billboard (sprite pack, not SWF).
-      // ENGINE DEV: chrome overlay; Pixi may later own the avatar sprite inside #stage-slot.
+      // (?v=20260906cn) #avatar-wear-layer: waiting note or empty once Pixi owns avatars (not tofu walk default).
+      // ENGINE DEV: draw avatars inside your canvas in #stage-slot; read Wear via getWornAvatar().
       +       avatarWearLayerHtml()
       // How this works: #stage-bubbles = temporary avatar speech/thought over the stage
       // (separate from Slide/Overlay history). ENGINE DEV: Pixi may later replace these.
@@ -11777,8 +11889,20 @@
     // Beginner: Experimental Flash preview in Stuff / loft. Never touches chat visit-since.
     // ENGINE DEV: #avatar-ruffle-host only — not #stage-slot.
     try {
+      // (?v=20260906cn) Classic Flash/Ruffle loft is experimental — skip as default playable path.
+      // Still allow Stuff viewer mounts; loft Wear Ruffle only with ?chromeWalk=1 / flashQa / engine not owning.
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.afterPaint) {
-        WhirledClassicAvatar.afterPaint();
+        if (engineOwnsAvatarPlayback()) {
+          /* Pixi owns loft — do not mount Ruffle into wear layer */
+        } else if (!chromeHomemadeWalkEnabled()) {
+          /* Default: no loft Ruffle / tofu walk; Stuff preview may still mount via afterPaint internals */
+          if (WhirledClassicAvatar.afterPaint) {
+            // Call afterPaint but mountWearIfNeeded will no-op without #avatar-ruffle-host in waiting HTML.
+            WhirledClassicAvatar.afterPaint();
+          }
+        } else {
+          WhirledClassicAvatar.afterPaint();
+        }
       }
     } catch (eClassicPaint) {}
   }
@@ -12241,7 +12365,7 @@
   // ---------------------------------------------------------------------------
 
   // ---------------------------------------------------------------------------
-  // Engine mount (chrome-side ONLY) — ?v=20260906cm
+  // Engine mount (chrome-side ONLY) — ?v=20260906cn
   // Beginner: optional Pixi engine loads from engineSrc URL into #stage-slot.
   // ENGINE DEV: NEVER ship private WhirledClassicGame files in this public mock.
   // Use ?engineSrc=http://127.0.0.1:8080/src/chrome-bridge.js (local Vite) or
@@ -12267,19 +12391,33 @@
   }
 
   function markStageEngineOwned(host) {
+    // (?v=20260906cn) Pixi owns room + avatars + walk — disable chrome loft animation.
     if (!host) return;
     try {
       host.setAttribute("data-whirled-engine", "1");
       host.setAttribute("data-engine-owns-avatar-walk", "1");
     } catch (eM) {}
+    try { hideChromeLoftAvatarLayer(); } catch (eH) {}
     try { bindChromeClickToWalk(); } catch (eB) {}
   }
 
+  function stageStillHasEngine(host) {
+    // Beginner: paint() rebuilds HTML and can wipe the canvas; detect a live mount.
+    if (!host) return false;
+    return !!(host.querySelector("canvas") || (host.getAttribute("data-whirled-engine") === "1" && host.querySelector("canvas")));
+  }
   function tryLoadAndMountEngine() {
-    if (engineMounted) return Promise.resolve(true);
+    // (?v=20260906cn) Remount if paint wiped #stage-slot but engineSrc / mountWhirledEngine still available.
+    var host0 = document.getElementById("stage-slot");
+    if (engineMounted && stageStillHasEngine(host0)) return Promise.resolve(true);
+    if (engineMounted && host0 && !stageStillHasEngine(host0)) {
+      // Canvas gone after chrome paint — allow remount.
+      engineMounted = false;
+      engineMountPromise = null;
+    }
     if (engineMountPromise) return engineMountPromise;
     var src = getEngineSrc();
-    var host = document.getElementById("stage-slot");
+    var host = host0 || document.getElementById("stage-slot");
     if (!host) return Promise.resolve(false);
 
     if (typeof globalThis.mountWhirledEngine === "function") {
@@ -12326,32 +12464,30 @@
 
   // WhirledChrome bridge — engine mounts only via getStageEl() → #stage-slot
   // ---------------------------------------------------------------------------
-  // ENGINE DEV: Contract for private WhirledClassicGame (Pixi). Read ENGINE-BRIDGE.md.
-  // You (engine developer) mount with mountWhirledEngine(host) where
-  //   host = WhirledChrome.getStageEl() === #stage-slot
-  //   resizeTo: host — canvas ONLY inside that element.
-  // API (version "0.4"):
-  //   version, getStageEl(), getSession(), getRoom(), onChat(fn), sendChat(text),
-  //   onOccupants(fn), getChatUi() → { mode, hideHistory, textSize, bubbleDuration },
-  //   getWornAvatar() (+states), setAvatarState(name), getAvatarWalkTarget(), isChromeWalkActive()
-  // Listen for document event "whirled:ready" if bridge is not ready yet (detail = this object).
-  // Do NOT draw outside #stage-slot. Do NOT rebuild login. Coins+Bars earn-only (no payments). No Flash.
-  // #decorate-layer, #avatar-wear-layer, and #stage-bubbles are chrome siblings above your canvas.
-  // ENGINE DEV: Wear billboard is temporary until Pixi owns avatars inside #stage-slot. No Ruffle.
-  // Chrome may show temporary #stage-bubbles until you own Pixi nametag bubbles.
+  // ENGINE DEV (?v=20260906cn / API "0.5"): YOU own room + avatars + walk in Pixi.
+  // Chrome = website shell (login, tabs, Stuff/Wear inventory, chat). Never rebuild login.
+  // Mount: mountWhirledEngine(host) where host = WhirledChrome.getStageEl() === #stage-slot
+  //   resizeTo: host — canvas ONLY inside that element. Never publish engine into public Pages.
+  // Homemade tofu/PNG loft walk is disabled by default. Classic Flash/Ruffle is experimental only.
+  // Listen for "whirled:ready" / "whirled:floorClick". Prefer canvas pointer events once mounted.
   // ---------------------------------------------------------------------------
   function exposeBridge() {
     // ENGINE DEV: wallet is chrome localStorage; getWallet() is optional read-only for engine.
     // Avatar lab wardrobe APIs are experimental read helpers — activeId is NOT applied to #stage-slot.
     window.WhirledChrome = {
-      version: "0.4",
+      version: "0.5",
       getStageEl: function () { return document.getElementById("stage-slot"); },
-      // (?v=20260906cm) Chrome asks an optional external engine to mount — never embeds private game files.
+      // (?v=20260906cn) Chrome asks an optional external engine to mount — never embeds private game files.
       tryMountEngine: function () { return tryLoadAndMountEngine(); },
-      isEngineMounted: function () { return !!engineMounted || !!(document.getElementById("stage-slot") && document.getElementById("stage-slot").getAttribute("data-whirled-engine") === "1"); },
+      isEngineMounted: function () {
+        return !!engineMounted
+          || engineOwnsAvatarPlayback()
+          || !!(document.getElementById("stage-slot")
+            && document.getElementById("stage-slot").getAttribute("data-whirled-engine") === "1");
+      },
       getEngineSrc: function () { return getEngineSrc(); },
       getSession: function () { return session(); },
-      getRoom: function () { return { id: "loft", name: ROOM }; },
+      getRoom: function () { return { id: currentRoomId || "loft", name: activeRoomName ? activeRoomName() : ROOM }; },
       onChat: function (fn) { listeners.chat.push(fn); },
       sendChat: function (text) { return window.WhirledApi.postChat(String(currentRoomId || roomChatRoomId || "loft"), text); },
       onOccupants: function (fn) { listeners.occupants.push(fn); fn(occupants()); },
@@ -12361,26 +12497,45 @@
         if (!s || !s.user) return { coins: 0, bars: 0, streakDays: 0 };
         return getWalletSnapshot(s.user.id);
       },
-      // Experimental (avatar lab): manifest only — never mounts SWF / Ruffle.
+      // Experimental (avatar lab): manifest only — never mounts SWF / Ruffle into #stage-slot.
       getWardrobe: function () { return loadWardrobe(); },
       getActiveAvatarId: function () {
         var w = loadWardrobe();
         return w && w.activeId ? w.activeId : null;
       },
-      // Stuff sprite Wear (modern path): chrome billboard on #avatar-wear-layer — not #stage-slot.
-      // ENGINE DEV (?v=20260906ao): worn row may include states{idle,walk,stand,pose}; chrome walk
-      // uses setAvatarState / getAvatarWalkTarget until mountWhirledEngine owns #stage-slot.
+      // Appearance for Pixi: worn Stuff row (+ states) and optional wardrobe snapshot.
+      // ENGINE DEV: build sprites from getWornAvatar().states in YOUR private repo — do not copy engine here.
       getWornAvatar: function () {
         var w = loadWornAvatar();
         if (!w) return null;
-        // Ensure states is visible for engine consumers even on legacy worn rows.
         if (!w.states) {
           try { w.states = resolveAvatarStates(w); } catch (e) {}
         }
         return w;
       },
-      setAvatarState: function (name) { return setAvatarState(name); },
-      playAvatarEmote: function (name) { return playAvatarEmote(name); },
+      getWardrobeAppearance: function () {
+        // Beginner: one object with worn + wardrobe for engine boot.
+        var worn = null;
+        try { worn = window.WhirledChrome.getWornAvatar(); } catch (eW) { worn = loadWornAvatar(); }
+        var wardrobe = null;
+        try { wardrobe = loadWardrobe(); } catch (eR) { wardrobe = null; }
+        return { worn: worn, wardrobe: wardrobe, activeId: wardrobe && wardrobe.activeId ? wardrobe.activeId : null };
+      },
+      setAvatarState: function (name) {
+        // No-op for chrome loft animation once engine owns avatars; still updates Wear snapshot for engine reads.
+        if (engineOwnsAvatarPlayback()) {
+          var worn = loadWornAvatar();
+          if (!worn) return false;
+          worn.state = String(name || "idle");
+          saveWornAvatar(worn);
+          return true;
+        }
+        return setAvatarState(name);
+      },
+      playAvatarEmote: function (name) {
+        if (engineOwnsAvatarPlayback()) return false; // engine owns emotes in room
+        return playAvatarEmote(name);
+      },
       playClassicChromeEmote: function (name) { return playClassicChromeEmote(name); },
       getLoftHostDebug: function () {
         try {
@@ -12391,15 +12546,29 @@
       listAvatarEmotes: function () { return listAvatarEmotes(); },
       getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
       isChromeWalkActive: function () {
-        var slot = document.getElementById("stage-slot");
-        if (slot && slot.getAttribute("data-engine-owns-avatar-walk") === "1") return false;
+        // Homemade loft walk only when explicitly enabled and engine does not own stage.
+        if (engineOwnsAvatarPlayback()) return false;
+        if (!chromeHomemadeWalkEnabled()) return false;
         return !!document.querySelector(".stage-host.chrome-walk-ready");
       },
-      // (?v=20260906cd): avatar setLocation_v1 bridge → chromeWalkTo (logical x*100 → %).
+      // Floor click: subscribe OR listen for document "whirled:floorClick".
+      // ENGINE DEV: once canvas is mounted, your own pointer handlers are preferred.
+      onFloorClick: function (fn) {
+        if (typeof fn === "function") floorClickListeners.push(fn);
+        return function unsubscribe() {
+          floorClickListeners = floorClickListeners.filter(function (f) { return f !== fn; });
+        };
+      },
+      // Legacy QA bridge — no-op when engine owns / homemade walk disabled.
       chromeWalkTo: function (xPct, yPct) { return chromeWalkTo(xPct, yPct); },
-      // How this works (?v=20260906bd): debug/UX — 'png-hybrid' | 'ruffle' | 'tofu' | 'png'
-      // Beginner: Whirl walking → usually 'png' (Ruffle not running). Force Ruffle / SWF-only → 'ruffle'.
-      getAvatarPlaybackMode: function () { return getAvatarPlaybackMode(); }
+      getAvatarPlaybackMode: function () {
+        if (engineOwnsAvatarPlayback()) return "engine";
+        if (!chromeHomemadeWalkEnabled()) return "waiting";
+        return getAvatarPlaybackMode();
+      },
+      // (?v=20260906cn) Helpers for engine / QA
+      engineOwnsAvatarWalk: function () { return engineOwnsAvatarPlayback(); },
+      chromeHomemadeWalkEnabled: function () { return chromeHomemadeWalkEnabled(); }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
     try { tryLoadAndMountEngine(); } catch (eEng) {}
