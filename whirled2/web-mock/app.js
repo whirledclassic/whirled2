@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ax";
+  var LOGO_V = "20260906ay";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -1661,15 +1661,22 @@
     var face = worn.face === -1 ? -1 : 1;
     var posStyle = "--wear-scale:" + scale + ";--wear-x:" + x + "%;--wear-face:" + face + ";";
     var isSwf = !!(worn.swfUrl || worn.mediaKind === "swf" || worn.kind === "swf");
-    // ---- MERGE NOTE (?v=20260906ax): user-uploaded classic Flash — Ruffle via classic-avatar.js ----
+    // ---- MERGE NOTE (?v=20260906ay): hybrid PNG walk preferred; Ruffle loft only if Force / SWF-only ----
     var wantsClassic = !!(worn.classicFlashOptIn || worn.useClassicFlash
       || (window.WhirledClassicAvatar && WhirledClassicAvatar.itemWantsClassicFlash && WhirledClassicAvatar.itemWantsClassicFlash(worn)));
-    if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && !(worn.frames && worn.frames.length) && !worn.preview) {
+    var forceRuffleLoft = !!(worn.forceRuffleInLoft
+      || (window.WhirledClassicAvatar && WhirledClassicAvatar.forceRuffleInLoft && WhirledClassicAvatar.forceRuffleInLoft(worn)));
+    var hasPngFrames = !!(worn.frames && worn.frames.length) || !!worn.preview
+      || !!(worn.states && ((worn.states.idle && worn.states.idle.frames && worn.states.idle.frames.length)
+        || (worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length)));
+    // SWF-only (no PNG): transparent Ruffle host; pointer-events none; chrome moves billboard on floor click.
+    if ((isSwf || wantsClassic) && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1) && !hasPngFrames) {
       var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
-      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '">'
+      return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle">'
         + '<div class="avatar-wear-billboard" data-avatar-hit="1" style="' + posStyle + '">'
-        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host" data-swf-url="' + swfAttr + '" title="Ruffle experimental"></div>'
-        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar") + ' <span class="classic-exp-badge">Experimental</span></div>'
+        +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" title="Ruffle experimental — transparent; floor click moves you"></div>'
+        +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "SWF avatar")
+        +   ' <span class="classic-exp-badge">Experimental</span></div>'
         + '</div></div>';
     }
     if (isTofu) {
@@ -1700,22 +1707,43 @@
     var meta = ' data-wear-frames="' + esc(JSON.stringify(frames)) + '"'
       + ' data-wear-durs="' + esc(JSON.stringify(durs)) + '"'
       + ' data-wear-state="' + esc(stateName) + '"';
-    // Hybrid (?v=20260906ax): PNG frames for walk + optional #avatar-ruffle-host when classic Flash opted in.
+    // Hybrid (?v=20260906ay): PNG frames drive walk/emotes. Ruffle loft only if Force Ruffle.
     var classicSlot = "";
+    var hybridBadge = "";
+    var loftMode = "png";
     try {
-      if (wantsClassic && (worn.swfUrl || worn.swfDataUrl || worn.swfSha1)) {
-        var swfU = esc(worn.swfUrl || worn.swfDataUrl || "");
-        classicSlot = '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host" data-swf-url="' + swfU + '" title="Classic Flash (experimental)"></div>'
-          + '<span class="classic-exp-badge classic-exp-badge-overlay">Flash</span>';
+      var hasSwf = !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1);
+      if (hasSwf && wantsClassic) {
+        if (forceRuffleLoft && window.WhirledClassicAvatar && WhirledClassicAvatar.classicWearSlotHtml) {
+          classicSlot = WhirledClassicAvatar.classicWearSlotHtml(worn) || "";
+          loftMode = "ruffle";
+        } else if (forceRuffleLoft) {
+          var swfU = esc(worn.swfUrl || worn.swfDataUrl || "");
+          classicSlot = '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfU + '" title="Force Ruffle in loft"></div>';
+          loftMode = "ruffle";
+        } else {
+          loftMode = "hybrid";
+          if (window.WhirledClassicAvatar && WhirledClassicAvatar.classicHybridBadgeHtml) {
+            hybridBadge = WhirledClassicAvatar.classicHybridBadgeHtml(worn) || "";
+          } else {
+            hybridBadge = '<span class="classic-hybrid-badge" title="PNG chrome walk; SWF for Stuff preview">Hybrid (smooth)</span>';
+          }
+        }
       } else if (window.WhirledClassicAvatar && WhirledClassicAvatar.classicWearSlotHtml) {
         classicSlot = WhirledClassicAvatar.classicWearSlotHtml(worn) || "";
       }
-    } catch (eSlot) { classicSlot = ""; }
-    return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on' + (classicSlot ? " is-swf-hybrid" : "") + '" aria-label="Worn avatar">'
+    } catch (eSlot) { classicSlot = ""; hybridBadge = ""; }
+    var layerClass = "avatar-wear-layer is-on"
+      + (loftMode === "hybrid" ? " is-swf-hybrid is-hybrid-smooth" : "")
+      + (classicSlot ? " is-swf-hybrid" : "");
+    var plateExtra = loftMode === "hybrid"
+      ? (' ' + (hybridBadge || '<span class="classic-hybrid-badge">Hybrid (smooth)</span>'))
+      : (classicSlot ? ' <span class="classic-exp-badge">Experimental</span>' : "");
+    return '<div id="avatar-wear-layer" class="' + layerClass + '" aria-label="Worn avatar" data-loft-mode="' + loftMode + '">'
       + '<div class="avatar-wear-billboard" data-avatar-hit="1"' + meta + ' style="' + posStyle + '">'
       +   classicSlot
       +   '<img class="avatar-wear-sprite" src="' + src0 + '" alt="' + esc(worn.name || "Avatar") + '" />'
-      +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + (classicSlot ? ' <span class="classic-exp-badge">Experimental</span>' : "") + '</div>'
+      +   '<div class="avatar-wear-nameplate">' + esc(worn.name || "Avatar") + plateExtra + '</div>'
       + '</div></div>';
   }
   function startAvatarWearAnim() {
@@ -1825,6 +1853,8 @@
   }
   function chromeWalkTo(xPct, yPct) {
     // Animate billboard toward floor click. Walk frames while moving; idle on arrive.
+    // How this works (?v=20260906ay): Hybrid PNG swaps walk frames; SWF-only still MOVES the billboard
+    // (Ruffle pointer-events none). Stock SWF walk *animation* needs AvatarControl host — not chrome.
     if (isEngineMountedOnStage()) return; // ENGINE DEV: yield to Pixi
     var layer = document.getElementById("avatar-wear-layer");
     var bill = layer && layer.querySelector(".avatar-wear-billboard");
@@ -6463,7 +6493,7 @@
         + '<button type="button" class="action-btn danger" data-stuff-delete="' + esc(item.id) + '">Delete Item</button>'
         + '</div>'
         + (isAvatar
-          ? ('<p class="meta">Wear shows this avatar in your loft on <code>#avatar-wear-layer</code> (PNG billboard; optional Experimental Ruffle overlay if classic SWF opted in). Scale applies to preview + loft.</p>'
+          ? ('<p class="meta">Wear → loft <code>#avatar-wear-layer</code>. Hybrid (smooth) = PNG walk when idle/walk attached; Force Ruffle = SWF appearance (transparent, no black box). Scale applies to preview + loft.</p>'
             + '<div class="stuff-detail-actions">'
             +   '<button type="button" class="action-btn" data-avatar-wiz-remap="' + esc(item.id) + '">Remap states…</button>'
             +   '<button type="button" class="text-btn" data-avatar-guide-open="1">How to make an avatar</button>'
@@ -11959,7 +11989,17 @@
         return;
       }
       wearStuffAvatar(wearItem);
-      pushNotice("green", "Wearing “" + (wearItem.name || "Avatar") + "” — visible in Stuff preview and your loft.", { transient: true });
+      var wearMsg = "Wearing “" + (wearItem.name || "Avatar") + "” — visible in Stuff preview and your loft.";
+      try {
+        if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemIsHybrid && WhirledClassicAvatar.itemIsHybrid(wearItem)
+          && !(wearItem.forceRuffleInLoft || (wearItem.pack && wearItem.pack.forceRuffleInLoft))) {
+          wearMsg = "Wearing “" + (wearItem.name || "Avatar") + "” — Hybrid (smooth): click loft floor to walk. SWF stays for Stuff Ruffle preview.";
+        } else if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasClassicSwf && WhirledClassicAvatar.itemHasClassicSwf(wearItem)
+          && !(wearItem.frames && wearItem.frames.length) && !wearItem.preview) {
+          wearMsg = "Wearing Flash “" + (wearItem.name || "Avatar") + "” — click floor to move. Attach PNG idle+walk for Hybrid smooth walk (SWF anim needs AvatarControl).";
+        }
+      } catch (eWm) {}
+      pushNotice("green", wearMsg, { transient: true });
       // How this works: refresh the tab you’re on (don’t yank out of Rooms if Stuff detail was stale).
       var curTabW = document.querySelector(".tab.is-on");
       var tabW = curTabW ? curTabW.getAttribute("data-tab") : "stuff";

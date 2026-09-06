@@ -1,6 +1,6 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906au` (`LOGO_V`)  
+**Cache:** `?v=20260906ay` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
@@ -63,7 +63,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906au`.
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906ay` — Hybrid Flash loft + pale-blue room chrome (see `QA-FLASH.md`).
 
 ---
 
@@ -84,6 +84,6 @@ Cross-link: [Using old Whirled / Flash avatars](#using-old-whirled--flash-avatar
 | `index.html` | cache-bust + `WHIRLED_API` on Pages |
 
 
-### Classic Flash module (?v=20260906aw)
+### Classic Flash module (?v=20260906ay)
 
-`src/classic-avatar.js` — Stuff upload/analyze/Ruffle Experimental. See AVATAR-IMPORT.md Phase 1.5.
+`src/classic-avatar.js` — Stuff upload/analyze/Ruffle Experimental; loft **Hybrid (smooth)** PNG walk by default; Force Ruffle toggle; transparent stage. See AVATAR-IMPORT.md / QA-FLASH.md.

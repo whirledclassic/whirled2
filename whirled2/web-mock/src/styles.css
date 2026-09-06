@@ -123,10 +123,10 @@ body {
 .note { display: none; }
 
 /* ---- Room workspace: occupant rail + stage ---- */
-.workspace { flex: 1; display: grid; grid-template-columns: 168px minmax(0,1fr); min-height: 0; background: #000; }
+.workspace { flex: 1; display: grid; grid-template-columns: 168px minmax(0,1fr); min-height: 0; background: #d7ebf8; }
 .rail {
-  background: linear-gradient(180deg, #1b2833, #121920);
-  color: #d5e6f0; overflow: auto; border-right: 1px solid #000;
+  background: linear-gradient(180deg, #eaf6fc, #d0e8f6);
+  color: #16324a; overflow: auto; border-right: 1px solid #9bb8cc;
 }
 .rail--end { display: none; }
 .rail h2 {
@@ -145,7 +145,7 @@ body {
 .dot.on { background: #5eb3e0; box-shadow: 0 0 0 1px rgba(30,111,168,0.35); }
 
 .stage-wrap { position: relative; background:
-  linear-gradient(#2a3d55 0 55%, #5c4030 55% 58%, #8b6914 58%);
+  linear-gradient(180deg, #9ec9e8 0%, #7aafd4 42%, #5f92b8 70%, #4a7aa0 100%);
   min-height: 420px; display: flex; flex-direction: column;
 }
 #stage-slot { flex: 1; min-height: 280px; display: grid; place-items: center; }
@@ -158,9 +158,9 @@ body {
 }
 .room-flag b { display: block; font-size: 13px; color: #fff; }
 .chat-log {
-  /* Slide mode fills this as its own dark window (wiki). Overlay mode hides it. */
-  max-height: 92px; overflow: auto; background: #0b1014; color: #dce8f0;
-  padding: 8px 10px; font-size: 12px; border-top: 1px solid #22303a;
+  /* Slide mode fills this as its own pale window. Overlay mode hides it. */
+  max-height: 92px; overflow: auto; background: #eef6fb; color: #16324a;
+  padding: 8px 10px; font-size: 12px; border-top: 1px solid #b7d3e8;
 }
 .chat-row { padding: 2px 0; }
 .chat-row b { color: #7ec8f0; margin-right: 6px; }
@@ -346,7 +346,7 @@ body {
   min-height: 80px;
   background:
     radial-gradient(ellipse 40% 28% at 72% 28%, rgba(255,255,255,0.55) 0 40%, transparent 55%),
-    linear-gradient(180deg, #9fd3f0 0%, #c5e4f5 42%, #7a9eb8 42%, #5c4030 52%, #8b6914 100%);
+    linear-gradient(180deg, #9fd3f0 0%, #c5e4f5 42%, #7a9eb8 55%, #5f92b8 78%, #4a7aa0 100%);
 }
 .room-tile .body { padding: 8px 10px 10px; }
 .room-tile h3 { margin: 0 0 4px; color: #1e6fa8; font-size: 14px; }
@@ -435,13 +435,13 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    background: #000;
+    background: #d7ebf8;
   }
   .rail {
     order: 2;
     max-height: 28vh;
     border-right: 0;
-    border-top: 1px solid #000;
+    border-top: 1px solid #9bb8cc;
   }
   .stage-wrap {
     order: 1;
@@ -605,8 +605,8 @@ body {
 .tb-vol-wrap.is-muted .tb-vol { color: #6a8292; }
 
 @media (max-width: 900px) {
-  .bar { background: #0e141a; color: #dce8f0; border-top: 0; }
-  .bar input { border-color: #2a3d4c; }
+  .bar { background: linear-gradient(180deg, #eaf6fc, #d7ebf8); color: #16324a; border-top: 1px solid #9bb8cc; }
+  .bar input { border-color: #b7d3e8; }
   /* 20260906r: keep Room/Music toolbar on phones (was display:none — blocked View room music) */
   .toolbar {
     display: flex !important;
@@ -1630,7 +1630,7 @@ body > .party-panel {
   min-width: 0;
 }
 .stage-body.chat-mode-slide .chat-log {
-  /* Classic Slide: own dark panel beside the room (wiki). */
+  /* Classic Slide: pale-blue panel beside the room (modern Whirled). */
   display: block;
   width: 240px;
   max-width: 38vw;
@@ -1639,8 +1639,9 @@ body > .party-panel {
   height: auto;
   align-self: stretch;
   border-top: 0;
-  border-left: 1px solid #22303a;
-  background: #0b1014;
+  border-left: 1px solid #9bb8cc;
+  background: #eef6fb;
+  color: #16324a;
   padding: 10px 12px;
   overflow: auto;
 }
@@ -2201,8 +2202,9 @@ body > .party-panel {
     min-height: 140px !important;
     height: auto !important;
     border-left: 0 !important;
-    border-top: 1px solid #2a3d4c !important;
-    background: #0b1014 !important;
+    border-top: 1px solid #9bb8cc !important;
+    background: #eef6fb !important;
+    color: #16324a !important;
     padding: 10px 12px !important;
     overflow: auto !important;
     font-size: 13px;
@@ -2968,7 +2970,7 @@ body > .party-panel {
   .rail.occ-rail {
     max-height: 180px;
     border-right: 0;
-    border-bottom: 1px solid #000;
+    border-bottom: 1px solid #9bb8cc;
   }
   .occ-list { max-height: 120px; }
   .room-embed-frame { min-height: 200px; height: 200px; }
@@ -3031,8 +3033,7 @@ body > .party-panel {
     grid-template-columns: none !important;
     min-height: 0 !important;
     flex: 1 1 auto;
-    background:
-      linear-gradient(#2a3d55 0 55%, #5c4030 55% 58%, #8b6914 58%) !important;
+    background: #d7ebf8 !important;
   }
 
   /* 7) Occupant rail = thin horizontal chip strip ABOVE stage */
@@ -3047,14 +3048,14 @@ body > .party-panel {
     overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch;
     border-right: 0 !important;
-    border-bottom: 1px solid #000 !important;
+    border-bottom: 1px solid #9bb8cc !important;
     border-top: 0 !important;
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
     gap: 6px;
     padding: 4px 8px !important;
-    background: linear-gradient(180deg, #1b2833, #121920) !important;
+    background: linear-gradient(180deg, #eaf6fc, #d7ebf8) !important;
   }
   .occ-rail-head {
     display: flex !important;
@@ -3108,8 +3109,7 @@ body > .party-panel {
     min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    background:
-      linear-gradient(#2a3d55 0 55%, #5c4030 55% 58%, #8b6914 58%) !important;
+    background: linear-gradient(180deg, #9ec9e8 0%, #7aafd4 45%, #5f92b8 100%) !important;
   }
   .room-strip { flex-shrink: 0; }
 
@@ -3151,7 +3151,9 @@ body > .party-panel {
     height: auto !important;
     align-self: stretch !important;
     border-left: 0 !important;
-    border-top: 1px solid #2a3d4c !important;
+    border-top: 1px solid #9bb8cc !important;
+    background: #eef6fb !important;
+    color: #16324a !important;
     padding: 6px 8px !important;
     font-size: 12px;
   }
@@ -3909,29 +3911,29 @@ button.tb.tb-music,
   color: #2a4a62 !important;
 }
 
-/* Slide panel — readable dark panel, not a broken black slab */
+/* Slide panel — pale-blue readable panel (no black slab chrome) */
 .stage-body.chat-mode-slide .chat-log {
-  background: #121a22 !important;
-  border-left: 1px solid #2a3d4c !important;
+  background: #eef6fb !important;
+  border-left: 1px solid #9bb8cc !important;
   padding: 12px 14px !important;
-  color: #dce8f0;
-  box-shadow: inset 2px 0 0 rgba(58, 163, 224, 0.15);
+  color: #16324a !important;
+  box-shadow: inset 2px 0 0 rgba(58, 163, 224, 0.18);
 }
 .chat-log .chat-bubble:not(.emote):not(.system) {
-  background: #f4f9fc !important;
+  background: #fff !important;
   color: #16324a !important;
   border: 1px solid #c5deee;
 }
 .chat-log .chat-who {
-  color: #7ec8f0 !important; /* classic cyan on dark panel */
+  color: #1e6fa8 !important; /* accent on pale panel */
 }
 .chat-log .chat-bubble.emote {
-  color: #b8d4e4 !important;
+  color: #4a6a80 !important;
 }
 .chat-log .chat-bubble.system {
-  background: rgba(58, 163, 224, 0.2) !important;
-  border-color: #3aa3e0 !important;
-  color: #cfe8f6 !important;
+  background: rgba(232, 244, 251, 0.95) !important;
+  border-color: #9bb8cc !important;
+  color: #1e6fa8 !important;
 }
 .chat-log .chat-row {
   padding: 4px 0;
@@ -4867,7 +4869,8 @@ button.tb.tb-music,
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 38%;
-  background: linear-gradient(180deg, #6b4a28 0%, #5a3c20 30%, #4a3018 100%);
+  /* pale-blue cool floor — no heavy brown bar (?v=20260906ay) */
+  background: linear-gradient(180deg, #7a9eb8 0%, #6a8eaa 35%, #5a7e9a 100%);
   transform: perspective(400px) rotateX(12deg);
   transform-origin: top center;
   overflow: hidden;
@@ -5924,26 +5927,26 @@ button.tb.tb-music,
     min-height: 32px;
   }
   .room-embed-now-sub { font-size: 11px !important; max-width: 42vw; }
-  /* Occupant strip — classic dark teal, no neon green glow */
+  /* Occupant strip — pale-blue classic (?v=20260906ay), no black/brown */
   .rail.occ-rail {
-    background: linear-gradient(180deg, #1e2f3c, #152028) !important;
-    border-bottom: 1px solid #2a4560 !important;
+    background: linear-gradient(180deg, #eaf6fc, #d7ebf8) !important;
+    border-bottom: 1px solid #9bb8cc !important;
   }
-  .rail.occ-rail h2 { color: #9ec4d8 !important; }
+  .rail.occ-rail h2 { color: #1e6fa8 !important; }
   .person-wrap {
-    background: rgba(255,255,255,0.06) !important;
+    background: rgba(255,255,255,0.8) !important;
     border-radius: 999px !important;
-    border: 1px solid rgba(126, 200, 240, 0.25);
+    border: 1px solid #b7d3e8;
   }
   .person-wrap.is-you {
     background: rgba(58, 163, 224, 0.18) !important;
     border-color: #3aa3e0;
   }
-  .person-name { color: #e8f4fb !important; font-weight: 700; }
-  /* Stage wrap — loft blue/brown, NEVER outdoor green grass */
+  .person-name { color: #16324a !important; font-weight: 700; }
+  /* Stage wrap — pale loft blue only (no brown bars) (?v=20260906ay) */
   .stage-wrap {
     background:
-      linear-gradient(#2a3d55 0 55%, #5c4030 55% 58%, #8b6914 58%) !important;
+      linear-gradient(180deg, #9ec9e8 0%, #7aafd4 45%, #5f92b8 100%) !important;
   }
 }
 
@@ -6069,4 +6072,322 @@ button.tb.tb-music,
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 6px 8px; background: #f7fbfd; border: 1px solid #c5deee; border-radius: 6px;
   font-size: 12px;
+}
+
+
+/* ==========================================================================
+   ?v=20260906ay — Flash transparent loft stage + Hybrid (smooth) walk
+   Beginner: black Ruffle box fixed; floor clicks work (SWF layer PE none).
+   ENGINE DEV: Ruffle stays on #avatar-ruffle-host chrome; never #stage-slot.
+   ========================================================================== */
+
+.avatar-ruffle-host,
+.classic-ruffle-host,
+.classic-wear-swf-slot,
+.avatar-wear-layer.is-swf .avatar-ruffle-host {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Loft: Ruffle must NOT steal floor clicks — chrome walk binds on .stage-host */
+.avatar-wear-layer .avatar-ruffle-host,
+.avatar-wear-layer .avatar-ruffle-host.is-loft,
+.avatar-wear-layer .classic-wear-swf-slot,
+.avatar-wear-layer ruffle-player,
+.avatar-wear-layer ruffle-embed,
+.avatar-wear-layer .avatar-ruffle-host canvas {
+  pointer-events: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.avatar-ruffle-host ruffle-player,
+.avatar-ruffle-host ruffle-embed,
+.classic-ruffle-host ruffle-player,
+.classic-ruffle-host ruffle-embed {
+  background: transparent !important;
+  background-color: transparent !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Stuff preview hosts MAY receive pointer events for inspect/play */
+#classic-ruffle-host,
+#classic-ruffle-detail-host,
+.classic-viewer-swf-slot.is-on,
+.classic-ruffle-preview .classic-ruffle-host {
+  pointer-events: auto;
+}
+
+.classic-hybrid-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  font: 700 10px/1.3 var(--ui, system-ui, sans-serif);
+  color: #0d5a8c;
+  background: linear-gradient(180deg, #e8f7ff, #cfeaf8);
+  border: 1px solid #6eb0d4;
+  border-radius: 8px;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}
+
+.classic-loft-mode-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-weight: 700;
+  background: #e7f4fc;
+  border: 1px solid #8ebdd8;
+  color: #16324a;
+}
+.classic-loft-mode-pill[data-loft-mode="hybrid"] {
+  background: #dff6ea;
+  border-color: #6cbc8e;
+  color: #1a5c38;
+}
+.classic-loft-mode-pill[data-loft-mode="ruffle"] {
+  background: #fff3d6;
+  border-color: #e0b84e;
+  color: #6a4b00;
+}
+
+/* Hybrid+Force Ruffle: keep PNG under SWF for walk frame swaps (dimmed) */
+.avatar-wear-sprite.classic-png-under-swf-soft {
+  opacity: 0.22;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) scaleX(var(--wear-face, 1));
+  z-index: 0;
+  max-height: min(160px, 42vh);
+  pointer-events: none;
+}
+.avatar-wear-layer.is-hybrid-smooth .avatar-wear-sprite {
+  /* Primary loft visual — smooth chrome walk */
+  position: relative;
+  z-index: 1;
+}
+.avatar-wear-layer.is-swf .avatar-wear-billboard {
+  /* Billboard still PE auto for tip/emote; Ruffle child PE none so most of stage floor works */
+  min-width: 72px;
+  min-height: 80px;
+}
+
+
+/* ==========================================================================
+   ?v=20260906ay — Kill brown/black room bars; pale-blue classic Whirled chrome
+   Beginner: no ugly brown stripes or black voids around stage / dock / rail.
+   ENGINE DEV: overrides older .stage-wrap / .workspace / loft-floor browns.
+   ========================================================================== */
+
+/* Workspace void was pure #000 → pale blue frame */
+#app[data-tab="rooms"] .workspace,
+.workspace {
+  background: #d7ebf8 !important;
+}
+#app[data-tab="rooms"] .workspace {
+  gap: 0;
+}
+
+/* Stage wrap — soft loft blues only (NO brown #5c4030 / #8b6914 bands) */
+.stage-wrap {
+  background: linear-gradient(180deg, #9ec9e8 0%, #7aafd4 42%, #5f92b8 58%, #4a7aa0 100%) !important;
+  border: 1px solid #9bb8cc;
+  border-radius: 0 0 8px 8px;
+}
+@media (max-width: 900px) {
+  .stage-wrap {
+    background: linear-gradient(180deg, #9ec9e8 0%, #7aafd4 45%, #5f92b8 100%) !important;
+  }
+}
+
+/* Room strip (IN THIS ROOM header siblings) — pale card, not dark slab */
+.room-strip {
+  background: linear-gradient(180deg, #eaf6fc, #d7ebf8) !important;
+  border-bottom: 1px solid #9bb8cc !important;
+  color: #16324a !important;
+  padding: 6px 10px !important;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.room-strip .room-name { color: #1e6fa8 !important; font-weight: 800; }
+.room-strip .room-owner { color: #4a6a80 !important; }
+.room-strip .room-rating-badge {
+  background: #e8f4fb !important;
+  color: #1e6fa8 !important;
+  border: 1px solid #9bb8cc;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Occupant rail — classic pale-blue (not black/brown) */
+.rail,
+.rail.occ-rail {
+  background: linear-gradient(180deg, #eaf6fc 0%, #d0e8f6 100%) !important;
+  color: #16324a !important;
+  border-right: 1px solid #9bb8cc !important;
+}
+.rail.occ-rail h2,
+.occ-rail-head h2 {
+  color: #1e6fa8 !important;
+}
+.occ-count { color: #1e6fa8 !important; }
+.occ-legend { color: #4a6a80 !important; }
+.occ-rail-head {
+  border-bottom: 1px solid #b7d3e8 !important;
+}
+.occ-filter input {
+  border: 1px solid #b7d3e8 !important;
+  background: #fff !important;
+  color: #16324a !important;
+}
+.person-name { color: #16324a !important; }
+.person-status, .person .sub, .occ-empty { color: #4a6a80 !important; }
+.person-wrap {
+  background: rgba(255,255,255,0.65) !important;
+  border: 1px solid #c5deee;
+}
+.person-wrap.is-you {
+  background: rgba(58, 163, 224, 0.16) !important;
+  border-color: #3aa3e0 !important;
+}
+.dot.on { background: #3aa3e0 !important; box-shadow: 0 0 0 1px rgba(30,111,168,0.35); }
+
+@media (max-width: 900px) {
+  .rail.occ-rail {
+    background: linear-gradient(180deg, #eaf6fc, #d7ebf8) !important;
+    border-bottom: 1px solid #9bb8cc !important;
+    border-right: 0 !important;
+  }
+  .rail.occ-rail h2 { color: #1e6fa8 !important; }
+  .person-wrap {
+    background: rgba(255,255,255,0.75) !important;
+    border: 1px solid #b7d3e8;
+  }
+  .person-name { color: #16324a !important; }
+}
+
+/* Loft backdrop floor — subtle wood/grid INSIDE #stage-slot only (never full-width chrome) */
+.loft-backdrop {
+  background: #3a5a78 !important;
+}
+.loft-floor {
+  /* Soft warm wood, contained — not #5c4030/#8b6914 chrome stripes */
+  background: linear-gradient(180deg, #c4a882 0%, #b8956a 40%, #a07c55 100%) !important;
+  box-shadow: inset 0 8px 16px rgba(40, 30, 20, 0.12);
+}
+.loft-floor-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80,50,20,0.18) 1px, transparent 1px) !important;
+  opacity: 0.4;
+}
+.loft-corner {
+  background: linear-gradient(90deg, rgba(20,48,74,0.25), rgba(20,48,74,0.05), rgba(20,48,74,0.22)) !important;
+}
+
+/* Stage host: transparent so loft-backdrop owns the scene — no second brown/black band */
+.stage-host {
+  background: transparent !important;
+}
+.stage-body {
+  background: #d7ebf8 !important;
+}
+
+/* Chat toolbar / Clear chat / Share row — pale, no black strip */
+.chat-toolbar-row {
+  background: linear-gradient(180deg, #eaf6fc, #dfeff8) !important;
+  border-top: 1px solid #b7d3e8 !important;
+  border-bottom: 1px solid #c5deee;
+  padding: 6px 10px !important;
+}
+.chat-clear-view-btn,
+.room-invite-row .text-btn {
+  color: #1e6fa8 !important;
+}
+.room-invite-row {
+  background: #eaf6fc !important;
+  border-top: 0 !important;
+  padding: 4px 10px 8px !important;
+}
+
+/* Slide chat log — soft blue panel instead of near-black */
+.chat-log {
+  background: #eef6fb !important;
+  color: #16324a !important;
+  border-top: 1px solid #b7d3e8 !important;
+}
+.chat-row b { color: #1e6fa8 !important; }
+.chat-row time { color: #5a7a90 !important; }
+.stage-body.chat-mode-slide .chat-log {
+  background: #e8f4fb !important;
+  border: 1px solid #9bb8cc !important;
+}
+
+/* Bottom chat bar — pale classic (override night/black variants in rooms) */
+#app[data-tab="rooms"] > .bar,
+#app[data-tab="rooms"] .bar {
+  background: linear-gradient(180deg, #eaf6fc, #d7ebf8) !important;
+  color: #16324a !important;
+  border-top: 1px solid #9bb8cc !important;
+}
+#app[data-tab="rooms"] .bar input {
+  background: #fff !important;
+  border: 1px solid #b7d3e8 !important;
+  color: #16324a !important;
+}
+
+/* Music/embed frame letterbox: keep player black ONLY inside the iframe hole;
+   chrome around it stays pale (already .room-embed-dock pale-blue). */
+.room-embed-frame-wrap {
+  border: 1px solid #9bb8cc !important;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #16324a !important; /* deep blue void, not pure #000 bar */
+}
+.room-embed-frame {
+  background: #16324a !important;
+}
+
+/* Kill leftover black 1px borders that read as bars */
+#app[data-tab="rooms"] .rail,
+#app[data-tab="rooms"] .workspace,
+#app[data-tab="rooms"] .stage-wrap {
+  border-color: #9bb8cc !important;
+}
+@media (max-width: 900px) {
+  #app[data-tab="rooms"] .rail.occ-rail,
+  #app[data-tab="rooms"] .workspace {
+    border-bottom-color: #9bb8cc !important;
+  }
+}
+
+/* Immersive / mobile: no pure black stage chrome */
+body.room-immersive #app[data-tab="rooms"] .workspace {
+  background: #cfe4f4 !important;
+}
+
+/* ---- ay residual bar kill (?v=20260906ay visual sweep) ---- */
+@media (max-width: 900px) {
+  #app[data-tab="rooms"] .rail.occ-rail {
+    background: linear-gradient(180deg, #eaf6fc, #d7ebf8) !important;
+    border-bottom: 1px solid #9bb8cc !important;
+    color: #16324a !important;
+  }
+  #app[data-tab="rooms"] .rail.occ-rail h2 { color: #1e6fa8 !important; }
+  #app[data-tab="rooms"] .workspace { background: #d7ebf8 !important; }
+}
+/* Collapsed music dock: never show black frame letterbox as a chrome bar */
+.room-embed-dock:not(.is-expanded) .room-embed-frame-wrap {
+  background: transparent !important;
+  border: 0 !important;
+  min-height: 0 !important;
+  height: 0 !important;
 }

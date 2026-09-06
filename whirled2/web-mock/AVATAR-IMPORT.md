@@ -1,11 +1,13 @@
 # AVATAR-IMPORT — classic Whirled avatars → Whirled2
 
-**STATUS (?v=20260906aw): USER CLASSIC UPLOAD SHIPPED (Experimental).** Legacy wardrobe lab still deferred behind `?avatarLab=1`.
+**STATUS (?v=20260906ay): HYBRID (SMOOTH) LOFT + TRANSPARENT RUFFLE.** Classic upload shipped (Experimental). Legacy wardrobe lab still deferred behind `?avatarLab=1`. See `QA-FLASH.md`.
 
 **Audience:** beginners on the web-mock chrome + ENGINE DEV on the Pixi (or later) room engine.  
 **Status:** Phase 0–1 wardrobe foundation exists behind a feature flag; **not** active for visitors (Sep 2026). **Do not** treat this as a license to scrape whirled.club shop media.  
 **Unlock side work:** URL `?avatarLab=1` (sets `localStorage whirled2.avatarLab = "1"`) or set that storage key manually. Default **OFF**.  
 **Related:** `ENGINE-BRIDGE.md` (Flash/Ruffle still banned for live rooms; Phase 2 deferred), Stuff upload UI in `app.js`, research clones under `/workspace/research/`.
+
+**Overnight ay fix:** Loft prefers **Hybrid (smooth)** PNG click-to-walk when idle/walk PNGs exist; Ruffle uses transparent stage + `pointer-events:none` so floor clicks work. Stock SWFs idle without AvatarControl host — Force Ruffle is appearance-only until Phase 2 host shim (study Grey Havens / whirled.club; do not copy AGPL).
 
 **What normal users see:** Stuff → Avatars → **Classic Flash / Whirled avatars** panel (upload/analyze/Ruffle Experimental) + PNG wizard + Whirl. Legacy lab note remains On hold. Wear can show Ruffle on `#avatar-ruffle-host` when opted in.
 

@@ -2,7 +2,7 @@
 
 **File saved:** `assets/avatars/fla-lab/user-test-avatar.fla` (~1.8 MB)  
 **Format:** Old Adobe Flash **OLE compound document** (not zip FLA). Metadata: *Saved by Adobe Flash Windows 9.0* (~2010).  
-**Status (?v=20260906aw):** Classic Flash **upload UI is ready** — drop a published `.swf` on Stuff → Classic Flash panel. FLA extracts still not Wearable.
+**Status (?v=20260906ay):** Classic Flash upload + **Hybrid (smooth)** loft walk ready. Drop published `.swf` (+ optional PNG idle/walk) on Stuff → Classic Flash. FLA extracts alone still not Wearable — publish SWF or export PNGs. Transparent Ruffle; see `QA-FLASH.md`.
 
 **Prior (?v=20260906aq):** Advanced as far as the file allows — **no SWF / no PNG sprite sequence inside**. Extracted camera JPEGs are **concept sketches** (multi-tail fox on lined paper), not loft-ready frames. Whirl remains the working Wearable.
 
