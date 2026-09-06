@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Whirled2 dd</title>
+  <title>Whirled2 de</title>
   <style>
     .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
     body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; background: #89C6E3; color: #16324a; }
@@ -18,8 +18,9 @@
     }
     #stage-slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260906dd" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260906dd" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260906de" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260906de" />
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
 </head>
 <body>
   <div id="app">Loading chrome…</div>
@@ -31,29 +32,25 @@
         if (bad(ls)) localStorage.removeItem("whirled2.engineSrc");
       } catch (e) {}
       window.WHIRLED_API = window.WHIRLED_API || "https://norfolk-approved-discussing-recognised.trycloudflare.com";
-      window.WHIRLED_ENGINE_SRC = new URL("./src/pixi-bridge.js?v=20260906dd", location.href).href;
+      window.WHIRLED_ENGINE_SRC = "";
       window.__whirledBoot = false;
     })();
   </script>
-  <script src="./src/api.js?v=20260906dd"></script>
-  <script src="./src/classic-avatar.js?v=20260906dd"></script>
-  <script src="./app.js?v=20260906dd"></script>
+  <script src="./src/api.js?v=20260906de"></script>
+  <script src="./src/classic-avatar.js?v=20260906de"></script>
+  <script src="./src/pixi-bridge.js?v=20260906de"></script>
+  <script src="./app.js?v=20260906de"></script>
   <script>
     (function () {
-      var mounting = false;
       function mount() {
         var host = document.getElementById("stage-slot");
-        if (!host || host.querySelector("canvas") || mounting) return;
-        var src = window.WHIRLED_ENGINE_SRC;
-        if (!src) return;
-        mounting = true;
-        import(src).then(function (mod) {
-          var fn = mod && (mod.mountWhirledEngine || mod.default);
-          if (typeof fn === "function") return fn(host);
-        }).finally(function () { mounting = false; });
+        if (!host || host.querySelector("canvas")) return;
+        if (typeof window.mountWhirledEngine === "function") {
+          try { window.mountWhirledEngine(host); } catch (e) {}
+        }
       }
       document.addEventListener("whirled:ready", mount);
-      setInterval(mount, 500);
+      setInterval(mount, 400);
     })();
   </script>
 </body>
