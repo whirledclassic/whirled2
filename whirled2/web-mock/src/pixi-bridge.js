@@ -1,6 +1,4 @@
-/* Uses window.PIXI from the classic script tag in index.html.
- * No ESM CDN import — that broke iPhone. Canvas fallback if Pixi missing.
- */
+/* Uses window.PIXI from the classic script tag in index.html. */
 (function (root) {
   function canvasMount(host) {
     if (host.querySelector("canvas[data-whirled-stage]")) return host._whirledApp;
@@ -55,7 +53,7 @@
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2)
     });
-    var view = app.view || (app.canvas);
+    var view = app.view || app.canvas;
     if (view) {
       view.setAttribute("data-whirled-stage", "1");
       view.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;";
@@ -63,7 +61,6 @@
     }
     host.setAttribute("data-whirled-engine", "1");
     host.setAttribute("data-engine-owns-avatar-walk", "1");
-
     var sky = new PIXI.Graphics();
     var floor = new PIXI.Graphics();
     var label = new PIXI.Text("Studio Loft", { fill: 0xf4f0e4, fontSize: 14, fontFamily: "Trebuchet MS", fontWeight: "700" });
@@ -89,7 +86,7 @@
       ay += (ty - ay) * 0.14;
       drawAvatar();
     });
-    view.addEventListener("pointerdown", function (ev) {
+    if (view) view.addEventListener("pointerdown", function (ev) {
       var r = view.getBoundingClientRect();
       tx = (ev.clientX - r.left) / r.width;
       ty = Math.max(0.6, (ev.clientY - r.top) / r.height);
@@ -101,16 +98,8 @@
     return app;
   }
 
-  function mountWhirledEngine(host) {
-    if (!host) throw new Error("mountWhirledEngine needs a host");
+  root.mountWhirledEngine = function (host) {
+    if (!host) return;
     try { return pixiMount(host); } catch (e) { return canvasMount(host); }
-  }
-
-  root.mountWhirledEngine = mountWhirledEngine;
-  if (typeof module !== "undefined") module.exports = { mountWhirledEngine: mountWhirledEngine };
+  };
 })(typeof window !== "undefined" ? window : this);
-
-export function mountWhirledEngine(host) {
-  return window.mountWhirledEngine(host);
-}
-export default mountWhirledEngine;
