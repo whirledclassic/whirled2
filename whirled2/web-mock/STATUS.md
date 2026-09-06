@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bo)
+
+- **Club gaps + polish (after bn):** wiki **Block** hides room/group chat lines + stage bubbles for blocked players; **Block/Unblock** toggle on chat name + occupant menus; whisper + `/msg|/tell|/w` refuse when blocked; `/help clear` `/help back` `/help block` topics; blocklist copy + Go **Games awaiting** Soon tag
+- **Preserve:** bl/bm Flash loft interact (`classic-avatar.js` UNTOUCHED), bg dual Wear cards, bn /action whisper Club★ Away/Back, bk–bj club, Whirl, visit-since
+- Updates thread sticky OP + ship note refreshed
+- Cache: **`?v=20260906bo`**. Push: `/tmp/push-bo.js` (dry-run default).
+
 ## What shipped (?v=20260906bn)
 
 - **Club gaps + polish (after bm):** wiki **/action|/ac** plays PNG or chrome/Ruffle emotes (prefix match; bare opens Emotes menu); **/msg|/tell|/w** whisper aliases; **Club ★** name-color legend stub; self occ-menu **Away/Back**; shortcuts/help refreshed

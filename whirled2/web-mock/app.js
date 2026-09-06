@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bn";
+  var LOGO_V = "20260906bo";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -4919,7 +4919,7 @@
   var DEV_GROUP_NAME = "Whirled2 Developers";
   function overnightChangelogBody() {
     return [
-      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm + bn) — auto-posted for Developers.",
+      "Overnight chrome ships (ar→az + ba/bc/bd/be/bf/bg/bh/bi/bj/bk/bl/bm/bn + bo) — auto-posted for Developers.",
       "",
       "• Whirl starter avatar (slug cyan-hair) auto-seed + auto-Wear",
       "• Chat visit-since + Clear my view (no cemetery rehydrate)",
@@ -4959,6 +4959,9 @@
       "• bn: club gaps after bm — /action|/ac plays PNG/chrome emotes (prefix match; bare opens menu),",
       "  /msg|/tell|/w whisper aliases, Club ★ name legend stub, self-menu Away/Back,",
       "  shortcuts/help refresh — classic-avatar.js Flash loft interact UNTOUCHED",
+      "• bo: club gaps after bn — Block hides room/group chat + stage bubbles; Block/Unblock toggle on",
+      "  name + occupant menus; whisper/PM refuse when blocked; /help clear|/help back topics;",
+      "  blocklist copy + Go Games soon-tag polish — classic-avatar.js Flash loft interact UNTOUCHED",
       "",
       "See STATUS.md / CLUB-GAP-REPORT.md and HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md.",
       "Classic wiki: Groups = discussion forum + hall; /broadcast was Bars — Whirled2 uses coins (earn-only)."
@@ -6163,6 +6166,7 @@
         }).join("")
       : '<button type="button" data-go="friends">No friends here — open Friends list</button>';
     // How this works (?v=20260906bi): wiki Go… also lists Group halls (joined groups).
+    // How this works (?v=20260906bo): Games awaiting players — honest Coming Soon (no fake parlor queue).
     // Beginner: Group halls open the Groups tab on that group's home — not a fake shop catalog.
     var halls = [];
     try { halls = myJoinedGroups(); } catch (eH) { halls = []; }
@@ -6181,8 +6185,8 @@
       + '<div class="go-menu-section meta">Group halls</div>'
       + hallBtns
       + '<div class="go-menu-section meta">Games</div>'
-      + '<button type="button" data-go="games">View games awaiting players</button>'
-      + '<p class="meta go-menu-hint">Classic Go — home, recents, friends, group halls, or parlor lobby.</p>'
+      + '<button type="button" data-go="games" title="Parlor / AVR matchmaking — Coming Soon">🎮 Games awaiting players <span class="soon-tag">Soon</span></button>'
+      + '<p class="meta go-menu-hint">Classic Go — home, recents, friends, group halls, or parlor lobby. Games list is a Coming Soon stub (no fake matchmaking).</p>'
       + '</div>';
   }
   function recentRoomsStripHtml() {
@@ -6297,6 +6301,7 @@
       +     '<li><b>/bleepall</b> — hide/unhide all room items for you (session)</li>'
       +     '<li><b>/action</b> <i>name</i> (/ac) — play emote (bare opens menu) · <b>/state</b>|/st Coming Soon</li>'
       +     '<li><b>/msg</b>|/tell|/w <i>name</i> [text] — open whisper / send PM</li>'
+      +     '<li><b>Block</b> — name or occupant menu; hides their chat for you · Unblock restores</li>'
       +   '</ul></div></div>';
   }
   function runCommand(cmd) {
@@ -6384,14 +6389,23 @@
     }
   }
   function activeChatMessages() {
+    // How this works (?v=20260906bo): wiki Block — hide messages from blocked players in this browser.
+    // Beginner: Block still lets you see the person in the room list; their chat lines and bubbles stay hidden.
     var t = loadChatTabs();
+    var msgs;
     if (t.activeTabId && t.activeTabId.indexOf("pm:") === 0) {
-      return loadPmChat(t.activeTabId.slice(3));
+      msgs = loadPmChat(t.activeTabId.slice(3));
+    } else if (t.activeTabId && t.activeTabId.indexOf("group:") === 0) {
+      msgs = loadGroupChat(t.activeTabId.slice(6));
+    } else {
+      msgs = chat;
     }
-    if (t.activeTabId && t.activeTabId.indexOf("group:") === 0) {
-      return loadGroupChat(t.activeTabId.slice(6));
-    }
-    return chat;
+    return (msgs || []).filter(function (m) {
+      if (!m || m.system) return true;
+      var uid = m.userId || "";
+      if (uid && isBlocked(uid)) return false;
+      return true;
+    });
   }
   function applyChatInputTint() {
     var input = document.getElementById("chat-input");
@@ -6601,13 +6615,17 @@
         + '<button type="button" class="occ-menu-item" data-room-menu="decorate">Decorate Room…</button>'
         + '</div>';
     } else {
+      // How this works (?v=20260906bo): Block/Unblock toggle (wiki Block) — Unblock restores chat visibility.
+      var blockedOn = !!(id && isBlocked(id));
       menu = '<div class="occ-menu" role="menu">'
         + '<button type="button" class="occ-menu-item" data-profile="' + esc(id) + '">View Profile</button>'
         + '<button type="button" class="occ-menu-item" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(p.name || id) + '">Whisper</button>'
         + '<button type="button" class="occ-menu-item" data-invite-buddy="' + esc(id) + '" data-friend-name="' + esc(niceName || p.name || id) + '">Invite to be your friend</button>'
         + (currentParty() ? ('<button type="button" class="occ-menu-item" data-party-invite="' + esc(id) + '" data-party-invite-name="' + esc(niceName || p.name || id) + '">Invite to party</button>') : '')
         + '<button type="button" class="occ-menu-item" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(niceName || p.name || id) + '">Send Mail</button>'
-        + '<button type="button" class="occ-menu-item" data-block-chat="' + esc(id) + '" data-block-name="' + esc(p.name || id) + '">Block</button>'
+        + (blockedOn
+          ? ('<button type="button" class="occ-menu-item" data-unblock-chat="' + esc(id) + '" data-unblock-name="' + esc(p.name || id) + '">Unblock</button>')
+          : ('<button type="button" class="occ-menu-item" data-block-chat="' + esc(id) + '" data-block-name="' + esc(p.name || id) + '">Block</button>'))
         + '<button type="button" class="occ-menu-item" data-boot-stub="' + esc(id) + '" title="Boot from room — Coming Soon">Boot… <span class="soon-tag">Soon</span></button>'
         + '<button type="button" class="occ-menu-item" data-enter-room="loft">Visit Home</button>'
         + '</div>';
@@ -8867,7 +8885,7 @@
           "dev-cache",
           "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
           "STATUS.md",
-          "Current build: ?v=20260906bb (Hybrid PNG walk fix + optional Ruffle; Wear&amp;enter loft). Hard-refresh after pulls."
+          "Current build: ?v=20260906bo (club Block chat hide + Unblock toggle after bn). Hard-refresh after pulls."
         )
       + devHubCard(
           "FLA / SWF lab notes",
@@ -10704,10 +10722,10 @@
             + '<button type="button" class="action-btn" data-unblock="' + esc(b.id) + '">Remove</button>'
             + '</div>';
         }).join("")
-      : '<p class="meta">Your blocklist is empty. Blocked players stay out of friends search results and cannot leave wall comments here.</p>';
+      : '<p class="meta">Your blocklist is empty. Blocked players stay out of friends search + wall comments, and their room chat / bubbles stay hidden for you.</p>';
     return '<section class="page me-page">' + meSubnav()
       + '<div class="panel"><h2>My Blocklist</h2>'
-      + '<p class="meta">Stored locally as <code>whirled2.blocklist</code>. Add by permaname / id — no invented players.</p>'
+      + '<p class="meta">Stored locally as <code>whirled2.blocklist</code>. Add by permaname / id — no invented players. Wiki Block: you will not see their chat here.</p>'
       + '<form id="blocklist-add-form" class="blocklist-add-form">'
       +   '<input name="id" maxlength="40" placeholder="Permaname or id" required />'
       +   '<input name="name" maxlength="40" placeholder="Display name (optional)" />'
@@ -11583,6 +11601,8 @@
       if (!m || !m.id || have[m.id]) return;
       // Skip pure seed ghosts with empty text
       if (!m.system && !String(m.text || "").trim()) return;
+      // How this works (?v=20260906bo): do not merge chat from blocked players.
+      try { if (!m.system && m.userId && isBlocked(m.userId)) return; } catch (eBlkM) {}
       chat.push(m);
       have[m.id] = true;
       added.push(m);
@@ -11822,6 +11842,10 @@
   }
   function spawnStageBubble(msg) {
     if (!msg || msg.system) return;
+    // How this works (?v=20260906bo): blocked players never spawn stage speech bubbles (wiki Block).
+    try {
+      if (msg.userId && isBlocked(msg.userId)) return;
+    } catch (eBlkBub) {}
     var id = msg.id || ("b" + Date.now() + Math.random());
     if (_stageBubbleSeen[id]) return;
     _stageBubbleSeen[id] = true;
@@ -11991,8 +12015,9 @@
         "/away|/afk [msg] · /dnd [msg] · /back — yellow name",
         "/bleepall — hide all room items (you)",
         "/action|/ac [name] — emote (bare = menu) · /state|/st Coming Soon",
-        "/msg|/tell|/w <name> [text] — whisper",
-        "/clear — clear active chat tab"
+        "/msg|/tell|/w <name> [text] — whisper (not if blocked)",
+        "/clear — clear active chat tab",
+        "Block — name menu (hides their chat for you)"
       ];
       if (helpTopic === "away" || helpTopic === "afk") {
         helpLines = ["/away [message] — mark yourself away (yellow name). Default: I'm away from the keyboard. /back returns."];
@@ -12011,7 +12036,13 @@
       } else if (helpTopic === "me" || helpTopic === "emote" || helpTopic === "em" || helpTopic === "e") {
         helpLines = ["/me <text> (/emote /em /e) — emote line: YourName text"];
       } else if (helpTopic === "msg" || helpTopic === "tell" || helpTopic === "w" || helpTopic === "whisper") {
-        helpLines = ["/msg|/tell|/w <name> [message] — open private tab; with text, send whisper."];
+        helpLines = ["/msg|/tell|/w <name> [message] — open private tab; with text, send whisper. Blocked players are refused."];
+      } else if (helpTopic === "clear") {
+        helpLines = ["/clear — clear the active chat tab (Room also bumps visit-since). Chat options → Clear all chat for every tab."];
+      } else if (helpTopic === "back") {
+        helpLines = ["/back — clear /away or /dnd; name returns to blue (wiki Chat)."];
+      } else if (helpTopic === "block") {
+        helpLines = ["Block — name/occ menu Block hides their chat + bubbles for you. Unblock restores. Me → My Blocklist."];
       }
       pushSystemChat(helpLines.join(" · "), { ephemeral: true });
       return;
@@ -12126,6 +12157,11 @@
       var sidW = session() && session().user ? session().user.id : "";
       if (sidW && String(tgt.id) === String(sidW)) {
         pushSystemChat("You cannot whisper yourself.", { ephemeral: true });
+        return;
+      }
+      // How this works (?v=20260906bo): /msg|/tell|/w respects blocklist.
+      if (isBlocked(tgt.id)) {
+        pushSystemChat("You blocked " + (tgt.name || tgt.id) + " — Unblock them first (name menu or Me → Blocklist).", { ephemeral: true });
         return;
       }
       openPmTab(tgt.id, tgt.name || tgt.id);
@@ -12384,6 +12420,7 @@
     var sid = session() && session().user ? session().user.id : "";
     var self = sid && id && sid === id;
     // How this works (?v=20260906bf): classic name-click — Profile / Add friend / Whisper / Block / Complain.
+    // How this works (?v=20260906bo): Block toggles to Unblock when already blocked; chat from blocked stays hidden.
     // Beginner: underlined chat names open this pale-blue menu (wiki Chat). Complain is Coming Soon (no fake mod queue).
     var partyInviteBtn = "";
     try {
@@ -12398,7 +12435,9 @@
       + (self ? '' : '<button type="button" data-whisper="' + esc(id) + '" data-whisper-name="' + esc(name) + '">Whisper</button>')
       + (self ? '' : '<button type="button" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(name || id) + '">Send Mail</button>')
       + partyInviteBtn
-      + (self ? '' : '<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>')
+      + (self ? '' : (isBlocked(id)
+        ? ('<button type="button" data-unblock-chat="' + esc(id) + '" data-unblock-name="' + esc(name) + '">Unblock</button>')
+        : ('<button type="button" data-block-chat="' + esc(id) + '" data-block-name="' + esc(name) + '">Block</button>')))
       + (self ? '' : '<button type="button" data-boot-stub="' + esc(id) + '" title="Boot from room — Coming Soon">Boot… <span class="soon-tag">Coming Soon</span></button>')
       + (self ? '' : '<button type="button" data-complain-stub="' + esc(id) + '" title="Report player — Coming Soon">Complain… <span class="soon-tag">Coming Soon</span></button>');
     document.body.appendChild(menu);
@@ -13134,6 +13173,13 @@
     if (whisperBtn && session()) {
       var wid = whisperBtn.getAttribute("data-whisper");
       var wname = whisperBtn.getAttribute("data-whisper-name") || wid;
+      // How this works (?v=20260906bo): cannot whisper someone on your blocklist (wiki Block).
+      if (isBlocked(wid)) {
+        pushNotice("orange", "Unblock " + (wname || "player") + " before whispering.", { transient: true });
+        var cnmWb = document.getElementById("chat-name-menu");
+        if (cnmWb) cnmWb.remove();
+        return;
+      }
       openPmTab(wid, wname);
       friendsPopupOpen = false;
       var fpop = document.getElementById("friends-toolbar-pop");
@@ -13346,12 +13392,29 @@
       return;
     }
     if (ev.target.closest("[data-block-chat]")) {
+      // How this works (?v=20260906bo): wiki Block — hide their chat locally; Unblock restores.
       var blk = ev.target.closest("[data-block-chat]");
       addBlocked({ id: blk.getAttribute("data-block-chat"), name: blk.getAttribute("data-block-name") });
       var cnm0 = document.getElementById("chat-name-menu");
       if (cnm0) cnm0.remove();
       chatNameMenu = null;
-      pushNotice("status", "Blocked " + (blk.getAttribute("data-block-name") || "player") + ".");
+      occMenuId = null;
+      pushNotice("status", "Blocked " + (blk.getAttribute("data-block-name") || "player") + " — their chat is hidden for you.", { transient: true });
+      try { refreshChatLog(); } catch (eBlkR) {}
+      try { refreshOccupantRail(); } catch (eBlkO) {}
+      return;
+    }
+    if (ev.target.closest("[data-unblock-chat]")) {
+      // How this works (?v=20260906bo): Unblock from name/occ menu — chat lines can show again.
+      var ub = ev.target.closest("[data-unblock-chat]");
+      removeBlocked(ub.getAttribute("data-unblock-chat"));
+      var cnmU = document.getElementById("chat-name-menu");
+      if (cnmU) cnmU.remove();
+      chatNameMenu = null;
+      occMenuId = null;
+      pushNotice("green", "Unblocked " + (ub.getAttribute("data-unblock-name") || "player") + ".", { transient: true });
+      try { refreshChatLog(); } catch (eUbR) {}
+      try { refreshOccupantRail(); } catch (eUbO) {}
       return;
     }
     if (ev.target.closest("[data-set-role]") && session() && getRole(session().user.id) === "admin") {

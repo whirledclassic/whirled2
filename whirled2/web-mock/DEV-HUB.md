@@ -1,6 +1,6 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906bn` (`LOGO_V`)  
+**Cache:** `?v=20260906bo` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
@@ -67,7 +67,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bn` — club /action emotes + whisper aliases + Club ★ after **bm** (see `STATUS.md`). **Do not edit** `classic-avatar.js` unless fixing a clear bug (preserve bl/bm Flash loft interact).
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bo` — club Block hides chat + Unblock toggle after **bn** (see `STATUS.md`). **Do not edit** `classic-avatar.js` unless fixing a clear bug (preserve bl/bm Flash loft interact).
 
 ---
 
