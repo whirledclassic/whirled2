@@ -28,7 +28,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## How to bump cache-bust `?v=`
 
-1. Pick a new token, e.g. `20260906n`.
+1. Pick a new token, e.g. `20260906o`.
 2. Replace in `index.html` (CSS + JS `href`/`src`, and the “reload fresh” links).
 3. Replace `LOGO_V` in `app.js`.
 4. Replace in repo root `index.html` redirect (Pages) if present.
@@ -87,7 +87,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 - Empty `#stage-slot` inside `.stage-host`; decorate chips in `#decorate-layer` (z-index above canvas).
 - Temporary `#stage-bubbles` for avatar speech/thought until Pixi owns nametags.
-- `window.WhirledChrome` v0.4: `getStageEl`, `getSession`, `getRoom`, `onChat`, `sendChat`, `onOccupants`, `getChatUi`. See `ENGINE-BRIDGE.md`.
+- `window.WhirledChrome` v0.4: `getStageEl`, `getSession`, `getRoom`, `onChat`, `sendChat`, `onOccupants`, `getChatUi`, `getWallet` (read-only `{coins,bars,streakDays}`). See `ENGINE-BRIDGE.md`.
 
 ## Profile look (Whirled profile themes)
 
@@ -118,7 +118,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 ## LocalStorage keys (common)
 
-`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.chatTabs`, `whirled2.pm.*`, `whirled2.groupChat.*`, `whirled2.friendRequests`, `whirled2.friends.*`, `whirled2.recentRooms`, `whirled2.chatReactions`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.profileSkin.*`, `whirled2.roomLock.loft`, `whirled2.notices`, `whirled2.chatUi`, …
+`whirled2.session`, `whirled2.users`, `whirled2.chat.loft`, `whirled2.chatTabs`, `whirled2.pm.*`, `whirled2.groupChat.*`, `whirled2.friendRequests`, `whirled2.friends.*`, `whirled2.recentRooms`, `whirled2.chatReactions`, `whirled2.stuff`, `whirled2.playlist.loft`, `whirled2.browserTheme`, `whirled2.groupTheme.*`, `whirled2.profileSkin.*`, `whirled2.roomLock.loft`, `whirled2.notices`, `whirled2.chatUi`, `whirled2.wallet.{userId}`, `whirled2.transactions`, …
 
 
 ## Modern shortcuts (20260906n)
@@ -135,3 +135,15 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - Notices: Me → Notices + header bell; `read` flag on `whirled2.notices`.
 - Group tabs: Chat Options → Groups; `whirled2.groupChat.{groupId}`; bluish-gray `.chat-tab-group`.
 - Leave loft hangout invite: real `loftVisitOccupants` only.
+
+
+## Coins + Bars / streaks (20260906o)
+
+- Key: `whirled2.wallet.{userId}` — `{ coins, bars, lastLoginDay, streakDays, weekKey, weekLogins, totalLogins, statusCoinDay }`.
+- Ledger: `whirled2.transactions` rows `{ at, kind, coins, bars, note }` — filter All / Coins / Bars on Me → Transactions.
+- Daily claim on session `paint` via `claimDailyLogin()` (once per local calendar day). Modal `#daily-reward-modal`.
+- Earn: passport stamp +25c; status +5c once/day; friend accept +15c each side.
+- Bars earn-only (streak 7/14/21/30 + weekly). Never Buy Bars / payments UI.
+- Shop: Buy disabled; `formatShopPrice` adds optional “or N bars” (10000 coins = 1 bar display).
+- ENGINE DEV: wallet is chrome localStorage; optional `WhirledChrome.getWallet()`.
+- Cache-bust: `?v=20260906o` (local ship; do not push unless asked).

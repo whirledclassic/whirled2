@@ -401,7 +401,23 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   display: inline-flex; align-items: center; gap: 4px;
   background: #fff; border: 1px solid #c5deee; border-radius: 999px;
   padding: 1px 8px; font-weight: 700; color: #1e6fa8;
+  font: 700 12px/1.3 var(--ui);
 }
+.who-stats button.stat {
+  cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  margin: 0;
+}
+.who-stats .stat .stat-label { font-weight: 600; opacity: 0.9; }
+.who-stats .stat.bars, .who-stats .wallet-bars {
+  color: #8a6a28;
+  border-color: #e2d2a8;
+  background: linear-gradient(#fffdf6, #f7efd8);
+}
+.bars-accent { color: #8a6a28; }
+.tx-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 12px; }
+.daily-reward-card { text-align: center; }
+.daily-reward-card .action-btn { margin-top: 8px; min-width: 120px; }
 .tab {
   min-width: 76px;
   min-height: 32px;
@@ -2099,7 +2115,7 @@ body > .party-panel {
   border-radius: 16px;
 }
 
-/* === Fidelity + modern upgrade (?v=20260906n) === */
+/* === Fidelity + modern upgrade (?v=20260906o) === */
 /* How this works: Room (blue) + Private (orange) tabs; unread glimmer; PM input tint. */
 .chat-tabs {
   display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
@@ -2244,7 +2260,7 @@ body > .party-panel {
 .friend-list-row { position: relative; }
 .friend-online-dot { position: absolute; left: 36px; top: 36px; width: 10px; height: 10px; border-radius: 50%; }
 
-/* ---- 20260906n: Profile look + Notices + group chat tabs ---- */
+/* ---- 20260906o: Profile look + Notices + group chat tabs ---- */
 .chat-tab-group {
   background: linear-gradient(#7a8a9a, #5a6a7a);
   color: #e8eef4;
@@ -2284,3 +2300,7 @@ body > .party-panel {
   background: #e8f4fb; border: 1px solid #b7d3e8; font-weight: 700;
 }
 .chat-opts-group { display: block; width: calc(100% - 16px); margin: 4px 8px; text-align: left; }
+
+
+/* ---- 20260906o: Coins + Bars wallet ---- */
+/* Soft gold bars accent only on wallet chips — keep chrome pale-blue overall. */

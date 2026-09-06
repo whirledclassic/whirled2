@@ -128,6 +128,7 @@ Chrome sets this after paint / login and fires `whirled:ready` with the same obj
 | `sendChat(text)` | Promise | Send through chrome API (same path as the bottom bar). |
 | `onOccupants(fn)` | subscribe | Occupant list; called immediately with current list. |
 | `getChatUi()` | fn → prefs | Read `whirled2.chatUi` (`mode`, `hideHistory`, `textSize`, `bubbleDuration`). |
+| `getWallet()` | fn → `{ coins, bars, streakDays }` | **Optional read-only** wallet snapshot from chrome `localStorage` (`whirled2.wallet.{userId}`). Coins & Bars are play currency (Bars earn-only); no payments. |
 
 Message shape on `onChat` (approx.):
 

@@ -8,7 +8,7 @@
  *    can share chat when WHIRLED_API is set.
  * 3) After login, shell() builds the top tabs + chat bar; paint(tab) fills #main for Me / Stuff /
  *    Games / Rooms / Groups / Shop. Room stage is empty #stage-slot for a future engine.
- * 4) Most data is browser-local (localStorage keys whirled2.*). Coins are labels only — no payments.
+ * 4) Most data is browser-local (localStorage keys whirled2.*). Coins + Bars are play currency (earn-only) — no payments.
  * 5) Engine bridge: window.WhirledChrome.getStageEl() returns #stage-slot. See ENGINE-BRIDGE.md.
  * 6) paint() redraws HTML from state; click/submit listeners on #app handle almost all UI actions.
  */
@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906n";
+  var LOGO_V = "20260906o";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -52,6 +52,7 @@
   var BLOCKLIST_KEY = "whirled2.blocklist";
   var GALLERIES_KEY = "whirled2.galleries";
   var TRANSACTIONS_KEY = "whirled2.transactions";
+  var WALLET_KEY = "whirled2.wallet."; // + userId
   var ROLES_KEY = "whirled2.roles";
   var CHAT_UI_KEY = "whirled2.chatUi";
   var FIRST_USER_KEY = "whirled2.firstUserId";
@@ -411,10 +412,219 @@
       kind: (row && row.kind) || "note",
       label: String((row && row.label) || "").slice(0, 160),
       coins: Number((row && row.coins) || 0) || 0,
-      note: "Coins are labels only — no real currency.",
-      at: new Date().toISOString()
+      bars: Number((row && row.bars) || 0) || 0,
+      note: String((row && row.note) || "Coins & Bars are play currency — no real-money purchases on Whirled2.").slice(0, 220),
+      at: (row && row.at) || new Date().toISOString()
     });
     saveTransactions(list);
+  }
+
+  // ---------------------------------------------------------------------------
+  // How this works: classic dual currency — Coins (play/social) + Bars (premium-feel).
+  // Stored per user in whirled2.wallet.{userId}. Bars are EARNED only (streaks / rare
+  // rewards) — never Buy Bars / PayPal / Bling cash-out. Daily claim runs once per
+  // browser calendar day on session paint. ENGINE DEV: wallet is chrome localStorage;
+  // engine may later read WhirledChrome.getWallet() if you add a tiny getter — optional.
+  // ---------------------------------------------------------------------------
+  var dailyRewardPending = null; // { streakDays, coins, bars, weekly } after first claim today
+  var txFilter = "all"; // all | coins | bars
+  var COINS_PER_BAR_DISPLAY = 10000; // shop label math only (classic ~1 bar ≈ 10k coins)
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function localDayKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+  function dayOffsetKey(dayStr, delta) {
+    var p = String(dayStr || "").split("-");
+    if (p.length !== 3) return "";
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setDate(d.getDate() + (delta || 0));
+    return localDayKey(d);
+  }
+  function weekKeyFromDay(dayStr) {
+    // Monday date string for the week containing dayStr (browser-local).
+    var p = String(dayStr || "").split("-");
+    if (p.length !== 3) return localDayKey();
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    var dow = d.getDay(); // 0=Sun
+    var toMon = (dow === 0 ? -6 : 1 - dow);
+    d.setDate(d.getDate() + toMon);
+    return localDayKey(d);
+  }
+  function defaultWallet() {
+    return {
+      coins: 0,
+      bars: 0,
+      lastLoginDay: "",
+      streakDays: 0,
+      weekKey: "",
+      weekLogins: 0,
+      totalLogins: 0,
+      statusCoinDay: ""
+    };
+  }
+  function loadWallet(userId) {
+    if (!userId) return defaultWallet();
+    try {
+      var raw = localStorage.getItem(WALLET_KEY + userId);
+      if (!raw) return defaultWallet();
+      var w = JSON.parse(raw);
+      if (!w || typeof w !== "object") return defaultWallet();
+      var base = defaultWallet();
+      Object.keys(base).forEach(function (k) {
+        if (w[k] == null) w[k] = base[k];
+      });
+      w.coins = Number(w.coins) || 0;
+      w.bars = Number(w.bars) || 0;
+      w.streakDays = Number(w.streakDays) || 0;
+      w.weekLogins = Number(w.weekLogins) || 0;
+      w.totalLogins = Number(w.totalLogins) || 0;
+      return w;
+    } catch (e) { return defaultWallet(); }
+  }
+  function saveWallet(userId, w) {
+    if (!userId || !w) return;
+    try { localStorage.setItem(WALLET_KEY + userId, JSON.stringify(w)); } catch (e) {}
+  }
+  function getWalletSnapshot(userId) {
+    var w = loadWallet(userId);
+    return { coins: w.coins || 0, bars: w.bars || 0, streakDays: w.streakDays || 0 };
+  }
+  function barsLabelForCoins(coins) {
+    var c = Number(coins) || 0;
+    if (c <= 0) return "";
+    var n = c / COINS_PER_BAR_DISPLAY;
+    var shown = (Math.abs(n - Math.round(n)) < 0.001) ? String(Math.round(n)) : (Math.round(n * 10) / 10).toString();
+    var unit = (shown === "1") ? " bar" : " bars";
+    return "or " + shown + unit;
+  }
+  function formatShopPrice(coins, owned) {
+    if (owned) return "owned";
+    var c = Number(coins) || 0;
+    var bar = barsLabelForCoins(c);
+    return c + " coins" + (bar ? (" (" + bar + ")") : "");
+  }
+  function grantCurrency(userId, coinsDelta, barsDelta, meta) {
+    // How this works: mutate wallet + append ledger row. Safe for other local users (friend accept).
+    if (!userId) return null;
+    var w = loadWallet(userId);
+    var c = Number(coinsDelta) || 0;
+    var b = Number(barsDelta) || 0;
+    if (!c && !b) return w;
+    w.coins = Math.max(0, (Number(w.coins) || 0) + c);
+    w.bars = Math.max(0, (Number(w.bars) || 0) + b);
+    saveWallet(userId, w);
+    var kind = (meta && meta.kind) || "earn";
+    var label = (meta && meta.label) || "Currency grant";
+    var note = (meta && meta.note) || ("+" + c + " coins" + (b ? (", +" + b + " bars") : ""));
+    appendTransaction({ kind: kind, label: label, coins: c, bars: b, note: note });
+    return w;
+  }
+  function claimDailyLogin() {
+    // How this works: once per calendar day on session paint. Base +50 coins, streak bonus
+    // +10×min(streak,30), Bars at streak 7/14/21/30, weekly 7 distinct days → +100c +1 Bar.
+    var s = session();
+    if (!s || !s.user) return null;
+    var uid = s.user.id;
+    var w = loadWallet(uid);
+    var today = localDayKey();
+    if (w.lastLoginDay === today) return null;
+    var yesterday = dayOffsetKey(today, -1);
+    if (w.lastLoginDay === yesterday) w.streakDays = (Number(w.streakDays) || 0) + 1;
+    else w.streakDays = 1;
+    var wk = weekKeyFromDay(today);
+    if (w.weekKey !== wk) {
+      w.weekKey = wk;
+      w.weekLogins = 0;
+    }
+    w.weekLogins = (Number(w.weekLogins) || 0) + 1;
+    w.totalLogins = (Number(w.totalLogins) || 0) + 1;
+    w.lastLoginDay = today;
+    var streakBonus = 10 * Math.min(w.streakDays, 30);
+    var coinsGain = 50 + streakBonus;
+    var barsGain = 0;
+    var streakBar = false;
+    if ([7, 14, 21, 30].indexOf(w.streakDays) >= 0) {
+      barsGain += 1;
+      streakBar = true;
+    }
+    var weekly = false;
+    if (w.weekLogins === 7) {
+      coinsGain += 100;
+      barsGain += 1;
+      weekly = true;
+    }
+    w.coins = (Number(w.coins) || 0) + coinsGain;
+    w.bars = (Number(w.bars) || 0) + barsGain;
+    saveWallet(uid, w);
+    var noteParts = ["Day " + w.streakDays + " streak", "+" + coinsGain + " coins"];
+    if (barsGain) noteParts.push("+" + barsGain + " bars");
+    if (weekly) noteParts.push("weekly complete");
+    appendTransaction({
+      kind: "login",
+      label: "Daily login",
+      coins: coinsGain,
+      bars: barsGain,
+      note: noteParts.join(" — ")
+    });
+    if (streakBar) {
+      try { pushNotice("green", "Streak Day " + w.streakDays + " — you earned a Bar!", { transient: true }); } catch (eN) {}
+    }
+    if (weekly) {
+      try { pushNotice("green", "Weekly login complete — +100 coins + 1 Bar!", { transient: true }); } catch (eW) {}
+    }
+    dailyRewardPending = {
+      streakDays: w.streakDays,
+      coins: coinsGain,
+      bars: barsGain,
+      weekly: weekly
+    };
+    return dailyRewardPending;
+  }
+  function tryStatusCoinGrant(userId) {
+    // +5 coins once per calendar day when status is set.
+    if (!userId) return;
+    var w = loadWallet(userId);
+    var today = localDayKey();
+    if (w.statusCoinDay === today) return;
+    w.statusCoinDay = today;
+    saveWallet(userId, w);
+    grantCurrency(userId, 5, 0, { kind: "status", label: "Status update", note: "+5 coins for setting status" });
+  }
+  function dailyRewardModalHtml() {
+    if (!dailyRewardPending) return "";
+    var r = dailyRewardPending;
+    var barBit = r.bars ? (" + " + r.bars + " Bar" + (r.bars > 1 ? "s" : "")) : "";
+    var weekBit = r.weekly ? '<p class="meta">Weekly streak complete — bonus included.</p>' : "";
+    return '<div class="modal-backdrop" id="daily-reward-modal" data-daily-dismiss="1">'
+      + '<div class="modal-card daily-reward-card" role="dialog" aria-label="Daily reward" onclick="event.stopPropagation()">'
+      +   '<h2>Daily reward</h2>'
+      +   '<p><b>Day ' + esc(String(r.streakDays)) + ' streak</b> — +' + esc(String(r.coins)) + ' coins' + esc(barBit) + '</p>'
+      +   weekBit
+      +   '<p class="meta">Coins &amp; Bars are play currency — no real-money purchases.</p>'
+      +   '<button type="button" class="action-btn" data-daily-dismiss="1">Nice!</button>'
+      + '</div></div>';
+  }
+  function ensureDailyRewardModal() {
+    var existing = document.getElementById("daily-reward-modal");
+    if (!dailyRewardPending) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing) return;
+    var wrap = document.createElement("div");
+    wrap.innerHTML = dailyRewardModalHtml();
+    if (wrap.firstChild) document.body.appendChild(wrap.firstChild);
+  }
+  function refreshWalletChrome() {
+    var s = session();
+    if (!s || !s.user) return;
+    var snap = getWalletSnapshot(s.user.id);
+    var coinsEl = document.querySelector(".who-stats .stat.coins, .who-stats .wallet-coins");
+    var barsEl = document.querySelector(".who-stats .stat.bars, .who-stats .wallet-bars");
+    if (coinsEl) coinsEl.innerHTML = esc(String(snap.coins)) + ' <span class="stat-label">coins</span>';
+    if (barsEl) barsEl.innerHTML = esc(String(snap.bars)) + ' <span class="stat-label">bars</span>';
   }
   function clearStrayUI() {
     goMenuOpen = false;
@@ -824,7 +1034,7 @@
   function shopCard(item) {
     var id = item.id || item.name || "";
     var tone = item.kind === "backdrop" || itemCat(item) === "backdrops" ? "night" : (item.kind === "avatar" || itemCat(item) === "avatars") ? "fox" : "";
-    var price = item.owned ? "owned" : ((item.coins != null ? item.coins : item.price) || 0) + " coins";
+    var price = formatShopPrice(item.coins != null ? item.coins : item.price, item.owned);
     var visual = item.thumb
       ? '<img class="stuff-thumb" src="' + item.thumb + '" alt="" />'
       : '<div class="swatch ' + tone + '"></div>';
@@ -843,7 +1053,7 @@
   ];
   // How this works: wiki Passport stamps. Each stamp listens for an action name;
   // awardAction bumps whirled2.passportProg.{userId}, then copies the stamp into
-  // whirled2.passport.{userId} when the need count is met (idempotent). Coins stay labels only.
+  // whirled2.passport.{userId} when the need count is met (idempotent). New stamps also grant +25 coins.
   var STAMP_CATALOG = [
     { id: "first_hello", cat: "mingle", name: "First Hello", tip: "Send a chat message in a room.", action: "chat", need: 1, goTab: "rooms", goEnter: true },
     { id: "make_friend", cat: "mingle", name: "Make a Friend", tip: "Invite someone to be your buddy.", action: "friend", need: 1, goTab: "me", goMe: "friends" },
@@ -910,6 +1120,16 @@
       try {
         pushNotice("green", "Passport stamp" + (newly.length > 1 ? "s" : "") + ": " + newly.join(", ") + "!", { transient: true });
       } catch (e) {}
+      // How this works: each newly awarded stamp grants +25 coins (idempotent via stamp list).
+      try {
+        var coinGrant = 25 * newly.length;
+        grantCurrency(uid, coinGrant, 0, {
+          kind: "passport",
+          label: "Passport stamp",
+          note: "+" + coinGrant + " coins for stamp" + (newly.length > 1 ? "s" : "") + ": " + newly.join(", ")
+        });
+        refreshWalletChrome();
+      } catch (eCoin) {}
     }
   }
   function findStamp(id) {
@@ -1062,7 +1282,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + modern upgrade (?v=20260906n)
+  // Fidelity + dual currency / streaks (?v=20260906o)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -1189,6 +1409,12 @@
     addFriendForUser(hit.fromId, { id: s.user.id, name: s.user.name });
     addFriendForUser(s.user.id, { id: hit.fromId, name: hit.fromName });
     pushNotice("friending", hit.fromName + " is now your friend!");
+    // How this works: friend accept grants +15 coins each side (local wallets).
+    try {
+      grantCurrency(s.user.id, 15, 0, { kind: "friend", label: "Friend accepted", note: "+15 coins — friended " + (hit.fromName || "") });
+      grantCurrency(hit.fromId, 15, 0, { kind: "friend", label: "Friend accepted", note: "+15 coins — friended by " + (s.user.name || "") });
+      refreshWalletChrome();
+    } catch (eFrCoin) {}
     // How this works: friend-accepted shows under My News → Friendings.
     try {
       var wallAcc = loadWall(s.user.id);
@@ -1551,6 +1777,7 @@
       ["profile", "My Profile", "tab:me:profile"],
       ["mail", "Mail", "tab:me:mail"],
       ["notices", "Notices", "tab:me:notices"],
+      ["transactions", "Transactions", "tab:me:transactions"],
       ["friends", "Friends", "tab:me:friends"],
       ["stuff", "Stuff", "tab:stuff"],
       ["rooms", "Rooms lobby", "tab:rooms-lobby"],
@@ -1774,9 +2001,18 @@
   function you() {
     var s = session();
     if (s && s.user) {
-      return { name: s.user.name, initials: s.user.initials || s.user.name.slice(0, 1).toUpperCase(), bio: s.user.bio || "", coins: s.user.coins || 0, room: s.user.room || ROOM };
+      var snap = getWalletSnapshot(s.user.id);
+      return {
+        name: s.user.name,
+        initials: s.user.initials || s.user.name.slice(0, 1).toUpperCase(),
+        bio: s.user.bio || "",
+        coins: snap.coins,
+        bars: snap.bars,
+        streakDays: snap.streakDays,
+        room: s.user.room || ROOM
+      };
     }
-    return { name: "Guest", initials: "?", bio: "", coins: 0, room: ROOM };
+    return { name: "Guest", initials: "?", bio: "", coins: 0, bars: 0, streakDays: 0, room: ROOM };
   }
   function personRow(p) {
     var id = p.id || "";
@@ -1815,7 +2051,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906n";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906o";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -1823,7 +2059,7 @@
     var body = encodeURIComponent(
       "Hey! Join me in Whirled2 — a free social world revival (no payments). Not affiliated with whirled.club.\n\n"
       + "Open: " + url + "\n\n"
-      + "Coins are labels only. See you in the loft!"
+      + "Coins & Bars are play currency. See you in the loft!"
     );
     return '<div class="panel invite-them-panel" id="invite-them-panel">'
       + '<div class="room-side-head"><h2>Invite Them!</h2>'
@@ -1984,7 +2220,7 @@
     if (!edit) {
       if (listing) {
         listBlock = '<div class="section-label">Shop listing</div>'
-          + '<p class="meta">Listed at <b>' + esc(String(listing.coins != null ? listing.coins : listing.price || 0)) + ' coins</b> (display-only).'
+          + '<p class="meta">Listed at <b>' + esc(formatShopPrice(listing.coins != null ? listing.coins : listing.price || 0, false)) + '</b> (display-only).'
           + (listing.tags ? (" Tags: " + esc(listing.tags)) : "") + '</p>'
           + '<button type="button" class="action-btn danger" data-stuff-delist="' + esc(item.id) + '">Delist</button>';
       } else if (stuffListMode) {
@@ -1997,7 +2233,7 @@
           +     '<button type="submit">Confirm list in Shop</button>'
           +     '<button type="button" class="text-btn" data-stuff-list-cancel="1">Cancel</button>'
           +   '</div>'
-          +   '<p class="meta">Copies a listing into Shop with your seller id/name and thumb. Buy stays disabled — coins are labels only.</p>'
+          +   '<p class="meta">Copies a listing into Shop with your seller id/name and thumb. Buy stays disabled — no payments; Bars are earn-only.</p>'
           + '</form>';
       } else {
         listBlock = '<div class="section-label">Shop</div>'
@@ -2031,7 +2267,7 @@
     var items = filterByCat(all, stuffCat);
     var how = '<div class="panel how-stuff-panel">'
       + '<h3>How do I get stuff?</h3>'
-      + '<p class="meta">Create furniture and media yourself (wiki Upload), or earn/buy later. Coins stay labels only — no payments. Nothing is invented for you.</p>'
+      + '<p class="meta">Create furniture and media yourself (wiki Upload), or earn/buy later. Coins & Bars are play currency — no payments. Nothing is invented for you.</p>'
       + '<button type="button" class="action-btn" data-stuff-mode="upload">Upload…</button>'
       + '</div>';
     var body;
@@ -2067,16 +2303,17 @@
           return '<div class="wall-row"><b>' + esc(c.who || "member") + '</b> ' + esc(c.text || "") + '<time>' + esc((c.at || "").slice(0, 16).replace("T", " ")) + '</time></div>';
         }).join("")
       : '<p class="meta">No comments yet.</p>';
-    var priceLabel = ((item.coins != null ? item.coins : item.price) || 0) + " coins";
+    var rawCoins = (item.coins != null ? item.coins : item.price) || 0;
+    var priceLabel = formatShopPrice(rawCoins, false);
     return '<div class="shop-detail">'
       + '<button type="button" class="text-btn" data-shop-back="1">← Back to Shop</button>'
       + '<div class="panel shop-detail-panel">'
       +   '<h2>' + esc(item.name || "Item") + '</h2>'
       +   '<p class="meta">' + esc(item.kind || itemCat(item)) + " · by " + esc(item.creator || "member") + '</p>'
-      +   '<p class="price">' + esc(priceLabel) + ' <span class="meta">(label only)</span></p>'
+      +   '<p class="price">' + esc(priceLabel) + ' <span class="meta">(display only · 10,000 coins ≈ 1 bar)</span></p>'
       +   '<div class="shop-detail-actions">'
       +     '<button type="button" class="action-btn fav-btn' + (isFav ? " is-on" : "") + '" data-shop-fav="' + esc(id) + '">' + (isFav ? "♥ Favorited" : "♡ Favorite") + '</button>'
-      +     '<button type="button" class="action-btn" disabled title="Coins are labels only — no payments">Buy — Coins are labels only — no payments</button>'
+      +     '<button type="button" class="action-btn" disabled title="Buy disabled — no payments; Bars are earn-only">Buy — disabled (no payments)</button>'
       +   '</div>'
       +   '<div class="section-label">Rate</div>'
       +   '<div class="star-row" role="group" aria-label="Rate item">' + stars + '</div>'
@@ -2097,7 +2334,7 @@
         if ((it.id || it.name) === shopItemId) { found = it; break; }
       }
       return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1>'
-        + '<p class="shop-banner">Coins are labels only — no payments on Whirled2 yet.</p></div></div>'
+        + '<p class="shop-banner">Coins & Bars are play currency — no real-money purchases on Whirled2.</p></div></div>'
         + shopItemDetail(found) + '</section>';
     }
     var meta = catMeta(shopCat);
@@ -2105,7 +2342,7 @@
     var items = sortShopItems(filterByCat(all, shopCat), shopSort);
     var body;
     if (!all.length) {
-      body = '<div class="panel"><p class="meta">No listings yet. List items from Stuff → List Item. Coins stay labels only — no invented catalog.</p></div>';
+      body = '<div class="panel"><p class="meta">No listings yet. List items from Stuff → List Item. Coins & Bars play currency — no invented catalog.</p></div>';
     } else if (!items.length) {
       body = '<div class="panel"><p class="meta">No ' + esc(meta.label.toLowerCase()) + ' listed yet.</p></div>';
     } else {
@@ -2133,8 +2370,8 @@
         }).join("")
       + '</div>';
     return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1>'
-      + '<p class="shop-banner">Coins are labels only — no payments on Whirled2 yet.</p>'
-      + '<p class="meta">Browse popular selections, then pick a category. Purchases stay disabled (labels only, no payments).</p></div></div>'
+      + '<p class="shop-banner">Coins & Bars are play currency — no real-money purchases on Whirled2.</p>'
+      + '<p class="meta">Browse popular selections, then pick a category. Purchases stay disabled (no payments; Bars are earn-only).</p></div></div>'
       + popular
       + '<div class="stuff-layout">' + catRail("shop", shopCat)
       + '<div class="stuff-main"><h2 class="stuff-cat-title">' + esc(meta.label) + '</h2>' + sortUi + body + '</div></div></section>';
@@ -2161,7 +2398,7 @@
   function gameCard(g) {
     var id = g.id || g.name || "";
     var coins = (g.coins != null ? g.coins : g.price);
-    var price = coins != null ? (coins + " coins") : "free";
+    var price = coins != null ? formatShopPrice(coins, false) : "free";
     return '<button type="button" class="card shop-card game-card" data-game-open="' + esc(id) + '">'
       + '<div class="swatch"></div><div class="body"><h3>' + esc(g.name || "Game") + '</h3>'
       + '<p class="meta">' + esc(gameGenreLabel(gameGenreOf(g))) + " · " + esc(g.creator || "member") + '</p>'
@@ -2231,7 +2468,7 @@
         }).join("")
       : '<p class="meta">No comments yet.</p>';
     var coins = (g.coins != null ? g.coins : g.price);
-    var price = coins != null ? (coins + " coins") : "free";
+    var price = coins != null ? formatShopPrice(coins, false) : "free";
     var tabs = [["play", "Play"], ["trophies", "Trophies"], ["comments", "Comments"]].map(function (t) {
       return '<button type="button" class="sort-btn' + (gameDetailTab === t[0] ? " is-on" : "") + '" data-game-tab="' + t[0] + '">' + t[1] + '</button>';
     }).join("");
@@ -2277,7 +2514,7 @@
       : '<p class="meta">No favorites yet.</p>';
     return '<section class="page games-page">'
       + '<div class="page-head"><div><h1>Games</h1>'
-      + '<p class="shop-banner">Parlor games mount later with the engine track. Coins from games are labels only.</p></div>'
+      + '<p class="shop-banner">Parlor games mount later with the engine track. Coins from games are play currency (labels / earn later).</p></div>'
       + '<button type="button" class="action-btn" data-games-lobby="1">Games awaiting players</button></div>'
       + '<div class="stuff-layout">' + genreRail(gameGenre)
       + '<div class="stuff-main">'
@@ -2633,7 +2870,7 @@
       +   '<h2>Whirled2 is not the original Whirled</h2>'
       +   '<p>Whirled2 is inspired by the original Whirled concept, public research, community docs, and open-source references (including <a href="https://github.com/greyhavens/msoy" target="_blank" rel="noopener">greyhavens/msoy</a>). We do <b>not</b> copy or redistribute original proprietary assets from whirled.club, Three Rings Design, or other projects.</p>'
       +   '<p>Logos and UI here are <b>Whirled2 originals</b> or user-supplied. This is <b>not</b> official Whirled Club / whirled.club.</p>'
-      +   '<p>Features are <b>prototypes</b> and subject to change. Coins and bars are <b>labels only</b> — no live payments on this mock.</p>'
+      +   '<p>Features are <b>prototypes</b> and subject to change. <b>Coins &amp; Bars</b> are play currency (earn-only Bars) — no live payments on this mock.</p>'
       + '</div></section>';
   }
 function helpPage() {
@@ -2642,7 +2879,7 @@ function helpPage() {
       + '<button type="button" class="text-btn" data-help-close="1">Close Help</button></div>'
       + '<div class="panel"><h2>Starting Out</h2>'
       + '<ul class="help-tips">'
-      + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname). Coins are labels only.</li>'
+      + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname), Transactions (Coins &amp; Bars).</li>'
       + '<li><b>Rooms</b> — enter Studio Loft; chat in the bar; Room menu for comment/rate, decorate, lock (visual).</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
       + '<li><b>Room playlist</b> — Room menu → View room playlist. Add from My Music; owner can remove/next. Soft autoplay with Click-to-play if blocked.</li>'
@@ -2652,13 +2889,14 @@ function helpPage() {
       + '<li><b>Mail</b> — header count; compose from Me → Mail or profiles.</li>'
       + '<li><b>Groups</b> — local clubs with discussion + Enter hall (lobby meta).</li>'
       + '<li><b>Games lobby</b> — genre filters and local tables from <code>whirled2.games</code> only — never invented titles.</li>'
-      + '<li><b>Coins labels</b> — prices display only; Buy stays disabled (“no payments”).</li>'
+      + '<li><b>Coins &amp; Bars</b> — classic dual currency. Daily login streak earns coins; Bars from streak milestones / weekly (earn-only). Buy stays disabled — no payments / no Buy Bars.</li>'
+      + '<li><b>Transactions</b> — Me → Transactions (or click header balances / Ctrl+K). Filter All / Coins / Bars. Bling cash-out Coming Soon.</li>'
       + '<li><b>Parties</b> — toolbar party board: create/join/leave locally; follow-leader later on a shared server.</li>'
       + '<li><b>Decorate</b> — place Stuff furniture/backdrops/toys/images as chips; Save to room layout.</li>'
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Profile look presets, chat name menu, Notices, group chat tabs, hash routes, hangout invites. Cache <code>?v=20260906n</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: Coins + Bars dual currency, daily/weekly streaks, Transactions filters. Cache <code>?v=20260906o</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -3382,7 +3620,7 @@ function helpPage() {
     return '<section class="page me-page">' + meSubnav()
       + '<div class="me-grid">'
       +   '<div class="me-main">'
-      +     '<div class="panel invite-banner">Invite friends to Whirled2 — coins stay labels only (no payments).</div>'
+      +     '<div class="panel invite-banner">Invite friends to Whirled2 — Coins & Bars are play currency (no payments).</div>'
       +     '<div class="panel"><h2>My News</h2>'
       +       (st ? '<p class="status-line"><b>Your status:</b> ' + esc(st) + '</p>' : '')
       +       myNewsSections() + '</div>'
@@ -3848,7 +4086,7 @@ function helpPage() {
     return '<section class="page me-page passport-page">' + meSubnav()
       + '<div class="panel passport-shell">'
       +   '<div class="passport-head"><h1>My Passport</h1>'
-      +     '<p class="meta">Earn stamps by mingling, playing, creating, and shopping. Coins stay labels only — stamps never grant coins. Progress is saved in this browser.</p>'
+      +     '<p class="meta">Earn stamps by mingling, playing, creating, and shopping. Each new stamp grants +25 coins (play currency). Progress is saved in this browser.</p>'
       +     '<p class="meta">Progress: <b>' + earnedCount + '</b> / ' + totalCount + ' stamps · keys <code>whirled2.passport.' + esc(sid) + '</code> + <code>whirled2.passportProg.' + esc(sid) + '</code></p>'
       +   '</div>'
       +   '<div class="passport-body">' + stampSections + '</div>'
@@ -4058,20 +4296,42 @@ function helpPage() {
   }
 
   function meTransactions() {
+    // How this works: ledger filter All / Coins / Bars. Bling cash-out stays Coming Soon.
     var rows = loadTransactions();
+    var filt = txFilter || "all";
+    if (filt === "coins") {
+      rows = rows.filter(function (tx) { return (Number(tx.coins) || 0) !== 0; });
+    } else if (filt === "bars") {
+      rows = rows.filter(function (tx) { return (Number(tx.bars) || 0) !== 0; });
+    }
+    var snap = session() && session().user ? getWalletSnapshot(session().user.id) : { coins: 0, bars: 0, streakDays: 0 };
+    function amtBits(tx) {
+      var bits = [];
+      if (tx.coins) bits.push((tx.coins > 0 ? "+" : "") + tx.coins + " coins");
+      if (tx.bars) bits.push((tx.bars > 0 ? "+" : "") + tx.bars + " bars");
+      return bits.length ? (' <span class="meta">(' + esc(bits.join(", ")) + ')</span>') : "";
+    }
     var list = rows.length
       ? rows.map(function (tx) {
           return '<div class="tx-row">'
             + '<div><b>' + esc(tx.kind || "event") + '</b> — ' + esc(tx.label || "")
-            + (tx.coins ? (' <span class="meta">(' + esc(String(tx.coins)) + ' coins label)</span>') : '')
-            + '<div class="meta">' + esc(tx.note || "Coins are labels only — no real currency.") + '</div></div>'
+            + amtBits(tx)
+            + '<div class="meta">' + esc(tx.note || "Coins & Bars are play currency — no real-money purchases on Whirled2.") + '</div></div>'
             + '<time class="meta">' + esc((tx.at || "").slice(0, 16).replace("T", " ")) + '</time>'
             + '</div>';
         }).join("")
-      : '<p class="meta">No transactions yet. Listing a shop item or uploading Stuff appends a label-only ledger row.</p>';
+      : '<p class="meta">No transactions yet. Daily login, passport stamps, status, and friend accepts append earn rows.</p>';
+    var filters = [["all", "All"], ["coins", "Coins"], ["bars", "Bars"]].map(function (f) {
+      return '<button type="button" class="sort-btn' + (filt === f[0] ? " is-on" : "") + '" data-tx-filter="' + f[0] + '">' + f[1] + '</button>';
+    }).join(" ");
     return '<section class="page me-page">' + meSubnav()
       + '<div class="panel"><h2>My Transactions</h2>'
-      + '<p class="meta">Stub ledger in <code>whirled2.transactions</code>. <b>Coins are labels only — no real currency / no payments.</b></p>'
+      + '<p class="shop-banner">Coins &amp; Bars are play currency — no real-money purchases on Whirled2.</p>'
+      + '<p class="meta">Balances: <b>' + esc(String(snap.coins)) + ' coins</b> · <b class="bars-accent">' + esc(String(snap.bars)) + ' bars</b>'
+      + ' · streak Day ' + esc(String(snap.streakDays || 0))
+      + ' · ledger <code>whirled2.transactions</code> + wallet <code>whirled2.wallet.{userId}</code></p>'
+      + '<p class="meta">Bling cash-out: <span class="club-badge-soon">Coming Soon</span> — no PayPal / no cash-out yet.</p>'
+      + '<div class="tx-filters" role="group" aria-label="Filter transactions">' + filters + '</div>'
       + '<div class="tx-list">' + list + '</div>'
       + '</div></section>';
   }
@@ -4147,14 +4407,14 @@ function helpPage() {
       +     '<li>Early access to selected chrome or decorate toys</li>'
       +     '<li>Occasional member-only events or contests</li>'
       +   '</ul>'
-      +   '<p class="meta">Coins and bars remain <b>labels only</b>. There are <b>no live payments</b> and no purchase buttons that charge money on this mock.</p>'
+      +   '<p class="meta"><b>Coins &amp; Bars</b> are play currency (Bars earn-only via streaks). There are <b>no live payments</b> and no Buy Bars on this mock.</p>'
       + '</div>'
       + '<div class="panel club-disclaimer">'
       +   '<h2>Disclaimer</h2>'
       +   '<p><b>Whirled2</b> is <b>not affiliated</b> with Three Rings Design, the operators of whirled.club, or any official Whirled commercial entity. We do not claim to be official whirled.club.</p>'
       +   '<p>Whirled2 is a same-game-spirit revival on a <b>new engine</b>, informed by public research, community docs, and the open-source <a href="https://github.com/greyhavens/msoy" target="_blank" rel="noopener">greyhavens/msoy</a> reference (BSD) — not a Flash/msoy port and not a private-engine dump.</p>'
       +   '<p>Features you see here are <b>prototypes</b>. Items, pages, and perks may appear or disappear before any launch. <b>Nothing is final.</b></p>'
-      +   '<p class="meta">Full IP / upload rules: <button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button>. Coins stay labels only — no payments.</p>'
+      +   '<p class="meta">Full IP / upload rules: <button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button>. Coins & Bars — no payments.</p>'
       + '</div>'
       + '<div class="panel">'
       +   '<h2>Notify me</h2>'
@@ -4174,7 +4434,7 @@ function helpPage() {
     var url = shareInviteUrl();
     return '<section class="page me-page">' + meSubnav()
       + '<div class="panel"><h2>Share Whirled</h2>'
-      + '<p class="meta">Copy the Pages URL and invite a friend. Coins stay labels only.</p>'
+      + '<p class="meta">Copy the Pages URL and invite a friend. Coins & Bars are play currency.</p>'
       + '<label class="invite-link-label">Pages URL'
       +   '<input id="share-whirled-url" readonly value="' + esc(url) + '" />'
       + '</label>'
@@ -4265,7 +4525,8 @@ function helpPage() {
       +       '<button type="button" id="logout-btn" class="text-btn">Logoff</button>'
       +     '</div>'
       +     '<div class="row who-stats">'
-      +       '<span class="stat coins" title="Coins">' + me.coins + ' coins</span>'
+      +       '<button type="button" class="stat coins wallet-coins" data-me="transactions" title="Coins — open Transactions">' + esc(String(me.coins)) + ' <span class="stat-label">coins</span></button>'
+      +       '<button type="button" class="stat bars wallet-bars" data-me="transactions" title="Bars — open Transactions">' + esc(String(me.bars || 0)) + ' <span class="stat-label">bars</span></button>'
       +       '<span class="stat level" title="Level">Lv 1</span>'
       +     '</div>'
       +   '</div>'
@@ -4327,6 +4588,8 @@ function helpPage() {
       return;
     }
     bootstrapRoles(); // ensure admin badges for test / first user before first paint
+    // How this works: daily login claim once per calendar day, then shell can show balances.
+    try { claimDailyLogin(); } catch (eDaily) {}
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
     var tabAttr = tab || "rooms";
     if (tabAttr === "rooms" && !inRoom) tabAttr = "rooms-lobby";
@@ -4396,6 +4659,8 @@ function helpPage() {
     } catch (eSkin) {}
     try { syncHashRoute(tab); } catch (eHash) {}
     try { applyChatInputTint(); } catch (eTint) {}
+    try { refreshWalletChrome(); } catch (eWal) {}
+    try { ensureDailyRewardModal(); } catch (eMod) {}
     try {
       if (friendsPopupOpen) {
         var fw2 = document.querySelector(".tb-friends-wrap");
@@ -4674,11 +4939,12 @@ function helpPage() {
   //   version, getStageEl(), getSession(), getRoom(), onChat(fn), sendChat(text),
   //   onOccupants(fn), getChatUi() → { mode, hideHistory, textSize, bubbleDuration }
   // Listen for document event "whirled:ready" if bridge is not ready yet (detail = this object).
-  // Do NOT draw outside #stage-slot. Do NOT rebuild login. Coins are labels only. No Flash.
+  // Do NOT draw outside #stage-slot. Do NOT rebuild login. Coins+Bars earn-only (no payments). No Flash.
   // #decorate-layer and #stage-bubbles are chrome siblings above your canvas (see z-index in ENGINE-BRIDGE.md).
   // Chrome may show temporary #stage-bubbles until you own Pixi nametag bubbles.
   // ---------------------------------------------------------------------------
   function exposeBridge() {
+    // ENGINE DEV: wallet is chrome localStorage; getWallet() is optional read-only for engine.
     window.WhirledChrome = {
       version: "0.4",
       getStageEl: function () { return document.getElementById("stage-slot"); },
@@ -4687,7 +4953,12 @@ function helpPage() {
       onChat: function (fn) { listeners.chat.push(fn); },
       sendChat: function (text) { return window.WhirledApi.postChat("loft", text); },
       onOccupants: function (fn) { listeners.occupants.push(fn); fn(occupants()); },
-      getChatUi: function () { return loadChatUi(); }
+      getChatUi: function () { return loadChatUi(); },
+      getWallet: function () {
+        var s = session();
+        if (!s || !s.user) return { coins: 0, bars: 0, streakDays: 0 };
+        return getWalletSnapshot(s.user.id);
+      }
     };
     document.dispatchEvent(new CustomEvent("whirled:ready", { detail: window.WhirledChrome }));
   }
@@ -5348,6 +5619,12 @@ function helpPage() {
       gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
       decorateMode = false; partyPanelOpen = false; playlistPanelOpen = false; helpOpen = false; legalOpen = false; galleryViewId = null; stuffListMode = false;
       friendsPopupOpen = false; cmdPaletteOpen = false; shortcutsOpen = false; awayMode = false;
+      dailyRewardPending = null;
+      txFilter = "all";
+      try {
+        var dmOut = document.getElementById("daily-reward-modal");
+        if (dmOut) dmOut.remove();
+      } catch (eDm) {}
       clearStrayUI();
       paint("");
       return;
@@ -5503,6 +5780,19 @@ function helpPage() {
       var modal = document.getElementById("buddy-invite-modal");
       if (modal) modal.remove();
       else paint(document.querySelector(".tab.is-on") ? document.querySelector(".tab.is-on").getAttribute("data-tab") : "rooms");
+      return;
+    }
+    if (ev.target.closest("[data-daily-dismiss]")) {
+      dailyRewardPending = null;
+      var dm = document.getElementById("daily-reward-modal");
+      if (dm) dm.remove();
+      return;
+    }
+    var txFilt = ev.target.closest("[data-tx-filter]");
+    if (txFilt && session()) {
+      txFilter = txFilt.getAttribute("data-tx-filter") || "all";
+      meSub = "transactions";
+      paint("me");
       return;
     }
     var invBuddy = ev.target.closest("[data-invite-buddy]");
@@ -6591,6 +6881,7 @@ function helpPage() {
         saveWall(session().user.id, wall);
         pushNotice("status", you().name + " " + st);
         try { awardAction("status"); } catch (e) {}
+        try { tryStatusCoinGrant(session().user.id); refreshWalletChrome(); } catch (eSt) {}
       }
       meSub = "profile";
       profileEditSection = null;
