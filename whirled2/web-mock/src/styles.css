@@ -208,6 +208,63 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 .gate-grid #register-form button { background: linear-gradient(#ff9a45, var(--join)); }
 .gate-grid #login-form button { background: linear-gradient(#4aa3d6, #2b7eb0); }
 .gate-err { color: #ffd0c8; min-height: 1.2em; text-align: center; }
+
+/* Facebook Connect — classic FB blue, not purple chrome */
+.gate-fb { margin-top: 16px; text-align: center; }
+.gate-fb-divider {
+  display: flex; align-items: center; gap: 12px; margin: 4px 0 12px;
+  color: #b7daf0; font: 700 11px var(--ui); text-transform: uppercase; letter-spacing: 0.08em;
+}
+.gate-fb-divider::before, .gate-fb-divider::after {
+  content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.22);
+}
+.fb-continue-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  width: min(320px, 100%);
+  border: 0; border-radius: 6px; cursor: pointer;
+  padding: 10px 14px;
+  font: 700 14px var(--ui);
+  color: #fff;
+  background: linear-gradient(#4c69ba, #3b5998);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 1px 2px rgba(0,0,0,0.18);
+}
+.fb-continue-btn:hover { background: linear-gradient(#5b78c9, #4267b2); }
+.fb-continue-btn:active { background: #2d4373; }
+.fb-continue-btn-sm { width: auto; min-width: 160px; padding: 8px 12px; font-size: 13px; }
+.fb-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 3px;
+  background: #fff; color: #3b5998; font: 700 16px/1 Helvetica, Arial, sans-serif;
+}
+.gate-fb-meta { margin: 10px auto 0; max-width: 420px; color: #b7daf0 !important; }
+.fb-connect-panel .fb-link-status { margin: 0 0 8px; font-size: 14px; color: #16324a; }
+.fb-account-actions { margin-bottom: 12px; }
+.fb-appid-account-form {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin: 10px 0;
+}
+.fb-appid-account-form label {
+  display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px;
+  font: 700 11px var(--ui); color: #5a7a90; text-transform: uppercase;
+}
+.fb-appid-account-form input {
+  border: 1px solid #9eb6c8; border-radius: 4px; padding: 8px 10px;
+  font: 13px var(--ui); color: #16324a; background: #fff;
+}
+.fb-setup-help { margin: 8px 0 0; padding-left: 18px; }
+.fb-setup-help li { margin: 4px 0; }
+.fb-appid-card { max-width: 420px; }
+.fb-appid-label {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  font: 700 12px var(--ui); color: #16324a; margin: 12px 0;
+}
+.fb-appid-label input {
+  border: 1px solid #9eb6c8; border-radius: 4px; padding: 8px 10px;
+  font: 13px var(--ui); color: #16324a;
+}
+.fb-appid-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .fb-continue-btn { width: 100%; }
+}
 .gate-card .meta { color: #b7daf0; text-align: center; }
 .gate-logo {
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
@@ -655,16 +712,22 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
 /* How this works: skin fills entire .page.profile-page (Profile look body BG), modules translucent.
    ENGINE DEV: profile page chrome only; not #stage-slot — engine ignores profile skins. */
 .page.profile-page {
+  /* How this works: Profile look BG paints the whole page; modules stay translucent so image peeks through. */
+  /* Beginner: Upload custom background → Publish look. ENGINE DEV: chrome only — not #stage-slot. */
   min-height: calc(100vh - 120px);
+  min-height: calc(100dvh - 120px);
   background-color: var(--paper);
   background-position: center top;
+  background-repeat: no-repeat;
   box-sizing: border-box;
   padding: 18px 22px 70px;
+  position: relative;
 }
 .page.profile-page.has-profile-skin {
   /* override --paper fill so gradient/image/color shows across the whole profile page */
-  background-color: transparent;
+  background-color: transparent !important;
   --paper: transparent;
+  /* keep modules readable but translucent — image is "behind everything" */
 }
 .page.profile-page .me-subnav {
   /* stay readable over busy BGs */
@@ -781,6 +844,41 @@ body { font-family: var(--ui); color: var(--ink); background: var(--sky); }
   grid-column: 1 / -1;
 }
 .skin-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+/* Prominent custom background upload (Profile look — not buried) */
+.skin-bg-upload-card {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 8px 0 12px;
+  padding: 12px 14px;
+  border: 2px dashed #3aa3e0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f3faff, #e8f4fb);
+}
+.skin-bg-upload-card .skin-bg-upload-copy { flex: 1 1 180px; min-width: 0; }
+.skin-bg-upload-card .skin-bg-upload-copy strong { display: block; font-size: 14px; color: #1e6fa8; margin-bottom: 2px; }
+.skin-bg-upload-card .skin-bg-file { margin: 0; font-weight: 700; color: #1e6fa8; }
+.skin-bg-upload-card input[type="file"] { font-size: 13px; max-width: 100%; }
+.skin-bg-thumb-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.skin-bg-thumb {
+  width: 72px; height: 48px; object-fit: cover;
+  border-radius: 6px; border: 1px solid #b7d3e8; background: #fff;
+}
+.skin-bg-upload-card .action-btn,
+.skin-bg-upload-card .text-btn { min-height: 40px; }
+.skin-bg-upload-always {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border: 2px dashed #3aa3e0;
+  border-radius: 10px;
+  background: #f3faff;
+}
+.skin-bg-upload-always strong { color: #1e6fa8; }
+
 .skin-form button[type="submit"] {
   border: 0; background: #3aa3e0; color: #fff; border-radius: 4px;
   padding: 8px 14px; font: 700 12px var(--ui); cursor: pointer;
@@ -2415,28 +2513,116 @@ body > .party-panel {
 }
 
 /* Room music embed dock — sibling under stage, Pixi stays clear */
+/* How this works: dock must receive taps (pointer-events + z-index above chat tabs).
+   Beginner: phone buttons sit ABOVE the iframe so you can always Open player / Open on YouTube.
+   ENGINE DEV: never cover #room-embed-dock with chat-overlay (overlay lives inside .stage-host only). */
 .room-embed-dock {
+  position: relative;
+  z-index: 12;
   margin: 8px 10px 4px;
   padding: 8px 10px;
-  background: rgba(8, 18, 28, 0.88);
+  background: rgba(8, 18, 28, 0.94);
   border: 1px solid #2a4560;
   border-radius: 8px;
   color: #d5e6f0;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  isolation: isolate;
 }
 .room-embed-dock[hidden] { display: none !important; }
 .room-embed-head {
   display: flex; justify-content: space-between; align-items: center;
   gap: 8px; margin-bottom: 6px;
+  pointer-events: auto;
+}
+.room-embed-head-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.room-embed-head .text-btn,
+.room-embed-head .room-embed-open { color: #9fd0f0; pointer-events: auto; }
+.room-embed-mobile-controls {
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  pointer-events: auto;
+}
+.room-embed-mobile-controls .action-btn,
+.room-embed-mobile-controls .room-embed-open-btn {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.room-embed-frame-wrap {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000;
 }
 .room-embed-frame {
+  display: block;
   width: 100%;
-  min-height: 152px;
-  height: 152px;
+  min-height: 180px;
+  height: 180px;
   border: 0;
   border-radius: 6px;
   background: #000;
+  pointer-events: auto !important;
+  touch-action: manipulation;
 }
-.playlist-embed-preview .room-embed-frame { min-height: 180px; height: 180px; }
+.room-embed-dock[data-embed-kind="spotify"] .room-embed-frame {
+  min-height: 152px;
+  height: 152px;
+}
+.room-embed-dock[data-embed-kind="youtube"] .room-embed-frame {
+  min-height: 200px;
+  height: 200px;
+}
+.playlist-embed-preview .room-embed-frame { min-height: 200px; height: 200px; }
+.playlist-embed-form input[type="url"],
+.playlist-embed-form button {
+  min-height: 44px;
+  font-size: 16px; /* iOS: avoid zoom-on-focus */
+}
+.playlist-embed-form button {
+  padding: 10px 16px;
+  font-weight: 700;
+}
+.playlist-source-tabs .action-btn {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+/* Expanded / bottom-sheet player — big tap target when iframe chrome is too small */
+.room-embed-dock.is-expanded {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  margin: 0;
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -8px 28px rgba(0,0,0,0.45);
+  max-height: min(72vh, 560px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.room-embed-dock.is-expanded .room-embed-frame {
+  min-height: 220px !important;
+  height: 42vw !important;
+  max-height: 280px;
+}
+.room-embed-dock.is-expanded[data-embed-kind="spotify"] .room-embed-frame {
+  min-height: 152px !important;
+  height: 152px !important;
+}
+.room-embed-dock.is-expanded .room-embed-collapse { display: inline !important; }
 .playlist-source-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
 .playlist-source-tabs .action-btn.is-on {
   outline: 2px solid #1e6fa8;
@@ -2531,7 +2717,9 @@ body > .party-panel {
     border-bottom: 1px solid #000;
   }
   .occ-list { max-height: 120px; }
-  .room-embed-frame { min-height: 120px; height: 120px; }
+  .room-embed-frame { min-height: 200px; height: 200px; }
+  .room-embed-dock[data-embed-kind="spotify"] .room-embed-frame { min-height: 152px; height: 152px; }
+  .room-embed-mobile-controls { display: flex !important; }
 }
 
 /* ---- 20260906q mobile visual overhaul ---- */
@@ -2768,13 +2956,38 @@ body > .party-panel {
   }
   .room-invite-row .text-btn { font-size: 11px; }
 
-  /* Embed dock shouldn't dominate */
+  /* Embed dock: tappable on phones — NEVER squash to 96px (YT play button unusable) */
   .room-embed-dock {
     flex-shrink: 0;
-    margin: 4px 6px !important;
-    padding: 6px 8px !important;
+    position: relative;
+    z-index: 12 !important;
+    margin: 6px 6px 4px !important;
+    padding: 8px !important;
+    pointer-events: auto !important;
+    touch-action: manipulation;
   }
-  .room-embed-frame { min-height: 96px !important; height: 96px !important; }
+  .room-embed-mobile-controls { display: flex !important; }
+  .room-embed-frame-wrap,
+  .room-embed-frame {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+  }
+  .room-embed-dock[data-embed-kind="youtube"] .room-embed-frame,
+  .room-embed-frame {
+    min-height: 200px !important;
+    height: 200px !important;
+  }
+  .room-embed-dock[data-embed-kind="spotify"] .room-embed-frame {
+    min-height: 152px !important;
+    height: 152px !important;
+  }
+  /* Keep chat tabs below embed dock for taps; overlay stays inside .stage-host only */
+  .chat-tabs {
+    z-index: 4 !important;
+  }
+  .room-embed-dock.is-expanded {
+    z-index: 95 !important;
+  }
 
   /* 8) Header wallet / links — less cramped */
   .who-stats .stat {

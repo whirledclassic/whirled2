@@ -8,6 +8,8 @@
  * - Session: localStorage key "whirled2.session" { token, user }.
  * - Offline users: "whirled2.users". First register also sets "whirled2.firstUserId".
  * - Offline loft chat: "whirled2.chat.loft" (array of messages).
+ * - Facebook Connect (client SDK only): App ID in "whirled2.facebookAppId" (or window.WHIRLED2_FB_APP_ID).
+ *   loginWithFacebookProfile / linkFacebook / unlinkFacebook — never invent users without SDK success.
  */
 (function (root) {
   "use strict";
@@ -15,6 +17,7 @@
   var KEY = "whirled2.session";
   var USERS_KEY = "whirled2.users";
   var CHAT_KEY = "whirled2.chat.loft";
+  var FB_APP_ID_KEY = "whirled2.facebookAppId";
 
   function apiBase() {
     return (root.WHIRLED_API || "").replace(/\/$/, "");
@@ -35,8 +38,51 @@
     catch (e) { return {}; }
   }
 
+  function saveLocalUsers(users) {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }
+
+  // How this works: Meta App ID is digits only. Pages deploy owner pastes it once (Account / gate).
+  function getFacebookAppId() {
+    try {
+      var fromLs = localStorage.getItem(FB_APP_ID_KEY);
+      if (fromLs != null && String(fromLs).trim() !== "") {
+        var a = String(fromLs).trim();
+        if (/^\d+$/.test(a)) return a;
+      }
+    } catch (e) {}
+    try {
+      if (root.WHIRLED2_FB_APP_ID != null && String(root.WHIRLED2_FB_APP_ID).trim() !== "") {
+        var b = String(root.WHIRLED2_FB_APP_ID).trim();
+        if (/^\d+$/.test(b)) return b;
+      }
+    } catch (e2) {}
+    return "";
+  }
+
+  function setFacebookAppId(appId) {
+    appId = String(appId || "").trim();
+    if (appId && !/^\d+$/.test(appId)) throw new Error("Facebook App ID must be digits only.");
+    if (appId) localStorage.setItem(FB_APP_ID_KEY, appId);
+    else localStorage.removeItem(FB_APP_ID_KEY);
+    return appId;
+  }
+
   function hashGuess(password) {
     return "local:" + password;
+  }
+
+  function findUserByFacebookId(users, fbId) {
+    fbId = String(fbId || "");
+    if (!fbId) return null;
+    var direct = users["fb_" + fbId];
+    if (direct) return direct;
+    for (var k in users) {
+      if (!Object.prototype.hasOwnProperty.call(users, k)) continue;
+      var row = users[k];
+      if (row && String(row.facebookId || "") === fbId) return row;
+    }
+    return null;
   }
 
   async function request(path, opts) {
@@ -114,6 +160,105 @@
         return session;
       }
     },
+
+    // How this works: called only after FB.login + FB.api('/me') succeed — never invent profiles.
+    // ENGINE DEV: session shape matches register/login; engine may later read session only.
+    async loginWithFacebookProfile(profile) {
+      profile = profile || {};
+      var fbId = String(profile.id || "").trim();
+      var name = String(profile.name || "").trim().slice(0, 40);
+      var email = profile.email ? String(profile.email).trim().slice(0, 120) : "";
+      if (!fbId) throw new Error("Facebook login failed — no user id from Facebook.");
+      if (!name) name = "Facebook " + fbId.slice(-6);
+      var localId = "fb_" + fbId.replace(/[^a-zA-Z0-9_-]/g, "");
+      if (localId === "fb_") throw new Error("Facebook login failed — invalid user id.");
+
+      // Server path not implemented for FB yet — always localStorage (GitHub Pages).
+      var users = localUsers();
+      var row = findUserByFacebookId(users, fbId);
+      if (row) {
+        row.name = name;
+        row.facebookId = fbId;
+        row.facebookName = name;
+        if (email) row.email = email;
+        row.authProvider = row.authProvider || "facebook";
+        users[row.id] = row;
+        saveLocalUsers(users);
+        var sessionExisting = { token: "local-" + row.id, user: publicUser(row) };
+        saveSession(sessionExisting);
+        return sessionExisting;
+      }
+
+      users[localId] = {
+        id: localId,
+        name: name,
+        password: "fb-oauth",
+        authProvider: "facebook",
+        facebookId: fbId,
+        facebookName: name,
+        email: email,
+        bio: "Home room is the profile.",
+        room: "Studio Loft",
+        coins: 0
+      };
+      saveLocalUsers(users);
+      try {
+        if (!localStorage.getItem("whirled2.firstUserId")) {
+          localStorage.setItem("whirled2.firstUserId", localId);
+        }
+      } catch (eFirst) {}
+      var sessionNew = { token: "local-" + localId, user: publicUser(users[localId]) };
+      saveSession(sessionNew);
+      return sessionNew;
+    },
+
+    // How this works: logged-in user links FB id onto their existing whirled2.users row.
+    async linkFacebook(profile) {
+      var session = loadSession();
+      if (!session || !session.user) throw new Error("Sign in first.");
+      profile = profile || {};
+      var fbId = String(profile.id || "").trim();
+      var name = String(profile.name || "").trim().slice(0, 40);
+      var email = profile.email ? String(profile.email).trim().slice(0, 120) : "";
+      if (!fbId) throw new Error("Facebook link failed — no user id from Facebook.");
+      var users = localUsers();
+      var row = users[session.user.id];
+      if (!row) throw new Error("Missing local profile.");
+      var taken = findUserByFacebookId(users, fbId);
+      if (taken && taken.id !== row.id) {
+        throw new Error("That Facebook account is already linked to another Whirled2 user on this browser.");
+      }
+      row.facebookId = fbId;
+      row.facebookName = name || row.name;
+      if (email) row.email = email;
+      users[row.id] = row;
+      saveLocalUsers(users);
+      session.user = publicUser(row);
+      saveSession(session);
+      return session;
+    },
+
+    async unlinkFacebook() {
+      var session = loadSession();
+      if (!session || !session.user) throw new Error("Sign in first.");
+      var users = localUsers();
+      var row = users[session.user.id];
+      if (!row) throw new Error("Missing local profile.");
+      delete row.facebookId;
+      delete row.facebookName;
+      // Keep authProvider if they registered via FB (id starts with fb_) — unlink just clears link fields.
+      if (row.authProvider === "facebook" && String(row.id).indexOf("fb_") !== 0) {
+        delete row.authProvider;
+      }
+      users[row.id] = row;
+      saveLocalUsers(users);
+      session.user = publicUser(row);
+      saveSession(session);
+      return session;
+    },
+
+    getFacebookAppId: getFacebookAppId,
+    setFacebookAppId: setFacebookAppId,
 
     logout: function () {
       var session = loadSession();
@@ -229,7 +374,7 @@
   };
 
   function publicUser(row) {
-    return {
+    var out = {
       id: row.id,
       name: row.name,
       initials: initials(row.name),
@@ -237,6 +382,11 @@
       room: row.room || "Studio Loft",
       coins: row.coins || 0
     };
+    if (row.authProvider) out.authProvider = row.authProvider;
+    if (row.facebookId) out.facebookId = row.facebookId;
+    if (row.facebookName) out.facebookName = row.facebookName;
+    if (row.email) out.email = row.email;
+    return out;
   }
 
   function initials(name) {

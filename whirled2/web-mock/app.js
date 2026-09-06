@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906r";
+  var LOGO_V = "20260906t";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -168,8 +168,9 @@
       return k === "music" && (it.dataUrl || it.audio || it.thumb);
     });
   }
-  // How this works: parse pasted YouTube / Spotify URLs into safe nocookie / embed iframe src.
-  // Only https youtube / youtu.be / youtube-nocookie and open.spotify.com hosts allowed.
+  // How this works: paste a YouTube or Spotify link → we turn it into a safe https embed iframe src.
+  // Beginner: watch / youtu.be / Shorts / Live / playlist / music.youtube all work; Spotify track/album/playlist/episode too.
+  // ENGINE DEV: https-only host allowlist; prefer embed/VID?list= when both present; no sandbox on iframe (clicks must work).
   function parseYouTubeEmbed(raw) {
     raw = String(raw || "").trim();
     if (!raw) return { ok: false, error: "Paste a YouTube video or playlist URL." };
@@ -177,28 +178,49 @@
     try { u = new URL(raw); } catch (e) { return { ok: false, error: "That does not look like a valid URL." }; }
     if (u.protocol !== "https:") return { ok: false, error: "Use https:// YouTube links only." };
     var host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
-    if (host !== "youtube.com" && host !== "m.youtube.com" && host !== "youtu.be" && host !== "youtube-nocookie.com") {
-      return { ok: false, error: "Only youtube.com / youtu.be links are allowed." };
+    var ytHosts = {
+      "youtube.com": 1,
+      "m.youtube.com": 1,
+      "music.youtube.com": 1,
+      "youtu.be": 1,
+      "youtube-nocookie.com": 1
+    };
+    if (!ytHosts[host]) {
+      return { ok: false, error: "Only youtube.com / music.youtube.com / youtu.be links are allowed." };
     }
     var list = u.searchParams.get("list") || "";
     var vid = "";
+    var path = u.pathname || "";
+    // Strip share junk (si=) — we only care about v / list / path ids.
     if (host === "youtu.be") {
-      vid = (u.pathname || "").replace(/^\//, "").split("/")[0] || "";
-    } else if ((u.pathname || "").indexOf("/embed/") === 0) {
-      vid = (u.pathname || "").split("/")[2] || "";
-      if (!list && u.searchParams.get("list")) list = u.searchParams.get("list");
-    } else if ((u.pathname || "").indexOf("/playlist") === 0) {
+      // youtu.be/VIDEOID or youtu.be/VIDEOID?list=
+      vid = path.replace(/^\//, "").split("/")[0] || "";
+      // drop query-ish junk from path segment (rare)
+      vid = vid.split("?")[0].split("&")[0];
+    } else if (path.indexOf("/embed/") === 0 || path.indexOf("/embed/") > -1) {
+      var embParts = path.split("/");
+      var embIdx = embParts.indexOf("embed");
+      vid = (embIdx >= 0 ? embParts[embIdx + 1] : "") || "";
+      if (vid === "videoseries") vid = "";
+    } else if (path.indexOf("/playlist") === 0) {
       list = list || u.searchParams.get("list") || "";
+    } else if (path.indexOf("/shorts/") === 0 || path.indexOf("/live/") === 0 || path.indexOf("/watch/") === 0) {
+      // /shorts/ID, /live/ID, /watch/ID (some share URLs)
+      var segs = path.split("/").filter(Boolean);
+      vid = segs[1] || "";
+    } else if (path.indexOf("/music/") === 0 || path === "/music" || path.indexOf("/watch") === 0) {
+      // music.youtube.com/watch?v= or /music/watch?v=
+      vid = u.searchParams.get("v") || "";
     } else {
       vid = u.searchParams.get("v") || "";
-      if (!vid && (u.pathname || "").indexOf("/shorts/") === 0) {
-        vid = (u.pathname || "").split("/")[2] || "";
-      }
-      if (!vid && (u.pathname || "").indexOf("/live/") === 0) {
-        vid = (u.pathname || "").split("/")[2] || "";
+      if (!vid && path.indexOf("/v/") === 0) {
+        vid = path.split("/")[2] || "";
       }
     }
-    if (!/^[A-Za-z0-9_-]{6,64}$/.test(vid || "x") && vid) {
+    if (!vid) vid = u.searchParams.get("v") || "";
+    if (!list) list = u.searchParams.get("list") || "";
+    // Validate ids (YouTube video ids are typically 11 chars; playlists vary).
+    if (vid && !/^[A-Za-z0-9_-]{6,64}$/.test(vid)) {
       return { ok: false, error: "Could not read a YouTube video id." };
     }
     if (list && !/^[A-Za-z0-9_-]{6,64}$/.test(list)) {
@@ -206,9 +228,10 @@
     }
     var src = "";
     var title = "YouTube";
-    if (list && (!vid || (u.pathname || "").indexOf("/playlist") === 0)) {
-      src = "https://www.youtube-nocookie.com/embed/videoseries?list=" + encodeURIComponent(list);
-      title = "YouTube playlist";
+    // Prefer video+list when both present → embed/VID?list=
+    if (vid && list) {
+      src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(vid) + "?list=" + encodeURIComponent(list);
+      title = "YouTube video + playlist";
     } else if (vid) {
       src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(vid);
       title = "YouTube video";
@@ -216,7 +239,7 @@
       src = "https://www.youtube-nocookie.com/embed/videoseries?list=" + encodeURIComponent(list);
       title = "YouTube playlist";
     } else {
-      return { ok: false, error: "Need a watch, youtu.be, or playlist URL." };
+      return { ok: false, error: "Need a watch, youtu.be, Shorts, Live, embed, or playlist URL." };
     }
     return { ok: true, embedUrl: raw, embedSrc: src, embedTitle: title };
   }
@@ -225,10 +248,28 @@
     if (!raw) return { ok: false, error: "Paste a Spotify track, album, playlist, or episode URL." };
     var u;
     try { u = new URL(raw); } catch (e) { return { ok: false, error: "That does not look like a valid URL." }; }
-    if (u.protocol !== "https:") return { ok: false, error: "Use https:// open.spotify.com links only." };
+    if (u.protocol !== "https:") return { ok: false, error: "Use https:// Spotify links only." };
     var host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+    // spotify.link short links rarely include type/id in the path without a network hop — only accept if parseable.
+    if (host === "spotify.link" || host === "spotify.app.link") {
+      var spParts = (u.pathname || "").split("/").filter(Boolean);
+      // Rare path shapes: /track/ID etc. if ever present without redirect
+      if (spParts[0] && spParts[0].indexOf("intl-") === 0) spParts = spParts.slice(1);
+      var spType = spParts[0] || "";
+      var spId = (spParts[1] || "").split("?")[0];
+      var spAllowed = { track: 1, album: 1, playlist: 1, episode: 1 };
+      if (!spAllowed[spType] || !/^[A-Za-z0-9]{10,64}$/.test(spId)) {
+        return { ok: false, error: "spotify.link short URLs need open.spotify.com (copy link from Spotify app → Share → Copy link)." };
+      }
+      return {
+        ok: true,
+        embedUrl: raw,
+        embedSrc: "https://open.spotify.com/embed/" + spType + "/" + encodeURIComponent(spId),
+        embedTitle: "Spotify " + spType
+      };
+    }
     if (host !== "open.spotify.com") {
-      return { ok: false, error: "Only open.spotify.com links are allowed." };
+      return { ok: false, error: "Only open.spotify.com (or parseable spotify.link) links are allowed." };
     }
     var parts = (u.pathname || "").split("/").filter(Boolean);
     // international paths: /intl-xx/track/id
@@ -242,15 +283,31 @@
     return {
       ok: true,
       embedUrl: raw,
-      embedSrc: "https://open.spotify.com/embed/" + type + "/" + encodeURIComponent(id),
+      embedSrc: "https://open.spotify.com/embed/" + type + "/" + encodeURIComponent(id) + "?utm_source=generator",
       embedTitle: "Spotify " + type
     };
   }
+  function detectEmbedSourceFromUrl(raw) {
+    // How this works: peek at host so we can auto-switch My uploads → YouTube/Spotify when owner pastes a link.
+    try {
+      var u = new URL(String(raw || "").trim());
+      if (u.protocol !== "https:") return "";
+      var h = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+      if (h === "youtube.com" || h === "m.youtube.com" || h === "music.youtube.com" || h === "youtu.be" || h === "youtube-nocookie.com") return "youtube";
+      if (h === "open.spotify.com" || h === "spotify.link" || h === "spotify.app.link") return "spotify";
+    } catch (e) {}
+    return "";
+  }
   function parseRoomEmbed(source, raw) {
+    // Auto-pick source from URL when caller passes "" or mismatched local.
+    var detected = detectEmbedSourceFromUrl(raw);
+    if ((!source || source === "local") && detected) source = detected;
+    else if ((source === "youtube" || source === "spotify") && detected && detected !== source) source = detected;
     if (source === "youtube") return parseYouTubeEmbed(raw);
     if (source === "spotify") return parseSpotifyEmbed(raw);
     return { ok: false, error: "Pick YouTube or Spotify." };
   }
+
   function ensureRoomAudioEl() {
     var a = document.getElementById("room-audio");
     if (a) return a;
@@ -270,9 +327,22 @@
     dock.innerHTML = "";
     dock.removeAttribute("data-embed-src");
   }
+  function roomEmbedSrcForIframe(pl) {
+    // How this works: YouTube needs playsinline=1 for iOS Safari; keep existing query if present.
+    var src = String((pl && pl.embedSrc) || "");
+    if (!src) return src;
+    if (pl.source === "youtube" && src.indexOf("youtube") !== -1) {
+      if (src.indexOf("playsinline=") === -1) {
+        src += (src.indexOf("?") >= 0 ? "&" : "?") + "playsinline=1";
+      }
+    }
+    return src;
+  }
   function ensureRoomEmbedDock(pl) {
-    // How this works: compact iframe dock under the stage (sibling of #stage-slot host).
-    // ENGINE DEV: not inside #stage-slot — Pixi stays clear. User presses play in embed (autoplay policy).
+    // How this works: iframe dock under the stage + big mobile buttons outside the iframe.
+    // Beginner: on a phone, tap "Open player" / "Open on YouTube" — those always work even if the tiny iframe play button is hard to hit.
+    // ENGINE DEV: dock is chrome sibling of .stage-host (not #stage-slot). No sandbox, no loading=lazy.
+    // Touch: raise z-index + pointer-events; expand sheet for ~220px tap target on iOS.
     if (!inRoom || !pl || (pl.source !== "youtube" && pl.source !== "spotify") || !pl.embedSrc) {
       removeRoomEmbedDock();
       return null;
@@ -292,18 +362,43 @@
         host.appendChild(dock);
       }
     }
+    var wasExpanded = dock.classList.contains("is-expanded");
     dock.hidden = false;
-    dock.className = "room-embed-dock";
-    var title = esc(pl.embedTitle || (pl.source === "spotify" ? "Spotify" : "YouTube"));
-    var src = String(pl.embedSrc || "");
+    dock.className = "room-embed-dock" + (wasExpanded ? " is-expanded" : "");
+    var kind = pl.source === "spotify" ? "spotify" : "youtube";
+    var title = esc(pl.embedTitle || (kind === "spotify" ? "Spotify" : "YouTube"));
+    var src = roomEmbedSrcForIframe(pl);
+    // How this works: rewrite iframe only when src changes (or caller cleared data-embed-src to force refresh).
     if (dock.getAttribute("data-embed-src") !== src) {
       dock.setAttribute("data-embed-src", src);
-      dock.innerHTML = '<div class="room-embed-head"><span class="meta">Room music · ' + title + '</span>'
-        + '<button type="button" class="text-btn" data-playlist-open-panel="1">Room music</button></div>'
-        + '<iframe class="room-embed-frame" title="' + title + '" src="' + esc(src) + '" '
-        + 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" '
-        + 'allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>'
-        + '<p class="meta room-embed-note">Press play in the embed. Spotify playlists must be public; YouTube must allow embedding.</p>';
+      dock.setAttribute("data-embed-kind", kind);
+      var openHref = String(pl.embedUrl || "");
+      var openLabel = kind === "spotify" ? "Open on Spotify" : "Open on YouTube";
+      var openBtn = openHref
+        ? ('<a class="action-btn room-embed-open room-embed-open-btn" href="' + esc(openHref) + '" target="_blank" rel="noopener noreferrer">' + openLabel + '</a>')
+        : "";
+      dock.innerHTML = ''
+        + '<div class="room-embed-head">'
+        +   '<span class="meta">Room music · ' + title + '</span>'
+        +   '<span class="room-embed-head-actions">'
+        +     '<button type="button" class="text-btn" data-playlist-open-panel="1">Room music</button>'
+        +     '<button type="button" class="text-btn room-embed-collapse" data-embed-collapse="1" hidden>Close player</button>'
+        +   '</span>'
+        + '</div>'
+        + '<div class="room-embed-mobile-controls" role="group" aria-label="Room music controls">'
+        +   '<button type="button" class="action-btn room-embed-play-btn" data-embed-expand="1">Open player</button>'
+        +   '<button type="button" class="action-btn" data-embed-focus="1">Tap play in embed</button>'
+        +   openBtn
+        + '</div>'
+        + '<div class="room-embed-frame-wrap">'
+        +   '<iframe class="room-embed-frame" title="' + title + '" src="' + esc(src) + '" '
+        +   'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" '
+        +   'allowfullscreen playsinline referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+        + '</div>'
+        + '<p class="meta room-embed-note">Phone tip: use <b>Open player</b> for a bigger tap target, or <b>' + openLabel + '</b> in your browser. Spotify playlists must be public; YouTube must allow embedding.</p>';
+    } else {
+      dock.setAttribute("data-embed-kind", kind);
+      if (wasExpanded) dock.classList.add("is-expanded");
     }
     return dock;
   }
@@ -418,22 +513,33 @@
                 + '<select name="stuffId" required><option value="">— pick a track —</option>' + addOpts + '</select>'
                 + '<button type="submit">Add to playlist</button></form>')
               : '<p class="meta">No Music in Stuff yet. Stuff → Music → Upload… (MP3/WAV/OGG; copyright checkbox required).</p>'))
-          : (src === "local" ? '<p class="meta">Local adds locked to loft owner.</p>' : ""));
+          : (src === "local" ? '<p class="meta">Local adds locked to loft owner.</p>' : ""))
+      + (owner && src === "local"
+          ? ('<div class="section-label">Or paste YouTube / Spotify</div>'
+            + '<p class="meta">Paste a link to auto-switch music source and set the embed.</p>'
+            + '<form id="playlist-smart-embed-form" class="playlist-embed-form">'
+            + '<input name="embedUrl" type="url" required placeholder="https://youtu.be/… or https://open.spotify.com/…" />'
+            + '<button type="submit">Set embed</button></form>')
+          : "");
+    var embedOpen = pl.embedUrl
+      ? ('<a class="text-btn room-embed-open" href="' + esc(pl.embedUrl) + '" target="_blank" rel="noopener noreferrer">'
+        + (src === "spotify" ? "Open on Spotify" : "Open on YouTube") + '</a>')
+      : "";
     var embedBody = ''
       + '<p class="meta">' + (src === "youtube"
-          ? "Paste a youtube.com watch / youtu.be / playlist URL. Embeds use youtube-nocookie. Video must allow embedding."
-          : "Paste an open.spotify.com track / album / playlist / episode URL. Playlists must be <b>public</b>.") + '</p>'
+          ? "Paste youtube.com / music.youtube.com / youtu.be / Shorts / Live / playlist URLs (si= share links OK). Embeds use youtube-nocookie. Video must allow embedding."
+          : "Paste open.spotify.com (intl- paths OK) track / album / playlist / episode. Playlists must be <b>public</b>. Prefer Copy link over spotify.link shorts.") + '</p>'
       + (owner
           ? ('<form id="playlist-embed-form" class="playlist-embed-form">'
             + '<input name="embedUrl" type="url" required placeholder="' + (src === "youtube" ? "https://www.youtube.com/watch?v=…" : "https://open.spotify.com/playlist/…") + '" value="' + esc(pl.embedUrl || "") + '" />'
             + '<button type="submit">Set embed</button></form>')
           : '<p class="meta">Owner controls room music — embed URL is read-only for guests.</p>')
       + (pl.embedSrc
-          ? ('<div class="playlist-embed-preview">'
-            + '<p class="meta">Preview · ' + esc(pl.embedTitle || src) + ' — press play in the player.</p>'
+          ? ('<div class="playlist-embed-preview" data-embed-kind="' + esc(src) + '">'
+            + '<p class="meta">Preview · ' + esc(pl.embedTitle || src) + ' — press play in the player. ' + embedOpen + '</p>'
             + '<iframe class="room-embed-frame" title="' + esc(pl.embedTitle || "embed") + '" src="' + esc(pl.embedSrc) + '" '
-            + 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" '
-            + 'allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>')
+            + 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share" '
+            + 'allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>')
           : '<p class="meta">No embed set yet.</p>')
       + '<p class="meta legal-embed-note">Embedded players use YouTube/Spotify’s own embeds. Respect their ToS; Whirled2 does not host that audio. Local uploads still require you own the rights.</p>';
     return '<div class="room-side-panel" id="room-playlist-panel">'
@@ -945,6 +1051,8 @@
     if (orphanParty && !document.querySelector(".workspace #party-panel")) orphanParty.remove();
     var buddy = document.getElementById("buddy-invite-modal");
     if (buddy) buddy.remove();
+    var fbModal = document.getElementById("fb-appid-modal");
+    if (fbModal) fbModal.remove();
     var com = document.getElementById("chat-opts-menu");
     if (com) com.hidden = true;
     var cnm = document.getElementById("chat-name-menu");
@@ -1720,7 +1828,7 @@
     saveFriends(list);
   }
   // ===========================================================================
-  // Fidelity + dual currency / streaks (?v=20260906r)
+  // Fidelity + dual currency / streaks (?v=20260906s)
   // How this works: friend requests, Room/PM chat tabs, recent rooms, gift mail,
   // command palette, reactions, notices — all localStorage / Pages-safe.
   // ENGINE DEV: chrome only; #stage-slot / WhirledChrome unchanged in spirit.
@@ -2570,7 +2678,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906r";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906t";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3399,11 +3507,12 @@ function helpPage() {
       + '<div class="panel"><h2>Starting Out</h2>'
       + '<ul class="help-tips">'
       + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname), Transactions (Coins &amp; Bars).</li>'
+      + '<li><b>Facebook Connect</b> — gate <b>Continue with Facebook</b>, or Me → Account to link/unlink + set Facebook App ID (local <code>whirled2.facebookAppId</code>). Create app at developers.facebook.com; add Facebook Login for Web; App Domains / OAuth redirect include <code>https://whirledclassic.github.io/</code>. Discord / Google Coming Soon.</li>'
       + '<li><b>Rooms</b> — enter Studio Loft; chat in the bar; Room menu for comment/rate, decorate, lock (visual).</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
-      + '<li><b>Room music</b> — Room menu → View room music. Owner picks My uploads / YouTube / Spotify. Guests listen; owner controls embeds. Soft autoplay for local.</li>'
+      + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Owner picks My uploads / YouTube / Spotify. On phones use <b>Open player</b> or <b>Open on YouTube/Spotify</b> if the embed is hard to tap.</li>'
       + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
-      + '<li><b>Profile look</b> — Me → My Profile → presets (Classic / Night / Ocean / Forest / Candy / Mono…) publish instantly; Edit look for font/corners/modules/banner.</li>'
+      + '<li><b>Profile look</b> — Me → My Profile → presets publish instantly; <b>Upload custom background</b> (image behind everything) or Edit look for font/corners/modules/banner.</li>'
       + '<li><b>Ctrl+K</b> — command palette to jump Me / Mail / Rooms / … Press <b>?</b> for shortcuts.</li>'
       + '<li><b>Mail</b> — header count; compose from Me → Mail or profiles.</li>'
       + '<li><b>Groups</b> — local clubs with discussion + Enter hall (lobby meta).</li>'
@@ -3415,7 +3524,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: mobile room layout (full stage, Overlay chat on phones, thin occupant strip). Cache <code>?v=20260906r</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: room music embeds (mobile-friendly) + Profile look custom BG + Facebook Connect. Cache <code>?v=20260906t</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -4380,6 +4489,17 @@ function helpPage() {
       +       '<button type="button" class="action-btn" data-skin-preset="mono">Mono</button>'
       +       '<button type="button" class="action-btn" data-skin-preset="clear">Clear</button>'
       +     '</div>'
+      +     '<div class="skin-bg-upload-always">'
+      +       '<strong>Upload custom background</strong>'
+      +       '<p class="meta" style="margin:4px 0 8px">Image behind everything on your profile. Choose a file, preview live, then Publish look. Only upload images you have rights to.</p>'
+      +       '<label class="skin-bg-file">Choose image (png/jpg/gif/webp)'
+      +         '<input type="file" id="skin-bg-input-quick" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+      +       (skin.bgImage
+              ? ('<div class="skin-bg-thumb-wrap" style="margin-top:8px">'
+                + '<img class="skin-bg-thumb" alt="Current background" src="' + esc(skin.bgImage) + '" />'
+                + '<button type="button" class="text-btn" data-skin-clear-bg="1">Clear image</button></div>')
+              : '')
+      +     '</div>'
       +     (editSkin
             ? ('<div class="cp-edit-panel is-open" id="edit-skin-panel">'
               +   '<div class="cp-edit-head"><b>Profile look</b>'
@@ -4440,10 +4560,20 @@ function helpPage() {
               +       '<option value="minimal"' + (skin.headerStyle === "minimal" ? " selected" : "") + '>Minimal</option>'
               +       '<option value="accent-bar"' + (skin.headerStyle === "accent-bar" ? " selected" : "") + '>Accent bar</option>'
               +     '</select></label>'
-              +     '<label class="skin-bg-file">Background image (png/jpg/gif/webp)'
-              +       '<input type="file" id="skin-bg-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
-              +     '<p class="meta">Only upload images you have rights to (same spirit as Stuff). ~400KB warn; huge files rejected. Stored as a data URL in this browser.</p>'
-              +     (skin.bgImage ? '<p class="meta">Current image saved. Choose Clear or Background type → None to remove.</p>' : '')
+              +     '<div class="skin-bg-upload-card">'
+              +       '<div class="skin-bg-upload-copy">'
+              +         '<strong>Upload custom background</strong>'
+              +         '<span class="meta">Image behind everything. Picking a file sets Background type → Image (cover + scroll), live-previews, then click Publish look.</span>'
+              +       '</div>'
+              +       '<label class="skin-bg-file">Choose image'
+              +         '<input type="file" id="skin-bg-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+              +       (skin.bgImage || window.__skinBgPending
+                  ? ('<div class="skin-bg-thumb-wrap">'
+                    + '<img class="skin-bg-thumb" alt="Current background" src="' + esc(window.__skinBgPending || skin.bgImage) + '" />'
+                    + '<button type="button" class="text-btn" data-skin-clear-bg="1">Clear image</button></div>')
+                  : '')
+              +     '</div>'
+              +     '<p class="meta">Rights: only upload images you own. Soft warn ~400KB; reject ~900KB. Stored as a data URL in this browser (localStorage).</p>' 
               +     '<label class="skin-bg-file">Banner image (thin strip under Me nav)'
               +       '<input type="file" id="skin-banner-input" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
               +     '<label class="check-row"><input type="checkbox" name="clearBanner" /> Clear banner</label>'
@@ -4817,8 +4947,48 @@ function helpPage() {
       +   '<p class="meta">Browser look: <button type="button" class="text-btn" data-me="themes">Themes</button> (CSS presets on this device). Group world themes live on group pages for managers.</p>'
       +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
       + '</div>'
+      + '<div class="panel fb-connect-panel">'
+      +   '<h2>Facebook Connect</h2>'
+      +   fbConnectAccountHtml()
+      + '</div>'
+      + '<div class="panel">'
+      +   '<h2>Other sign-in</h2>'
+      +   '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span></p>'
+      +   '<p class="meta">Google — <span class="club-badge-soon">Coming Soon</span></p>'
+      +   '<p class="meta">Modern options listed for later — not wired yet (no fake buttons).</p>'
+      + '</div>'
       + rolePanel
       + '</section>';
+  }
+
+  // How this works: Account shows linked status + App ID field for this browser deploy owner.
+  function fbConnectAccountHtml() {
+    var s = session();
+    var u = s && s.user ? s.user : {};
+    var linked = !!(u.facebookId);
+    var linkedLabel = linked
+      ? ('Linked as <b>' + esc(u.facebookName || u.name || u.facebookId) + '</b>')
+      : 'Not linked';
+    var appId = getFbAppId();
+    var statusBtn = linked
+      ? '<button type="button" class="action-btn" data-fb-unlink="1">Unlink</button>'
+      : '<button type="button" class="fb-continue-btn fb-continue-btn-sm" data-fb-link="1"><span class="fb-icon" aria-hidden="true">f</span> Link Facebook</button>';
+    return ''
+      + '<p class="fb-link-status">' + linkedLabel + '</p>'
+      + '<div class="fb-account-actions">' + statusBtn + '</div>'
+      + '<form id="fb-appid-account-form" class="fb-appid-account-form">'
+      +   '<label>Facebook App ID'
+      +     '<input name="appId" inputmode="numeric" pattern="[0-9]*" maxlength="32" placeholder="Digits only" value="' + esc(appId) + '" />'
+      +   '</label>'
+      +   '<button type="submit" class="action-btn">Save</button>'
+      + '</form>'
+      + '<ol class="fb-setup-help meta">'
+      +   '<li>Create app at <code>developers.facebook.com</code></li>'
+      +   '<li>Add Facebook Login for Web</li>'
+      +   '<li>App Domains / Valid OAuth Redirect URIs include <code>https://whirledclassic.github.io/</code></li>'
+      +   '<li>Paste App ID here</li>'
+      + '</ol>'
+      + '<p class="meta">Uses Facebook Login. We store your Facebook user id + name in this browser only — no password from Facebook. Key: <code>whirled2.facebookAppId</code>.</p>';
   }
 
   function otherProfile(id) {
@@ -5141,7 +5311,271 @@ function helpPage() {
   // Gate (logged out) + Shell (logged in chrome) + paint(tab) redraw
   // How this works: paint("rooms"|"me"|...) replaces #main innerHTML from state.
   // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // Facebook Connect (?v=20260906s) — classic Me→Account + gate Continue with Facebook
+  // How this works: pure client Facebook JS SDK. App ID in localStorage whirled2.facebookAppId
+  //   (or window.WHIRLED2_FB_APP_ID stub). We never invent FB users without SDK success.
+  // ENGINE DEV: auth is chrome; engine may later read session only via WhirledChrome.
+  // ===========================================================================
+  var FB_SDK_SRC = "https://connect.facebook.net/en_US/sdk.js";
+  var _fbSdkReady = null; // Promise
+  var _fbInitedAppId = "";
+
+  function getFbAppId() {
+    try {
+      if (window.WhirledApi && typeof window.WhirledApi.getFacebookAppId === "function") {
+        return window.WhirledApi.getFacebookAppId() || "";
+      }
+    } catch (e) {}
+    try {
+      var a = localStorage.getItem("whirled2.facebookAppId");
+      if (a && /^\d+$/.test(String(a).trim())) return String(a).trim();
+    } catch (e2) {}
+    try {
+      if (window.WHIRLED2_FB_APP_ID && /^\d+$/.test(String(window.WHIRLED2_FB_APP_ID).trim())) {
+        return String(window.WHIRLED2_FB_APP_ID).trim();
+      }
+    } catch (e3) {}
+    return "";
+  }
+
+  function saveFbAppId(appId) {
+    if (window.WhirledApi && typeof window.WhirledApi.setFacebookAppId === "function") {
+      return window.WhirledApi.setFacebookAppId(appId);
+    }
+    appId = String(appId || "").trim();
+    if (appId && !/^\d+$/.test(appId)) throw new Error("Facebook App ID must be digits only.");
+    if (appId) localStorage.setItem("whirled2.facebookAppId", appId);
+    else localStorage.removeItem("whirled2.facebookAppId");
+    return appId;
+  }
+
+  function loadFacebookSdk(appId) {
+    // How this works: load sdk.js once, FB.init with v21.0 when App ID known.
+    appId = String(appId || "").trim();
+    if (!appId) return Promise.reject(new Error("Set a Facebook App ID first."));
+    if (window.FB && _fbInitedAppId === appId) return Promise.resolve(window.FB);
+    if (_fbSdkReady && _fbInitedAppId === appId) return _fbSdkReady;
+
+    _fbSdkReady = new Promise(function (resolve, reject) {
+      var finished = false;
+      function finishOk() {
+        if (finished) return;
+        finished = true;
+        try {
+          window.FB.init({ appId: appId, cookie: true, xfbml: false, version: "v21.0" });
+          _fbInitedAppId = appId;
+          resolve(window.FB);
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function finishErr(msg) {
+        if (finished) return;
+        finished = true;
+        reject(new Error(msg || "Facebook SDK failed to load."));
+      }
+
+      var prev = window.fbAsyncInit;
+      window.fbAsyncInit = function () {
+        try { if (typeof prev === "function") prev(); } catch (eP) {}
+        finishOk();
+      };
+
+      if (window.FB && document.getElementById("facebook-jssdk")) {
+        finishOk();
+        return;
+      }
+
+      if (!document.getElementById("facebook-jssdk")) {
+        var js = document.createElement("script");
+        js.id = "facebook-jssdk";
+        js.async = true;
+        js.src = FB_SDK_SRC;
+        js.onerror = function () { finishErr("Could not load Facebook SDK (network / blocked)."); };
+        (document.body || document.head).appendChild(js);
+      }
+
+      // Safety timeout — SDK should call fbAsyncInit
+      setTimeout(function () {
+        if (window.FB) finishOk();
+        else finishErr("Facebook SDK timed out. Check network or App ID.");
+      }, 12000);
+    });
+    return _fbSdkReady;
+  }
+
+  function facebookLoginViaSdk() {
+    // How this works: FB.login → FB.api('/me') → WhirledApi.loginWithFacebookProfile.
+    // Never invent users without SDK success.
+    var appId = getFbAppId();
+    if (!appId) return Promise.reject(new Error("no-app-id"));
+    return loadFacebookSdk(appId).then(function (FB) {
+      return new Promise(function (resolve, reject) {
+        FB.login(function (response) {
+          if (!response || response.status !== "connected" || !response.authResponse) {
+            reject(new Error("Facebook login was cancelled or failed."));
+            return;
+          }
+          FB.api("/me", { fields: "id,name,email" }, function (me) {
+            if (!me || me.error || !me.id) {
+              reject(new Error((me && me.error && me.error.message) || "Could not read Facebook profile."));
+              return;
+            }
+            resolve({ id: me.id, name: me.name, email: me.email || "" });
+          });
+        }, { scope: "public_profile,email" });
+      });
+    }).then(function (profile) {
+      return window.WhirledApi.loginWithFacebookProfile(profile);
+    });
+  }
+
+  function facebookLinkViaSdk() {
+    var appId = getFbAppId();
+    if (!appId) return Promise.reject(new Error("no-app-id"));
+    return loadFacebookSdk(appId).then(function (FB) {
+      return new Promise(function (resolve, reject) {
+        FB.login(function (response) {
+          if (!response || response.status !== "connected" || !response.authResponse) {
+            reject(new Error("Facebook link was cancelled or failed."));
+            return;
+          }
+          FB.api("/me", { fields: "id,name,email" }, function (me) {
+            if (!me || me.error || !me.id) {
+              reject(new Error((me && me.error && me.error.message) || "Could not read Facebook profile."));
+              return;
+            }
+            resolve({ id: me.id, name: me.name, email: me.email || "" });
+          });
+        }, { scope: "public_profile,email" });
+      });
+    }).then(function (profile) {
+      return window.WhirledApi.linkFacebook(profile);
+    });
+  }
+
+  function dismissFbAppIdModal() {
+    var m = document.getElementById("fb-appid-modal");
+    if (m) m.remove();
+  }
+
+  function openFbAppIdModal(opts) {
+    // How this works: gate cannot open Account — inline mini form to paste App ID then retry.
+    opts = opts || {};
+    dismissFbAppIdModal();
+    var wrap = document.createElement("div");
+    wrap.innerHTML = ''
+      + '<div class="modal-backdrop" id="fb-appid-modal" role="presentation">'
+      +   '<div class="modal-card fb-appid-card" role="dialog" aria-modal="true" aria-label="Set Facebook App ID">'
+      +     '<h2>Set Facebook App ID</h2>'
+      +     '<p class="meta">Create an app at developers.facebook.com → Add Facebook Login for Web → '
+      +       'App Domains / Valid OAuth Redirect URIs include <code>https://whirledclassic.github.io/</code> → paste App ID here.</p>'
+      +     '<form id="fb-appid-form">'
+      +       '<label class="fb-appid-label">Facebook App ID'
+      +         '<input name="appId" inputmode="numeric" pattern="[0-9]*" maxlength="32" placeholder="Digits only" required value="' + esc(getFbAppId()) + '" />'
+      +       '</label>'
+      +       '<div class="fb-appid-actions">'
+      +         '<button type="submit" class="action-btn">Save' + (opts.retry ? " &amp; Continue" : "") + '</button>'
+      +         '<button type="button" class="text-btn" data-fb-appid-cancel="1">Cancel</button>'
+      +       '</div>'
+      +     '</form>'
+      +     '<p class="meta">Stored in this browser only as <code>whirled2.facebookAppId</code>. No server secrets on GitHub Pages.</p>'
+      +   '</div></div>';
+    var modal = wrap.firstChild;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", function (ev) {
+      if (ev.target === modal || ev.target.closest("[data-fb-appid-cancel]")) {
+        dismissFbAppIdModal();
+      }
+    });
+    var form = document.getElementById("fb-appid-form");
+    if (form) {
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var data = new FormData(form);
+        var id = String(data.get("appId") || "").trim();
+        try {
+          saveFbAppId(id);
+        } catch (e) {
+          pushNotice("gray", e.message || String(e));
+          return;
+        }
+        dismissFbAppIdModal();
+        try { pushNotice("green", "Facebook App ID saved on this browser.", { transient: true }); } catch (eN) {}
+        if (opts.retry) {
+          startFacebookContinue();
+        } else if (opts.retryLink) {
+          startFacebookLink();
+        } else if (session() && meSub === "account") {
+          paint("me");
+        }
+      });
+      try {
+        var inp = form.querySelector("input[name=appId]");
+        if (inp) inp.focus();
+      } catch (eF) {}
+    }
+  }
+
+  function setGateFbErr(msg) {
+    var err = document.getElementById("gate-err");
+    if (err) err.textContent = msg || "";
+  }
+
+  function startFacebookContinue() {
+    // Gate: Continue with Facebook → login or register via SDK profile.
+    setGateFbErr("");
+    var appId = getFbAppId();
+    if (!appId) {
+      openFbAppIdModal({ retry: true });
+      return;
+    }
+    setGateFbErr("Opening Facebook…");
+    facebookLoginViaSdk().then(function () {
+      setGateFbErr("");
+      boot();
+    }).catch(function (e) {
+      if (e && e.message === "no-app-id") {
+        openFbAppIdModal({ retry: true });
+        return;
+      }
+      setGateFbErr((e && e.message) || String(e));
+    });
+  }
+
+  function startFacebookLink() {
+    var appId = getFbAppId();
+    if (!appId) {
+      openFbAppIdModal({ retryLink: true });
+      return;
+    }
+    facebookLinkViaSdk().then(function () {
+      pushNotice("green", "Facebook linked on this browser.", { transient: true });
+      meSub = "account";
+      paint("me");
+    }).catch(function (e) {
+      if (e && e.message === "no-app-id") {
+        openFbAppIdModal({ retry: false });
+        return;
+      }
+      pushNotice("gray", (e && e.message) || String(e));
+    });
+  }
+
+  function startFacebookUnlink() {
+    if (!window.WhirledApi || !window.WhirledApi.unlinkFacebook) return;
+    window.WhirledApi.unlinkFacebook().then(function () {
+      pushNotice("green", "Facebook unlinked on this browser.", { transient: true });
+      meSub = "account";
+      paint("me");
+    }).catch(function (e) {
+      pushNotice("gray", (e && e.message) || String(e));
+    });
+  }
+
   function gate() {
+    // How this works: Sign Up / Logon + Continue with Facebook (classic blue). App ID optional until click.
     return ''
       + '<section class="gate"><div class="gate-card">'
       +   logoImg("gate-logo")
@@ -5157,6 +5591,12 @@ function helpPage() {
       +       '<input name="name" autocomplete="username" placeholder="Display name" required />'
       +       '<input name="password" type="password" autocomplete="current-password" placeholder="Password" required />'
       +       '<button type="submit">Logon</button></form>'
+      +   '</div>'
+      +   '<div class="gate-fb">'
+      +     '<div class="gate-fb-divider"><span>or</span></div>'
+      +     '<button type="button" class="fb-continue-btn" id="fb-continue-btn" data-fb-continue="1">'
+      +       '<span class="fb-icon" aria-hidden="true">f</span> Continue with Facebook</button>'
+      +     '<p class="meta gate-fb-meta">Uses Facebook Login. We store your Facebook user id + name in this browser only — no password from Facebook.</p>'
       +   '</div>'
       +   '<p class="gate-err" id="gate-err"></p>'
       +   '<p class="meta">Offline preview stays in this browser. Shared chat needs server/server.mjs.</p>'
@@ -5458,6 +5898,14 @@ function helpPage() {
     }
     hook("register-form", window.WhirledApi.register);
     hook("login-form", window.WhirledApi.login);
+    // How this works: Continue with Facebook on the gate (classic blue, not purple chrome).
+    var fbBtn = document.getElementById("fb-continue-btn");
+    if (fbBtn) {
+      fbBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        startFacebookContinue();
+      });
+    }
   }
   var _decDrag = null;
   function bindDecorateDrag() {
@@ -6282,6 +6730,22 @@ function helpPage() {
       paint("me");
       return;
     }
+    // How this works: Facebook Connect — gate continue + Account link/unlink (chrome auth only).
+    if (ev.target.closest("[data-fb-continue]")) {
+      ev.preventDefault();
+      startFacebookContinue();
+      return;
+    }
+    if (ev.target.closest("[data-fb-link]") && session()) {
+      ev.preventDefault();
+      startFacebookLink();
+      return;
+    }
+    if (ev.target.closest("[data-fb-unlink]") && session()) {
+      ev.preventDefault();
+      startFacebookUnlink();
+      return;
+    }
     if (!ev.target.closest("#chat-opts-menu") && !ev.target.closest("#chat-opts-btn")) {
       var com3 = document.getElementById("chat-opts-menu");
       if (com3 && !com3.hidden) { com3.hidden = true; chatOptsOpen = false; }
@@ -7045,6 +7509,50 @@ function helpPage() {
       paint("rooms");
       return;
     }
+    // How this works: mobile embed controls live OUTSIDE the iframe (iOS often blocks tiny YT taps).
+    // Beginner: Open player = bigger sheet; Tap play = scroll/focus iframe; Open on YouTube/Spotify = real browser tab.
+    // ENGINE DEV: do not put these buttons inside #stage-slot.
+    var embedExpand = ev.target.closest("[data-embed-expand]");
+    if (embedExpand) {
+      var dockEx = document.getElementById("room-embed-dock");
+      if (dockEx) {
+        dockEx.classList.add("is-expanded");
+        dockEx.hidden = false;
+        var col = dockEx.querySelector("[data-embed-collapse]");
+        if (col) col.hidden = false;
+        try { dockEx.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (eSc) {}
+        var fr = dockEx.querySelector("iframe.room-embed-frame");
+        if (fr) { try { fr.focus(); } catch (eF) {} }
+      }
+      return;
+    }
+    var embedCollapse = ev.target.closest("[data-embed-collapse]");
+    if (embedCollapse) {
+      var dockCol = document.getElementById("room-embed-dock");
+      if (dockCol) {
+        dockCol.classList.remove("is-expanded");
+        var colB = dockCol.querySelector("[data-embed-collapse]");
+        if (colB) colB.hidden = true;
+      }
+      return;
+    }
+    var embedFocus = ev.target.closest("[data-embed-focus]");
+    if (embedFocus) {
+      var dockFo = document.getElementById("room-embed-dock");
+      if (dockFo) {
+        dockFo.classList.add("is-expanded");
+        var colC = dockFo.querySelector("[data-embed-collapse]");
+        if (colC) colC.hidden = false;
+        try { dockFo.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (eSc2) {}
+        var fr2 = dockFo.querySelector("iframe.room-embed-frame");
+        if (fr2) {
+          try { fr2.focus(); } catch (eF2) {}
+          // Nudge iframe so user gesture lands near the player (iOS needs gesture + visible chrome).
+          try { fr2.click(); } catch (eC) {}
+        }
+      }
+      return;
+    }
     if (ev.target.closest("[data-playlist-open-panel]") && session()) {
       // How this works: compact dock button opens Room music side panel.
       if (!inRoom) inRoom = true;
@@ -7292,6 +7800,34 @@ function helpPage() {
       } catch (e) {}
       mailRow.classList.remove("unread");
     }
+    // How this works: Clear image removes custom profile BG (pending + saved keep flag).
+    // Beginner: Upload custom background → preview → Publish; Clear image removes it.
+    if (ev.target.closest("[data-skin-clear-bg]") && session()) {
+      window.__skinBgPending = "";
+      var keepClr = document.querySelector('#skin-form [name="keepImage"]');
+      if (keepClr) keepClr.value = "0";
+      var hidClr = document.getElementById("skin-bg-data");
+      if (hidClr) hidClr.value = "";
+      var typeClr = document.querySelector('#skin-form [name="bgType"]');
+      if (typeClr && typeClr.value === "image") typeClr.value = "color";
+      var uidClr = session().user.id;
+      var cur = loadProfileSkin(uidClr);
+      cur.bgImage = "";
+      if (cur.bgType === "image") cur.bgType = "color";
+      saveProfileSkin(uidClr, cur);
+      try {
+        var formClr = document.getElementById("skin-form");
+        if (formClr) {
+          var draftClr = readSkinFormDraft(formClr);
+          if (draftClr) applyProfileSkinDom(uidClr, draftClr);
+          else applyProfileSkinDom(uidClr, cur);
+        } else applyProfileSkinDom(uidClr, cur);
+      } catch (eClr) {}
+      meSub = "profile";
+      paint("me");
+      pushNotice("green", "Custom background cleared.", { transient: true });
+      return;
+    }
     var skinPreset = ev.target.closest("[data-skin-preset]");
     if (skinPreset && session()) {
       // How this works: preset click = Publish immediately (save + repaint), Profile look.
@@ -7477,13 +8013,16 @@ function helpPage() {
       }
     }
     // How this works: profile background image → data URL (cap ~400KB warn / reject huge).
-    if (ev.target.id === "skin-bg-input" && session()) {
+    if ((ev.target.id === "skin-bg-input" || ev.target.id === "skin-bg-input-quick") && session()) {
+      // How this works: pick a file → Background type Image + cover/scroll → live preview → Publish look.
+      // Beginner: this is the custom profile background (image behind everything). ENGINE DEV: chrome only.
       var sfile = ev.target.files && ev.target.files[0];
       var smsg = document.getElementById("skin-msg");
       if (!sfile) return;
       var okType = /image\/(png|jpeg|jpg|gif|webp)/i.test(sfile.type) || /\.(png|jpe?g|gif|webp)$/i.test(sfile.name || "");
       if (!okType) {
         if (smsg) smsg.textContent = "Use png, jpg, gif, or webp.";
+        else alert("Use png, jpg, gif, or webp.");
         return;
       }
       if (sfile.size > PROFILE_BG_MAX_HARD) {
@@ -7493,6 +8032,7 @@ function helpPage() {
       }
       if (sfile.size > PROFILE_BG_MAX_WARN) {
         if (smsg) smsg.textContent = "Warning: large image (~400KB+). Saving may fill browser storage.";
+        else alert("Warning: large image (~400KB+). Saving may fill browser storage.");
       }
       var sreader = new FileReader();
       sreader.onload = function () {
@@ -7504,12 +8044,26 @@ function helpPage() {
         if (keep) keep.value = "0";
         var typeSel = document.querySelector('#skin-form [name="bgType"]');
         if (typeSel) typeSel.value = "image";
-        if (smsg) smsg.textContent = "Image ready — previewing; click Publish look to save.";
+        var repSel = document.querySelector('#skin-form [name="bgRepeat"]');
+        if (repSel) repSel.value = "cover";
+        var attSel = document.querySelector('#skin-form [name="bgAttachment"]');
+        if (attSel) attSel.value = "scroll";
+        if (smsg) smsg.textContent = "Image ready — previewing behind modules; click Publish look to save.";
+        // If Edit look is closed, open it so Publish is obvious; still live-preview immediately.
+        if (!document.getElementById("skin-form")) {
+          profileEditSection = "skin";
+          meSub = "profile";
+          paint("me");
+          return;
+        }
         try {
           var formImg = document.getElementById("skin-form");
           var draftImg = readSkinFormDraft(formImg);
           if (draftImg && session()) applyProfileSkinDom(session().user.id, draftImg);
+          var thumbs = document.querySelectorAll(".skin-bg-thumb");
+          for (var ti = 0; ti < thumbs.length; ti++) thumbs[ti].src = dataUrl;
         } catch (eImg) {}
+        pushNotice("green", "Background preview on — Publish look to save.", { transient: true });
       };
       sreader.readAsDataURL(sfile);
       return;
@@ -7890,6 +8444,19 @@ function helpPage() {
       paint("stuff");
       return;
     }
+    if (ev.target.id === "fb-appid-account-form" && session()) {
+      var fad = new FormData(ev.target);
+      var faid = String(fad.get("appId") || "").trim();
+      try {
+        saveFbAppId(faid);
+        pushNotice("green", faid ? "Facebook App ID saved on this browser." : "Facebook App ID cleared.", { transient: true });
+        meSub = "account";
+        paint("me");
+      } catch (eFb) {
+        pushNotice("gray", (eFb && eFb.message) || String(eFb));
+      }
+      return;
+    }
     if (ev.target.id === "blocklist-add-form" && session()) {
       var bd = new FormData(ev.target);
       var bid = String(bd.get("id") || "").trim().slice(0, 40);
@@ -8117,33 +8684,48 @@ function helpPage() {
       paint("rooms");
       return;
     }
-    if (ev.target.id === "playlist-embed-form" && session()) {
+    if ((ev.target.id === "playlist-embed-form" || ev.target.id === "playlist-smart-embed-form") && session()) {
       // Hard rule: only loft owner may paste/change YouTube or Spotify embed URLs.
+      // How this works: parse URL → save embedSrc → force dock refresh → keep panel open + success notice.
+      // Beginner: if you paste while still on My uploads, we auto-switch to YouTube or Spotify.
+      // ENGINE DEV: clear data-embed-src so ensureRoomEmbedDock rewrites the iframe after Set embed.
       if (!isLoftOwner()) {
         pushNotice("orange", "Owner controls room music.");
         return;
       }
       var em = new FormData(ev.target);
+      var rawUrl = String(em.get("embedUrl") || "");
       var plE = loadPlaylist();
       var srcE = normalizePlaylistSource(plE.source);
+      var detected = detectEmbedSourceFromUrl(rawUrl);
+      if (detected && (srcE === "local" || srcE !== detected)) {
+        srcE = detected;
+        plE.source = detected;
+      }
       if (srcE !== "youtube" && srcE !== "spotify") {
-        pushNotice("orange", "Switch Music source to YouTube or Spotify first.");
+        pushNotice("orange", "Switch Music source to YouTube or Spotify first (or paste a YouTube/Spotify link).");
         return;
       }
-      var parsed = parseRoomEmbed(srcE, String(em.get("embedUrl") || ""));
+      var parsed = parseRoomEmbed(srcE, rawUrl);
       if (!parsed.ok) {
         pushNotice("orange", parsed.error || "Invalid embed URL.");
         return;
       }
+      plE.source = srcE;
       plE.embedUrl = parsed.embedUrl;
       plE.embedSrc = parsed.embedSrc;
       plE.embedTitle = parsed.embedTitle;
       plE.ownerControlsMusic = true;
       if (typeof plE.ownerOnlyAdd !== "boolean") plE.ownerOnlyAdd = true;
       savePlaylist(plE);
+      try {
+        var dockForce = document.getElementById("room-embed-dock");
+        if (dockForce) dockForce.removeAttribute("data-embed-src");
+      } catch (eForce) {}
       playlistPanelOpen = true;
       paint("rooms");
       syncRoomAudio();
+      pushNotice("green", "Room embed set — press play in the player. " + (srcE === "spotify" ? "Open on Spotify" : "Open on YouTube") + " is in the dock.", { transient: true });
       return;
     }
     if (ev.target.id === "playlist-add-form" && session()) {

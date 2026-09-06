@@ -20,7 +20,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 |------|------|
 | `index.html` | Boot shell. Loads `src/styles.css`, `src/api.js`, `app.js`. **Cache-bust** with `?v=YYYYMMDDx` on every asset + reload links. |
 | `app.js` | Almost all UI: gate, tabs, Me/Stuff/Games/Rooms/Groups/Shop, chat, notices, themes, playlist, stage bubbles. One big IIFE. |
-| `src/api.js` | `WhirledApi` — register/login/chat/presence. If `WHIRLED_API` empty → **offline localStorage** (GitHub Pages default). |
+| `src/api.js` | `WhirledApi` — register/login/chat/presence + `loginWithFacebookProfile` / link/unlink Facebook. If `WHIRLED_API` empty → **offline localStorage** (GitHub Pages default). |
 | `src/styles.css` | Classic pale-blue chrome + theme presets (`#app[data-theme]`). |
 | `server/server.mjs` | Optional Node API for shared chat when `WHIRLED_API` points at it. Not required for Pages. |
 | `ENGINE-BRIDGE.md` | Full Pixi engineer runbook. |
@@ -153,3 +153,20 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 
 - `occupantRailHtml` / `personRow`: you-first sort, presence dots (green here / yellow away / orange in-game stub), friend highlight, loft-owner ♛, optional filter when >5.
 - Real `liveOccupants` only — no fake NPCs. Click opens existing occ menu.
+
+## Facebook Connect (20260906s → combined prefer **20260906t**)
+
+- **Keys**: `whirled2.facebookAppId` (digits); user rows may have `facebookId`, `facebookName`, `authProvider:'facebook'`, id `fb_{facebookId}`.
+- **Optional stub**: `window.WHIRLED2_FB_APP_ID` in `index.html` comment/script.
+- **Flow**: load SDK once App ID known → `FB.init({ version:'v21.0' })` → `FB.login` → `FB.api('/me', {fields:'id,name,email'})` → `WhirledApi.loginWithFacebookProfile` (or `linkFacebook` when already signed in).
+- **Meta app setup**: developers.facebook.com → Facebook Login for Web → App Domains / Valid OAuth Redirect URIs include `https://whirledclassic.github.io/`.
+- **Safety**: never invent FB users without SDK success; no payments; Discord/Google Coming Soon only.
+- **Engine**: auth is chrome; session only — do not break `#stage-slot` / `syncRoomAudio` / ♪ Music.
+- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship prefers `?v=20260906t`.
+
+## Room music embeds + Profile BG (20260906t)
+
+- **Mobile touch**: `#room-embed-dock` z-index 12, `pointer-events:auto`, iframe ≥200px (YT). Expanded sheet (`is-expanded`, z-index 90+) for finger-sized player. External buttons do not rely on iframe chrome alone.
+- **Parse**: music.youtube.com, Shorts/Live/embed/youtu.be/watch+list; Spotify intl- + parseable spotify.link only.
+- **Profile BG**: Upload custom background card; `applyProfileSkinDom` full-bleed on `.page.profile-page`; never call it MySpace — Profile look / Customize look only.
+- **Cache**: `LOGO_V` / `?v=20260906t`. Do not push mid-parallel FB edit unless instructed.
