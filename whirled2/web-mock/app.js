@@ -1,12 +1,16 @@
 /* Whirled 2 page chrome. Classic whirled.club layout. No Pixi. */
 (function () {
   "use strict";
-  var LOGO = "./assets/whirled-classic-logo.png";
+  var LOGO = "./assets/whirled2-logo.png";
+  var LOGO_CLASSIC = "./assets/whirled-classic-logo.png";
   var LOGO_FALLBACK = "./assets/logo.svg";
   function logoImg(cls) {
     var wh = cls.indexOf("gate") >= 0 ? ' width="180" height="120"' : ' width="120" height="48"';
-    return '<img class="' + cls + '" alt="Whirled Classic" src="' + LOGO + '"' + wh + ' decoding="async" onerror="this.onerror=null;this.src=\'' + LOGO_FALLBACK + '\'" />';
+    return '<img class="' + cls + '" alt="Whirled2" src="' + LOGO + '"' + wh
+      + ' decoding="async" data-fb1="' + LOGO_CLASSIC + '" data-fb2="' + LOGO_FALLBACK + '"'
+      + " onerror=\"var i=this;if(i.getAttribute('data-fb1')){i.src=i.getAttribute('data-fb1');i.removeAttribute('data-fb1');}else if(i.getAttribute('data-fb2')){i.src=i.getAttribute('data-fb2');i.removeAttribute('data-fb2');}else{i.onerror=null;}\" />";
   }
+
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (ch) {
       return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
@@ -205,6 +209,7 @@
     friendInvitePending = null;
     chatOptsOpen = false;
     chatNameMenu = null;
+    profileEditSection = null;
     var gm = document.getElementById("go-menu");
     if (gm) gm.hidden = true;
     var rm = document.getElementById("room-menu");
@@ -537,7 +542,8 @@
     var ROOM = "Studio Loft";
   var chat = [];
   var liveOccupants = [];
-  var meSub = "home"; // home | profile | friends | mail | passport | account | blocklist | galleries | transactions | contests | share
+  var meSub = "home"; // home | profile | friends | mail | passport | account | club | blocklist | galleries | transactions | contests | share
+  var profileEditSection = null; // null | status | photo | info
   var tourTip = 0;
   var goMenuOpen = false;
   var inRoom = false;
@@ -687,20 +693,20 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905w";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905x";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
-    var subject = encodeURIComponent("Come hang out in Whirled Classic");
+    var subject = encodeURIComponent("Come hang out in Whirled2");
     var body = encodeURIComponent(
-      "Hey! Join me in Whirled Classic — a free social world revival (no payments).\n\n"
+      "Hey! Join me in Whirled2 — a free social world revival (no payments). Not affiliated with whirled.club.\n\n"
       + "Open: " + url + "\n\n"
       + "Coins are labels only. See you in the loft!"
     );
     return '<div class="panel invite-them-panel" id="invite-them-panel">'
       + '<div class="room-side-head"><h2>Invite Them!</h2>'
       +   '<button type="button" class="text-btn" data-invite-close="1">Close</button></div>'
-      + '<p class="meta">Share Whirled Classic with a friend. No email-import from Hotmail etc. — just a link or mailto.</p>'
+      + '<p class="meta">Share Whirled2 with a friend. No email-import from Hotmail etc. — just a link or mailto.</p>'
       + '<label class="invite-link-label">Share link'
       +   '<input id="invite-share-url" readonly value="' + esc(url) + '" />'
       + '</label>'
@@ -929,7 +935,7 @@
         if ((it.id || it.name) === shopItemId) { found = it; break; }
       }
       return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1>'
-        + '<p class="shop-banner">Coins are labels only — no payments on Whirled Classic yet.</p></div></div>'
+        + '<p class="shop-banner">Coins are labels only — no payments on Whirled2 yet.</p></div></div>'
         + shopItemDetail(found) + '</section>';
     }
     var meta = catMeta(shopCat);
@@ -965,7 +971,7 @@
         }).join("")
       + '</div>';
     return '<section class="page stuff-page"><div class="page-head"><div><h1>Shop</h1>'
-      + '<p class="shop-banner">Coins are labels only — no payments on Whirled Classic yet.</p>'
+      + '<p class="shop-banner">Coins are labels only — no payments on Whirled2 yet.</p>'
       + '<p class="meta">Browse popular selections, then pick a category. Purchases stay disabled (labels only, no payments).</p></div></div>'
       + popular
       + '<div class="stuff-layout">' + catRail("shop", shopCat)
@@ -1406,7 +1412,7 @@
   }
   function helpPage() {
     return '<section class="page help-page"><div class="page-head"><div><h1>Help</h1>'
-      + '<p>Starting Out — Whirled Classic chrome tips.</p></div>'
+      + '<p>Starting Out — Whirled2 chrome tips.</p></div>'
       + '<button type="button" class="text-btn" data-help-close="1">Close Help</button></div>'
       + '<div class="panel"><h2>Starting Out</h2>'
       + '<ul class="help-tips">'
@@ -1422,7 +1428,8 @@
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Me sidebar classics (blocklist / galleries / transactions / contests / share), polish. Cache <code>?v=20260905w</code>.</p>'
+      + '<p class="meta">This pass: Whirled2 branding, Club/Membership Coming Soon, roles/badges, chat Slide/Overlay. Cache <code>?v=20260905x</code>.</p>'
+      + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
       + '<p class="meta">Live docs live in-repo as CONCEPT.md / STATUS.md — no external secrets.</p>'
       + '</div></section>';
   }
@@ -1690,6 +1697,8 @@
       + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "passport" ? " is-on" : "") + '" data-me="passport">My Passport</button>'
       + '<span class="sep">|</span>'
+      + '<button type="button" class="me-link' + (meSub === "club" ? " is-on" : "") + '" data-me="club">Club</button>'
+      + '<span class="sep">|</span>'
       + '<button type="button" class="me-link' + (meSub === "account" ? " is-on" : "") + '" data-me="account">Account</button>'
       + '</nav></div>';
   }
@@ -1768,7 +1777,7 @@
     return '<section class="page me-page">' + meSubnav()
       + '<div class="me-grid">'
       +   '<div class="me-main">'
-      +     '<div class="panel invite-banner">Invite friends to Whirled Classic — coins stay labels only (no payments).</div>'
+      +     '<div class="panel invite-banner">Invite friends to Whirled2 — coins stay labels only (no payments).</div>'
       +     '<div class="panel"><h2>My News</h2>'
       +       (st ? '<p class="status-line"><b>Your status:</b> ' + esc(st) + '</p>' : '')
       +       myNewsSections() + '</div>'
@@ -1781,6 +1790,7 @@
       +       '<button type="button" class="text-btn" data-me="passport">My Passport</button>'
       +       '<button type="button" class="text-btn" data-me="mail">Mail' + (unread ? ' (' + unread + ')' : '') + '</button>'
       +       '<button type="button" class="text-btn" data-me="account">Account</button>'
+      +       '<button type="button" class="text-btn" data-me="club">Club / Membership</button>'
       +       '<hr class="me-side-rule" />'
       +       '<button type="button" class="text-btn" data-me="blocklist">My Blocklist</button>'
       +       '<button type="button" class="text-btn" data-me="galleries">My Galleries</button>'
@@ -1818,14 +1828,26 @@
       member = new Date().toISOString().slice(0, 10);
       try { localStorage.setItem("whirled2.since." + sid, member); } catch (e) {}
     }
+    var editSt = profileEditSection === "status";
+    var editPh = profileEditSection === "photo";
+    var editInfo = profileEditSection === "info";
+    function editToggle(sec, label) {
+      var open = profileEditSection === sec;
+      return '<button type="button" class="edit-link' + (open ? " is-open" : "") + '" data-profile-edit="' + sec + '">'
+        + (open ? "Done" : ("Edit " + label)) + '</button>';
+    }
     return '<section class="page me-page profile-page">' + meSubnav()
       + '<div class="classic-profile">'
       +   '<div class="cp-header">'
-      +     '<div class="cp-photo">' + photoHtml + '</div>'
+      +     '<div class="cp-photo">' + photoHtml
+      +       '<div class="cp-edit-row">' + editToggle("photo", "photo") + '</div></div>'
       +     '<div class="cp-main">'
       +       '<div class="cp-name-row"><span class="cp-name">' + esc(me.name) + '</span>' + roleBadgeHtml(getRole(sid)) + '<span class="level-badge">Level 1</span></div>'
-      +       '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
-      +       profileActionRow({ photo: true, poke: 'id="poke-self-demo"' })
+      +       '<div class="cp-status-block">'
+      +         '<div class="cp-status">' + (st ? esc(st) : '<span class="meta">No status set</span>') + '</div>'
+      +         editToggle("status", "status")
+      +       '</div>'
+      +       profileActionRow({ poke: 'id="poke-self-demo"' })
       +     '</div>'
       +     '<aside class="cp-meta-box">'
       +       '<div><span class="k">Permaname</span><span class="v">' + esc(sid) + '</span></div>'
@@ -1834,22 +1856,46 @@
       +       '<div><span class="k">Home Page</span><span class="v">' + (info.homepage ? '<a href="' + esc(info.homepage) + '" target="_blank" rel="noopener">' + esc(info.homepage) + '</a>' : '—') + '</span></div>'
       +     '</aside>'
       +   '</div>'
-      +   '<form class="status-form cp-status-form" id="status-form"><input name="status" maxlength="140" placeholder="Update your status…" value="' + esc(st) + '" /><button type="submit">Set status</button></form>'
-      +   '<div class="cp-section"><h2>Information</h2>'
-      +     '<form class="info-form" id="info-form">'
-      +       '<label>Activities <input name="activities" value="' + esc(info.activities) + '" /></label>'
-      +       '<label>Interests <input name="interests" value="' + esc(info.interests) + '" /></label>'
-      +       '<label>Favorite Games <input name="games" value="' + esc(info.games) + '" /></label>'
-      +       '<label>Favorite Music <input name="music" value="' + esc(info.music) + '" /></label>'
-      +       '<label>Favorite Movies <input name="movies" value="' + esc(info.movies) + '" /></label>'
-      +       '<label>Favorite Shows <input name="shows" value="' + esc(info.shows) + '" /></label>'
-      +       '<label>Favorite Books <input name="books" value="' + esc(info.books) + '" /></label>'
-      +       '<label>About Me <input name="about" value="' + esc(info.about || me.bio) + '" /></label>'
-      +       '<label>Home Page URL <input name="homepage" value="' + esc(info.homepage) + '" /></label>'
-      +       '<label>Display name <input name="name" maxlength="24" value="' + esc(me.name) + '" /></label>'
-      +       '<button type="submit">Save information</button><p class="meta" id="profile-msg"></p>'
-      +     '</form>'
+      +   (editSt
+          ? ('<div class="cp-edit-panel is-open" id="edit-status-panel">'
+            +   '<div class="cp-edit-head"><b>Edit status</b>'
+            +     '<button type="button" class="text-btn" data-profile-edit-cancel="1">Cancel</button></div>'
+            +   '<form class="status-form cp-status-form" id="status-form">'
+            +     '<input name="status" maxlength="140" placeholder="Update your status…" value="' + esc(st) + '" />'
+            +     '<button type="submit">Set status</button></form></div>')
+          : '')
+      +   (editPh
+          ? ('<div class="cp-edit-panel is-open" id="edit-photo-panel">'
+            +   '<div class="cp-edit-head"><b>Edit photo</b>'
+            +     '<button type="button" class="text-btn" data-profile-edit-cancel="1">Cancel</button></div>'
+            +   '<p class="meta">Choose an image from your device (stored in this browser).</p>'
+            +   '<label class="profile-action photo-label edit-photo-pick"><span class="pa-ico">▣</span><span>Choose photo</span>'
+            +     '<input type="file" id="photo-input" accept="image/*" hidden /></label>'
+            +   '<p class="meta" id="photo-edit-msg"></p></div>')
+          : '')
+      +   '<div class="cp-section"><div class="cp-section-head"><h2>Information</h2>'
+      +     editToggle("info", "information") + '</div>'
       +     '<div class="info-preview">' + infoRows(Object.assign({}, info, { about: info.about || me.bio })) + '</div>'
+      +     (editInfo
+            ? ('<div class="cp-edit-panel is-open" id="edit-info-panel">'
+              +   '<div class="cp-edit-head"><b>Edit information</b>'
+              +     '<button type="button" class="text-btn" data-profile-edit-cancel="1">Cancel</button></div>'
+              +   '<form class="info-form" id="info-form">'
+              +     '<label>Activities <input name="activities" value="' + esc(info.activities) + '" /></label>'
+              +     '<label>Interests <input name="interests" value="' + esc(info.interests) + '" /></label>'
+              +     '<label>Favorite Games <input name="games" value="' + esc(info.games) + '" /></label>'
+              +     '<label>Favorite Music <input name="music" value="' + esc(info.music) + '" /></label>'
+              +     '<label>Favorite Movies <input name="movies" value="' + esc(info.movies) + '" /></label>'
+              +     '<label>Favorite Shows <input name="shows" value="' + esc(info.shows) + '" /></label>'
+              +     '<label>Favorite Books <input name="books" value="' + esc(info.books) + '" /></label>'
+              +     '<label>About Me <input name="about" value="' + esc(info.about || me.bio) + '" /></label>'
+              +     '<label>Home Page URL <input name="homepage" value="' + esc(info.homepage) + '" /></label>'
+              +     '<label>Display name <input name="name" maxlength="24" value="' + esc(me.name) + '" /></label>'
+              +     '<div class="cp-edit-actions"><button type="submit">Save information</button>'
+              +       '<button type="button" class="text-btn" data-profile-edit-cancel="1">Done</button></div>'
+              +     '<p class="meta" id="profile-msg"></p>'
+              +   '</form></div>')
+            : '')
       +   '</div>'
       +   '<div class="cp-section"><h2>Player News</h2>' + newsHtml + '</div>'
       +   '<div class="cp-section"><h2>Friends</h2>' + friendsStrip() + '</div>'
@@ -2265,6 +2311,51 @@
       + '</div></section>';
   }
 
+
+  function meClub() {
+    var sid = session() && session().user ? session().user.id : "guest";
+    var note = "";
+    try { note = localStorage.getItem("whirled2.clubNotify." + sid) || ""; } catch (e) {}
+    var interested = false;
+    try { interested = localStorage.getItem("whirled2.clubInterested." + sid) === "1"; } catch (e2) {}
+    return '<section class="page me-page club-page">' + meSubnav()
+      + '<div class="panel club-hero">'
+      +   '<div class="club-badge-soon">Coming Soon</div>'
+      +   '<h2>Club / Membership</h2>'
+      +   '<p>Club Whirled–style membership for <b>Whirled2</b> is on the way. Nothing to buy today — this page is a preview of what membership <i>may</i> include.</p>'
+      + '</div>'
+      + '<div class="panel">'
+      +   '<h2>What membership may include</h2>'
+      +   '<p class="meta">Inspired by classic Club Whirled perks. All items are <b>may / subject to change</b> — prototypes only.</p>'
+      +   '<ul class="club-may-list">'
+      +     '<li>Extra rooms or room slots beyond the free home loft</li>'
+      +     '<li>Cosmetic flair (badges, name accents, room themes) — labels &amp; visuals, not pay-to-win</li>'
+      +     '<li>Supporter recognition in-profile (Club member mark)</li>'
+      +     '<li>Early access to selected chrome or decorate toys</li>'
+      +     '<li>Occasional member-only events or contests</li>'
+      +   '</ul>'
+      +   '<p class="meta">Coins and bars remain <b>labels only</b>. There are <b>no live payments</b> and no purchase buttons that charge money on this mock.</p>'
+      + '</div>'
+      + '<div class="panel club-disclaimer">'
+      +   '<h2>Disclaimer</h2>'
+      +   '<p><b>Whirled2</b> is <b>not affiliated</b> with Three Rings Design, the operators of whirled.club, or any official Whirled commercial entity. We do not claim to be official whirled.club.</p>'
+      +   '<p>Whirled2 is a same-game-spirit revival on a <b>new engine</b>, informed by public research, community docs, and the open-source <a href="https://github.com/greyhavens/msoy" target="_blank" rel="noopener">greyhavens/msoy</a> reference (BSD) — not a Flash/msoy port and not a private-engine dump.</p>'
+      +   '<p>Features you see here are <b>prototypes</b>. Items, pages, and perks may appear or disappear before any launch. <b>Nothing is final.</b></p>'
+      + '</div>'
+      + '<div class="panel">'
+      +   '<h2>Notify me</h2>'
+      +   '<p class="meta">Optional local stub — no real mailing list. We can also just announce in-game later.</p>'
+      +   '<form id="club-notify-form" class="club-notify-form">'
+      +     '<label>Email (optional, stored only in this browser)'
+      +       '<input type="email" name="email" maxlength="120" placeholder="you@example.com" value="' + esc(note) + '" /></label>'
+      +     '<label class="check-row"><input type="checkbox" name="interested"' + (interested ? " checked" : "") + ' /> Keep me posted (local flag)</label>'
+      +     '<button type="submit" class="action-btn">Save interest</button>'
+      +     '<p class="meta" id="club-notify-msg">' + (interested ? "You are marked interested on this browser." : "We will announce Club membership in Whirled2 when ready.") + '</p>'
+      +   '</form>'
+      +   '<p class="meta">No checkout. No cards. Coins stay labels.</p>'
+      + '</div></section>';
+  }
+
   function meShare() {
     var url = shareInviteUrl();
     return '<section class="page me-page">' + meSubnav()
@@ -2300,6 +2391,7 @@
     if (meSub === "transactions") return meTransactions();
     if (meSub === "contests") return meContests();
     if (meSub === "share") return meShare();
+    if (meSub === "club") return meClub();
     return meHome();
   }
 
@@ -2309,9 +2401,9 @@
     return ''
       + '<section class="gate"><div class="gate-card">'
       +   logoImg("gate-logo")
-      +   '<p class="eyebrow">Whirled Classic</p>'
-      +   '<h1>Welcome to Whirled</h1>'
-      +   '<p>Play games, make friends, make stuff — classic whirled chrome, new engine.</p>'
+      +   '<p class="eyebrow">Whirled2</p>'
+      +   '<h1>Welcome to Whirled2</h1>'
+      +   '<p>Play games, make friends, make stuff — classic Whirled spirit, new engine — Whirled2.</p>'
       +   '<div class="gate-grid">'
       +     '<form id="register-form"><h2>It\'s free — create an account</h2>'
       +       '<input name="name" autocomplete="username" placeholder="Display name" required />'
@@ -2330,7 +2422,7 @@
     var me = you();
     return ''
       + '<header class="topbar">'
-      +   '<a class="brand" href="#rooms">' + logoImg("logo") + '<span class="sr-only">Whirled Classic</span></a>'
+      +   '<a class="brand" href="#rooms">' + logoImg("logo") + '<span class="sr-only">Whirled2</span></a>'
       +   '<nav class="tabs">' + [["me","Me"],["stuff","Stuff"],["games","Games"],["rooms","Rooms"],["groups","Groups"],["shop","Shop"]].map(function (t) {
             return '<button class="tab' + (t[0] === "rooms" ? " is-on" : "") + '" type="button" data-tab="' + t[0] + '">' + t[1] + '</button>';
           }).join("") + '</nav>'
@@ -2338,6 +2430,8 @@
       +     '<div class="row who-links">'
       +       '<button type="button" class="mail mail-btn" data-me="mail" title="Mail">&#9993; <u>(' + unreadCount() + ')</u></button>'
       +       '<b>' + esc(me.name) + '</b>'
+      +       '<span class="sep">|</span>'
+      +       '<button type="button" class="text-btn" data-me="club" title="Membership">Club</button>'
       +       '<span class="sep">|</span>'
       +       '<button type="button" class="text-btn" data-help-open="1">Help</button>'
       +       '<span class="sep">|</span>'
@@ -3562,12 +3656,28 @@
       } catch (e) {}
       mailRow.classList.remove("unread");
     }
+    var ped = ev.target.closest("[data-profile-edit]");
+    if (ped && session()) {
+      var sec = ped.getAttribute("data-profile-edit");
+      profileEditSection = (profileEditSection === sec) ? null : sec;
+      meSub = "profile";
+      viewingId = null;
+      paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-profile-edit-cancel]") && session()) {
+      profileEditSection = null;
+      meSub = "profile";
+      paint("me");
+      return;
+    }
     var meBtn = ev.target.closest("[data-me]");
     if (meBtn && session()) {
       meSub = meBtn.getAttribute("data-me") || "home";
       viewingId = null;
       occMenuId = null;
       galleryViewId = null; // sidebar Me links always show list/root, not a nested gallery
+      if (meSub !== "profile") profileEditSection = null;
       if (meSub !== "mail") window.__mailCompose = null;
       paint("me");
       return;
@@ -3618,6 +3728,7 @@
         s.user.photo = data;
         try { localStorage.setItem("whirled2.session", JSON.stringify(s)); } catch (e) {}
         meSub = "profile";
+        profileEditSection = null;
         paint("me");
       };
       img.src = String(reader.result || "");
@@ -3646,6 +3757,7 @@
         if (msg) msg.textContent = "Saved.";
         meSub = "profile";
         viewingId = null;
+        profileEditSection = null;
         paint("me");
       }).catch(function (e) { if (msg) msg.textContent = e.message; });
       return;
@@ -3661,6 +3773,7 @@
         pushNotice("status", you().name + " " + st);
       }
       meSub = "profile";
+      profileEditSection = null;
       paint("me");
       return;
     }
@@ -4082,6 +4195,22 @@
     var input = ev.target.querySelector("input");
     var text = input && input.value.trim();
     if (!text) return;
+    if (ev.target.id === "club-notify-form" && session()) {
+      var cf = new FormData(ev.target);
+      var email = String(cf.get("email") || "").trim().slice(0, 120);
+      var interested = !!ev.target.querySelector('[name="interested"]') && ev.target.querySelector('[name="interested"]').checked;
+      var sid = session().user.id;
+      try {
+        if (email) localStorage.setItem("whirled2.clubNotify." + sid, email);
+        else localStorage.removeItem("whirled2.clubNotify." + sid);
+        localStorage.setItem("whirled2.clubInterested." + sid, interested ? "1" : "0");
+      } catch (e) {}
+      var msg = document.getElementById("club-notify-msg");
+      if (msg) msg.textContent = interested
+        ? "Saved locally. We'll announce Club membership in Whirled2 when ready."
+        : "Interest cleared on this browser.";
+      return;
+    }
     if (ev.target.id === "chat-form") { pushChat(text); input.value = ""; }
   });
   document.addEventListener("keydown", function (ev) {

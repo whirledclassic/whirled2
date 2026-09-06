@@ -1,4 +1,4 @@
-# Whirled Classic — concept notes (wiki.whirled.club)
+# Whirled2 — concept notes (wiki.whirled.club)
 
 Whirled = social network + virtual world. Chrome tabs: **Me, Stuff, Games, Rooms, Groups, Shop**.
 
@@ -21,7 +21,7 @@ Whirled = social network + virtual world. Chrome tabs: **Me, Stuff, Games, Rooms
 
 The original Whirled server/client lived in **[greyhavens/msoy](https://github.com/greyhavens/msoy)** (BSD-licensed Java / GWT / Flash / ActionScript; build with `ant distall`, run `./bin/msoyserver`). Related libraries were extracted under **[threerings/orth](https://github.com/threerings/orth)**. Those repos are **reference only**.
 
-**Whirled Classic** (this web-mock) is a same-game revival: classic chrome + a new engine bridge (`window.WhirledChrome` / `#stage-slot`). It is **intentionally not a port** of msoy, not a Flash SWF rehost, and not a private-engine dump.
+**Whirled2** (this web-mock) is a same-game revival: classic chrome + a new engine bridge (`window.WhirledChrome` / `#stage-slot`). It is **intentionally not a port** of msoy, not a Flash SWF rehost, and not a private-engine dump.
 
 ## Chat UI (Slide vs Overlay)
 
@@ -30,3 +30,7 @@ Classic Chat Options (wiki Chat): **Slide chat** = own dark panel beside the roo
 ## Roles
 
 Staff vibe without purple/gold chrome: **Admin** (deeper blue + optional Agent label) and **Mod** (teal) via `whirled2.roles`. Local-only promote/demote on Account for admins. The `test` profile is always treated as admin.
+
+## Club / Membership
+
+**Coming Soon.** Inspired by classic Club Whirled (extra rooms, cosmetics, supporter perks) — listed as *may / subject to change*. Coins/bars stay labels; **no live payments**. Whirled2 is not affiliated with Three Rings or whirled.club; same-game-spirit revival on a new engine (greyhavens/msoy is reference only).

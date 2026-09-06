@@ -1385,3 +1385,114 @@ body > .party-panel {
   .chat-overlay { width: min(240px, 55%); }
   .chat-opts { display: inline-block; }
 }
+
+
+/* Club / Membership Coming Soon (20260905x) */
+.club-hero { position: relative; }
+.club-badge-soon {
+  display: inline-block;
+  background: #1e6fa8;
+  color: #fff;
+  font: 700 11px/1 var(--ui);
+  padding: 5px 10px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.club-may-list {
+  margin: 8px 0 12px;
+  padding-left: 1.2em;
+  color: #16324a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.club-may-list li { margin: 4px 0; }
+.club-disclaimer {
+  background: #f3f8fc;
+  border-color: #9bb8cc;
+}
+.club-disclaimer p { font-size: 13px; line-height: 1.45; color: #16324a; }
+.club-notify-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+.club-notify-form input[type="email"] {
+  border: 1px solid #b7d3e8;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font: 13px var(--ui);
+  width: 100%;
+  box-sizing: border-box;
+}
+.brand .logo, img.logo {
+  /* keep classic constrained size even if PNG is large */
+  width: 120px;
+  height: 48px;
+  object-fit: contain;
+}
+.gate-logo, img.gate-logo {
+  width: 180px;
+  max-height: 100px;
+  object-fit: contain;
+}
+
+
+/* Profile edit-on-demand (classic whirled.club vibe) */
+.edit-link {
+  border: 0;
+  background: transparent;
+  color: #1e6fa8;
+  font: 700 11px/1.2 var(--ui);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 8px;
+}
+.edit-link:hover, .edit-link.is-open { color: #0b4a78; }
+.cp-status-block {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 4px 0 8px;
+}
+.cp-edit-row { margin-top: 6px; text-align: center; }
+.cp-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.cp-section-head h2 { margin: 0; }
+.cp-edit-panel {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f4f9fc;
+  border: 1px solid #b7d3e8;
+  border-radius: 8px;
+  animation: cpEditIn 0.16s ease-out;
+}
+@keyframes cpEditIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.cp-edit-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #1e6fa8;
+  font-size: 13px;
+}
+.cp-edit-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+.edit-photo-pick { display: inline-flex; margin-top: 6px; }
+.info-form { max-width: 480px; }
