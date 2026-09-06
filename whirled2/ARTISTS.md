@@ -1,14 +1,22 @@
 # Artist terms
 
-Short version so nobody gets baited.
+Paid spots exist. Volunteer spots exist. You pick on the application.
 
-**Now:** volunteer / free. No contract hours. No guaranteed paycheck.
+Public page + form: [artists.html](https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html)
 
-**Later:** if Whirled 2 makes money, Josh pays from that money for work that shipped into the live world. Ship alone is not a paycheck. No money in = no pay.
+## Money
 
-**Either way:** credit in the repo and in the client when there is a credits screen.
+**Volunteer** — you work for credit and a seat on the project. No invoice.
 
-Public page + application form: [artists.html](https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html)
+**Paid** — you quote a rate on the form. Josh reviews the application and the quote. A paid yes is a written yes on a specific drop, not a salary.
+
+**Either way:** credit in the repo and on a credits screen when one exists.
+
+If you want long-term work: say so. Right now paid work is still **one-time payments per asset drop**. We stay in touch. Next batch = next one-time payment. There is no monthly retainer unless that is agreed later in writing.
+
+Applying is not a hire. Shipping a file is not a paycheck until Josh agrees to that drop.
+
+Original work only. No original Whirled shop items or ripped Flash assets.
 
 ## Roles
 
@@ -25,15 +33,13 @@ Apply for the parts you actually do. You can pick more than one.
 | Music / SFX | Original room loop or tiny UI sounds |
 | Other | Logo, loading, marketing stills — say it on the form |
 
-Style target: high-contrast, readable at game scale. Not purple-gold casino, not emoji sticker pack. Think editorial toybox, not gacha. UI must look like original whirled.com / whirled.club chrome (blue header, swirl, tabs). Do not restyle the product as a different brand.
+Style target: high-contrast, readable at game scale. Editorial toybox, not gacha. UI must look like original whirled.com / whirled.club chrome (blue header, swirl, tabs).
 
 ## How to apply
 
-1. Fill the form on the [artist page](https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html). It emails Josh with the subject `[W2 ARTIST]`.
-2. Optional: open a GitHub issue with the `artist` label (button on that page, or [this template](https://github.com/whirledclassic/whirled2/issues/new?template=artist-application.yml)).
+1. Fill the form on the [artist page](https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html). Choose volunteer or paid. If paid, put your rate and whether this drop is one-time or you want ongoing batches. Subject line: `[W2 ARTIST]`.
+2. Optional: open a GitHub issue with the `artist` label ([template](https://github.com/whirledclassic/whirled2/issues/new?template=artist-application.yml)).
 3. Attach a zip or a link. Name files clearly.
-
-Do not send original Whirled shop items or ripped Flash assets.
 
 ## License
 

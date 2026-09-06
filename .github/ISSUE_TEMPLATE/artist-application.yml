@@ -1,5 +1,5 @@
 name: Artist application
-description: Apply for avatar, room, UI, props, audio, or other art work on Whirled 2.
+description: Apply for volunteer or paid art work on Whirled 2.
 title: "[artist] "
 labels: ["artist", "whirled2"]
 body:
@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Read [ARTISTS.md](https://github.com/whirledclassic/whirled2/blob/main/whirled2/ARTISTS.md) first.
-        Volunteer now. Credit always. Pay only if the project makes money and the work shipped.
+        Paid spots exist. Volunteer spots exist. Pick one.
         No original Whirled shop items.
   - type: input
     id: handle
@@ -45,6 +45,33 @@ body:
         - Other
     validations:
       required: true
+  - type: dropdown
+    id: track
+    attributes:
+      label: Track
+      options:
+        - Volunteer (credit, no invoice)
+        - Paid spot (I will quote a rate)
+        - Open to either
+    validations:
+      required: true
+  - type: input
+    id: rate
+    attributes:
+      label: Rate for the first drop (if paid or open to either)
+      description: Example — $80 for one walk cycle, or $40 per prop.
+      placeholder: $
+  - type: dropdown
+    id: pay_shape
+    attributes:
+      label: How do you want to get paid?
+      options:
+        - Volunteer / not applicable
+        - One-time payment for this drop only
+        - Long-term — I get that it is still one-time payments per batch for now
+        - Would discuss a retainer later if the project can carry it
+    validations:
+      required: true
   - type: textarea
     id: first_drop
     attributes:
@@ -69,7 +96,7 @@ body:
     attributes:
       label: Terms
       options:
-        - label: I read ARTISTS.md. Volunteer now, credit always, pay only from real revenue later.
+        - label: I understand paid vs volunteer, applying is not a hire, and long-term paid work is still one-time payments per asset drop unless we agree otherwise in writing.
           required: true
   - type: textarea
     id: notes

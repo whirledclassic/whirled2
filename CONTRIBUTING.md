@@ -39,7 +39,7 @@ Read the terms and pick a role: [whirled2/ARTISTS.md](whirled2/ARTISTS.md).
 Apply here (email + optional GitHub issue):
 https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html
 
-Same money line as code: volunteer now, credit always, pay only from real revenue later.
+Paid and volunteer tracks both exist. Quote a rate if you want paid. Long-term still means one-time payments per asset drop unless agreed otherwise in writing.
 
 ## Code style (Whirled 2)
 
