@@ -1,0 +1,78 @@
+name: Artist application
+description: Apply for avatar, room, UI, props, audio, or other art work on Whirled 2.
+title: "[artist] "
+labels: ["artist", "whirled2"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [ARTISTS.md](https://github.com/whirledclassic/whirled2/blob/main/whirled2/ARTISTS.md) first.
+        Volunteer now. Credit always. Pay only if the project makes money and the work shipped.
+        No original Whirled shop items.
+  - type: input
+    id: handle
+    attributes:
+      label: Name / handle
+    validations:
+      required: true
+  - type: input
+    id: email
+    attributes:
+      label: Email
+      description: Josh uses this to reply. It will be visible on this issue.
+    validations:
+      required: true
+  - type: input
+    id: portfolio
+    attributes:
+      label: Portfolio link
+      placeholder: https://
+    validations:
+      required: true
+  - type: dropdown
+    id: roles
+    attributes:
+      label: Roles
+      multiple: true
+      options:
+        - Avatar
+        - Room / environment
+        - Furniture / props
+        - UI / chrome
+        - Shop / items
+        - Animator
+        - Music / SFX
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: first_drop
+    attributes:
+      label: First drop you would actually make
+      description: One room, one walk cycle, 4 props — not a whole catalog.
+    validations:
+      required: true
+  - type: dropdown
+    id: license
+    attributes:
+      label: License if we ship it
+      options:
+        - Repo license is fine
+        - CC-BY
+        - CC-BY-SA
+        - Written grant, ask me first
+        - Not sure yet
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Terms
+      options:
+        - label: I read ARTISTS.md. Volunteer now, credit always, pay only from real revenue later.
+          required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Tools, hours you can spare, Discord handle.
