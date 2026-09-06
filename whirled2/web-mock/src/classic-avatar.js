@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906ci
+ * Cache: ?v=20260906cj
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906ci";
+  var VERSION = "20260906cj";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -66,9 +66,9 @@
   // demo-qa.swf = Ruffle paint smoke ONLY (no AvatarControl). Walk QA uses BODY_DEMO below.
   var RUFFLE_DEMO_SWF = "./assets/ruffle/demo-qa.swf";
   var BODY_DEMO_SWF = "./assets/avatars/flash-qa/demo-avatar.swf"; // controlConnect + appearanceChanged_v2
-  var BODY_DEMO_SWF_ALT = "./assets/ruffle/demo-avatar.swf"; // (?v=20260906ci) mirror — Pages must 200
+  var BODY_DEMO_SWF_ALT = "./assets/ruffle/demo-avatar.swf"; // (?v=20260906cj) mirror — Pages must 200
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906ci): COMPANION-ONLY nest; stand = PNG/tofu SVG NEVER letter glyph.
+  // How this works (?v=20260906cj): COMPANION-ONLY nest; stand = PNG/tofu SVG NEVER letter glyph.
   // Beginner: we load OUR tiny host.swf first; your avatar is rebuilt inside it from bytes.
   // Stand thumb covers the host (opacity 1) until bridge "connected" — never a blank loft.
   // ENGINE DEV: cg dual-layer raced loftActivePlayer + EI silent-miss → never connected.
@@ -527,7 +527,7 @@
     catch (e) { return RUFFLE_DEMO_SWF; }
   }
   function getBodyDemoSwfUrl() {
-    // (?v=20260906ci) AvatarControl mimic — floor click → hostWalk → green walk pose.
+    // (?v=20260906cj) AvatarControl mimic — floor click → hostWalk → green walk pose.
     try { return new URL(BODY_DEMO_SWF + "?v=" + VERSION, global.location.href).href; }
     catch (e) { return BODY_DEMO_SWF; }
   }
@@ -536,7 +536,7 @@
     catch (e) { return BODY_DEMO_SWF_ALT; }
   }
   function standTofuHtml() {
-    // (?v=20260906ci) CRITICAL: never paint a lonely letter "T" as the loft avatar.
+    // (?v=20260906cj) CRITICAL: never paint a lonely letter "T" as the loft avatar.
     // Beginner: no stand PNG yet → tiny tofu face cover (NOT grey initial glyph).
     return '<div class="classic-swf-stand-tofu" aria-hidden="true" title="Stand cover — waiting for Flash">'
       + '<svg viewBox="0 0 64 80" width="64" height="80" focusable="false">'
@@ -593,7 +593,7 @@
       player.setAttribute("data-classic-ruffle", "1");
       player.setAttribute("data-wmode", "transparent");
       if (loftMount) player.setAttribute("data-loft-ruffle", "1");
-      // (?v=20260906ci) CRITICAL: keep stand PNG or tofu-SVG — NEVER restore letter glyph.
+      // (?v=20260906cj) CRITICAL: keep stand PNG or tofu-SVG — NEVER restore letter glyph.
       // Beginner: keep last thumb under Ruffle until SWF paints; restore on fail.
       // ENGINE DEV: innerHTML="" was the overnight tofu bug after ?v=bs.
       var savedStand = null;
@@ -711,7 +711,7 @@
     if (item.swfUrl && (/^(blob:|data:|https?:|\.\/|\/)/i.test(item.swfUrl))) {
       return Promise.resolve(item.swfUrl);
     }
-    // (?v=20260906ci) flashQa / durable mirror path when primary missing
+    // (?v=20260906cj) flashQa / durable mirror path when primary missing
     if (item.swfUrlAlt && (/^(blob:|data:|https?:|\.\/|\/)/i.test(item.swfUrlAlt))) {
       return Promise.resolve(item.swfUrlAlt);
     }
@@ -1513,7 +1513,7 @@
       });
     }
     // Prefer DataLoadOptions ArrayBuffer (official) over blob: URL for remount too.
-    // (?v=20260906ci) If primary URL 404s, fall through to demo-avatar / demo-qa so loft never tofu+T.
+    // (?v=20260906cj) If primary URL 404s, fall through to demo-avatar / demo-qa so loft never tofu+T.
     return tryMountUrl(url).catch(function (err1) {
       logAvatarDebug("remountDirect primary fail — try body demo", err1 && err1.message);
       var alt = null;
@@ -1554,7 +1554,7 @@
         // Companion-ONLY or no DIRECT left → remount avatar DIRECT (chrome bob fallback)
         remountDirectAvatarImmediate("watchdog-no-connected:" + String(reasonTag || ""));
       }
-    }, 3200); // (?v=20260906ci) faster DIRECT remount — empty host must not linger as junk UI
+    }, 3200); // (?v=20260906cj) faster DIRECT remount — empty host must not linger as junk UI
   }
 
   /**
@@ -2743,7 +2743,7 @@
   }
 
   function ensureStandFallback(slot, worn, reason) {
-    // (?v=20260906ci): always leave SOMETHING visible — stand PNG/thumb, else tofu SVG. Never blank loft.
+    // (?v=20260906cj): always leave SOMETHING visible — stand PNG/thumb, else tofu SVG. Never blank loft.
     // Beginner: NEVER a lonely letter "T" grey box overlapping the loft.
     // ENGINE DEV: companion-cover / mounting are SOFT (not is-failed). Hard-fail only on real mount death.
     if (!slot) return;

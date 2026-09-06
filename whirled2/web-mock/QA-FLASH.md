@@ -1,8 +1,8 @@
-# QA-FLASH — Flash / loft interact checklist (?v=20260906ci)
+# QA-FLASH — Flash / loft interact checklist (?v=20260906cj)
 
 Dual modes: `playbackMode` png-hybrid|ruffle. **ci** = no letter-glyph stand; `demo-avatar.swf` on Pages (flash-qa + ruffle); companion-only fail→DIRECT. **ch** companion-only nest.
 
-## Success criteria (?v=20260906ci)
+## Success criteria (?v=20260906cj)
 
 0. Loft NEVER shows grey letter "T" (or any initial glyph) as the avatar.
 1. Worn Classic Flash never blank loft — stand PNG/tofu-SVG cover until connected, or DIRECT outer SWF.
@@ -21,4 +21,4 @@ curl -sI https://whirledclassic.github.io/whirled2/whirled2/web-mock/assets/avat
 WHIRLED_DO_PUSH=1 node /tmp/push-ci.js
 ```
 
-Live: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ci&flashQa=1&avatarDebug=1
+Live: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906cj&flashQa=1&avatarDebug=1

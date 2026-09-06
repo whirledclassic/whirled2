@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ci";
+  var LOGO_V = "20260906cj";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2189,7 +2189,7 @@
 
 
   function classicRuffleWearHtml(worn, posStyle) {
-    // (?v=20260906ci): Always mount Ruffle companion host + hitbox/nameplate + stand PNG OR tofu SVG.
+    // (?v=20260906cj): Always mount Ruffle companion host + hitbox/nameplate + stand PNG OR tofu SVG.
     // Beginner: never blank when a .swf is worn; NEVER a grey letter "T" glyph as the loft avatar.
     // ENGINE DEV: data-swf-sha1 on host; PE none on Ruffle; hitbox owns emotes; stand survives mountRuffle.
     var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
@@ -2452,10 +2452,13 @@
   function chromeWalkTo(xPct, yPct) {
     // Animate billboard toward floor click. Walk frames while moving; idle on arrive.
     // How this works (?v=20260906bb): Hybrid PNG swaps walk frames (Whirl path). SWF-only MOVES the
-    // billboard + synthesized bob/flip (Ruffle PE none). Never tofu mid-walk.
+    // billboard + synthesized bob/flip (Ruffle PE none). (?v=20260906cj): tofu walks via CSS legs.
     // (?v=20260906cd): notifyLoftWalk(true) at START keeps loftHostState.moving until arrive → hostWalk(false).
     // Beginner: Flash walk plays the whole floor trek. ENGINE DEV: classic-avatar ticks locX ~100ms.
-    if (isEngineMountedOnStage()) return; // ENGINE DEV: yield to Pixi
+    // (?v=20260906cj): do not abort when Pixi canvas exists — Wear overlay still walks.
+    // ENGINE DEV: opt out with #stage-slot[data-engine-owns-avatar-walk="1"].
+    var slotOwn = document.getElementById("stage-slot");
+    if (slotOwn && slotOwn.getAttribute("data-engine-owns-avatar-walk") === "1") return;
     var layer = document.getElementById("avatar-wear-layer");
     var bill = layer && layer.querySelector(".avatar-wear-billboard");
     if (!bill || !layer.classList.contains("is-on")) return;
@@ -2463,7 +2466,10 @@
     // How this works (?v=20260906bl): SWF/Ruffle loft must walk even if tofu flag wrongly set.
     var layerIsSwf = !!(layer.classList.contains("is-swf") || layer.getAttribute("data-playback") === "ruffle");
     if (!worn) return;
-    if (worn.isTofu && !layerIsSwf && !(worn.swfUrl || worn.swfSha1 || worn.swfDataUrl)) return;
+    // (?v=20260906cj): tofu MUST walk — old early-return killed floor click for default Wear.
+    // Beginner: tofu uses CSS leg cycle; Classic Flash still uses notifyLoftWalk / hostWalk.
+    // ENGINE DEV: only skip when engine owns stage; tofu + SWF both animate now.
+    var tofuWalkOnly = !!(worn.isTofu && !layerIsSwf && !(worn.swfUrl || worn.swfSha1 || worn.swfDataUrl));
     xPct = Math.max(8, Math.min(92, xPct));
     yPct = Math.max(55, Math.min(92, yPct)); // floor band
     chromeWalkTarget = { xPct: xPct, yPct: yPct, at: new Date().toISOString() };
@@ -2496,6 +2502,11 @@
       }
     } catch (eAct0) {}
     try {
+      try {
+        bill.classList.add("is-walking");
+        layer.classList.add("is-walking");
+        if (tofuWalkOnly) bill.classList.add("is-tofu-walk");
+      } catch (eWalkOn) {}
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.notifyLoftWalk) {
         WhirledClassicAvatar.notifyLoftWalk(true, face);
       } else if (useSwfMotion && window.WhirledClassicAvatar && WhirledClassicAvatar.setLoftWalkMotion) {
@@ -2510,6 +2521,10 @@
     function clearSwfMotion() {
       try {
         if (window.WhirledClassicAvatar) {
+          try {
+            bill.classList.remove("is-walking", "is-tofu-walk");
+            layer.classList.remove("is-walking");
+          } catch (eWalkOff) {}
           if (WhirledClassicAvatar.notifyLoftWalk) {
             WhirledClassicAvatar.notifyLoftWalk(false, face);
           } else if (WhirledClassicAvatar.setLoftWalkMotion) {
@@ -2519,9 +2534,12 @@
       } catch (eCl) {}
     }
     function step(now) {
-      if (isEngineMountedOnStage()) {
+      // (?v=20260906cj): keep chrome Wear walk alive while Pixi canvas exists.
+      if (document.getElementById("stage-slot")
+          && document.getElementById("stage-slot").getAttribute("data-engine-owns-avatar-walk") === "1") {
         setAvatarState("idle");
         clearSwfMotion();
+        try { bill.classList.remove("is-walking", "is-tofu-walk"); layer.classList.remove("is-walking"); } catch (eOw) {}
         chromeWalkRaf = 0;
         return;
       }
@@ -2544,7 +2562,9 @@
   }
   function onStageHostWalkClick(ev) {
     // Beginner: tap the floor (lower stage), not the chat strip / buttons.
-    if (isEngineMountedOnStage()) return;
+    // (?v=20260906cj): keep Wear walk even when Pixi canvas is in #stage-slot.
+    if (document.getElementById("stage-slot")
+        && document.getElementById("stage-slot").getAttribute("data-engine-owns-avatar-walk") === "1") return;
     if (decorateMode) return;
     var host = ev.currentTarget;
     if (!host || !host.classList.contains("stage-host")) return;
@@ -2561,11 +2581,15 @@
     chromeWalkTo(xPct, yPct);
   }
   function bindChromeClickToWalk() {
-    // How this works: one listener on .stage-host; no canvas in #stage-slot for chrome walk.
-    // ENGINE DEV: if engine mounted, do not bind / remove listener so Pixi owns pointer.
+    // How this works (?v=20260906cj): ALWAYS bind chrome floor-click for #avatar-wear-layer.
+    // Beginner: tofu / PNG / Classic Flash Wear must walk even if a Pixi canvas sits in #stage-slot.
+    // ENGINE DEV: old yield-to-Pixi unbound the listener whenever canvas existed → zero walk anim.
+    // Pixi still reads getAvatarWalkTarget(); set data-engine-owns-avatar-walk on #stage-slot to opt out.
     var host = document.querySelector(".stage-host");
     if (!host) return;
-    if (isEngineMountedOnStage()) {
+    var slot = document.getElementById("stage-slot");
+    var engineOwnsAvatar = !!(slot && slot.getAttribute("data-engine-owns-avatar-walk") === "1");
+    if (engineOwnsAvatar) {
       if (host._chromeWalkBound) {
         host.removeEventListener("click", onStageHostWalkClick);
         host._chromeWalkBound = false;
@@ -2855,13 +2879,14 @@
   }
   function tofuSvgHtml(cls) {
     // Classic default “tofu” blank avatar — soft beige block with simple face.
-    // Beginner: if you have not Worn a pack yet, the loft shows this placeholder.
+    // Beginner (?v=20260906cj): loft tofu NOW walks on floor click (legs + bob). Was previously blocked.
+    // ENGINE DEV: .tofu-leg-l / .tofu-leg-r + .is-walking on billboard drive CSS keyframes — no PNG pack needed.
     cls = cls || "tofu-avatar";
     return '<div class="' + cls + '" role="img" aria-label="Default tofu avatar">'
       + '<svg viewBox="0 0 64 80" width="100%" height="100%" aria-hidden="true" focusable="false">'
-      +   '<rect x="10" y="4" width="44" height="52" rx="8" fill="#f0e6d2" stroke="#c4a882" stroke-width="2"/>'
-      +   '<rect x="18" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
-      +   '<rect x="34" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/>'
+      +   '<rect class="tofu-body" x="10" y="4" width="44" height="52" rx="8" fill="#f0e6d2" stroke="#c4a882" stroke-width="2"/>'
+      +   '<g class="tofu-leg-l"><rect x="18" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/></g>'
+      +   '<g class="tofu-leg-r"><rect x="34" y="56" width="12" height="18" rx="3" fill="#e8dcc4" stroke="#c4a882" stroke-width="1.5"/></g>'
       +   '<circle cx="24" cy="26" r="3" fill="#8a7048"/>'
       +   '<circle cx="40" cy="26" r="3" fill="#8a7048"/>'
       +   '<path d="M26 38c2.5 3 9.5 3 12 0" fill="none" stroke="#8a7048" stroke-width="2" stroke-linecap="round"/>'
@@ -12270,7 +12295,11 @@
       },
       listAvatarEmotes: function () { return listAvatarEmotes(); },
       getAvatarWalkTarget: function () { return getAvatarWalkTarget(); },
-      isChromeWalkActive: function () { return !isEngineMountedOnStage() && !!document.querySelector(".stage-host.chrome-walk-ready"); },
+      isChromeWalkActive: function () {
+        var slot = document.getElementById("stage-slot");
+        if (slot && slot.getAttribute("data-engine-owns-avatar-walk") === "1") return false;
+        return !!document.querySelector(".stage-host.chrome-walk-ready");
+      },
       // (?v=20260906cd): avatar setLocation_v1 bridge → chromeWalkTo (logical x*100 → %).
       chromeWalkTo: function (xPct, yPct) { return chromeWalkTo(xPct, yPct); },
       // How this works (?v=20260906bd): debug/UX — 'png-hybrid' | 'ruffle' | 'tofu' | 'png'
@@ -13165,7 +13194,7 @@
         wearStuffAvatar(seeded);
         return { mode: "seeded", id: seeded.id };
       }
-      // (?v=20260906ci) Prefer Body demo (AvatarControl mimic). Mirror under assets/ruffle/ too.
+      // (?v=20260906cj) Prefer Body demo (AvatarControl mimic). Mirror under assets/ruffle/ too.
       // demo-qa.swf = paint-only last resort. Stand thumb = tiny SVG so cover is NEVER letter "T".
       var demoUrl = "./assets/avatars/flash-qa/demo-avatar.swf?v=" + LOGO_V;
       try {

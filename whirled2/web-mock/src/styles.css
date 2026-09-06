@@ -7343,7 +7343,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906ci — Stand cover = PNG/thumb OR tofu SVG — NEVER letter glyph
+   ?v=20260906cj — Stand cover = PNG/thumb OR tofu SVG — NEVER letter glyph
    Beginner: grey rounded "T" box was junk overlapping tofu. Retired.
    ENGINE DEV: classic-swf-stand-tofu mirrors stand-thumb z-index rules.
    ========================================================================== */
@@ -7390,4 +7390,39 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 .avatar-ruffle-host.is-companion-connected.is-playing .classic-swf-stand-tofu {
   opacity: 0.35 !important;
   z-index: 0 !important;
+}
+
+
+/* === TOFU WALK CJ === */
+/* Beginner (?v=20260906cj): default tofu click-to-walk animates legs + bob — was frozen before. */
+/* ENGINE DEV: toggled via .avatar-wear-billboard.is-walking / .is-tofu-walk from app.js. */
+.avatar-wear-billboard.is-walking .tofu-avatar,
+.avatar-wear-billboard.is-tofu-walk .tofu-avatar {
+  animation: tofu-walk-bob 0.28s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.avatar-wear-billboard.is-walking .tofu-leg-l,
+.avatar-wear-billboard.is-tofu-walk .tofu-leg-l {
+  transform-origin: 24px 56px;
+  animation: tofu-leg-l 0.28s ease-in-out infinite;
+}
+.avatar-wear-billboard.is-walking .tofu-leg-r,
+.avatar-wear-billboard.is-tofu-walk .tofu-leg-r {
+  transform-origin: 40px 56px;
+  animation: tofu-leg-r 0.28s ease-in-out infinite;
+}
+@keyframes tofu-walk-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes tofu-leg-l {
+  0%, 100% { transform: rotate(12deg); }
+  50% { transform: rotate(-14deg); }
+}
+@keyframes tofu-leg-r {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(14deg); }
+}
+.avatar-wear-layer.is-tofu .avatar-wear-billboard.is-walking {
+  /* keep face flip via --wear-face */
 }
