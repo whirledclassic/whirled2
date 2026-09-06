@@ -1,22 +1,22 @@
 # Stuff avatars (Aseprite / PNG packs)
 
 **Audience:** beginners + ENGINE DEV  
-**Cache:** `?v=20260906al` (`LOGO_V`)  
-**Status:** Sprite-pack Wear + Stuff **Avatar viewer** (preview + scale). Classic **SWF / Ruffle** wardrobe stays **On hold** (`AVATAR-IMPORT.md`, unlock only with `?avatarLab=1`).  
+**Cache:** `?v=20260906ao` (`LOGO_V`)  
+**Status:** Unified **Cyan Hair** Wearable (idle+walk+pose) + chrome **click-to-walk**. Classic **SWF / Ruffle** wardrobe stays **On hold** (`AVATAR-IMPORT.md`, unlock only with `?avatarLab=1`).  
 **Fidelity notes:** [AVATAR-STUFF-FIDELITY.md](./AVATAR-STUFF-FIDELITY.md)
 
-## Beginner — upload, preview & Wear
+## Beginner — upload, Wear & walk
 
-Classic whirled.club avatars were mostly **Flash SWF**. Whirled2’s modern path (until engine Ruffle) is a **sprite pack**:
+Classic whirled.club avatars were mostly **Flash SWF**. Whirled2’s modern path (until engine Ruffle) is a **sprite pack with states**:
 
 1. Open **Stuff → Avatars**.
 2. Either:
-   - **Add user packs to Stuff** (imports converted packs from `assets/avatars/user-pack/`), or
-   - **Upload…** a **PNG/WebP** preview (classic thumb size ~**80×60** is fine). Optionally attach the source **`.aseprite`** file (stored as a pack attachment; not played in the room).
-3. Open the inventory card → **Avatar viewer** (big loft-style preview). Drag **Scale**. Tap **Wear avatar** (happy face).
-4. Or use **Wear avatar** on the list card without opening detail.
-5. Go to **Rooms → Enter** your loft. Soft **placeholder loft** backdrop + your sprite on `#avatar-wear-layer`. If nothing is worn, you see default **tofu**.
-6. **Take off** / **Remove avatar** clears the pack (loft falls back to tofu). **Wear default tofu** forces the blank avatar.
+   - **Add Cyan Hair to Stuff** (imports the unified pack from `assets/avatars/user-pack/cyan-hair/`), or
+   - **Upload…** idle PNG(s) + optional walk PNG(s) (multi-select). Optionally attach `.aseprite` source(s).
+3. Open the inventory card → **Avatar viewer** → **Wear avatar** (happy face).
+4. Go to **Rooms → Enter** your loft. Soft loft backdrop + your sprite on `#avatar-wear-layer`.
+5. **Click the loft floor** → avatar walks there (walk frames), then returns to idle. Face flips left/right.
+6. **Take off** / **Wear default tofu** as needed.
 
 Copyright checkbox is required on upload. Only upload art you created or have rights to use.
 
@@ -30,26 +30,33 @@ Click **yourself** in the occupant rail → **Change avatar…** → recent 5 pa
 |-------|------|
 | `#stage-slot` | Soft loft **placeholder** until Pixi mounts. **Not** changed by Wear media. |
 | `#decorate-layer` | Furniture / images you place via Decorate. |
-| **`#avatar-wear-layer`** | **Worn Stuff avatar** — PNG preview / multi-frame flip / tofu. Scale from Stuff. |
+| **`#avatar-wear-layer`** | **Worn Stuff avatar** — PNG states / multi-frame flip / tofu. Chrome click-to-walk until engine mounts. |
 | `#stage-bubbles` | Temporary speech/thought chrome. |
 
 No Ruffle, no SWF in the loft for this path. Lab “Wear (lab only)” still only sets wardrobe `activeId` and does **not** change the room.
 
-## Pack format (`pack.json`)
+## Unified pack format (`pack.json`)
 
 ```json
 {
-  "name": "Cyan Hair Idle",
-  "frames": ["frames/frame_00.png", "frames/frame_01.png"],
+  "name": "Cyan Hair",
+  "slug": "cyan-hair",
+  "states": {
+    "idle": { "frames": ["frames/idle/frame_00.png", "frames/idle/frame_01.png"], "frameDurationsMs": [200, 200] },
+    "walk": { "frames": ["frames/walk/frame_00.png", "..."], "frameDurationsMs": [200, 200, 200, 200] },
+    "stand": { "frames": ["frames/stand/frame_00.png"], "frameDurationsMs": [833] },
+    "pose": { "frames": ["frames/pose/frame_00.png", "frames/pose/frame_01.png"], "frameDurationsMs": [833, 833] }
+  },
   "thumb": "thumb.png",
-  "source": "aseprite"
+  "preview": "preview.png",
+  "source": "aseprite-unified"
 }
 ```
 
-Extra fields used by this mock: `preview`, `displayFrames`, `frameDurationsMs`, `sourceFile`, `sourceSha1`, `layers`.
+Legacy single-state packs still work (treated as `idle` only).
 
-**Beginner:** `thumb` ≈ classic Stuff thumbnail; `preview` / `displayFrames` are what Wear + the viewer show.  
-**ENGINE DEV:** chrome reads Wear state via `WhirledChrome.getWornAvatar()`. Do not mount `.aseprite` or SWF into `#stage-slot`. Pixi may later own the avatar sprite inside the stage.
+**Beginner:** Wear Cyan Hair, then click the floor to walk.  
+**ENGINE DEV:** `WhirledChrome.getWornAvatar()` exposes `states`; `setAvatarState` / `getAvatarWalkTarget` for chrome walk. When `mountWhirledEngine(host)` owns `#stage-slot`, chrome walk disables. Pixi Player can later consume the same JSON. Prefer `resizeTo: host`.
 
 ## Scale persistence
 
@@ -57,22 +64,24 @@ Extra fields used by this mock: `preview`, `displayFrames`, `frameDurationsMs`, 
 
 ## Converted user packs
 
-|Slug|Frames|Notes|
-|----|------|-----|
-|`char-a-dress-idle`|2|Idle|
-|`char-b-dress-walk`|4|Walk cycle|
-|`char-c-dress-stand`|1|Stand|
-|`char-d-dress-pose`|2|Pose|
+|Slug|Notes|
+|----|-----|
+|**`cyan-hair`**|**Preferred unified Wearable** — idle + walk + stand + pose|
+|`char-a-dress-idle`|Part (idle) — optional|
+|`char-b-dress-walk`|Part (walk) — optional|
+|`char-c-dress-stand`|Part (stand) — optional|
+|`char-d-dress-pose`|Part (pose) — optional|
 
-Output: `assets/avatars/user-pack/<slug>/…` + `index.json`. Re-export: `scripts/export_aseprite_avatars.py`.
+Output: `assets/avatars/user-pack/<slug>/…` + `index.json`. Re-export parts: `scripts/export_aseprite_avatars.py`.
 
 ## Coming Soon
 
 - SWF states / custom actions / Ruffle in loft (lab locked).
 - Viewer sound + idle/sleep icons (classic chrome).
+- Pixi-owned walk inside `#stage-slot` (replaces chrome click-to-walk).
 
 ## Do not
 
-- Do not push unless instructed.
 - Do not unlock avatar lab for normal users.
 - Do not scrape whirled.club shop media.
+- Do not put engine canvas outside `#stage-slot`.
