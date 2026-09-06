@@ -1,3 +1,11 @@
+## What shipped (?v=20260906bx)
+
+- **Flash sync path:** companion host `hostLoadBytes(base64)` → AS3 `Loader.loadBytes` → `controlConnect` → `appearanceChanged_v2` (club-like walk)
+- Chunked EI: `hostLoadBytesBegin/Chunk/Commit` for large IDB avatars; `hostLoadUrl` only for http(s)
+- Mount: companion-first when bytes/url ready; watchdog / bridge error → DIRECT Ruffle (never blank forever)
+- Preserve: bw reliability, bu host SWF, bt never-tofu, bg dual Wear, Whirl
+- Cache: **`?v=20260906bx`**. Push: `/tmp/push-bx.js`.
+
 ## What shipped (?v=20260906bw)
 
 - **Flash Wear RELIABILITY:** IDB `blob:` avatars skip broken companion nest → **DIRECT outer Ruffle** (always visible) + chrome bob walk. Nested `Loader.load(blob|data)` rejected by Ruffle research.

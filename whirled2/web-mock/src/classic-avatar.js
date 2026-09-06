@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906bw
+ * Cache: ?v=20260906bx
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906bw";
+  var VERSION = "20260906bx";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -27,11 +27,12 @@
   var THUMB_MAX_BYTES = 1 * 1024 * 1024;
   var RUFFLE_CDN = "https://unpkg.com/@ruffle-rs/ruffle";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906bw): Classic Flash reliability FIRST.
+  // How this works (?v=20260906bx): Classic Flash reliability FIRST.
   // ROOT BREAK (bu/bv): nested AS3 Loader cannot load blob:/data: under Ruffle → blank loft forever.
   // FIX: outer Ruffle loads host.swf (http); avatar bytes via hostLoadBytes(base64) → Loader.loadBytes.
-  // blob:/IDB Wear: mount DIRECT primary FIRST (always visible + chrome bob). Companion only when
-  // we have base64 bytes for hostLoadBytes. http(s) avatars may use hostLoadUrl. Watchdog ~2s → DIRECT.
+  // blob:/IDB Wear: companion host + hostLoadBytes(base64) → Loader.loadBytes (REAL walk sync).
+  // DIRECT fallback if no b64 / mount fail / ~2s watchdog / bridge error. http(s) may use hostLoadUrl.
+  // Stand thumb preserved while companion pending so loft is never blank.
   // Never set loftUsesCompanionHost until bridge "connected". Keep stand thumb (bt).
   // LIVE whirled.club: ActorSprite → appearanceChanged_v2 → Body state_*_walking (+ gotControl_v1).
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
@@ -693,7 +694,7 @@
     if (!layer) return;
     var bill = layer.querySelector(".avatar-wear-billboard");
     var host = layer.querySelector("#avatar-ruffle-host, .avatar-ruffle-host");
-    // (?v=20260906bw): Body (uravatar) flips via orient<180 → scaleX=-1. When companion host
+    // (?v=20260906bx): Body (uravatar) flips via orient<180 → scaleX=-1. When companion host
     // is connected, do NOT also CSS-flip the ruffle host (double-flip = moonwalk). Fallback
     // direct-avatar path still uses --wear-face on host bob keyframes (bt).
     var companionFacing = !!(loftUsesCompanionHost && loftHostState.connected);
@@ -794,7 +795,7 @@
    * logs what the SWF tries (?avatarDebug=1). Chrome always moves the billboard + bob.
    */
 
-  // (?v=20260906bw): companion host nest — outer Ruffle = host.swf (http); avatar via hostLoadBytes.
+  // (?v=20260906bx): companion host nest — outer Ruffle = host.swf (http); avatar via hostLoadBytes.
   // Beginner: host.swf is OUR tiny Flash wrapper — not your avatar. It rebuilds your SWF from base64 bytes.
   // ENGINE DEV: nested Loader.load(blob:/data:) FAILS under Ruffle. Use Loader.loadBytes(ByteArray) only.
   // EI cannot pass ByteArray — JS sends base64 (chunked if huge). http(s) may still use hostLoadUrl.
@@ -976,11 +977,15 @@
   }
 
   /**
-   * (?v=20260906bw) Decide companion load strategy.
+   * (?v=20260906bx) Decide companion load strategy.
    * - blob:/data: → NEVER hostLoadUrl (nested Loader fails). Need base64 → hostLoadBytes, else skip companion.
    * - http(s)/relative → hostLoadUrl OK.
    * Returns { ok, mode: 'bytes'|'url'|'skip', b64?, url?, reason }
    */
+  function prepareCompanionStrategy(avatarUrl, item) {
+    return prepareCompanionPayload(avatarUrl, item);
+  }
+
   function prepareCompanionPayload(avatarUrl, item) {
     var url = avatarUrl || "";
     if (/^https?:/i.test(url) || (/^\.?\//.test(url) && url.indexOf("blob:") !== 0)) {
@@ -1042,7 +1047,7 @@
   }
 
   function remountDirectAvatarImmediate(reason, slotOpt, urlOpt, wornOpt, loftOptsOpt) {
-    // (?v=20260906bw) CRITICAL: empty companion host → remount the real avatar SWF (blob: OK for outer Ruffle).
+    // (?v=20260906bx) CRITICAL: empty companion host → remount the real avatar SWF (blob: OK for outer Ruffle).
     if (loftFallbackInFlight) {
       logAvatarDebug("remountDirect skipped (in flight)", reason);
       return Promise.resolve(null);
@@ -1415,7 +1420,7 @@
   }
 
   function attachLoftAvatarHost(player, container) {
-    // (?v=20260906bw): attach after companion host OR direct-avatar mount.
+    // (?v=20260906bx): attach after companion host OR direct-avatar mount.
     loftActivePlayer = player;
     loftHostState.connected = false;
     installWhirledAvatarHostBridge();
@@ -1476,7 +1481,7 @@
   }
 
   function notifyLoftWalk(moving, orientHint) {
-    // (?v=20260906bw): chrome bob ALWAYS; companion hostWalk drives in-SWF walk scenes.
+    // (?v=20260906bx): chrome bob ALWAYS; companion hostWalk drives in-SWF walk scenes.
     // Beginner: floor click moves your billboard AND tells the SWF to play walking frames.
     // ENGINE DEV: hostWalk → appearanceChanged_v2(loc, orient, moving, sleeping) → Body
     // state_<state>_walking (fallback state_Default_walking). Orient: face±1 → 90/270.
@@ -1530,7 +1535,7 @@
   }
 
   function notifyLoftEmote(actionName) {
-    // (?v=20260906bw): prefer companion hostEmote → messageReceived_v1(ACTION_TRIGGERED).
+    // (?v=20260906bx): prefer companion hostEmote → messageReceived_v1(ACTION_TRIGGERED).
     actionName = String(actionName || "wave");
     var pretty = actionName.charAt(0).toUpperCase() + actionName.slice(1);
     try {
@@ -1559,6 +1564,7 @@
       hostSwf: getCompanionHostSwfUrl(),
       avatarUrl: !!(loftPendingAvatarUrl || loftHostState.avatarUrl),
       hostLoadUrlKind: loftHostState._hostLoadUrl ? String(loftHostState._hostLoadUrl).slice(0, 48) : null,
+      hostLoadBytesLen: loftPendingAvatarB64 ? loftPendingAvatarB64.length : 0,
       state: {
         connected: loftHostState.connected,
         moving: loftHostState.moving,
@@ -1581,9 +1587,9 @@
   function describeAvatarControlNextSteps() {
     return {
       whyIdle: "Stock Whirled SWFs dispatch ConnectEvent type controlConnect on loaderInfo.sharedEvents (NOT ExternalInterface).",
-      protocol: "Nested host: Ruffle loads avatar-host.swf → hostLoadUrl(avatar) → Loader + sharedEvents controlConnect → hostProps → gotControl_v1 → appearanceChanged_v2.",
+      protocol: "Nested host: Ruffle loads avatar-host.swf (http) → hostLoadBytes(base64) → Loader.loadBytes → sharedEvents controlConnect → hostProps → gotControl_v1 → appearanceChanged_v2. http(s) avatars may use hostLoadUrl.",
       liveClub: "whirled.club world-client: ActorSprite floor move → appearanceChanged_v2(loc,orient,moving,sleeping) → Body state_*_walking / towalking / fromwalking. Embed allowScriptAccess sameDomain; nested avatar inside host SWF (same nest as ours).",
-      whatWorksNow: "bv RELIABILITY: direct Ruffle avatar is the guaranteed path. Companion nest tried after blob→data:; 1.8s watchdog / bridge error → remount DIRECT. Floor chrome bob always; hostWalk bonus if connected.",
+      whatWorksNow: "bx: companion nest + hostLoadBytes(base64)→loadBytes for blob/IDB (REAL walk). Stand thumb while pending. DIRECT if no b64 / watchdog / error. Floor notifyLoftWalk → hostWalk → appearanceChanged_v2 when connected.",
       hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
       hostShim: "assets/avatar-host/avatar-host.swf compiled from tools/avatar-host/AvatarHost.hx (Haxe --swf). No AGPL copy.",
       debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
@@ -2147,14 +2153,18 @@
           }
         }
       }
-      // (?v=20260906bw) RELIABILITY: try companion nest, but NEVER leave a blank stage.
-      // ROOT BREAK: nested Loader rejects blob: → convert to data: OR skip to DIRECT Ruffle.
-      // Do NOT set loftUsesCompanionHost until bridge "connected". Watchdog → remount DIRECT.
+      // (?v=20260906bx) RELIABILITY FIRST + loadBytes walk sync.
+      // Beginner: always show your avatar (DIRECT Ruffle + blob). Then, if we can, upgrade to
+      // companion host so floor-clicks play real walk scenes inside the SWF (like whirled.club).
+      // ENGINE DEV: outer Ruffle blob: OK; nested Loader MUST use loadBytes(base64) via hostLoadBytes.
+      // Never set loftUsesCompanionHost until bridge "connected". Watchdog ~2s → DIRECT.
       installWhirledAvatarHostBridge();
       loftMountGeneration += 1;
       var mountGen = loftMountGeneration;
-      loftPendingAvatarUrl = url; // keep ORIGINAL blob/url for direct remount
+      loftPendingAvatarUrl = url; // ORIGINAL blob/http for direct remount
+      loftPendingAvatarB64 = null;
       loftHostState.avatarUrl = url;
+      loftHostState._hostLoadUrl = null;
       loftUsesCompanionHost = false;
       loftCompanionAttempted = false;
       loftHostState.hostMode = false;
@@ -2174,12 +2184,14 @@
         backgroundColor: null,
         allowScriptAccess: true
       };
+      var isBlobOrData = (String(url).indexOf("blob:") === 0 || String(url).indexOf("data:") === 0);
 
       function mountDirectPrimary(why) {
         logAvatarDebug("mount DIRECT primary", why);
         loftUsesCompanionHost = false;
         loftHostState.hostMode = false;
-        loftCompanionAttempted = false;
+        loftHostState.connected = false;
+        // Keep companionAttempted as-is (may have failed upgrade)
         return mountRuffle(slot, url, loftOpts).then(function (player) {
           afterMountUi();
           try { slot.setAttribute("data-mount-mode", "direct"); } catch (eM) {}
@@ -2187,41 +2199,74 @@
         });
       }
 
-      return prepareUrlForHostLoader(url).then(function (prep) {
-        if (mountGen !== loftMountGeneration) return null;
-        if (!prep || prep.skipped || !prep.ok || !prep.url) {
-          return mountDirectPrimary(prep && prep.reason || "prep-skip");
-        }
+      function startCompanionWithPayload(prep) {
         loftCompanionAttempted = true;
-        logAvatarDebug("companion attempt", { reason: prep.reason, hostUrl: hostUrl, dataLen: prep.url.length });
+        loftPendingAvatarB64 = (prep.mode === "bytes") ? prep.b64 : null;
+        loftHostState._hostLoadUrl = (prep.mode === "url") ? prep.url : null;
+        logAvatarDebug("companion attempt", {
+          reason: prep.reason, mode: prep.mode, hostUrl: hostUrl,
+          b64Len: prep.b64 ? prep.b64.length : 0
+        });
         return mountRuffle(slot, hostUrl, loftOpts).then(function (player) {
           if (mountGen !== loftMountGeneration) return player;
-          // NOT loftUsesCompanionHost yet — only companionAttempted until connected
           loftHostState.hostMode = false;
           loftUsesCompanionHost = false;
           afterMountUi();
           try { slot.setAttribute("data-mount-mode", "companion-pending"); } catch (eM2) {}
-          var hostAvatarUrl = prep.url; // data: or http — safe for nested Loader
-          loftHostState._hostLoadUrl = hostAvatarUrl;
-          callHostLoadUrl(hostAvatarUrl);
+          // Feed avatar into host: bytes preferred, else http(s) URL
+          var fed = { ok: false };
+          if (prep.mode === "bytes" && prep.b64) {
+            fed = callHostLoadBytes(prep.b64);
+            if (!fed.ok) {
+              setTimeout(function () {
+                if (mountGen !== loftMountGeneration || loftHostState.connected) return;
+                callHostLoadBytes(prep.b64);
+              }, 120);
+            }
+          } else if (prep.mode === "url" && prep.url) {
+            fed = callHostLoadUrl(prep.url);
+          } else {
+            remountDirectAvatarImmediate("companion-no-payload");
+            return player;
+          }
           setTimeout(function () {
             if (mountGen !== loftMountGeneration || loftHostState.connected) return;
             tryFlushPendingAvatarLoad();
           }, 200);
           setTimeout(function () {
             if (mountGen !== loftMountGeneration || loftHostState.connected) return;
-            var r = tryCallHostMethod("hostLoadUrl", [hostAvatarUrl]);
-            logAvatarDebug("hostLoadUrl late retry", r);
-            if (!r.ok) {
-              remountDirectAvatarImmediate("hostLoadUrl-never-ok");
+            var r = tryFlushPendingAvatarLoad();
+            logAvatarDebug("companion late flush", r);
+            if (!r || !r.ok) {
+              remountDirectAvatarImmediate("hostLoad-never-ok");
             }
           }, 700);
-          armCompanionWatchdog(mountGen, prep.reason);
+          armCompanionWatchdog(mountGen, prep.reason || prep.mode);
           return player;
         }).catch(function (hostErr) {
           logAvatarDebug("companion host mount failed — direct", hostErr && hostErr.message);
           return mountDirectPrimary((hostErr && hostErr.message) || "host-mount-fail");
         });
+      }
+
+      // Strategy (?v=20260906bx): companion + hostLoadBytes is the REAL walk-sync path.
+      // Beginner: show stand thumb while mounting; host loads your SWF from base64 bytes.
+      // ENGINE DEV: blob Wear MUST use hostLoadBytes (never nested blob:/data: URL).
+      // DIRECT fallback ONLY when no b64 / host mount fails / watchdog / bridge error.
+      ensureStandFallback(slot, worn, "preparing-companion");
+      return prepareCompanionStrategy(url, worn).then(function (prep) {
+        if (mountGen !== loftMountGeneration) return null;
+        var canBytes = prep && prep.ok && prep.mode === "bytes" && prep.b64;
+        var canUrl = prep && prep.ok && prep.mode === "url" && prep.url;
+
+        if (canBytes || canUrl) {
+          return startCompanionWithPayload(prep).catch(function (err) {
+            logAvatarDebug("companion failed → DIRECT", err && err.message);
+            return mountDirectPrimary((err && err.message) || "companion-catch");
+          });
+        }
+        // No bytes and no http URL — visible DIRECT (outer Ruffle accepts blob:)
+        return mountDirectPrimary((prep && prep.reason) || "no-companion-payload");
       }).catch(function (prepErr) {
         return mountDirectPrimary((prepErr && prepErr.message) || "prep-fail");
       });
@@ -2614,6 +2659,9 @@
   api.ensureRuffle = ensureRuffle;
   api.mountRuffle = mountRuffle;
   api.resolveSwfUrl = resolveSwfUrl;
+  api.resolveSwfBytes = resolveSwfBytes;
+  api.prepareCompanionStrategy = prepareCompanionStrategy;
+  api.callHostLoadBytes = callHostLoadBytes;
   api.itemHasClassicSwf = itemHasClassicSwf;
   api.itemWantsClassicFlash = itemWantsClassicFlash;
   api.itemHasPngWalk = itemHasPngWalk;
