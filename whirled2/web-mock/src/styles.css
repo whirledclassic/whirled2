@@ -938,6 +938,21 @@ body {
   background: #f3faff;
 }
 .skin-bg-upload-always strong { color: #1e6fa8; }
+/* Beginner (?v=20260906an): status line under quick Choose image (save / compress / errors). */
+#skin-msg-quick {
+  margin: 6px 0 0;
+  min-height: 1.2em;
+  color: #1e6fa8;
+  font-weight: 600;
+}
+.skin-bg-upload-always .skin-bg-file {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #9ec9e6;
+}
 
 .skin-form button[type="submit"] {
   border: 0; background: #3aa3e0; color: #fff; border-radius: 4px;
@@ -4672,10 +4687,10 @@ button.tb.tb-music,
 }
 
 
-/* ---- Worn Stuff avatar billboard (20260906ai) ----
+/* ---- Worn Stuff avatar billboard (20260906ai / am) ----
  * Beginner: after Wear in Stuff → Avatars, this sprite shows in your loft.
- * ENGINE DEV: chrome overlay sibling of #stage-slot — not Ruffle, not inside Pixi yet.
- * pointer-events:none so it never steals clicks from decorate / stage.
+ * Click loft floor (.stage-host.chrome-walk-ready) to walk — layer itself stays pointer-events none.
+ * ENGINE DEV: chrome overlay sibling of #stage-slot — yields when Pixi mounts. No Ruffle.
  */
 .avatar-wear-layer {
   position: absolute;
@@ -4692,9 +4707,10 @@ button.tb.tb-music,
 }
 .avatar-wear-billboard {
   position: absolute;
-  left: 50%;
+  left: var(--wear-x, 50%);
   bottom: 12%;
   /* How this works (20260906ak): --wear-scale from Stuff slider (default 1). */
+  /* 20260906am: --wear-x click-to-walk; --wear-face ±1 flips sprite left/right. */
   transform: translateX(-50%) scale(var(--wear-scale, 1));
   transform-origin: center bottom;
   display: flex;
@@ -4703,6 +4719,7 @@ button.tb.tb-music,
   gap: 4px;
   max-width: min(200px, 42%);
   filter: drop-shadow(0 2px 4px rgba(22, 50, 74, 0.35));
+  transition: left 0.05s linear;
 }
 .avatar-wear-sprite {
   display: block;
@@ -4712,6 +4729,11 @@ button.tb.tb-music,
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   object-fit: contain;
+  /* Face left/right without flipping the nameplate. */
+  transform: scaleX(var(--wear-face, 1));
+}
+.avatar-wear-layer.is-tofu .tofu-wear {
+  transform: scaleX(var(--wear-face, 1));
 }
 .avatar-wear-nameplate {
   background: rgba(255, 255, 255, 0.92);
@@ -4735,6 +4757,40 @@ button.tb.tb-music,
 @media (max-width: 700px) {
   .avatar-wear-billboard { bottom: 8%; max-width: 46%; }
   .avatar-wear-sprite { max-height: min(120px, 36vh); }
+}
+
+/* ---- Chrome click-to-walk (?v=20260906am) ----
+ * Beginner: pointer on loft floor → walk. Soft white target marker (classic feel).
+ * ENGINE DEV: disabled when #stage-slot has canvas / [data-whirled-engine].
+ */
+.stage-host.chrome-walk-ready {
+  cursor: crosshair;
+}
+.stage-host.chrome-walk-ready #chat-overlay,
+.stage-host.chrome-walk-ready button,
+.stage-host.chrome-walk-ready a,
+.stage-host.chrome-walk-ready .decorate-chip {
+  cursor: pointer;
+}
+.chrome-walk-target {
+  position: absolute;
+  z-index: 3;
+  width: 28px;
+  height: 14px;
+  margin-left: -14px;
+  margin-top: -7px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.chrome-walk-target.is-on {
+  opacity: 1;
+  transform: scale(1);
 }
 
 
