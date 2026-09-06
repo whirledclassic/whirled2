@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906bs
+ * Cache: ?v=20260906bt
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906bs";
+  var VERSION = "20260906bt";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -27,7 +27,8 @@
   var THUMB_MAX_BYTES = 1 * 1024 * 1024;
   var RUFFLE_CDN = "https://unpkg.com/@ruffle-rs/ruffle";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906bs): dual Wear modes + loft EI shim — png-hybrid | ruffle (playbackMode).
+  // How this works (?v=20260906bt): dual Wear modes + loft EI shim — png-hybrid | ruffle (playbackMode).
+  // CRITICAL bt: preserve stand thumb across mountRuffle; never silent-fail sha1-only Wear; SWF beats tofu.
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
   // SWF-only: transparent Ruffle + synthesized bob/flip walk — never broken tofu.
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
@@ -375,7 +376,7 @@
   }
 
   function mountRuffle(container, swfUrl, opts) {
-    // How this works (?v=20260906bs): Ruffle TRANSPARENT stage + loft PE-none canvas.
+    // How this works (?v=20260906bt): Ruffle TRANSPARENT stage + loft PE-none canvas; preserve stand thumb.
     // Beginner: black box was opaque stage — fixed via wmode + backgroundColor null + CSS.
     // ENGINE DEV: chrome-owned host only (never #stage-slot). Loft enables allowScriptAccess so
     // user-owned SWFs can talk to our minimal AvatarHost shim (EI only — not full sharedEvents).
@@ -411,9 +412,34 @@
       player.setAttribute("data-classic-ruffle", "1");
       player.setAttribute("data-wmode", "transparent");
       if (loftMount) player.setAttribute("data-loft-ruffle", "1");
-      container.innerHTML = "";
+      // (?v=20260906bt) CRITICAL: do NOT wipe stand thumb / placeholder — empty loft looks like tofu.
+      // Beginner: keep last thumb under Ruffle until SWF paints; restore on fail.
+      // ENGINE DEV: innerHTML="" was the overnight tofu bug after ?v=bs.
+      var savedStand = null;
+      var savedGlyph = null;
+      try {
+        var standEl = container.querySelector("img.classic-swf-stand-thumb");
+        if (standEl) {
+          savedStand = { src: standEl.getAttribute("src") || standEl.src || "", alt: standEl.alt || "" };
+        }
+        var glyphEl = container.querySelector(".classic-swf-placeholder");
+        if (glyphEl) savedGlyph = glyphEl.outerHTML;
+      } catch (eSave) {}
+      destroyPlayersIn(container);
+      // Clear only ruffle nodes; rebuild host contents with stand first, then player.
+      try {
+        var keepBits = [];
+        if (savedStand && savedStand.src) {
+          keepBits.push('<img class="classic-swf-stand-thumb" src="' + esc(savedStand.src)
+            + '" alt="' + esc(savedStand.alt || "") + '" aria-hidden="true" />');
+        } else if (savedGlyph) {
+          keepBits.push(savedGlyph);
+        }
+        container.innerHTML = keepBits.join("");
+      } catch (eHtml) { try { container.innerHTML = ""; } catch (e2) {} }
       container.appendChild(player);
       activePlayers.push(player);
+      try { container.classList.add("is-mounting"); container.classList.remove("is-failed", "is-playing"); } catch (eCl) {}
       // Loft: allowScriptAccess so SWF→JS EI can reach our shim. Preview/Stuff stays locked down.
       var allowScript = loftMount ? true : (opts.allowScriptAccess === true);
       var loadOpts = {
@@ -440,7 +466,17 @@
             logAvatarDebug("attachLoftAvatarHost failed", eHost && eHost.message);
           }
         }
+        try {
+          container.classList.remove("is-mounting", "is-failed");
+          container.classList.add("is-playing", "is-on");
+        } catch (eOk) {}
         return player;
+      }).catch(function (err) {
+        try {
+          container.classList.remove("is-mounting", "is-playing");
+          container.classList.add("is-failed", "is-on");
+        } catch (eF) {}
+        throw err;
       });
     });
   }
@@ -463,8 +499,9 @@
       return Promise.resolve(item.swfUrl);
     }
     if (item.swfDataUrl) return Promise.resolve(item.swfDataUrl);
-    if (item.swfSha1) {
-      return idbGetBlob(item.swfSha1).then(function (rec) {
+    var sha = item.swfSha1 || (item.pack && item.pack.swfSha1) || null;
+    if (sha) {
+      return idbGetBlob(sha).then(function (rec) {
         if (!rec) return null;
         if (rec.blob) return URL.createObjectURL(rec.blob);
         if (rec.dataUrl) return rec.dataUrl;
@@ -602,8 +639,11 @@
 
   function shouldMountRuffleInLoft(worn) {
     // Mode A (ruffle): mount transparent Ruffle. Mode B (png-hybrid): never mount Ruffle in loft.
-    if (!worn || worn.isTofu) return false;
-    if (!itemHasClassicSwf(worn) && !(worn.swfUrl || worn.swfDataUrl || worn.swfSha1)) return false;
+    // (?v=20260906bt): SWF markers beat a stale isTofu flag — never skip mount for classic Wear.
+    if (!worn) return false;
+    var hasSwf = itemHasClassicSwf(worn) || !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf");
+    if (worn.isTofu && !hasSwf) return false;
+    if (!hasSwf) return false;
     var mode = getPlaybackMode(worn);
     if (mode === "png-hybrid") return false;
     if (mode === "ruffle") {
@@ -624,7 +664,8 @@
 
   function loftRenderMode(worn) {
     // Labels for UI: hybrid | ruffle | png | tofu  (hybrid ≈ png-hybrid)
-    if (!worn || worn.isTofu) return "tofu";
+    if (!worn) return "tofu";
+    if (worn.isTofu && !wornHasClassicSwf(worn)) return "tofu";
     var mode = getPlaybackMode(worn);
     if (mode === "png-hybrid") return "hybrid";
     if (mode === "ruffle" || shouldMountRuffleInLoft(worn)) return "ruffle";
@@ -642,11 +683,21 @@
    * while chrome moves it. Stock SWFs cannot animate via AvatarControl yet — this keeps
    * the room feeling alive without broken tofu or a frozen slide.
    */
-  function setLoftWalkMotion(on) {
+  function setLoftWalkMotion(on, faceHint) {
     var layer = document.getElementById("avatar-wear-layer");
     if (!layer) return;
     var bill = layer.querySelector(".avatar-wear-billboard");
     var host = layer.querySelector("#avatar-ruffle-host, .avatar-ruffle-host");
+    // (?v=20260906bt): copy --wear-face onto host so bob keyframes can flip SWF without flipping nameplate.
+    try {
+      var face = (faceHint === -1 || faceHint === 1) ? faceHint
+        : (bill && parseFloat(bill.style.getPropertyValue("--wear-face"))) || loftHostState._face || 1;
+      if (face === -1 || face === 1) {
+        loftHostState._face = face;
+        if (bill) bill.style.setProperty("--wear-face", String(face));
+        if (host) host.style.setProperty("--wear-face", String(face));
+      }
+    } catch (eFace) {}
     if (on) {
       layer.classList.add("is-swf-walking");
       if (bill) bill.classList.add("is-swf-walking");
@@ -964,7 +1015,8 @@
 
   function notifyLoftWalk(moving, orientHint) {
     // Called from app.js chromeWalkTo — always bob host; try EI into SWF.
-    setLoftWalkMotion(!!moving);
+    var faceForCss = (orientHint === -1 || orientHint === 1) ? orientHint : undefined;
+    setLoftWalkMotion(!!moving, faceForCss);
     var orient = loftHostState.orient;
     if (typeof orientHint === "number" && isFinite(orientHint)) orient = orientHint;
     else if (moving) {
@@ -1021,12 +1073,13 @@
 
   function describeAvatarControlNextSteps() {
     return {
-      whyIdle: "Stock Whirled SWFs speak controlConnect on loaderInfo.sharedEvents — not JS click handlers / EI.",
-      whatWorksNow: "Chrome moves billboard + bob; nameplate/hitbox emotes show bubble; EI probes try setBodyState/triggerAction/appearanceChanged_*.",
+      whyIdle: "Stock Whirled SWFs dispatch ConnectEvent type controlConnect on loaderInfo.sharedEvents (NOT ExternalInterface).",
+      protocol: "AvatarControl→AbstractControl builds userProps (appearanceChanged_v2, stateSet_v1, …); host must set event.props.hostProps with setLocation_v1/setMoveSpeed_v1/setState_v1/…; avatar gotHostProps → isConnected. Drive walk via userProps.appearanceChanged_v2(loc, orient, moving, sleeping).",
+      whatWorksNow: "Chrome puppet: billboard move + CSS bob/flip; stand thumb never wiped; nameplate/hitbox emotes (bubble + EI try). JS WhirledAvatarHost helps only EI-patched SWFs.",
       hybrid: "Attach PNG idle+walk → loft uses chrome walk (Whirled2 Smooth) — best mobile feel.",
-      hostShim: "JS WhirledAvatarHost + loft allowScriptAccess (EI). Full sharedEvents host SWF = Phase 2 (do not copy AGPL).",
+      hostShim: "JS EI shim cannot inject sharedEvents into Ruffle VM. Phase-2 = tiny companion host SWF (Loader+EI bridge) — only if we can compile without copying AGPL. Tonight: chrome puppet rock-solid.",
       debug: "Add ?avatarDebug=1 then WhirledClassicAvatar.getLoftHostDebug()",
-      docs: ["AVATAR-IMPORT.md §4", "HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md", "https://www.whirled.club/code/asdocs/com/whirled/AvatarControl.html"]
+      docs: ["HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md", "https://www.whirled.club/code/asdocs/com/whirled/AvatarControl.html", "greyhavens/whirled-api AbstractControl.as"]
     };
   }
 
@@ -1196,7 +1249,8 @@
   function classicWearSlotHtml(worn) {
     // Sibling slot on the billboard — only when loft should actually mount Ruffle.
     // Hybrid default: no slot (PNG walk). Force Ruffle or SWF-only: mount host.
-    if (!worn || worn.isTofu) return "";
+    if (!worn) return "";
+    if (worn.isTofu && !wornHasClassicSwf(worn)) return "";
     if (!shouldMountRuffleInLoft(worn)) {
       if (itemIsHybrid(worn) && itemWantsClassicFlash(worn)) {
         // (?v=20260906bg): Mode B — PNG walk means Ruffle is NOT running in loft.
@@ -1205,10 +1259,14 @@
       return "";
     }
     var swfU = esc(worn.swfUrl || worn.swfDataUrl || "");
+    var shaU = esc(worn.swfSha1 || (worn.pack && worn.pack.swfSha1) || "");
     var standU = esc(worn.thumb || worn.preview || "");
+    var initial = esc(((worn.name || "SWF").trim().charAt(0) || "S").toUpperCase());
     return '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host classic-wear-swf-slot is-loft" data-swf-url="'
-      + swfU + '" aria-label="Classic Flash avatar overlay" title="Ruffle experimental — PE none; click nameplate/hitbox for emotes">'
-      + (standU ? ('<img class="classic-swf-stand-thumb" src="' + standU + '" alt="" aria-hidden="true" />') : "")
+      + swfU + '" data-swf-sha1="' + shaU + '" aria-label="Classic Flash avatar overlay" title="Ruffle experimental — PE none; click nameplate/hitbox for emotes">'
+      + (standU
+        ? ('<img class="classic-swf-stand-thumb" src="' + standU + '" alt="" aria-hidden="true" />')
+        : ('<div class="classic-swf-placeholder" aria-hidden="true"><span>' + initial + '</span></div>'))
       + '<span class="classic-exp-badge classic-exp-badge-overlay">Flash</span>'
       + '</div>';
   }
@@ -1503,8 +1561,38 @@
     });
   }
 
+  function ensureStandFallback(slot, worn, reason) {
+    // (?v=20260906bt): always leave SOMETHING visible — thumb, or initial glyph. Never blank loft.
+    if (!slot) return;
+    try {
+      slot.classList.add("is-failed");
+      slot.classList.remove("is-playing", "is-mounting");
+      if (reason) slot.setAttribute("data-mount-fail", String(reason).slice(0, 120));
+      var stand = (worn && (worn.thumb || worn.preview)) || "";
+      if (stand) {
+        var existing = slot.querySelector("img.classic-swf-stand-thumb");
+        if (!existing) {
+          var img = document.createElement("img");
+          img.className = "classic-swf-stand-thumb";
+          img.alt = (worn && worn.name) || "Avatar";
+          img.src = stand;
+          slot.insertBefore(img, slot.firstChild);
+        } else {
+          existing.style.opacity = "1";
+        }
+      } else if (!slot.querySelector(".classic-swf-placeholder")) {
+        var g = document.createElement("div");
+        g.className = "classic-swf-placeholder";
+        g.setAttribute("aria-hidden", "true");
+        g.innerHTML = "<span>" + esc(((worn && worn.name) || "SWF").trim().charAt(0).toUpperCase() || "S") + "</span>";
+        slot.insertBefore(g, slot.firstChild);
+      }
+    } catch (eThumb) {}
+  }
+
   function mountWearIfNeeded() {
     // Prefer shared #avatar-ruffle-host; loft mounts only when shouldMountRuffleInLoft (hybrid default = skip).
+    // (?v=20260906bt): sha1-only Wear must resolve via IDB; never silent-return when URL missing.
     var slot = document.getElementById("avatar-ruffle-host")
       || document.getElementById("classic-wear-swf-slot");
     var worn = null;
@@ -1517,15 +1605,27 @@
       // Hybrid smooth: destroy any stale loft player so PNG walk stays clickable / visible.
       if (slot) {
         destroyPlayersIn(slot);
-        slot.classList.remove("is-on");
+        slot.classList.remove("is-on", "is-playing", "is-mounting");
       }
       return;
     }
     if (!slot) return;
     var attrUrl = slot.getAttribute("data-swf-url") || "";
+    var attrSha = slot.getAttribute("data-swf-sha1") || "";
+    // Merge sha1 from DOM if worn snapshot lost it (localStorage slim).
+    if (worn && !worn.swfSha1 && attrSha) {
+      try { worn.swfSha1 = attrSha; } catch (eSha) {}
+    }
     resolveSwfUrl(worn).then(function (url) {
       url = url || attrUrl || null;
-      if (!url) return;
+      if (!url) {
+        // CRITICAL: do not return silently — user sees empty loft (= "tofu").
+        ensureStandFallback(slot, worn, "no-swf-url (re-upload SWF if IDB cleared)");
+        logAvatarDebug("mountWearIfNeeded: no URL", {
+          sha1: worn && worn.swfSha1, attrUrl: !!attrUrl, attrSha: !!attrSha
+        });
+        return null;
+      }
       slot.classList.add("is-on");
       slot.classList.add("is-loft");
       var bill = slot.closest(".avatar-wear-billboard");
@@ -1536,7 +1636,8 @@
         loftMount: true,
         pointerEvents: "none",
         wmode: "transparent",
-        backgroundColor: null
+        backgroundColor: null,
+        allowScriptAccess: true
       }).then(function () {
         if (bill) {
           var img = bill.querySelector(".avatar-wear-sprite");
@@ -1547,19 +1648,8 @@
           }
         }
       });
-    }).catch(function () {
-      // (?v=20260906bs): never leave blank/tofu — show last thumb/preview under host if Ruffle fails.
-      slot.classList.add("is-failed");
-      try {
-        var stand = (worn && (worn.thumb || worn.preview)) || "";
-        if (stand && !slot.querySelector("img.classic-swf-stand-thumb")) {
-          var img = document.createElement("img");
-          img.className = "classic-swf-stand-thumb";
-          img.alt = (worn && worn.name) || "Avatar";
-          img.src = stand;
-          slot.appendChild(img);
-        }
-      } catch (eThumb) {}
+    }).catch(function (err) {
+      ensureStandFallback(slot, worn, (err && err.message) || "ruffle-mount-failed");
     });
   }
 
@@ -1902,9 +1992,17 @@
     }
     if (item.source) row.source = item.source;
     ensureClassicWornStates(row, item);
-    if ((row.classicFlashOptIn || pm === "ruffle") && (row.swfSha1 || row.swfDataUrl || row.swfUrl)) {
-      row.mediaKind = "swf";
+    if (row.swfSha1 || row.swfDataUrl || row.swfUrl || pm === "ruffle" || row.classicFlashOptIn) {
+      if (row.swfSha1 || row.swfDataUrl || row.swfUrl) {
+        row.mediaKind = "swf";
+        row.classicFlashOptIn = true;
+      }
       if (!row.swfUrl && row.swfDataUrl) row.swfUrl = row.swfDataUrl;
+    }
+    // Keep sha1 on pack so resolveSwfUrl can find IDB after localStorage slim.
+    if (row.swfSha1) {
+      if (!row.pack) row.pack = {};
+      row.pack.swfSha1 = row.swfSha1;
     }
     // Hybrid flag from item (has PNG frames) — worn row may omit empty walk until setAvatarState.
     row.isHybrid = itemIsHybrid(item) || itemIsHybrid(row) || pm === "png-hybrid";

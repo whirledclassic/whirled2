@@ -1,3 +1,10 @@
+## What shipped (?v=20260906bt)
+
+- **Flash/Ruffle Wear→loft CRITICAL fix:** never blank/tofu when SWF worn — `mountRuffle` no longer wipes stand thumb; sha1-only Wear resolves IDB (no silent fail); placeholder glyph; face-flip bob; SWF markers beat stale `isTofu`
+- **Protocol research:** Grey Havens `controlConnect` / `appearanceChanged_v2` documented; JS EI cannot inject sharedEvents — Phase-2 host SWF deferred (no AGPL copy / no compiler tonight); chrome puppet rock-solid
+- **Preserve:** bs Hybrid walk-gate, br club polish, bg dual Wear, Whirl, visit-since
+- Cache: **`?v=20260906bt`**. Push: `/tmp/push-bt.js` (dry-run default).
+
 ## What shipped (?v=20260906bs)
 
 - **Flash/Ruffle playability (CRITICAL):** Wear Classic Flash SWF → loft shows SWF (or last thumb), **never tofu**; floor click moves billboard (bob/flip); nameplate/hitbox emotes (bubble + EI try); second SWF one-flow (Analyze → Classic Flash → Save → Wear & enter loft)

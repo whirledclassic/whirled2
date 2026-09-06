@@ -1,6 +1,6 @@
 # Classic Whirled avatars — without Adobe Flash
 
-**Cache:** `?v=20260906bs`  
+**Cache:** `?v=20260906bt`  
 **Audience:** beginners + ENGINE DEV. In-site: Help → **Developers** → *Classic Whirled avatars — without Adobe Flash*. Groups → **Dev Updates** thread.
 
 ---
@@ -11,11 +11,11 @@ Classic Flash users want the real `.swf`. Modern Whirled2 users want smooth clic
 
 | Mode | What you get | When to use |
 |------|----------------|-------------|
-| **A — Classic Flash (Ruffle)** | Real `.swf` via Ruffle WASM (transparent stage; canvas `pointer-events: none`). Chrome moves billboard + bob/flip. Nameplate/hitbox opens emotes (chrome bubble + EI try). Badge: `Appearance: Ruffle (SWF)` | You have a SWF and want classic appearance now. |
+| **A — Classic Flash (Ruffle)** | Real `.swf` via Ruffle WASM (transparent stage; canvas `pointer-events: none`). Chrome moves billboard + bob/flip. Stand thumb / glyph always visible (never blank loft). Nameplate/hitbox opens emotes (chrome bubble + EI try). Badge: `Appearance: Ruffle (SWF)` | You have a SWF and want classic appearance now. |
 | **B — Whirled2 Smooth (PNG hybrid)** | Idle+walk PNG/WebP chrome walk like Whirl (+ emotes). **No Ruffle** in loft. Badge: `Walking: PNG hybrid (no Ruffle)` | You have (or can attach) PNG frames. Best feel on mobile / HTTPS Pages. |
 
 Persist choice on the Stuff item as `playbackMode: 'png-hybrid' | 'ruffle'`.  
-**Default:** Smooth if PNGs exist, else Classic Flash if SWF, else Whirl.
+**Default:** Smooth if **walk** PNGs exist, else Classic Flash if SWF, else Whirl.
 
 ---
 
@@ -36,18 +36,32 @@ Persist choice on the Stuff item as `playbackMode: 'png-hybrid' | 'ruffle'`.
 
 ---
 
-
-## Root causes fixed (?v=20260906bs)
+## Root causes fixed (?v=20260906bt)
 
 | Bug | Fix |
 |-----|-----|
-| Thumb/preview treated as Hybrid PNG walk | `itemHasPngWalk` requires **walk** frames only |
-| Default Smooth radio on SWF-only Save | Default **Classic Flash**; Analyze picks Smooth only if walk PNGs attached |
-| Wear → tofu / empty loft | Never invent idle-from-thumb for SWF; strip huge dataURLs; loft always mounts Ruffle (or last thumb) when SWF worn |
-| Dead floor / emotes | Billboard bob/flip walk; hitbox+nameplate PE auto; chrome bubble + EI try |
-| Stock SWF no AvatarControl | Honest: sharedEvents `controlConnect` needs Phase-2 host SWF — chrome puppet now |
+| `mountRuffle` did `innerHTML=""` wiping stand thumb | Preserve/restore stand thumb + placeholder glyph across mount |
+| sha1-only Wear + silent `if (!url) return` | Resolve IDB; on miss mark `is-failed` + show thumb/glyph (never blank) |
+| Thumb/preview treated as Hybrid walk | `itemHasPngWalk` requires **walk** frames only (bs, kept) |
+| Wear persist dataURL blowup | Strip huge dataURLs; keep `swfSha1` + IDB; `data-swf-sha1` on host |
+| Stale `isTofu` skipped Ruffle mount | SWF markers beat tofu in mount gates |
+| Face flip missing on SWF | `--wear-face` on host + bob keyframes |
+| Stock SWF no in-timeline walk | Honest: needs sharedEvents host (Phase 2) — chrome puppet is what you *see* |
 
-Research (architecture only, no AGPL copy): Ruffle `allowScriptAccess` + EI callbacks on player element; Grey Havens `AvatarControl` / `ActorControl` use `appearanceChanged` + `setLogicalLocation` / states+actions via **sharedEvents**, not raw JS clicks.
+### Grey Havens protocol (study only — do not copy AGPL)
+
+From `greyhavens/whirled-api` `AbstractControl.as` / `ActorControl.as` / `AvatarControl.as`:
+
+1. Avatar constructs `AvatarControl(this)` → `AbstractControl` builds `userProps` (`appearanceChanged_v2`, `stateSet_v1`, …).
+2. Dispatches **`ConnectEvent` type `"controlConnect"`** (bubbles) on **`disp.root.loaderInfo.sharedEvents`**.
+3. Host listener sets `event.props.hostProps = { setLocation_v1, setMoveSpeed_v1, setState_v1, getState_v1, … }`.
+4. Avatar `gotHostProps` → `_funcs = hostProps`; `isConnected()` true.
+5. **Walk animation inside SWF** = host calling **`userProps.appearanceChanged_v2(location, orient, moving, sleeping)`**.
+6. Actions = host fires `ACTION_TRIGGERED` via userProps callbacks (`messageReceived_v1` path).
+
+**Ruffle cannot inject `sharedEvents` from plain JS.** `window.WhirledAvatarHost` EI shim only helps SWFs that call `ExternalInterface`. Phase-2 = tiny companion host SWF (Loader + EI bridge) **only if** we can compile without copying AGPL — not feasible overnight without a toolchain; chrome puppet is the ship.
+
+---
 
 ## Do we use Ruffle?
 
@@ -57,8 +71,8 @@ Research (architecture only, no AGPL copy): Ruffle `allowScriptAccess` + EI call
 |-----------|------------|----------------------|
 | **Whirl / PNG pack** | No Ruffle | Click loft floor — PNG idle/walk; click avatar — PNG emotes |
 | **Whirled2 Smooth** (`playbackMode: png-hybrid`) | Ruffle **not** in loft | Click floor — **PNG chrome walk** |
-| **Classic Flash (Ruffle)** (`playbackMode: ruffle`) | **Ruffle** shows the avatar | Click floor **moves** you (bob/flip). Click **nameplate/hitbox** → emotes (bubble + EI try). Canvas does **not** eat floor clicks. |
-| **SWF-only, no PNGs** | Classic Flash only until you attach frames | Smooth card disabled with CTA |
+| **Classic Flash (Ruffle)** (`playbackMode: ruffle`) | **Ruffle** + stand thumb backup | Click floor **moves** you (bob/flip). Click **nameplate/hitbox** → emotes. Canvas PE-none. |
+| **SWF-only, no PNGs** | Classic Flash; stand thumb/glyph if Ruffle slow | Smooth card disabled with CTA |
 | **Stuff → Preview in Ruffle** | Ruffle CDN preview | Preview only |
 
 ---
@@ -68,26 +82,28 @@ Research (architecture only, no AGPL copy): Ruffle `allowScriptAccess` + EI call
 1. Stuff → Avatars → **Classic Flash / Whirled avatars** panel.  
 2. Drop your **own** `.swf` (plus optional PNG idle + walk).  
 3. **Analyze** → pick **Wear mode** → **Save** → **Wear & enter loft**.  
-4. Walk on the floor; click nameplate/hitbox for emotes.
+4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906bt`.
 
 ---
 
-## What works in Classic Flash (Ruffle) after `?v=20260906bs`
+## What works in Classic Flash (Ruffle) after `?v=20260906bt`
 
 | Action | Works? | How |
 |--------|--------|-----|
 | Floor click-to-walk | **Yes** | Chrome moves billboard + CSS bob/flip |
-| In-SWF walk animation | **Maybe** | `WhirledAvatarHost` EI tries `appearanceChanged_*` / `setBodyState` — only if SWF registered EI callbacks |
-| Click avatar → emote menu | **Yes** | Hitbox + nameplate (`pointer-events: auto`); Ruffle canvas PE-none |
-| Emote visible feedback | **Yes** | Chrome bubble + brief bob; EI `triggerAction` / `setBodyState` tried |
+| Visible avatar (never blank/tofu) | **Yes** | Ruffle and/or stand thumb / initial glyph |
+| In-SWF walk animation | **Maybe** | Only if SWF registered EI callbacks — stock SDK needs Phase-2 sharedEvents host |
+| Click avatar → emote menu | **Yes** | Hitbox + nameplate (`pointer-events: auto`) |
+| Emote visible feedback | **Yes** | Chrome bubble + brief bob; EI `triggerAction` tried |
 | Smooth PNG dual Wear | **Yes** | Unchanged |
+| Second SWF one-flow | **Yes** | Analyze → Classic Flash → Save → Wear & enter loft |
 
 ### Honest limits (AvatarControl)
 
 - Stock Whirled SWFs speak **`controlConnect` on `loaderInfo.sharedEvents`** (not ExternalInterface).
-- Without a Flash-side **host SWF**, those avatars stay on idle timeline inside Ruffle — chrome still moves them across the loft.
-- We do **not** copy AGPL Grey Havens / community host code; JS EI shim + chrome interactivity only.
-- Full sharedEvents host = Phase 2 (`AVATAR-IMPORT.md`).
+- Without a Flash-side **host SWF**, those avatars often stay on idle timeline inside Ruffle — chrome still moves them + shows thumb.
+- We do **not** copy AGPL Grey Havens / community host code.
+- Full sharedEvents host = Phase 2.
 
 ---
 

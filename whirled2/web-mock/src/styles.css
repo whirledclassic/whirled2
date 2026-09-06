@@ -6476,9 +6476,10 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   50% { transform: translateX(-50%) scale(var(--wear-scale, 1)) translateY(-6px); }
 }
 @keyframes whirled-swf-host-bob {
-  0%, 100% { transform: translateY(0) scaleX(1); }
-  25% { transform: translateY(-4px) scaleX(1.02); }
-  75% { transform: translateY(-2px) scaleX(0.98); }
+  /* (?v=20260906bt): honor --wear-face so walk flips SWF without flipping nameplate */
+  0%, 100% { transform: translateY(0) scaleX(var(--wear-face, 1)); }
+  25% { transform: translateY(-4px) scaleX(calc(var(--wear-face, 1) * 1.02)); }
+  75% { transform: translateY(-2px) scaleX(calc(var(--wear-face, 1) * 0.98)); }
 }
 
 .avatar-wear-layer.is-swf .avatar-wear-billboard.is-swf-walking,
@@ -7094,7 +7095,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 
 
 /* ==========================================================================
-   ?v=20260906bs — Never-tofu Classic Flash loft (stand thumb + hitbox)
+   ?v=20260906bt — Never-tofu Classic Flash loft (stand thumb + hitbox)
    Beginner: if Ruffle is slow/fails, last thumb still shows — not grey tofu bean.
    ENGINE DEV: stand thumb PE none; hitbox/nameplate keep emote clicks.
    ========================================================================== */
@@ -7114,13 +7115,24 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
   z-index: 0;
   opacity: 0.92;
 }
-.avatar-ruffle-host.is-on .classic-swf-stand-thumb,
-.avatar-ruffle-host:has(ruffle-player) .classic-swf-stand-thumb {
-  opacity: 0.18; /* soft under live SWF */
+/* (?v=20260906bt): keep stand art readable under SWF — stock avatars often idle-blank without sharedEvents */
+.avatar-ruffle-host.is-mounting .classic-swf-stand-thumb,
+.avatar-ruffle-host.is-on:not(.is-playing) .classic-swf-stand-thumb {
+  opacity: 1;
+  z-index: 2;
+}
+.avatar-ruffle-host.is-playing .classic-swf-stand-thumb,
+.avatar-ruffle-host:has(ruffle-player).is-playing .classic-swf-stand-thumb {
+  opacity: 0.55; /* still visible — chrome puppet backup if SWF stays on idle frame */
+  z-index: 0;
 }
 .avatar-ruffle-host.is-failed .classic-swf-stand-thumb {
   opacity: 1;
-  z-index: 1;
+  z-index: 2;
+}
+.avatar-ruffle-host.is-failed ruffle-player,
+.avatar-ruffle-host.is-failed ruffle-embed {
+  opacity: 0.35;
 }
 .avatar-wear-layer.is-swf .avatar-hitbox {
   width: 96px;
@@ -7129,4 +7141,50 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 }
 .avatar-wear-layer.is-swf .avatar-wear-nameplate[data-avatar-hit] {
   z-index: 6;
+}
+
+
+/* ==========================================================================
+   ?v=20260906bt — Rock-solid chrome puppet (Wear→loft never blank)
+   Beginner: stand thumb / initial glyph always visible; floor bob + face flip.
+   ENGINE DEV: mountRuffle must not wipe stand; sha1-only Wear resolves via IDB.
+   ========================================================================== */
+.classic-swf-placeholder {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%) scaleX(var(--wear-face, 1));
+  width: 72px;
+  height: 96px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #dff0fa 0%, #b9d8ec 100%);
+  border: 2px solid #7eb6d4;
+  box-shadow: 0 2px 6px rgba(22, 50, 74, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none !important;
+  z-index: 1;
+}
+.classic-swf-placeholder span {
+  font: 800 36px/1 var(--ui, system-ui, sans-serif);
+  color: #1e6fa8;
+  text-shadow: 0 1px 0 #fff;
+}
+.avatar-ruffle-host.is-playing .classic-swf-placeholder {
+  opacity: 0.35;
+  z-index: 0;
+}
+.avatar-ruffle-host.is-failed .classic-swf-placeholder,
+.avatar-ruffle-host.is-mounting .classic-swf-placeholder {
+  opacity: 1;
+  z-index: 2;
+}
+.avatar-wear-layer.is-swf .avatar-ruffle-host {
+  transform: scaleX(var(--wear-face, 1));
+  transform-origin: center bottom;
+}
+.avatar-wear-layer.is-swf .avatar-ruffle-host.is-swf-walking {
+  /* bob keyframes own transform (includes face) */
+  transform-origin: center bottom;
 }

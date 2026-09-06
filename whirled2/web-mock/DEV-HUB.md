@@ -1,6 +1,6 @@
 # Developer Information Hub
 
-**Cache:** `?v=20260906bs` (`LOGO_V`)  
+**Cache:** `?v=20260906bt` (`LOGO_V`)  
 **In-site:** Help → **Developers**, header **Developers**, `#dev` / `#docs`, or `?page=dev`.
 
 Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-only; never invent shop catalog; say **Profile look**; engine mounts only in `#stage-slot`.
@@ -9,7 +9,7 @@ Pale-blue classic chrome index for newbies and engine hires. Coins/Bars earn-onl
 
 ## Classic Whirled avatars — without Adobe Flash
 
-> **Currently (?v=20260906bs): Dual Wear modes. Classic Flash default for SWF-only (walk PNGs unlock Smooth). Never tofu when SWF worn. Floor bob walk + hitbox emotes. sharedEvents Phase-2 documented.**
+> **Currently (?v=20260906bt overnight): Wear→loft chrome puppet rock-solid (stand thumb survives mount; sha1 IDB; never blank). Floor bob/flip + hitbox emotes. sharedEvents Phase-2 documented — EI shim alone cannot drive stock SWF walk.**
 
 Browsers can’t run Flash Player; we never require it. **Hybrid (smooth)** = PNG/WebP idle+walk for loft click-to-walk. **Ruffle** (WASM, CDN) is optional for real `.swf` preview / SWF-only Wear. Whirl-only users never load Ruffle.
 
@@ -67,7 +67,7 @@ Lobby → preview → Enter. Chat bar + Overlay/Slide. Room music YouTube/Spotif
 
 ## Cache-bust / STATUS
 
-Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bs` — Flash/Ruffle loft playability (never tofu, floor walk, emotes, second SWF) + br club preserved (see `STATUS.md` / `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md`).
+Bump `LOGO_V` in `app.js` + matching `?v=` on `index.html`. See [STATUS.md](./STATUS.md). **This build:** `?v=20260906bt` — Flash/Ruffle loft playability (never tofu, floor walk, emotes, second SWF) + br club preserved (see `STATUS.md` / `HOW-CLASSIC-AVATARS-WITHOUT-FLASH.md`).
 
 ---
 

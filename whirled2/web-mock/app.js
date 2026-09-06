@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906bs";
+  var LOGO_V = "20260906bt";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2073,7 +2073,7 @@
         if (!row.swfUrl) row.swfUrl = row.swfDataUrl;
       }
     } catch (eClassicWear) {}
-    // (?v=20260906bs): SWF Wear must never become tofu — force Classic Flash when no walk PNGs.
+        // (?v=20260906bt): SWF Wear must never become tofu — force Classic Flash when no walk PNGs.
     try {
       var hasWalkWear = !!(row.states && row.states.walk && row.states.walk.frames && row.states.walk.frames.length);
       var hasSwfWear = !!(row.swfSha1 || row.swfDataUrl || row.swfUrl || row.mediaKind === "swf");
@@ -2083,8 +2083,16 @@
         row.classicFlashOptIn = true;
         row.mediaKind = "swf";
         row.isTofu = false;
+        // Keep thumb/preview for stand art, but do not pretend idle frames are Smooth walk.
+        // ENGINE DEV: avatarWearLayerHtml keys off playbackMode/ruffle + hasSwfMedia, not idle thumb.
       }
-      if (hasSwfWear) row.isTofu = false;
+      if (hasSwfWear) {
+        row.isTofu = false;
+        if (row.swfSha1) {
+          if (!row.pack) row.pack = {};
+          row.pack.swfSha1 = row.swfSha1;
+        }
+      }
     } catch (eForce) {}
     saveWornAvatar(normalizeWornAvatar(row));
     pushRecentAvatarId(item.id);
@@ -2106,7 +2114,7 @@
     return slug === "cyan-hair" || /cyan-hair/i.test(path) || /^whirl$/i.test(name.trim());
   }
   function itemHasRealPngWalk(item) {
-    // (?v=20260906bs): match classic-avatar — walk frames only (thumb/idle ≠ Smooth).
+    // (?v=20260906bt): match classic-avatar — walk frames only (thumb/idle ≠ Smooth).
     if (!item) return false;
     try {
       if (window.WhirledClassicAvatar && WhirledClassicAvatar.itemHasPngWalk) {
@@ -2125,7 +2133,7 @@
       try { worn = loadWornAvatar(); } catch (e) { worn = null; }
     }
     if (!worn) worn = makeTofuWornRow();
-    // (?v=20260906bs): SWF markers beat tofu flag (Wear persist race / false isTofu).
+    // (?v=20260906bt): SWF markers beat tofu flag (Wear persist race / false isTofu).
     var isSwfEarly = !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || worn.mediaKind === "swf" || worn.kind === "swf");
     if ((worn.isTofu || worn.stuffId === TOFU_AVATAR_ID || worn.source === "tofu") && !isSwfEarly) return "tofu";
     try {
@@ -2181,14 +2189,20 @@
 
 
   function classicRuffleWearHtml(worn, posStyle) {
-    // (?v=20260906bs): Always mount Ruffle host + hitbox/nameplate + optional stand thumb.
-    // Beginner: never tofu when a .swf is worn. ENGINE DEV: PE none on Ruffle; hitbox owns emotes.
+    // (?v=20260906bt): Always mount Ruffle host + hitbox/nameplate + stand thumb OR glyph.
+    // Beginner: never tofu / never blank when a .swf is worn (sha1-only OK — IDB resolves at mount).
+    // ENGINE DEV: data-swf-sha1 on host; PE none on Ruffle; hitbox owns emotes; stand survives mountRuffle.
     var swfAttr = esc(worn.swfUrl || worn.swfDataUrl || "");
+    var shaAttr = esc(worn.swfSha1 || (worn.pack && worn.pack.swfSha1) || "");
     var stand = esc(worn.thumb || worn.preview || "");
-    return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-loft-mode="ruffle" data-playback="ruffle">'
+    var initial = esc(((worn.name || "SWF").trim().charAt(0) || "S").toUpperCase());
+    var standHtml = stand
+      ? ('<img class="classic-swf-stand-thumb" src="' + stand + '" alt="" aria-hidden="true" />')
+      : ('<div class="classic-swf-placeholder" aria-hidden="true"><span>' + initial + '</span></div>');
+    return '<div id="avatar-wear-layer" class="avatar-wear-layer is-on is-swf" aria-label="Classic Flash avatar (experimental)" data-swf-url="' + swfAttr + '" data-swf-sha1="' + shaAttr + '" data-loft-mode="ruffle" data-playback="ruffle">'
       + '<div class="avatar-wear-billboard is-ruffle-billboard" style="' + posStyle + '">'
-      +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" title="Ruffle — transparent; floor click moves you; PE none">'
-      +     (stand ? ('<img class="classic-swf-stand-thumb" src="' + stand + '" alt="" aria-hidden="true" />') : "")
+      +   '<div id="avatar-ruffle-host" class="avatar-ruffle-host classic-ruffle-host is-loft" data-swf-url="' + swfAttr + '" data-swf-sha1="' + shaAttr + '" title="Ruffle — transparent; floor click moves you; PE none">'
+      +     standHtml
       +   '</div>'
       +   '<button type="button" class="avatar-hitbox" data-avatar-hit="1" aria-label="Open avatar emotes" title="Click for emotes"></button>'
       +   '<div class="avatar-wear-nameplate" data-avatar-hit="1">' + esc(worn.name || "SWF avatar")
@@ -2229,7 +2243,7 @@
       hasRealPngWalk = !!(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length);
     }
     var hasPngFrames = hasRealPngWalk;
-    // (?v=20260906bs): Classic Flash / SWF-without-walk ALWAYS mounts Ruffle — never tofu / never false PNG path.
+    // (?v=20260906bt): Classic Flash / SWF-without-walk ALWAYS mounts Ruffle — never tofu / never false PNG path.
     if (hasSwfMedia && (playModeEarly === "ruffle" || forceRuffleLoft || ((wantsClassic || hasSwfMedia) && !hasPngFrames))) {
       if (isTofu) { try { worn.isTofu = false; } catch (eT) {} }
       return classicRuffleWearHtml(worn, posStyle);
@@ -2414,6 +2428,11 @@
     }
     if (face === 1 || face === -1) {
       bill.style.setProperty("--wear-face", String(face));
+      // (?v=20260906bt): SWF host bob keyframes read --wear-face for flip (nameplate stays unflipped).
+      try {
+        var host = bill.querySelector("#avatar-ruffle-host, .avatar-ruffle-host");
+        if (host) host.style.setProperty("--wear-face", String(face));
+      } catch (eH) {}
     }
   }
   function persistWearPose(xPct, face) {
@@ -2457,7 +2476,8 @@
     var hasWalkPng = !!(worn.states && worn.states.walk && worn.states.walk.frames && worn.states.walk.frames.length);
     setAvatarState(hasWalkPng ? "walk" : "idle");
     // SWF-only / no walk PNGs: bob the Ruffle host while moving (classic-avatar helper).
-    var useSwfMotion = !hasWalkPng && !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1 || layer.classList.contains("is-swf"));
+    var useSwfMotion = !hasWalkPng && !!(worn.swfUrl || worn.swfDataUrl || worn.swfSha1
+      || worn.mediaKind === "swf" || layerIsSwf || layer.classList.contains("is-swf"));
     try {
       if (useSwfMotion && window.WhirledClassicAvatar) {
         // How this works (?v=20260906bl): bob + try EI appearanceChanged / setBodyState(walk).
@@ -5233,7 +5253,7 @@
       "   chrome walks the billboard on #avatar-wear-layer; emotes swap frames.",
       "2) Dual Wear modes (bg): pick Whirled2 Smooth (png-hybrid) OR Classic Flash (Ruffle)",
       "   before Wear — Ruffle is optional WASM, never an Adobe Flash plugin.",
-      "3) Classic Flash (Ruffle, ?v=20260906bs): chrome moves billboard + bob/flip; nameplate/hitbox emotes",
+      "3) Classic Flash (Ruffle, ?v=20260906bt): never tofu; stand thumb survives mount; floor bob/flip; hitbox emotes",
       "   (bubble + EI try). Never tofu when .swf worn — stand thumb under Ruffle if CDN fails.",
       "4) Stock SDK SWFs speak controlConnect on sharedEvents (not EI) — Phase-2 host SWF later; chrome puppet now.",
       "",
@@ -9147,7 +9167,7 @@
           "dev-cache",
           "Bump <code>LOGO_V</code> in <code>app.js</code> and matching <code>?v=</code> on <code>index.html</code> script/link tags whenever chrome assets change. Phones cache aggressively. Read <code>STATUS.md</code> for what each letter shipped.",
           "STATUS.md",
-          "Current build: ?v=20260906bs (Flash loft playability + br club). Hard-refresh after pulls."
+          "Current build: ?v=20260906bt (Flash loft playability + br club). Hard-refresh after pulls."
         )
       + devHubCard(
           "FLA / SWF lab notes",

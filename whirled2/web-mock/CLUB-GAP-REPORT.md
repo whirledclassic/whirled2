@@ -1,9 +1,10 @@
-> **Note:** ?v=20260906bs ships Flash/Ruffle loft playability beside br club commands.
+<!-- Current cache for Flash loft: ?v=20260906bt (chrome puppet). Club gaps otherwise as prior. -->
+> **Note:** ?v=20260906bt ships Flash/Ruffle loft playability beside br club commands.
 
 # Whirled.club / wiki → web-mock gap report
 
 **Date:** 2026-09-06 (America/New_York)  
-**Cache / chrome:** `?v=20260906bs` (`LOGO_V`)  
+**Cache / chrome:** `?v=20260906bt` (`LOGO_V`)  
 **Sources:** wiki.whirled.club parse API dumps in `_wiki/` (Avatar, Stuff_tab, Room, Chat, Me*, Profile, Starting_out, Door, Music, Friends→Friend).  
 **Rule:** only claim features that exist in this repo’s chrome. Never invent a fake catalog as shipped.
 
@@ -19,7 +20,7 @@ Login hybrid (API → offline localStorage fallback) was fixed in **`al`** and r
 
 ---
 
-## Closed this pass (`?v=20260906bs`)
+## Closed this pass (`?v=20260906bt`)
 
 | Item | Notes |
 |------|--------|
