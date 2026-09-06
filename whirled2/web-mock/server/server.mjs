@@ -5,7 +5,13 @@
  * - Run locally (see README). Point the page at it with window.WHIRLED_API = "http://localhost:PORT".
  * - On GitHub Pages, WHIRLED_API is empty — app.js uses WhirledApi offline localStorage instead.
  * - In-memory users + loft chat; not a production database.
- * - Endpoints used by src/api.js: /api/register, /api/login, /api/me, /api/rooms/:id/chat, occupants.
+ * - Endpoints used by src/api.js: /api/register, /api/login, /api/me,
+ *   /api/rooms/:id/chat, occupants, music (+ optional music/resync).
+ *
+ * Shared room soundtrack (chrome sync protocol):
+ * - GitHub Pages alone cannot sync two phones. Run this demo server so clients
+ *   poll GET /api/rooms/:id/music and the owner PUTs embed + startedAt.
+ * - ENGINE DEV: music sync is chrome HTTP only — never touches #stage-slot / Pixi.
  */
 import http from "node:http";
 import fs from "node:fs";
@@ -20,7 +26,11 @@ const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 
 // DB shape kept in server/data.json (created on first write).
-function emptyDb() { return { users: {}, sessions: {}, messages: [], presence: {} }; }
+function emptyDb() {
+  // How this works: roomMusic[roomId] holds the shared loft soundtrack timeline.
+  // Beginner: startedAt is when the current embed began — clients seek to (now - startedAt).
+  return { users: {}, sessions: {}, messages: [], presence: {}, roomMusic: {} };
+}
 function load() {
   try { return Object.assign(emptyDb(), JSON.parse(fs.readFileSync(DATA, "utf8"))); }
   catch { return emptyDb(); }
@@ -64,7 +74,7 @@ function send(res, code, body) {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS"
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS"
   });
   res.end(JSON.stringify(body));
 }
@@ -224,6 +234,87 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { occupants: occupantsInRoom(db, room) });
       }
     }
+
+    // -------------------------------------------------------------------------
+    // Shared room soundtrack (owner embeds once → all clients hear the same loop)
+    // How this works: owner PUT sets embed + startedAt (resets timeline when URL changes).
+    // Guests GET + poll every ~2–3s. Optional POST .../music/resync bumps startedAt only.
+    // Beginner: without this server, Pages localStorage is same-browser / multi-tab only.
+    // ENGINE DEV: chrome protocol only — do not mount players in #stage-slot.
+    // -------------------------------------------------------------------------
+    const musicMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/music$/);
+    if (musicMatch) {
+      const room = decodeURIComponent(musicMatch[1]);
+      if (!db.roomMusic) db.roomMusic = {};
+      if (req.method === "GET") {
+        const row = db.roomMusic[room] || {
+          source: "",
+          embedUrl: "",
+          embedSrc: "",
+          embedTitle: "",
+          startedAt: 0,
+          loop: true,
+          ownerId: "",
+          updatedAt: 0
+        };
+        return send(res, 200, row);
+      }
+      if (req.method === "PUT") {
+        const user = authUser(db, req);
+        if (!user) return send(res, 401, { error: "Sign in first." });
+        const body = await readBody(req);
+        const prev = db.roomMusic[room] || {};
+        const ownerId = String(prev.ownerId || "");
+        // canControl: first setter claims owner; later only that owner (or loft claim) may change.
+        if (ownerId && ownerId !== user.id) {
+          return send(res, 403, { error: "Owner controls room music." });
+        }
+        const source = String(body.source || prev.source || "").toLowerCase();
+        const embedUrl = String(body.embedUrl != null ? body.embedUrl : (prev.embedUrl || "")).trim();
+        const embedSrc = String(body.embedSrc != null ? body.embedSrc : (prev.embedSrc || "")).trim();
+        const embedTitle = String(body.embedTitle != null ? body.embedTitle : (prev.embedTitle || "")).slice(0, 120);
+        const loop = body.loop === false ? false : true;
+        const urlChanged = embedSrc !== String(prev.embedSrc || "") || embedUrl !== String(prev.embedUrl || "");
+        let startedAt = Number(prev.startedAt || 0) || 0;
+        if (urlChanged || !startedAt) {
+          // Reset timeline when the embed URL changes so everyone seeks from the same start.
+          startedAt = Date.now();
+        } else if (body.startedAt != null && Number(body.startedAt) > 0) {
+          startedAt = Number(body.startedAt);
+        }
+        const next = {
+          source: source === "spotify" || source === "youtube" || source === "local" ? source : (prev.source || "youtube"),
+          embedUrl,
+          embedSrc,
+          embedTitle,
+          startedAt,
+          loop,
+          ownerId: ownerId || user.id,
+          updatedAt: Date.now()
+        };
+        db.roomMusic[room] = next;
+        save(db);
+        return send(res, 200, next);
+      }
+    }
+    const musicResync = url.pathname.match(/^\/api\/rooms\/([^/]+)\/music\/resync$/);
+    if (musicResync && req.method === "POST") {
+      const room = decodeURIComponent(musicResync[1]);
+      const user = authUser(db, req);
+      if (!user) return send(res, 401, { error: "Sign in first." });
+      if (!db.roomMusic) db.roomMusic = {};
+      const prev = db.roomMusic[room];
+      if (!prev || !prev.embedSrc) return send(res, 404, { error: "No room music set." });
+      if (prev.ownerId && prev.ownerId !== user.id) {
+        return send(res, 403, { error: "Owner controls room music." });
+      }
+      prev.startedAt = Date.now();
+      prev.updatedAt = Date.now();
+      db.roomMusic[room] = prev;
+      save(db);
+      return send(res, 200, prev);
+    }
+
     // logout clears session presence
     if (req.method === "POST" && url.pathname === "/api/logout") {
       const header = req.headers.authorization || "";

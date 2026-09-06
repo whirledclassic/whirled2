@@ -2,22 +2,21 @@
 
 Date: 2026-09-06
 
-## What shipped (?v=20260906z)
+## What shipped (?v=20260906ab)
 
-- **Classic visual theme polish**: one pale-blue color system (`--paper` `#e8f4fb`, `--ink` `#16324a`, `--accent` `#1e6fa8`, `--muted` `#4a6a80`, `--border` `#b7d3e8`) + one `--ui` type stack across Me / Stuff / Shop / Games / Groups / Help / Legal / gate.
-- **Readable long-term**: body ≥14px, inputs ≥16px on mobile, meta/help line-height ~1.45, links accent + underline on hover.
-- **Page-switch flash fix**: `#main` stays on `--paper`; `applyBrowserTheme` pins `#app[data-theme=classic]` vars; `clearProfileSkinDom` runs when leaving Profile look so custom BG does not leak onto Rooms/Stuff.
-- **Keep intact**: room stage dark chrome, Overlay chat, room music modal/dock from **y**, Profile look custom BG (profile only).
-- Prior **?v=20260906y**: Room music background play + YouTube loop + Done CTA + ♪ chip.
-- Prior **?v=20260906x**: Room music modal sheet + `canControlRoomMusic` for FB users.
+- **Club / Membership overhaul**: Me → Club shows cool tier cards — **Free / Supporter / Creator** (sell avatars, small platform cut) / **Studio**. All paid tiers Coming Soon; no payments. Design doc: `MEMBERSHIP.md` (Three Rings lessons + 2026 tiers).
+- Prior **?v=20260906aa** (folded):
+  - Shared loft soundtrack (demo server `GET/PUT /api/rooms/:id/music`; Pages local-only meta).
+  - Facebook Connect removed (username/password primary).
+  - Room preview before enter (lobby tile → sheet → Enter + soft curtain).
 
 ## Live URL
 
-- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906z
+- Live mock: https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ab
 - Site root: https://whirledclassic.github.io/whirled2/
 
 ## Out of scope
 
-- No payments / Buy Bars
-- No fake NPCs / catalog
-- No server-side Facebook secrets (Pages is client-only)
+- No payments / Buy Bars / live membership checkout
+- No fake NPCs / catalog / fake member counts
+- No zero-setup social OAuth on static Pages

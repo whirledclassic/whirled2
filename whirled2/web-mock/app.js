@@ -5,7 +5,7 @@
  * 1) index.html loads src/api.js then app.js. Everything runs in one IIFE (this file).
  * 2) Gate: if no session, show register/login. Session lives in localStorage whirled2.session
  *    (via WhirledApi). Offline Pages uses local users in whirled2.users; optional server/server.mjs
- *    can share chat when WHIRLED_API is set.
+ *    can share chat + room music when WHIRLED_API is set.
  * 3) After login, shell() builds the top tabs + chat bar; paint(tab) fills #main for Me / Stuff /
  *    Games / Rooms / Groups / Shop. Room stage is empty #stage-slot for a future engine.
  * 4) Most data is browser-local (localStorage keys whirled2.*). Coins + Bars are play currency (earn-only) — no payments.
@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906z";
+  var LOGO_V = "20260906ab";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -159,14 +159,24 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Room music / playlist (wiki Music) — offline Pages-safe
+  // Room music / playlist (wiki Music) + shared realtime soundtrack
   // How this works: MP3/etc upload → Stuff (type music, data URL). Room menu opens
   // playlist panel. Tracks live in localStorage whirled2.playlist.loft.
   // source: local | youtube | spotify. Local uses HTML5 <audio id="room-audio">;
   // embeds use #room-embed-dock iframe (shell host outside #main — not #stage-slot).
+  // Shared sync: owner Set embed → WhirledApi.setRoomMusic (demo server) OR
+  // whirled2.roomMusic.loft (Pages local-only / multi-tab via storage event).
+  // Guests poll ~2–3s and auto-apply owner embedSrc + seek from startedAt.
   // ENGINE DEV: keep embed dock outside Pixi mount + outside #main so paint never wipes it.
   // ---------------------------------------------------------------------------
   var PLAYLIST_KEY = "whirled2.playlist.loft";
+  var ROOM_MUSIC_KEY = "whirled2.roomMusic.loft"; // Pages fallback mirror of server music row
+  // How this works: last applied sync fingerprint so we do not rebuild the iframe every poll.
+  var lastMusicSyncKey = "";
+  var ytPlayer = null; // YouTube IFrame API player (when available)
+  var ytApiLoading = false;
+  var ytApiReady = false;
+  var lastYtSeekAt = 0;
   var MUSIC_WARN_BYTES = 2 * 1024 * 1024; // soft warn ~2MB
   var MUSIC_MAX_BYTES = 4 * 1024 * 1024;  // hard reject ~4MB
   function isLoftOwner() {
@@ -181,7 +191,7 @@
   }
   function canControlRoomMusic() {
     // How this works: Pages mock — session may control music when loft owner OR playlist.ownerId
-    // matches session OR ownerId is empty (then claim on first save). Fixes FB/fb_ users who are
+    // matches session OR ownerId is empty (then claim on first save). Fixes users who are
     // not FIRST_USER_KEY and previously only saw "Owner controls" with no embed.
     // Beginner: the person who opened their loft can Set embed; a foreign lock (other ownerId) stays locked.
     // ENGINE DEV: use this for Set embed + source tabs (not bare isLoftOwner alone).
@@ -221,7 +231,9 @@
       ownerId: "",
       embedUrl: "",
       embedSrc: "",
-      embedTitle: ""
+      embedTitle: "",
+      startedAt: 0,
+      loop: true
     };
   }
   function normalizePlaylistSource(v) {
@@ -246,6 +258,8 @@
       p.embedUrl = String(p.embedUrl || "");
       p.embedSrc = String(p.embedSrc || "");
       p.embedTitle = String(p.embedTitle || "").slice(0, 120);
+      p.startedAt = Number(p.startedAt || 0) || 0;
+      p.loop = p.loop === false ? false : true;
       return p;
     } catch (e) { return defaultPlaylist(); }
   }
@@ -257,6 +271,256 @@
       }
       localStorage.setItem(PLAYLIST_KEY, JSON.stringify(p));
     } catch (e) {}
+  }
+  function isWhirledApiLive() {
+    // How this works: demo server mode when WHIRLED_API is a non-empty origin.
+    // Beginner: GitHub Pages leaves this empty → shared soundtrack is local-only.
+    try { return !!(window.WHIRLED_API && String(window.WHIRLED_API).replace(/\/$/, "")); }
+    catch (e) { return false; }
+  }
+  function musicSyncMetaHtml() {
+    // How this works: clear UI meta so players know Pages alone cannot sync two phones.
+    if (isWhirledApiLive()) {
+      return '<p class="meta playlist-sync-meta">Everyone in this loft hears the same loop (synced). Demo server sync is <b>on</b>.</p>';
+    }
+    return '<p class="meta playlist-sync-meta">Everyone in this loft hears the same loop (synced). '
+      + '<b>Shared soundtrack syncs when the demo server is running; Pages alone is local-only.</b> '
+      + '(Same browser / multi-tab can still share via localStorage.)</p>';
+  }
+  function youtubeVideoIdFromEmbedSrc(src) {
+    // How this works: pull the 11-char-ish video id from a youtube-nocookie embed URL.
+    try {
+      var u = new URL(String(src || ""));
+      var parts = (u.pathname || "").split("/").filter(Boolean);
+      var i = parts.indexOf("embed");
+      if (i >= 0) {
+        var seg = parts[i + 1] || "";
+        if (seg && seg !== "videoseries" && /^[A-Za-z0-9_-]{6,64}$/.test(seg)) return seg;
+      }
+    } catch (e) {}
+    return "";
+  }
+  function musicElapsedSeconds(pl) {
+    // How this works: seconds since startedAt, used for start= / seekTo.
+    var started = Number((pl && pl.startedAt) || 0) || 0;
+    if (!started) return 0;
+    return Math.max(0, Math.floor((Date.now() - started) / 1000));
+  }
+  function ensureYoutubeIframeApi(cb) {
+    // How this works: load YouTube IFrame API once; then we can seekTo for shared sync.
+    // Beginner: if the API is blocked, we still fall back to iframe start= on first apply.
+    // ENGINE DEV: chrome-only; never inject into #stage-slot.
+    if (ytApiReady && window.YT && window.YT.Player) {
+      if (cb) cb();
+      return;
+    }
+    var prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = function () {
+      ytApiReady = true;
+      try { if (typeof prev === "function") prev(); } catch (eP) {}
+      if (cb) try { cb(); } catch (eC) {}
+    };
+    if (window.YT && window.YT.Player) {
+      ytApiReady = true;
+      if (cb) cb();
+      return;
+    }
+    if (ytApiLoading) return;
+    ytApiLoading = true;
+    var tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    tag.async = true;
+    (document.head || document.body).appendChild(tag);
+  }
+  function destroyYtPlayer() {
+    try {
+      if (ytPlayer && typeof ytPlayer.destroy === "function") ytPlayer.destroy();
+    } catch (e) {}
+    ytPlayer = null;
+  }
+  function attachYtPlayerIfPossible(pl) {
+    // How this works: wrap the dock iframe with YT.Player so we can seekTo(elapsed % duration).
+    // Beginner: only rebuilds when the video id changes; soft seek when drift is big.
+    if (!pl || normalizePlaylistSource(pl.source) !== "youtube" || !pl.embedSrc) return;
+    var vid = youtubeVideoIdFromEmbedSrc(pl.embedSrc);
+    if (!vid) return;
+    ensureYoutubeIframeApi(function () {
+      try {
+        var dock = document.getElementById("room-embed-dock");
+        if (!dock || dock.hidden) return;
+        var frame = dock.querySelector("iframe.room-embed-frame");
+        if (!frame) return;
+        if (!frame.id) frame.id = "whirled2-yt-frame";
+        // enablejsapi must be on the src for Player to attach
+        var wantEnable = String(frame.src || "").indexOf("enablejsapi=1") === -1;
+        if (wantEnable) {
+          try {
+            var u = new URL(frame.src);
+            u.searchParams.set("enablejsapi", "1");
+            u.searchParams.set("origin", location.origin || "");
+            frame.src = u.toString();
+          } catch (eEn) {}
+        }
+        function softSeek(player) {
+          var elapsed = musicElapsedSeconds(pl);
+          var dur = 0;
+          try { dur = Number(player.getDuration && player.getDuration()) || 0; } catch (eD) {}
+          var target = elapsed;
+          if (dur > 1) target = elapsed % Math.floor(dur);
+          var nowPos = 0;
+          try { nowPos = Number(player.getCurrentTime && player.getCurrentTime()) || 0; } catch (eT) {}
+          // Only seek when drift > 2.5s — avoid thrashing every poll.
+          if (Math.abs(nowPos - target) > 2.5) {
+            try { player.seekTo(target, true); } catch (eS) {}
+            lastYtSeekAt = Date.now();
+          }
+          try {
+            if (player.getPlayerState && player.getPlayerState() !== 1) {
+              player.playVideo();
+            }
+          } catch (ePlay) {}
+        }
+        if (ytPlayer && ytPlayer.__vid === vid) {
+          softSeek(ytPlayer);
+          return;
+        }
+        destroyYtPlayer();
+        ytPlayer = new window.YT.Player(frame.id, {
+          events: {
+            onReady: function (ev) {
+              try {
+                var p = ev.target;
+                p.__vid = vid;
+                var elapsed = musicElapsedSeconds(pl);
+                var dur = Number(p.getDuration && p.getDuration()) || 0;
+                var target = dur > 1 ? (elapsed % Math.floor(dur)) : elapsed;
+                try { p.seekTo(target, true); } catch (e0) {}
+                try { p.playVideo(); } catch (e1) {}
+                // Prefer loop via playlist=self already on embed URL; also setLoop if available.
+                try { if (p.setLoop) p.setLoop(true); } catch (e2) {}
+              } catch (eR) {}
+            },
+            onStateChange: function (ev) {
+              // When ended, restart for loop if API reports ended (0)
+              try {
+                if (ev.data === 0 && ytPlayer && typeof ytPlayer.seekTo === "function") {
+                  ytPlayer.seekTo(0, true);
+                  ytPlayer.playVideo();
+                }
+              } catch (eEnd) {}
+            }
+          }
+        });
+        ytPlayer.__vid = vid;
+      } catch (eAttach) {}
+    });
+  }
+  function applySharedMusicState(remote, opts) {
+    // How this works: guest/owner apply a music row from server or localStorage mirror.
+    // Beginner: guests do not paste — owner embedSrc appears automatically.
+    // ENGINE DEV: only rewrite iframe when embedSrc / startedAt fingerprint changes.
+    opts = opts || {};
+    if (!remote || typeof remote !== "object") return false;
+    if (!remote.embedSrc && !remote.embedUrl) return false;
+    var pl = loadPlaylist();
+    var src = normalizePlaylistSource(remote.source || pl.source || "youtube");
+    if (src !== "youtube" && src !== "spotify") src = "youtube";
+    var startedAt = Number(remote.startedAt || 0) || 0;
+    var fp = String(remote.embedSrc || "") + "|" + startedAt + "|" + src;
+    var same = fp === lastMusicSyncKey
+      && pl.embedSrc === String(remote.embedSrc || "")
+      && Number(pl.startedAt || 0) === startedAt;
+    pl.source = src;
+    pl.embedUrl = String(remote.embedUrl || pl.embedUrl || "");
+    pl.embedSrc = String(remote.embedSrc || "");
+    pl.embedTitle = String(remote.embedTitle || pl.embedTitle || "").slice(0, 120);
+    pl.startedAt = startedAt;
+    pl.loop = remote.loop === false ? false : true;
+    if (remote.ownerId) pl.ownerId = String(remote.ownerId);
+    savePlaylist(pl);
+    lastMusicSyncKey = fp;
+    if (!inRoom) return true;
+    if (!same || opts.force) {
+      try {
+        var dock = document.getElementById("room-embed-dock");
+        if (dock) dock.removeAttribute("data-embed-src");
+      } catch (eF) {}
+      try { syncRoomAudio(); } catch (eS) {}
+    } else if (src === "youtube") {
+      // Soft seek only — do not recreate iframe every poll.
+      try { attachYtPlayerIfPossible(pl); } catch (eA) {}
+    }
+    return true;
+  }
+  async function publishRoomMusicFromPlaylist(pl) {
+    // How this works: after owner Set embed, publish to demo server (or Pages local mirror).
+    if (!pl || !pl.embedSrc) return null;
+    if (!window.WhirledApi || typeof window.WhirledApi.setRoomMusic !== "function") return null;
+    var payload = {
+      source: normalizePlaylistSource(pl.source),
+      embedUrl: pl.embedUrl || "",
+      embedSrc: pl.embedSrc || "",
+      embedTitle: pl.embedTitle || "",
+      startedAt: Number(pl.startedAt || Date.now()) || Date.now(),
+      loop: pl.loop === false ? false : true,
+      ownerId: pl.ownerId || (session() && session().user && session().user.id) || ""
+    };
+    try {
+      var row = await window.WhirledApi.setRoomMusic("loft", payload);
+      if (row && row.startedAt) {
+        pl.startedAt = Number(row.startedAt) || pl.startedAt;
+        if (row.ownerId) pl.ownerId = String(row.ownerId);
+        savePlaylist(pl);
+        lastMusicSyncKey = String(pl.embedSrc || "") + "|" + pl.startedAt + "|" + normalizePlaylistSource(pl.source);
+      }
+      return row;
+    } catch (e) {
+      try { pushNotice("orange", "Could not publish shared soundtrack: " + ((e && e.message) || e)); } catch (eN) {}
+      return null;
+    }
+  }
+  async function pollSharedRoomMusic() {
+    // How this works: poll with chat (~2.5s). Guests auto-apply owner's embed without pasting.
+    if (!session() || !inRoom) return;
+    if (!window.WhirledApi || typeof window.WhirledApi.getRoomMusic !== "function") return;
+    try {
+      var remote = await window.WhirledApi.getRoomMusic("loft");
+      if (!remote || !remote.embedSrc) return;
+      var pl = loadPlaylist();
+      // If we are owner and local embed is newer empty remote skip; otherwise apply remote.
+      var remoteAt = Number(remote.updatedAt || remote.startedAt || 0) || 0;
+      var localAt = Number(pl.startedAt || 0) || 0;
+      var sameSrc = String(pl.embedSrc || "") === String(remote.embedSrc || "");
+      if (sameSrc && Number(pl.startedAt || 0) === Number(remote.startedAt || 0)) {
+        // Soft YouTube seek only
+        if (normalizePlaylistSource(pl.source) === "youtube") {
+          try { attachYtPlayerIfPossible(pl); } catch (eSoft) {}
+        }
+        return;
+      }
+      // Guests always take remote. Owner takes remote if remote URL differs (another device).
+      applySharedMusicState(remote, { force: !sameSrc });
+      // Remount playlist meta lightly if open (not while typing)
+      if (playlistPanelOpen && !playlistPanelHasFocus()) {
+        playlistPanelDirty = true;
+        try { ensurePlaylistPanel(); } catch (eP) {}
+      }
+    } catch (ePoll) {}
+  }
+  function bindRoomMusicStorageListener() {
+    // How this works: Pages multi-tab sync via storage event on whirled2.roomMusic.loft.
+    // Beginner: two different phones on GitHub Pages alone still cannot sync — need the demo server.
+    if (window.__whirledMusicStorageBound) return;
+    window.__whirledMusicStorageBound = true;
+    window.addEventListener("storage", function (ev) {
+      try {
+        if (!ev || ev.key !== ROOM_MUSIC_KEY) return;
+        if (!inRoom || !session()) return;
+        var remote = null;
+        try { remote = JSON.parse(ev.newValue || "null"); } catch (e) {}
+        if (remote && remote.embedSrc) applySharedMusicState(remote, { force: true });
+      } catch (eS) {}
+    });
   }
   function myMusicStuff() {
     return loadStuff().filter(function (it) {
@@ -404,9 +668,10 @@
     return { ok: false, error: "Pick YouTube or Spotify." };
   }
   function roomEmbedSrcForIframe(pl) {
-    // How this works: take stored embedSrc and add YouTube loop + playsinline for the live dock iframe.
-    // Beginner: one video keeps repeating; a playlist loops the list. Spotify uses its own player loop.
+    // How this works: take stored embedSrc and add YouTube loop + playsinline + start= for shared sync.
+    // Beginner: one video keeps repeating; guests join mid-song via start= seconds from startedAt.
     // ENGINE DEV: YouTube single-video loop REQUIRES loop=1&playlist=VIDEO_ID (same id). Keep playsinline=1.
+    // Prefer IFrame API seekTo when available; start= is the sparingly-used iframe fallback (URL change only).
     var base = String((pl && pl.embedSrc) || "");
     if (!base) return "";
     var kind = normalizePlaylistSource(pl && pl.source);
@@ -415,6 +680,8 @@
     try {
       var u = new URL(base);
       u.searchParams.set("playsinline", "1");
+      u.searchParams.set("enablejsapi", "1");
+      try { if (location.origin) u.searchParams.set("origin", location.origin); } catch (eO) {}
       var path = u.pathname || "";
       var list = u.searchParams.get("list") || "";
       var vid = "";
@@ -435,6 +702,9 @@
         u.searchParams.set("loop", "1");
         u.searchParams.set("playlist", vid);
       }
+      // Shared soundtrack: land near the same beat (unknown duration → raw elapsed; API corrects later).
+      var elapsed = musicElapsedSeconds(pl);
+      if (elapsed > 0) u.searchParams.set("start", String(elapsed));
       return u.toString();
     } catch (eLoop) {
       return base;
@@ -479,6 +749,7 @@
     // Beginner: Close player is separate — this fully tears down the iframe when music should stop.
     // ENGINE DEV: dock lives in shell() outside #main — never wipe via main.innerHTML.
     roomEmbedExpanded = false;
+    try { destroyYtPlayer(); } catch (eYt) {}
     var dock = document.getElementById("room-embed-dock");
     if (!dock) return;
     dock.hidden = true;
@@ -598,6 +869,10 @@
     }
     applyRoomEmbedExpanded(dock);
     try { updateRoomMusicChip(); } catch (eChipDock) {}
+    // How this works: after iframe exists, try YouTube IFrame API for seekTo sync (fallback already used start=).
+    if (kind === "youtube") {
+      try { attachYtPlayerIfPossible(pl); } catch (eYtAtt) {}
+    }
     return dock;
   }
   function playlistPanelHasFocus() {
@@ -712,9 +987,13 @@
     plE.embedSrc = parsed.embedSrc;
     plE.embedTitle = parsed.embedTitle;
     plE.ownerControlsMusic = true;
+    plE.loop = true;
+    // Reset shared timeline so every client seeks from the same start.
+    plE.startedAt = Date.now();
     if (typeof plE.ownerOnlyAdd !== "boolean") plE.ownerOnlyAdd = true;
     claimPlaylistOwnerIfNeeded(plE);
     savePlaylist(plE);
+    lastMusicSyncKey = String(plE.embedSrc || "") + "|" + plE.startedAt + "|" + srcE;
     try {
       var dockForce = document.getElementById("room-embed-dock");
       if (dockForce) dockForce.removeAttribute("data-embed-src");
@@ -723,11 +1002,13 @@
     playlistPanelDirty = true; // remount once to show Done success (modal only — dock iframe stays)
     paint("rooms");
     try { syncRoomAudio(); } catch (eSync) {}
+    // Publish so other phones / tabs hear the same loop (server) or same-browser tabs (Pages).
+    try { publishRoomMusicFromPlaylist(plE); } catch (ePub) {}
     var okMsg = srcE === "spotify"
-      ? "Embed set — press play in the dock. Spotify loops via its own player."
-      : "Embed set — press play in the dock. YouTube will loop.";
+      ? "Embed set — everyone in this loft hears the same loop (synced). Press play in the dock."
+      : "Embed set — everyone in this loft hears the same loop (synced). YouTube will loop.";
     setPlaylistEmbedMsg("ok", okMsg);
-    pushNotice("green", "Room music set — playing in the dock. Tap Done to keep listening.", { transient: true });
+    pushNotice("green", "Room music set — shared soundtrack published. Tap Done to keep listening.", { transient: true });
     return true;
   }
   function ensurePlaylistPanel() {
@@ -931,7 +1212,7 @@
             + '<input id="playlist-embed-url-input" name="embedUrl" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" required class="playlist-embed-url" placeholder="' + (src === "youtube" ? "Paste YouTube link" : "Paste Spotify link") + '" value="' + esc(pl.embedUrl || "") + '" />'
             + '<button type="button" class="action-btn playlist-set-embed-btn" data-playlist-set-embed="1">Set embed</button></form>'
             + '<p id="playlist-embed-msg" class="playlist-embed-msg" role="status" aria-live="polite"></p>')
-          : '<p class="meta">Owner controls room music — embed URL is read-only for guests.</p>')
+          : '<p class="meta">Owner controls room music — you hear their embed automatically (no paste needed).</p>')
       + (hasEmbed
           ? ('<div class="playlist-embed-success">'
             + '<p class="meta"><b>Playing in the dock</b> · ' + esc(pl.embedTitle || src) + (embedOpen ? (' · ' + embedOpen) : "") + '</p>'
@@ -949,7 +1230,8 @@
       + '<div class="room-music-card panel" data-playlist-card="1">'
       +   '<div class="room-side-head"><h2>Room music</h2>'
       +     '<button type="button" class="text-btn" data-playlist-close="1">Close</button></div>'
-      +   '<p class="meta">Music keeps playing after Close — the dock under the room holds the player.</p>'
+      +   '<p class="meta">Everyone in this loft hears the same loop (synced). Music keeps playing after Close — the dock under the room holds the player.</p>'
+      +   musicSyncMetaHtml()
       +   sourceTabs
       +   (src === "local" ? localBody : embedBody)
       + '</div></div>';
@@ -984,6 +1266,12 @@
   var roomMenuOpen = false;
   var roomPanelOpen = false;
   var playlistPanelOpen = false; // Room menu → View room music
+  // How this works: lobby tile opens a preview sheet FIRST — inRoom stays false until Enter.
+  // Beginner: Cancel closes the sheet; Enter runs tryEnterLoft (+ optional soft curtain).
+  // ENGINE DEV: preview is chrome modal on #app — never mounts Pixi / #stage-slot early.
+  var roomPreviewOpen = false;
+  var roomPreviewId = null; // "loft" today; future room ids later
+  var roomEnterCurtainTimer = null;
   // How this works: playlistPanelDirty = true when source/embed/mute/queue changes so ensurePlaylistPanel may rebuild once.
   // Modal never closes on focus loss / paint — only Close, backdrop, leave room, clearStrayUI.
   // Beginner: while you are typing/pasting a link, the panel HTML is never replaced (keyboard stays up).
@@ -1445,6 +1733,8 @@
     partyPanelOpen = false;
     playlistPanelOpen = false;
     playlistPanelDirty = false;
+    roomPreviewOpen = false;
+    roomPreviewId = null;
     roomEmbedExpanded = false;
     roomItemsPanelOpen = false;
     roomSharePanelOpen = false;
@@ -1465,6 +1755,14 @@
     if (orphanParty && !document.querySelector(".workspace #party-panel")) orphanParty.remove();
     var plPanel = document.getElementById("room-playlist-panel");
     if (plPanel) plPanel.remove();
+    var rpPanel = document.getElementById("room-preview-panel");
+    if (rpPanel) rpPanel.remove();
+    var curtain = document.getElementById("room-enter-curtain");
+    if (curtain) curtain.remove();
+    if (roomEnterCurtainTimer) {
+      try { clearTimeout(roomEnterCurtainTimer); } catch (eT) {}
+      roomEnterCurtainTimer = null;
+    }
     try {
       var dockClr = document.getElementById("room-embed-dock");
       if (dockClr) {
@@ -1474,8 +1772,6 @@
     } catch (eDockClr) {}
     var buddy = document.getElementById("buddy-invite-modal");
     if (buddy) buddy.remove();
-    var fbModal = document.getElementById("fb-appid-modal");
-    if (fbModal) fbModal.remove();
     var com = document.getElementById("chat-opts-menu");
     if (com) com.hidden = true;
     var cnm = document.getElementById("chat-name-menu");
@@ -2699,7 +2995,7 @@
     return '<div class="section-label">Recently visited</div>'
       + '<div class="recent-rooms-strip">'
       + recent.map(function (r) {
-          return '<button type="button" class="recent-room-chip" data-enter-room="' + esc(r.id || "loft") + '">' + esc(r.name || "Room") + '</button>';
+          return '<button type="button" class="recent-room-chip" data-room-preview="' + esc(r.id || "loft") + '">' + esc(r.name || "Room") + '</button>';
         }).join("")
       + '</div>';
   }
@@ -3101,7 +3397,7 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906z";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ab";
   }
   function inviteThemPanel() {
     var url = shareInviteUrl();
@@ -3720,21 +4016,165 @@
     }
     return groupsListPage();
   }
+  function roomOccupantChipsHtml(limit) {
+    // How this works: show up to N real occupant names on lobby tiles / preview (never invent people).
+    limit = limit || 3;
+    var list = (liveOccupants || []).slice();
+    if (!list.length && session() && session().user) {
+      list = [{ id: session().user.id, name: session().user.name || "You", you: true }];
+    }
+    if (!list.length) return '<span class="meta room-occ-chips-empty">No one here yet</span>';
+    var shown = list.slice(0, limit);
+    var extra = list.length - shown.length;
+    var chips = shown.map(function (p) {
+      return '<span class="room-occ-chip' + (p.you ? " is-you" : "") + '">' + esc(p.name || p.id || "?") + '</span>';
+    }).join("");
+    if (extra > 0) chips += '<span class="room-occ-chip is-more">+' + extra + '</span>';
+    return '<div class="room-occ-chips" aria-label="People in room">' + chips + '</div>';
+  }
+  function roomLockGlyphHtml() {
+    var mode = (loadRoomLock().mode || "unlocked");
+    if (mode === "friends") return '<span class="room-lock-glyph" title="Friends only">👥</span>';
+    if (mode === "locked") return '<span class="room-lock-glyph" title="Locked">🔒</span>';
+    return '<span class="room-lock-glyph" title="Unlocked">🔓</span>';
+  }
   function roomTile(opts) {
+    // How this works: lobby tiles open a PREVIEW sheet (data-room-preview) — not instant enter.
+    // Beginner: first click = peek (name/owner/lock/people); Enter inside the sheet actually joins.
+    // ENGINE DEV: do not set inRoom here; preview is chrome-only before #stage-slot exists.
     opts = opts || {};
     var online = opts.online != null ? opts.online : 0;
     var enter = opts.enterable !== false;
     var rating = opts.rating || "Rating: new";
+    var rid = opts.id || "loft";
     var tag = enter ? "button" : "div";
-    var attrs = enter ? ' type="button" class="room-tile" data-enter-room="' + esc(opts.id || "loft") + '"' : ' class="room-tile is-empty"';
+    var attrs = enter
+      ? (' type="button" class="room-tile" data-room-preview="' + esc(rid) + '"')
+      : ' class="room-tile is-empty"';
     return '<' + tag + attrs + '>'
       + '<div class="thumb" aria-hidden="true"></div>'
-      + '<div class="body"><h3>' + esc(opts.name || ROOM) + '</h3>'
+      + '<div class="body"><h3>' + roomLockGlyphHtml() + ' ' + esc(opts.name || ROOM) + '</h3>'
       +   '<p class="meta">' + esc(opts.meta || "") + '</p>'
       +   '<div class="room-rating">' + esc(rating) + '</div>'
       +   '<div class="online">' + (online > 0 ? (online + " online now!") : "0 players") + '</div>'
-      +   (enter ? '<span class="enter-label">Enter</span>' : '<span class="meta">—</span>')
+      +   (enter ? roomOccupantChipsHtml(3) : "")
+      +   (enter ? '<span class="enter-label">Preview</span>' : '<span class="meta">—</span>')
       + '</div></' + tag + '>';
+  }
+  function closeRoomPreview() {
+    // How this works: Cancel / backdrop — stay in lobby, never touched inRoom.
+    roomPreviewOpen = false;
+    roomPreviewId = null;
+    try {
+      var el = document.getElementById("room-preview-panel");
+      if (el) el.remove();
+    } catch (e) {}
+  }
+  function roomPreviewHtml(roomId) {
+    // How this works: pre-enter sheet — name, owner, lock, rating, occupant chips, optional now-playing.
+    roomId = roomId || "loft";
+    var me = you();
+    var lock = loadRoomLock();
+    var mode = (lock && lock.mode) || "unlocked";
+    var lockLabel = mode === "friends" ? "Friends only" : (mode === "locked" ? "Locked" : "Unlocked");
+    var online = (liveOccupants || []).length || (session() ? 1 : 0);
+    var pl = loadPlaylist();
+    var nowPlaying = "";
+    if (pl && pl.embedSrc && (pl.source === "youtube" || pl.source === "spotify")) {
+      nowPlaying = '<p class="meta room-preview-music">♪ Now playing: <b>' + esc(pl.embedTitle || pl.source) + '</b></p>';
+    } else if (pl && pl.source === "local" && pl.tracks && pl.tracks[pl.current]) {
+      nowPlaying = '<p class="meta room-preview-music">♪ Queue: <b>' + esc(pl.tracks[pl.current].name || "Track") + '</b></p>';
+    }
+    var syncNote = isWhirledApiLive()
+      ? '<p class="meta">Shared soundtrack sync is on (demo server).</p>'
+      : '<p class="meta">Shared soundtrack syncs when the demo server is running; Pages alone is local-only.</p>';
+    return ''
+      + '<div class="room-preview-modal" id="room-preview-panel" data-room-preview-backdrop="1" role="dialog" aria-modal="true" aria-label="Room preview">'
+      +   '<div class="room-preview-card panel" data-room-preview-card="1">'
+      +     '<div class="room-side-head"><h2>Room preview</h2>'
+      +       '<button type="button" class="text-btn" data-room-preview-close="1">Cancel</button></div>'
+      +     '<div class="room-preview-thumb" aria-hidden="true"></div>'
+      +     '<h3 class="room-preview-name">' + roomLockGlyphHtml() + ' ' + esc(ROOM) + '</h3>'
+      +     '<p class="meta">owner: <b>' + esc(me.name) + '</b> · home whirled</p>'
+      +     '<p class="meta">Lock: <b>' + esc(lockLabel) + '</b> · ' + esc(loftRatingLabel()) + ' · ' + online + ' online</p>'
+      +     '<div class="section-label">People here</div>'
+      +     roomOccupantChipsHtml(8)
+      +     nowPlaying
+      +     syncNote
+      +     '<p class="meta">Everyone in this loft hears the same loop (synced) after you enter (when sync is available).</p>'
+      +     '<div class="room-preview-actions">'
+      +       '<button type="button" class="action-btn room-preview-enter-btn" data-room-preview-enter="' + esc(roomId) + '">Enter</button>'
+      +       '<button type="button" class="text-btn" data-room-preview-close="1">Cancel</button>'
+      +     '</div>'
+      +   '</div></div>';
+  }
+  function ensureRoomPreviewPanel() {
+    var app = document.getElementById("app");
+    var existing = document.getElementById("room-preview-panel");
+    if (!app || !roomPreviewOpen || inRoom || !session()) {
+      if (existing) existing.remove();
+      return null;
+    }
+    var html = roomPreviewHtml(roomPreviewId || "loft");
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    var next = wrap.firstChild;
+    if (!next) return null;
+    if (existing && existing.parentNode) existing.parentNode.replaceChild(next, existing);
+    else app.appendChild(next);
+    return document.getElementById("room-preview-panel");
+  }
+  function openRoomPreview(roomId) {
+    // How this works: lobby / recent-room click → preview only (inRoom stays false).
+    // Beginner: you peek first; Enter in the sheet is the real join.
+    if (!session()) return;
+    if (inRoom) return;
+    roomPreviewId = roomId || "loft";
+    roomPreviewOpen = true;
+    try { loadOccupants(); } catch (e) {}
+    ensureRoomPreviewPanel();
+  }
+  function showEnterCurtain(roomName, thenFn) {
+    // How this works: optional soft curtain before mounting the loft stage.
+    // Beginner: short “Entering…” flash — not a fake loading bar.
+    // ENGINE DEV: chrome overlay only; future engine can hook onRoomEnter after curtain clears.
+    try {
+      var old = document.getElementById("room-enter-curtain");
+      if (old) old.remove();
+    } catch (e0) {}
+    var el = document.createElement("div");
+    el.id = "room-enter-curtain";
+    el.className = "room-enter-curtain";
+    el.setAttribute("role", "status");
+    el.innerHTML = '<div class="room-enter-curtain-card"><p>Entering <b>' + esc(roomName || ROOM) + '</b>…</p></div>';
+    (document.getElementById("app") || document.body).appendChild(el);
+    if (roomEnterCurtainTimer) {
+      try { clearTimeout(roomEnterCurtainTimer); } catch (e1) {}
+    }
+    roomEnterCurtainTimer = setTimeout(function () {
+      roomEnterCurtainTimer = null;
+      try {
+        var c = document.getElementById("room-enter-curtain");
+        if (c) c.remove();
+      } catch (e2) {}
+      if (typeof thenFn === "function") thenFn();
+    }, 420);
+  }
+  function confirmEnterFromPreview(roomId) {
+    // How this works: preview Enter → soft curtain → tryEnterLoft → paint roomView.
+    closeRoomPreview();
+    showEnterCurtain(ROOM, function () {
+      if (!tryEnterLoft()) {
+        paint("rooms");
+        return;
+      }
+      clearRoomChatDisplay(true);
+      loftVisitOccupants = [];
+      paint("rooms");
+      loadOccupants();
+      try { pollSharedRoomMusic(); } catch (eM) {}
+      try { awardAction("enterRoom"); } catch (e) {}
+    });
   }
   function roomsLobby() {
     var me = you();
@@ -3766,7 +4206,7 @@
     var tip = tips[tourTip % tips.length];
     return '<section class="page rooms-lobby">'
       + '<div class="featured">Featured Rooms</div>'
-      + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Decorate, chat and play — engine mounts inside the loft.</p>'
+      + '<p class="lobby-blurb">Rooms are where you create your space and show it off. Tap a room tile to <b>preview</b> who is there, then Enter — engine mounts inside the loft.</p>'
       + recentRoomsStripHtml()
       + '<div class="room-tiles">' + featured + '</div>'
       + '<div class="section-label">Active Rooms</div>'
@@ -3933,10 +4373,10 @@ function helpPage() {
       + '<div class="panel"><h2>Starting Out</h2>'
       + '<ul class="help-tips">'
       + '<li><b>Me</b> — profile, friends, mail, passport stamps, account (permaname), Transactions (Coins &amp; Bars).</li>'
-      + '<li><b>Facebook Connect</b> — gate <b>Continue with Facebook</b>, or Me → Account to link/unlink + set Facebook App ID (local <code>whirled2.facebookAppId</code>). Create app at developers.facebook.com; add Facebook Login for Web; App Domains / OAuth redirect include <code>https://whirledclassic.github.io/</code>. Discord / Google Coming Soon.</li>'
-      + '<li><b>Rooms</b> — enter Studio Loft; chat in the bar; Room menu for comment/rate, decorate, lock (visual).</li>'
+      + '<li><b>Sign-in</b> — username / password is primary. Discord / Google Coming Soon (OAuth apps needed). Facebook Connect removed (Meta App ID was required for Pages).</li>'
+      + '<li><b>Rooms</b> — tap a lobby tile to <b>preview</b> (who is there, lock) then Enter; chat in the bar; Room menu for comment/rate, decorate, lock.</li>'
       + '<li><b>Stuff upload</b> — furniture/media with Upload…; <b>Music</b> accepts MP3/WAV/OGG (copyright checkbox required). List Item copies into Shop.</li>'
-      + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Paste a YouTube/Spotify link → <b>Set embed</b> → <b>Done</b>. Closing the sheet does <b>not</b> stop playback (dock keeps looping). On phones use <b>Open player</b> if the embed is hard to tap.</li>'
+      + '<li><b>Room music</b> — ♪ Music / Room menu → View room music. Owner pastes a YouTube/Spotify link → <b>Set embed</b> → <b>Done</b>. <b>Everyone in this loft hears the same loop (synced)</b> when the demo server is running; Pages alone is local-only. Closing the sheet does <b>not</b> stop playback. On phones use <b>Open player</b> if the embed is hard to tap.</li>'
       + '<li><b>Themes</b> — Me → Themes for browser CSS presets; group managers get Edit Whirled theme shell (Coming Soon).</li>'
       + '<li><b>Profile look</b> — Me → My Profile → presets publish instantly; <b>Upload custom background</b> (image behind everything) or Edit look for font/corners/modules/banner.</li>'
       + '<li><b>Ctrl+K</b> — command palette to jump Me / Mail / Rooms / … Press <b>?</b> for shortcuts.</li>'
@@ -3950,8 +4390,8 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: Classic pale-blue theme polish (one type + color system, clearer meta contrast, no page-switch flash when leaving Profile look). Music from y still in tree. Cache <code>?v=20260906z</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
-      + '<p class="meta"><b>Club</b> — Membership Coming Soon (Me → Club or header Club). Coins/bars stay labels; no live payments.</p>'
+      + '<p class="meta">This pass: shared soundtrack + FB removed + room preview + Club tier cards. Cache <code>?v=20260906ab</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
       + '</div></section>';
@@ -5374,48 +5814,15 @@ function helpPage() {
       +   '<p class="meta">Browser look: <button type="button" class="text-btn" data-me="themes">Themes</button> (CSS presets on this device). Group world themes live on group pages for managers.</p>'
       +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
       + '</div>'
-      + '<div class="panel fb-connect-panel">'
-      +   '<h2>Facebook Connect</h2>'
-      +   fbConnectAccountHtml()
-      + '</div>'
       + '<div class="panel">'
       +   '<h2>Other sign-in</h2>'
+      +   '<p class="meta">Username / password is primary (no Meta App ID steps).</p>'
       +   '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span></p>'
       +   '<p class="meta">Google — <span class="club-badge-soon">Coming Soon</span></p>'
-      +   '<p class="meta">Modern options listed for later — not wired yet (no fake buttons).</p>'
+      +   '<p class="meta">GitHub / Apple OAuth also need a developer app — none are zero-setup on a static site.</p>'
       + '</div>'
       + rolePanel
       + '</section>';
-  }
-
-  // How this works: Account shows linked status + App ID field for this browser deploy owner.
-  function fbConnectAccountHtml() {
-    var s = session();
-    var u = s && s.user ? s.user : {};
-    var linked = !!(u.facebookId);
-    var linkedLabel = linked
-      ? ('Linked as <b>' + esc(u.facebookName || u.name || u.facebookId) + '</b>')
-      : 'Not linked';
-    var appId = getFbAppId();
-    var statusBtn = linked
-      ? '<button type="button" class="action-btn" data-fb-unlink="1">Unlink</button>'
-      : '<button type="button" class="fb-continue-btn fb-continue-btn-sm" data-fb-link="1"><span class="fb-icon" aria-hidden="true">f</span> Link Facebook</button>';
-    return ''
-      + '<p class="fb-link-status">' + linkedLabel + '</p>'
-      + '<div class="fb-account-actions">' + statusBtn + '</div>'
-      + '<form id="fb-appid-account-form" class="fb-appid-account-form">'
-      +   '<label>Facebook App ID'
-      +     '<input name="appId" inputmode="numeric" pattern="[0-9]*" maxlength="32" placeholder="Digits only" value="' + esc(appId) + '" />'
-      +   '</label>'
-      +   '<button type="submit" class="action-btn">Save</button>'
-      + '</form>'
-      + '<ol class="fb-setup-help meta">'
-      +   '<li>Create app at <code>developers.facebook.com</code></li>'
-      +   '<li>Add Facebook Login for Web</li>'
-      +   '<li>App Domains / Valid OAuth Redirect URIs include <code>https://whirledclassic.github.io/</code></li>'
-      +   '<li>Paste App ID here</li>'
-      + '</ol>'
-      + '<p class="meta">Uses Facebook Login. We store your Facebook user id + name in this browser only — no password from Facebook. Key: <code>whirled2.facebookAppId</code>.</p>';
   }
 
   function otherProfile(id) {
@@ -5647,35 +6054,124 @@ function helpPage() {
   }
 
   function meClub() {
+    // How this works: Me → Club shows 2026 tier cards (Free / Supporter / Creator / Studio).
+    // Beginner: nothing to buy — every paid card is Coming Soon. Notify-me is localStorage only.
+    // ENGINE DEV: chrome preview only — see MEMBERSHIP.md; never gate #stage-slot on a tier.
     var sid = session() && session().user ? session().user.id : "guest";
     var note = "";
     try { note = localStorage.getItem("whirled2.clubNotify." + sid) || ""; } catch (e) {}
     var interested = false;
     try { interested = localStorage.getItem("whirled2.clubInterested." + sid) === "1"; } catch (e2) {}
+
+    function tierCard(opts) {
+      // How this works: one visual card per tier. Free is current; others show Coming Soon CTAs.
+      opts = opts || {};
+      var soon = !!opts.soon;
+      var current = !!opts.current;
+      return ''
+        + '<article class="club-tier-card club-tier-' + esc(opts.id || "free")
+        + (current ? " is-current" : "")
+        + (soon ? " is-soon" : "") + '">'
+        +   (soon ? '<span class="club-badge-soon">Coming Soon</span>' : '<span class="club-badge-free">Your plan</span>')
+        +   '<div class="club-tier-icon" aria-hidden="true">' + (opts.icon || "★") + '</div>'
+        +   '<h3 class="club-tier-name">' + esc(opts.name || "") + '</h3>'
+        +   '<p class="club-tier-price meta">' + esc(opts.price || "") + '</p>'
+        +   '<p class="club-tier-blurb">' + esc(opts.blurb || "") + '</p>'
+        +   '<ul class="club-tier-perks">'
+        +     (opts.perks || []).map(function (p) {
+          return '<li>' + esc(p) + '</li>';
+        }).join("")
+        +   '</ul>'
+        +   (soon
+          ? '<button type="button" class="action-btn club-tier-cta" disabled title="No payments on this mock">Coming Soon</button>'
+          : '<button type="button" class="action-btn club-tier-cta is-on" disabled>Free — active</button>')
+        + '</article>';
+    }
+
+    var cards = ''
+      + tierCard({
+          id: "free",
+          name: "Free",
+          icon: "⌂",
+          price: "$0 forever",
+          blurb: "Hang out, make friends, make stuff — the whole social world stays open.",
+          current: true,
+          soon: false,
+          perks: [
+            "Home loft + Rooms lobby preview",
+            "Chat, Stuff, Games, Groups, Shop browse",
+            "Earn Coins & Bars via daily streaks (play currency)",
+            "Profile look + browser themes"
+          ]
+        })
+      + tierCard({
+          id: "supporter",
+          name: "Supporter",
+          icon: "✦",
+          price: "Optional tip / soft sub later",
+          blurb: "Thank-you flair for fans who keep the lights on — cosmetics first, never pay-to-win.",
+          soon: true,
+          perks: [
+            "Club mark / name flair (classic star vibe)",
+            "Modest coin-earn bonus (may)",
+            "Free party create + member comment tint",
+            "Early chrome cosmetics"
+          ]
+        })
+      + tierCard({
+          id: "creator",
+          name: "Creator",
+          icon: "✎",
+          price: "Sell stuff · small platform cut",
+          blurb: "For avatar & furniture makers. You sell; Whirled2 takes a small published cut later.",
+          soon: true,
+          perks: [
+            "Sell avatars & Stuff in Shop",
+            "Small platform cut (target ~10–15% — TBD, not live)",
+            "Creator badge + listing tools",
+            "Sales stub / analytics later"
+          ]
+        })
+      + tierCard({
+          id: "studio",
+          name: "Studio",
+          icon: "◈",
+          price: "Teams / group managers later",
+          blurb: "Classic “themed Whirled” energy — extra rooms, theme tools, manager seats.",
+          soon: true,
+          perks: [
+            "Extra room slots beyond home loft",
+            "Themed Whirled / group theme tools",
+            "Manager seats + Studio mark",
+            "Reduced theme / room costs (may)"
+          ]
+        });
+
     return '<section class="page me-page club-page">' + meSubnav()
       + '<div class="panel club-hero">'
       +   '<div class="club-badge-soon">Coming Soon</div>'
       +   '<h2>Club / Membership</h2>'
-      +   '<p>Club Whirled–style membership for <b>Whirled2</b> is on the way. Nothing to buy today — this page is a preview of what membership <i>may</i> include.</p>'
+      +   '<p>Four clear tiers for Whirled2 — researched from classic Whirled / Club Whirled lessons. '
+      +     '<b>Nothing to buy today.</b> Full design notes: <code>MEMBERSHIP.md</code>.</p>'
+      +   '<p class="meta">Coins &amp; Bars stay play currency (earn-only Bars). <b>No live payments</b> / no Buy Bars on this mock.</p>'
       + '</div>'
+      + '<div class="club-tier-grid" role="list">' + cards + '</div>'
       + '<div class="panel">'
-      +   '<h2>What membership may include</h2>'
-      +   '<p class="meta">Inspired by classic Club Whirled perks. All items are <b>may / subject to change</b> — prototypes only.</p>'
+      +   '<h2>Why these tiers?</h2>'
+      +   '<p class="meta">Three Rings-era Whirled kept play free and sold optional bars/support. Community <b>Club Whirled</b> added a star, monthly bars, and listing perks — but one VIP tier + Buy Bars was confusing. '
+      +     'Whirled2 splits <b>Supporter</b> (flair) from <b>Creator</b> (sell avatars with a small platform cut) and <b>Studio</b> (group managers). All may / subject to change.</p>'
       +   '<ul class="club-may-list">'
-      +     '<li>Extra rooms or room slots beyond the free home loft</li>'
-      +     '<li>Cosmetic flair (badges, name accents, room themes) — labels &amp; visuals, not pay-to-win</li>'
-      +     '<li>Supporter recognition in-profile (Club member mark)</li>'
-      +     '<li>Early access to selected chrome or decorate toys</li>'
-      +     '<li>Occasional member-only events or contests</li>'
+      +     '<li>Free core must stay fun without paying</li>'
+      +     '<li>Creator cut will be published before any real checkout</li>'
+      +     '<li>No fake member counts or live prices on Pages</li>'
       +   '</ul>'
-      +   '<p class="meta"><b>Coins &amp; Bars</b> are play currency (Bars earn-only via streaks). There are <b>no live payments</b> and no Buy Bars on this mock.</p>'
       + '</div>'
       + '<div class="panel club-disclaimer">'
       +   '<h2>Disclaimer</h2>'
       +   '<p><b>Whirled2</b> is <b>not affiliated</b> with Three Rings Design, the operators of whirled.club, or any official Whirled commercial entity. We do not claim to be official whirled.club.</p>'
       +   '<p>Whirled2 is a same-game-spirit revival on a <b>new engine</b>, informed by public research, community docs, and the open-source <a href="https://github.com/greyhavens/msoy" target="_blank" rel="noopener">greyhavens/msoy</a> reference (BSD) — not a Flash/msoy port and not a private-engine dump.</p>'
-      +   '<p>Features you see here are <b>prototypes</b>. Items, pages, and perks may appear or disappear before any launch. <b>Nothing is final.</b></p>'
-      +   '<p class="meta">Full IP / upload rules: <button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button>. Coins & Bars — no payments.</p>'
+      +   '<p>Features you see here are <b>prototypes</b>. Tiers, cuts, and perks may appear or disappear before any launch. <b>Nothing is final.</b></p>'
+      +   '<p class="meta">Full IP / upload rules: <button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button>. Coins &amp; Bars — no payments.</p>'
       + '</div>'
       + '<div class="panel">'
       +   '<h2>Notify me</h2>'
@@ -5737,272 +6233,15 @@ function helpPage() {
   // ---------------------------------------------------------------------------
   // Gate (logged out) + Shell (logged in chrome) + paint(tab) redraw
   // How this works: paint("rooms"|"me"|...) replaces #main innerHTML from state.
-  // ---------------------------------------------------------------------------
-  // ===========================================================================
-  // Facebook Connect (?v=20260906s) — classic Me→Account + gate Continue with Facebook
-  // How this works: pure client Facebook JS SDK. App ID in localStorage whirled2.facebookAppId
-  //   (or window.WHIRLED2_FB_APP_ID stub). We never invent FB users without SDK success.
-  // ENGINE DEV: auth is chrome; engine may later read session only via WhirledChrome.
-  // ===========================================================================
-  var FB_SDK_SRC = "https://connect.facebook.net/en_US/sdk.js";
-  var _fbSdkReady = null; // Promise
-  var _fbInitedAppId = "";
 
-  function getFbAppId() {
-    try {
-      if (window.WhirledApi && typeof window.WhirledApi.getFacebookAppId === "function") {
-        return window.WhirledApi.getFacebookAppId() || "";
-      }
-    } catch (e) {}
-    try {
-      var a = localStorage.getItem("whirled2.facebookAppId");
-      if (a && /^\d+$/.test(String(a).trim())) return String(a).trim();
-    } catch (e2) {}
-    try {
-      if (window.WHIRLED2_FB_APP_ID && /^\d+$/.test(String(window.WHIRLED2_FB_APP_ID).trim())) {
-        return String(window.WHIRLED2_FB_APP_ID).trim();
-      }
-    } catch (e3) {}
-    return "";
-  }
-
-  function saveFbAppId(appId) {
-    if (window.WhirledApi && typeof window.WhirledApi.setFacebookAppId === "function") {
-      return window.WhirledApi.setFacebookAppId(appId);
-    }
-    appId = String(appId || "").trim();
-    if (appId && !/^\d+$/.test(appId)) throw new Error("Facebook App ID must be digits only.");
-    if (appId) localStorage.setItem("whirled2.facebookAppId", appId);
-    else localStorage.removeItem("whirled2.facebookAppId");
-    return appId;
-  }
-
-  function loadFacebookSdk(appId) {
-    // How this works: load sdk.js once, FB.init with v21.0 when App ID known.
-    appId = String(appId || "").trim();
-    if (!appId) return Promise.reject(new Error("Set a Facebook App ID first."));
-    if (window.FB && _fbInitedAppId === appId) return Promise.resolve(window.FB);
-    if (_fbSdkReady && _fbInitedAppId === appId) return _fbSdkReady;
-
-    _fbSdkReady = new Promise(function (resolve, reject) {
-      var finished = false;
-      function finishOk() {
-        if (finished) return;
-        finished = true;
-        try {
-          window.FB.init({ appId: appId, cookie: true, xfbml: false, version: "v21.0" });
-          _fbInitedAppId = appId;
-          resolve(window.FB);
-        } catch (e) {
-          reject(e);
-        }
-      }
-      function finishErr(msg) {
-        if (finished) return;
-        finished = true;
-        reject(new Error(msg || "Facebook SDK failed to load."));
-      }
-
-      var prev = window.fbAsyncInit;
-      window.fbAsyncInit = function () {
-        try { if (typeof prev === "function") prev(); } catch (eP) {}
-        finishOk();
-      };
-
-      if (window.FB && document.getElementById("facebook-jssdk")) {
-        finishOk();
-        return;
-      }
-
-      if (!document.getElementById("facebook-jssdk")) {
-        var js = document.createElement("script");
-        js.id = "facebook-jssdk";
-        js.async = true;
-        js.src = FB_SDK_SRC;
-        js.onerror = function () { finishErr("Could not load Facebook SDK (network / blocked)."); };
-        (document.body || document.head).appendChild(js);
-      }
-
-      // Safety timeout — SDK should call fbAsyncInit
-      setTimeout(function () {
-        if (window.FB) finishOk();
-        else finishErr("Facebook SDK timed out. Check network or App ID.");
-      }, 12000);
-    });
-    return _fbSdkReady;
-  }
-
-  function facebookLoginViaSdk() {
-    // How this works: FB.login → FB.api('/me') → WhirledApi.loginWithFacebookProfile.
-    // Never invent users without SDK success.
-    var appId = getFbAppId();
-    if (!appId) return Promise.reject(new Error("no-app-id"));
-    return loadFacebookSdk(appId).then(function (FB) {
-      return new Promise(function (resolve, reject) {
-        FB.login(function (response) {
-          if (!response || response.status !== "connected" || !response.authResponse) {
-            reject(new Error("Facebook login was cancelled or failed."));
-            return;
-          }
-          FB.api("/me", { fields: "id,name,email" }, function (me) {
-            if (!me || me.error || !me.id) {
-              reject(new Error((me && me.error && me.error.message) || "Could not read Facebook profile."));
-              return;
-            }
-            resolve({ id: me.id, name: me.name, email: me.email || "" });
-          });
-        }, { scope: "public_profile,email" });
-      });
-    }).then(function (profile) {
-      return window.WhirledApi.loginWithFacebookProfile(profile);
-    });
-  }
-
-  function facebookLinkViaSdk() {
-    var appId = getFbAppId();
-    if (!appId) return Promise.reject(new Error("no-app-id"));
-    return loadFacebookSdk(appId).then(function (FB) {
-      return new Promise(function (resolve, reject) {
-        FB.login(function (response) {
-          if (!response || response.status !== "connected" || !response.authResponse) {
-            reject(new Error("Facebook link was cancelled or failed."));
-            return;
-          }
-          FB.api("/me", { fields: "id,name,email" }, function (me) {
-            if (!me || me.error || !me.id) {
-              reject(new Error((me && me.error && me.error.message) || "Could not read Facebook profile."));
-              return;
-            }
-            resolve({ id: me.id, name: me.name, email: me.email || "" });
-          });
-        }, { scope: "public_profile,email" });
-      });
-    }).then(function (profile) {
-      return window.WhirledApi.linkFacebook(profile);
-    });
-  }
-
-  function dismissFbAppIdModal() {
-    var m = document.getElementById("fb-appid-modal");
-    if (m) m.remove();
-  }
-
-  function openFbAppIdModal(opts) {
-    // How this works: gate cannot open Account — inline mini form to paste App ID then retry.
-    opts = opts || {};
-    dismissFbAppIdModal();
-    var wrap = document.createElement("div");
-    wrap.innerHTML = ''
-      + '<div class="modal-backdrop" id="fb-appid-modal" role="presentation">'
-      +   '<div class="modal-card fb-appid-card" role="dialog" aria-modal="true" aria-label="Set Facebook App ID">'
-      +     '<h2>Set Facebook App ID</h2>'
-      +     '<p class="meta">Create an app at developers.facebook.com → Add Facebook Login for Web → '
-      +       'App Domains / Valid OAuth Redirect URIs include <code>https://whirledclassic.github.io/</code> → paste App ID here.</p>'
-      +     '<form id="fb-appid-form">'
-      +       '<label class="fb-appid-label">Facebook App ID'
-      +         '<input name="appId" inputmode="numeric" pattern="[0-9]*" maxlength="32" placeholder="Digits only" required value="' + esc(getFbAppId()) + '" />'
-      +       '</label>'
-      +       '<div class="fb-appid-actions">'
-      +         '<button type="submit" class="action-btn">Save' + (opts.retry ? " &amp; Continue" : "") + '</button>'
-      +         '<button type="button" class="text-btn" data-fb-appid-cancel="1">Cancel</button>'
-      +       '</div>'
-      +     '</form>'
-      +     '<p class="meta">Stored in this browser only as <code>whirled2.facebookAppId</code>. No server secrets on GitHub Pages.</p>'
-      +   '</div></div>';
-    var modal = wrap.firstChild;
-    document.body.appendChild(modal);
-    modal.addEventListener("click", function (ev) {
-      if (ev.target === modal || ev.target.closest("[data-fb-appid-cancel]")) {
-        dismissFbAppIdModal();
-      }
-    });
-    var form = document.getElementById("fb-appid-form");
-    if (form) {
-      form.addEventListener("submit", function (ev) {
-        ev.preventDefault();
-        var data = new FormData(form);
-        var id = String(data.get("appId") || "").trim();
-        try {
-          saveFbAppId(id);
-        } catch (e) {
-          pushNotice("gray", e.message || String(e));
-          return;
-        }
-        dismissFbAppIdModal();
-        try { pushNotice("green", "Facebook App ID saved on this browser.", { transient: true }); } catch (eN) {}
-        if (opts.retry) {
-          startFacebookContinue();
-        } else if (opts.retryLink) {
-          startFacebookLink();
-        } else if (session() && meSub === "account") {
-          paint("me");
-        }
-      });
-      try {
-        var inp = form.querySelector("input[name=appId]");
-        if (inp) inp.focus();
-      } catch (eF) {}
-    }
-  }
-
-  function setGateFbErr(msg) {
-    var err = document.getElementById("gate-err");
-    if (err) err.textContent = msg || "";
-  }
-
-  function startFacebookContinue() {
-    // Gate: Continue with Facebook → login or register via SDK profile.
-    setGateFbErr("");
-    var appId = getFbAppId();
-    if (!appId) {
-      openFbAppIdModal({ retry: true });
-      return;
-    }
-    setGateFbErr("Opening Facebook…");
-    facebookLoginViaSdk().then(function () {
-      setGateFbErr("");
-      boot();
-    }).catch(function (e) {
-      if (e && e.message === "no-app-id") {
-        openFbAppIdModal({ retry: true });
-        return;
-      }
-      setGateFbErr((e && e.message) || String(e));
-    });
-  }
-
-  function startFacebookLink() {
-    var appId = getFbAppId();
-    if (!appId) {
-      openFbAppIdModal({ retryLink: true });
-      return;
-    }
-    facebookLinkViaSdk().then(function () {
-      pushNotice("green", "Facebook linked on this browser.", { transient: true });
-      meSub = "account";
-      paint("me");
-    }).catch(function (e) {
-      if (e && e.message === "no-app-id") {
-        openFbAppIdModal({ retry: false });
-        return;
-      }
-      pushNotice("gray", (e && e.message) || String(e));
-    });
-  }
-
-  function startFacebookUnlink() {
-    if (!window.WhirledApi || !window.WhirledApi.unlinkFacebook) return;
-    window.WhirledApi.unlinkFacebook().then(function () {
-      pushNotice("green", "Facebook unlinked on this browser.", { transient: true });
-      meSub = "account";
-      paint("me");
-    }).catch(function (e) {
-      pushNotice("gray", (e && e.message) || String(e));
-    });
-  }
+  // Facebook Connect removed (?v=20260906ab): Meta App ID setup was required for a static
+  // Pages deploy, so Continue with Facebook / Account link-unlink / SDK load paths are gone.
+  // Username/password stays primary. Discord / Google remain Coming Soon labels only.
+  // ENGINE DEV: auth is chrome session only — do not break #stage-slot / syncRoomAudio / ♪ Music.
 
   function gate() {
-    // How this works: Sign Up / Logon + Continue with Facebook (classic blue). App ID optional until click.
+    // How this works: Sign Up / Logon with username + password (primary). No Facebook button.
+    // Beginner: social OAuth needs a developer app setup — keep local accounts until a hosted OAuth is chosen.
     return ''
       + '<section class="gate"><div class="gate-card">'
       +   logoImg("gate-logo")
@@ -6019,14 +6258,9 @@ function helpPage() {
       +       '<input name="password" type="password" autocomplete="current-password" placeholder="Password" required />'
       +       '<button type="submit">Logon</button></form>'
       +   '</div>'
-      +   '<div class="gate-fb">'
-      +     '<div class="gate-fb-divider"><span>or</span></div>'
-      +     '<button type="button" class="fb-continue-btn" id="fb-continue-btn" data-fb-continue="1">'
-      +       '<span class="fb-icon" aria-hidden="true">f</span> Continue with Facebook</button>'
-      +     '<p class="meta gate-fb-meta">Uses Facebook Login. We store your Facebook user id + name in this browser only — no password from Facebook.</p>'
-      +   '</div>'
       +   '<p class="gate-err" id="gate-err"></p>'
-      +   '<p class="meta">Offline preview stays in this browser. Shared chat needs server/server.mjs.</p>'
+      +   '<p class="meta">Username / password is the primary sign-in. Discord / Google — Coming Soon (need OAuth app setup).</p>'
+      +   '<p class="meta">Offline preview stays in this browser. Shared chat + shared soundtrack need server/server.mjs.</p>'
       +   '<p class="gate-legal meta">By continuing you agree not to upload copyrighted material you do not own. '
       +     '<button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button></p>'
       + '</div></section>';
@@ -6190,6 +6424,7 @@ function helpPage() {
     try { if (decorateMode) bindDecorateDrag(); } catch (e) {}
     try { syncRoomAudio(); } catch (e) {}
     try { ensurePlaylistPanel(); } catch (ePl) {}
+    try { if (roomPreviewOpen && !inRoom) ensureRoomPreviewPanel(); } catch (eRp) {}
     // What/How/Why: Profile look only on profile views; every other tab clears leftover skin styles
     // so Me→Rooms→Stuff never flashes a custom BG. ENGINE DEV: chrome only — not #stage-slot.
     try {
@@ -6349,14 +6584,6 @@ function helpPage() {
     }
     hook("register-form", window.WhirledApi.register);
     hook("login-form", window.WhirledApi.login);
-    // How this works: Continue with Facebook on the gate (classic blue, not purple chrome).
-    var fbBtn = document.getElementById("fb-continue-btn");
-    if (fbBtn) {
-      fbBtn.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        startFacebookContinue();
-      });
-    }
   }
   var _decDrag = null;
   function bindDecorateDrag() {
@@ -6761,7 +6988,10 @@ function helpPage() {
   }
 
   function startPoll() {
+    // How this works: ~2.5s poll for loft chat + shared room soundtrack (same cadence).
+    // Beginner: when demo server is on, guests pick up the owner's YouTube without pasting.
     if (pollTimer) clearInterval(pollTimer);
+    try { bindRoomMusicStorageListener(); } catch (eBind) {}
     pollTimer = setInterval(async function () {
       if (!session()) return;
       var result = await window.WhirledApi.pollChat("loft");
@@ -6775,6 +7005,7 @@ function helpPage() {
           if (m && m.id && !prevIds[m.id]) spawnStageBubble(m);
         });
       }
+      try { await pollSharedRoomMusic(); } catch (eMusic) {}
     }, 2500);
   }
   // ---------------------------------------------------------------------------
@@ -7288,22 +7519,6 @@ function helpPage() {
       paint("me");
       return;
     }
-    // How this works: Facebook Connect — gate continue + Account link/unlink (chrome auth only).
-    if (ev.target.closest("[data-fb-continue]")) {
-      ev.preventDefault();
-      startFacebookContinue();
-      return;
-    }
-    if (ev.target.closest("[data-fb-link]") && session()) {
-      ev.preventDefault();
-      startFacebookLink();
-      return;
-    }
-    if (ev.target.closest("[data-fb-unlink]") && session()) {
-      ev.preventDefault();
-      startFacebookUnlink();
-      return;
-    }
     if (!ev.target.closest("#chat-opts-menu") && !ev.target.closest("#chat-opts-btn")) {
       var com3 = document.getElementById("chat-opts-menu");
       if (com3 && !com3.hidden) { com3.hidden = true; chatOptsOpen = false; }
@@ -7320,7 +7535,7 @@ function helpPage() {
       liveOccupants = []; inRoom = false; viewingId = null; meSub = "home";
       shopItemId = null; groupViewId = null; groupThreadId = null; roomPanelOpen = false; roomMenuOpen = false;
       gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; gameGenre = "all"; friendSearchQ = "";
-      decorateMode = false; partyPanelOpen = false; playlistPanelOpen = false; helpOpen = false; legalOpen = false; galleryViewId = null; stuffListMode = false;
+      decorateMode = false; partyPanelOpen = false; playlistPanelOpen = false; roomPreviewOpen = false; roomPreviewId = null; helpOpen = false; legalOpen = false; galleryViewId = null; stuffListMode = false;
       friendsPopupOpen = false; cmdPaletteOpen = false; shortcutsOpen = false; awayMode = false;
       dailyRewardPending = null;
       txFilter = "all";
@@ -7332,18 +7547,37 @@ function helpPage() {
       paint("");
       return;
     }
+    // How this works: lobby tile / recent chip → preview sheet (NOT inRoom yet).
+    // Beginner: Cancel stays in lobby; Enter in the sheet joins (with soft curtain).
+    if (ev.target.closest("[data-room-preview-close]") || (ev.target.closest("[data-room-preview-backdrop]") && !ev.target.closest("[data-room-preview-card]"))) {
+      closeRoomPreview();
+      return;
+    }
+    var previewEnter = ev.target.closest("[data-room-preview-enter]");
+    if (previewEnter && session()) {
+      ev.preventDefault();
+      confirmEnterFromPreview(previewEnter.getAttribute("data-room-preview-enter") || "loft");
+      return;
+    }
+    var previewOpen = ev.target.closest("[data-room-preview]");
+    if (previewOpen && session() && !inRoom) {
+      ev.preventDefault();
+      openRoomPreview(previewOpen.getAttribute("data-room-preview") || "loft");
+      return;
+    }
     var enter = ev.target.closest("[data-enter-room]");
     if (enter && session()) {
-      // How this works: room lock gates entry — blocked visitors stay in lobby.
+      // How this works: Visit Home / Join them / hash — still may enter directly (or open preview from lobby tiles via data-room-preview).
+      // Beginner: profile Visit Home skips the lobby sheet for speed; lock still gates.
       if (!tryEnterLoft()) {
         paint("rooms");
         return;
       }
-      // Fresh visit: empty room chat (old sessions stay wiped).
       clearRoomChatDisplay(true);
       loftVisitOccupants = [];
       paint("rooms");
       loadOccupants();
+      try { pollSharedRoomMusic(); } catch (eM2) {}
       try { awardAction("enterRoom"); } catch (e) {}
       return;
     }
@@ -9044,19 +9278,6 @@ function helpPage() {
       pushNotice("green", "Listed “" + (src.name || "item") + "” in Shop at " + coins + " coins (label).", { transient: true });
       try { awardAction("shopList"); } catch (e) {}
       paint("stuff");
-      return;
-    }
-    if (ev.target.id === "fb-appid-account-form" && session()) {
-      var fad = new FormData(ev.target);
-      var faid = String(fad.get("appId") || "").trim();
-      try {
-        saveFbAppId(faid);
-        pushNotice("green", faid ? "Facebook App ID saved on this browser." : "Facebook App ID cleared.", { transient: true });
-        meSub = "account";
-        paint("me");
-      } catch (eFb) {
-        pushNotice("gray", (eFb && eFb.message) || String(eFb));
-      }
       return;
     }
     if (ev.target.id === "blocklist-add-form" && session()) {

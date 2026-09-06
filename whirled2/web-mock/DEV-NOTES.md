@@ -20,7 +20,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 |------|------|
 | `index.html` | Boot shell. Loads `src/styles.css`, `src/api.js`, `app.js`. **Cache-bust** with `?v=YYYYMMDDx` on every asset + reload links. |
 | `app.js` | Almost all UI: gate, tabs, Me/Stuff/Games/Rooms/Groups/Shop, chat, notices, themes, playlist, stage bubbles. One big IIFE. |
-| `src/api.js` | `WhirledApi` — register/login/chat/presence + `loginWithFacebookProfile` / link/unlink Facebook. If `WHIRLED_API` empty → **offline localStorage** (GitHub Pages default). |
+| `src/api.js` | `WhirledApi` — register/login/chat/presence + `getRoomMusic` / `setRoomMusic` / `resyncRoomMusic`. If `WHIRLED_API` empty → **offline localStorage** (GitHub Pages default). |
 | `src/styles.css` | Classic pale-blue chrome + theme presets (`#app[data-theme]`). |
 | `server/server.mjs` | Optional Node API for shared chat when `WHIRLED_API` points at it. Not required for Pages. |
 | `ENGINE-BRIDGE.md` | Full Pixi engineer runbook. |
@@ -74,7 +74,7 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 ## Room music / playlist
 
 1. Stuff → Music → Upload… accepts `audio/mpeg|mp3|wav|ogg|webm` (~2MB warn, ~4MB reject). Copyright checkbox **required**. Stored as `dataUrl` on the stuff item in `whirled2.stuff`.
-2. Playlist: `whirled2.playlist.loft` = `{ source, tracks, current, ownerOnlyAdd, ownerControlsMusic, embedUrl, embedSrc, embedTitle }`. Legacy `currentIndex` migrates to `current`. Max 99 local tracks.
+2. Playlist: `whirled2.playlist.loft` = `{ source, tracks, current, ownerOnlyAdd, ownerControlsMusic, ownerId, embedUrl, embedSrc, embedTitle, startedAt, loop }`. Shared mirror: `whirled2.roomMusic.loft` (Pages) / server `roomMusic`. Legacy `currentIndex` migrates to `current`. Max 99 local tracks.
 3. Room menu → **View room music**. Sources: **My uploads** | **YouTube** | **Spotify**. YouTube → `youtube-nocookie.com/embed/…`; Spotify → `open.spotify.com/embed/{type}/{id}`. Hosts validated (https only).
 4. **Owner hard rule**: only loft owner switches source / pastes embeds / ownerOnlyAdd / remove-next. Guests listen; may add local tracks only when `ownerOnlyAdd === false`. Never guest yt/spotify URL changes. Defaults `ownerOnlyAdd: true`, `ownerControlsMusic: true`.
 5. Local: hidden `<audio id="room-audio">`; soft autoplay + Click-to-play. Embed: `#room-embed-dock` iframe under stage (not `#stage-slot`); user presses play. Leaving room clears/hides dock, keeps storage.
@@ -154,15 +154,10 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - `occupantRailHtml` / `personRow`: you-first sort, presence dots (green here / yellow away / orange in-game stub), friend highlight, loft-owner ♛, optional filter when >5.
 - Real `liveOccupants` only — no fake NPCs. Click opens existing occ menu.
 
-## Facebook Connect (20260906s → combined prefer **20260906t**)
+## Facebook Connect (removed in 20260906aa)
 
-- **Keys**: `whirled2.facebookAppId` (digits); user rows may have `facebookId`, `facebookName`, `authProvider:'facebook'`, id `fb_{facebookId}`.
-- **Optional stub**: `window.WHIRLED2_FB_APP_ID` in `index.html` comment/script.
-- **Flow**: load SDK once App ID known → `FB.init({ version:'v21.0' })` → `FB.login` → `FB.api('/me', {fields:'id,name,email'})` → `WhirledApi.loginWithFacebookProfile` (or `linkFacebook` when already signed in).
-- **Meta app setup**: developers.facebook.com → Facebook Login for Web → App Domains / Valid OAuth Redirect URIs include `https://whirledclassic.github.io/`.
-- **Safety**: never invent FB users without SDK success; no payments; Discord/Google Coming Soon only.
-- **Engine**: auth is chrome; session only — do not break `#stage-slot` / `syncRoomAudio` / ♪ Music.
-- **Cache-bust**: leave `LOGO_V` / `index.html` alone mid-parallel-edit; combined music+profile+Facebook ship was `?v=20260906y`; theme polish is `?v=20260906z`.
+- Historical: client SDK + App ID lived in `?v=20260906s`–`y`. Removed — Meta App ID steps were required for Pages.
+- See “Facebook Connect removed (20260906aa)” below.
 
 ## Room music embeds + Profile BG (20260906t)
 
@@ -205,4 +200,38 @@ You work on private **WhirledClassicGame** (Pixi). This folder is only the websi
 - **Flash fix**: `#main`/`#app` background `--paper`; `applyBrowserTheme` pins `#app[data-theme=classic|night|soft]`; `clearProfileSkinDom()` when leaving profile.
 - **Fidelity crumbs**: Stuff “Your Stuff” blurb; status-panel link vs wallet colors; tab 76×32 selected wash; busy-friend orange class; dotted list rules.
 - **Keep**: room stage dark, Overlay chat, music y dock/modal, Profile look on profile only.
-- **Cache**: `LOGO_V` / `?v=20260906z`. Do not push unless instructed.
+- **Cache**: superseded by `?v=20260906ab`.
+
+
+## Shared loft soundtrack (20260906aa)
+
+- **Reality**: GitHub Pages cannot sync two phones alone. Demo server = shared sync; Pages = local-only (same browser / multi-tab via `storage` on `whirled2.roomMusic.loft`).
+- **Server**: `GET/PUT /api/rooms/:id/music` → `{ source, embedUrl, embedSrc, embedTitle, startedAt, loop, ownerId, updatedAt }`. URL change resets `startedAt`. Optional `POST .../music/resync`.
+- **Client**: owner Set embed → `publishRoomMusicFromPlaylist` → poll `pollSharedRoomMusic` ~2.5s with chat. Guests auto-apply `embedSrc`. YouTube: IFrame API `seekTo((now-startedAt)%duration)` when possible; else iframe `start=` on rebuild only.
+- **UI meta**: “Shared soundtrack syncs when the demo server is running; Pages alone is local-only.” Copy: “Everyone in this loft hears the same loop (synced).”
+- **ENGINE DEV**: chrome HTTP + `#room-embed-dock` only — never `#stage-slot`.
+
+## Facebook Connect removed (20260906aa)
+
+- Gate Continue with Facebook, Account link/unlink/App ID UI, and FB SDK load paths removed (Meta App ID was required for Pages).
+- Username/password remains primary. Discord / Google stay Coming Soon labels.
+- Legacy `fb_*` local users may still exist in `whirled2.users` — no SDK path to create new ones.
+
+## Room preview before enter (20260906aa)
+
+- Lobby tiles / recent chips use `data-room-preview` → `openRoomPreview` (modal `#room-preview-panel`). **Does not** set `inRoom`.
+- Preview shows name, owner, lock, rating, occupant name chips (real `liveOccupants` only), optional now-playing, Enter / Cancel.
+- Enter → soft `#room-enter-curtain` → `tryEnterLoft` → `paint` / `loadOccupants` / music poll.
+- Visit Home / some Go paths may still `data-enter-room` direct.
+- **ENGINE DEV**: preview is chrome on `#app`; Pixi mounts only after enter when `#stage-slot` exists.
+- **Cache**: `LOGO_V` / `?v=20260906ab`. Do not push unless instructed.
+
+
+## Club membership tiers (20260906ab)
+
+- UI: `meClub()` — Free / Supporter / Creator / Studio cards; Coming Soon CTAs disabled.
+- Design: `MEMBERSHIP.md` (Three Rings / Club Whirled lessons + creator platform cut).
+- Keys: `whirled2.clubInterested.{userId}`, `whirled2.clubNotify.{userId}` (notify stub only).
+- **No payments.** Coins/Bars stay play labels.
+- ENGINE DEV: chrome only — do not gate `#stage-slot` on tier.
+- **Cache**: `LOGO_V` / `?v=20260906ab`. Do not push unless instructed.

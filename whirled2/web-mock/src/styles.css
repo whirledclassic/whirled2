@@ -3591,3 +3591,197 @@ button.tb.tb-music,
   color: #fff;
   font-family: var(--ui);
 }
+
+/* ---- 20260906aa: Room preview before enter + shared soundtrack meta ---- */
+/* How this works: lobby tile opens a modal sheet first; Enter joins with optional curtain.
+   Beginner: Preview ≠ Enter — Cancel leaves you in the lobby.
+   ENGINE DEV: chrome overlay on #app only — never early-mount #stage-slot / Pixi. */
+.room-occ-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 4px;
+}
+.room-occ-chip {
+  display: inline-block;
+  font: 600 11px var(--ui);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #d7ebf7;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-occ-chip.is-you { background: #fff6d6; border-color: #e6c86a; }
+.room-occ-chip.is-more { background: transparent; border-style: dashed; }
+.room-lock-glyph { font-size: 12px; margin-right: 2px; }
+
+.room-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(12, 36, 56, 0.45);
+  padding: 12px;
+  box-sizing: border-box;
+}
+.room-preview-card {
+  width: min(440px, 100%);
+  max-height: min(88vh, 640px);
+  overflow: auto;
+  margin: 0 auto 8px;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(10, 40, 70, 0.28);
+  position: relative;
+  z-index: 131;
+}
+.room-preview-thumb {
+  height: 96px;
+  border-radius: 10px;
+  margin: 0 0 10px;
+  background:
+    linear-gradient(180deg, #8ec8e8 0%, #8ec8e8 42%, #c8e4a8 42%, #c8e4a8 58%, #b08968 58%, #b08968 100%);
+  border: 1px solid var(--border);
+}
+.room-preview-name { margin: 0 0 6px; color: var(--accent); font-size: 18px; }
+.room-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+.room-preview-enter-btn {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-weight: 700;
+}
+.room-enter-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 40, 64, 0.55);
+  pointer-events: none;
+}
+.room-enter-curtain-card {
+  background: var(--card, #fff);
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 18px 22px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 28px rgba(10, 40, 70, 0.25);
+  font: 600 15px var(--ui);
+}
+.playlist-sync-meta { line-height: 1.45; }
+@media (min-width: 720px) {
+  .room-preview-modal { align-items: center; }
+}
+
+
+/* ---- 20260906ab: Club membership tier cards (Coming Soon, no payments) ---- */
+/* How this works: Me → Club shows Free / Supporter / Creator / Studio as visual cards.
+   Beginner: Coming Soon buttons are disabled — nothing to buy.
+   ENGINE DEV: chrome only — membership must not gate #stage-slot. */
+.club-page .club-hero { margin-bottom: 12px; }
+.club-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.club-tier-card {
+  position: relative;
+  background: var(--card, #fff);
+  border: 1px solid var(--border, #b7d3e8);
+  border-radius: 14px;
+  padding: 16px 14px 14px;
+  box-shadow: 0 4px 14px rgba(16, 48, 72, 0.08);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  overflow: hidden;
+}
+.club-tier-card.is-current {
+  border-color: var(--accent, #1e6fa8);
+  box-shadow: 0 6px 18px rgba(30, 111, 168, 0.18);
+}
+.club-tier-card .club-badge-soon,
+.club-tier-card .club-badge-free {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+.club-badge-free {
+  display: inline-block;
+  font: 700 10px/1 var(--ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #d6f0c8;
+  color: #2a6b1f;
+  border: 1px solid #9ccc7a;
+}
+.club-tier-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 8px;
+  color: #fff;
+}
+.club-tier-free .club-tier-icon { background: linear-gradient(135deg, #6eb8e8, #3aa3e0); }
+.club-tier-supporter .club-tier-icon { background: linear-gradient(135deg, #f0c14a, #e09a20); }
+.club-tier-creator .club-tier-icon { background: linear-gradient(135deg, #7bc67e, #3d9a55); }
+.club-tier-studio .club-tier-icon { background: linear-gradient(135deg, #8b7cc9, #5a4fa0); }
+.club-tier-name {
+  margin: 0 0 2px;
+  font-size: 18px;
+  color: var(--ink, #16324a);
+  font-family: var(--ui);
+}
+.club-tier-price { margin: 0 0 8px; font-weight: 700; color: var(--accent, #1e6fa8); }
+.club-tier-blurb {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted, #4a6a80);
+  flex: 0 0 auto;
+}
+.club-tier-perks {
+  margin: 0 0 12px;
+  padding: 0 0 0 1.1em;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink, #16324a);
+  flex: 1 1 auto;
+}
+.club-tier-perks li { margin: 4px 0; }
+.club-tier-cta {
+  width: 100%;
+  min-height: 40px;
+  margin-top: auto;
+}
+.club-tier-cta:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+.club-tier-cta.is-on {
+  background: linear-gradient(#6eb8e8, #3aa3e0);
+  color: #fff;
+  border: 0;
+}
+@media (max-width: 520px) {
+  .club-tier-grid { grid-template-columns: 1fr; }
+}

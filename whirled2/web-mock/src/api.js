@@ -1,5 +1,5 @@
 /**
- * WhirledApi — tiny client for accounts + room chat.
+ * WhirledApi — tiny client for accounts + room chat + shared room music.
  *
  * How this works:
  * - If window.WHIRLED_API is set and the server is up, requests go to server/server.mjs.
@@ -8,8 +8,9 @@
  * - Session: localStorage key "whirled2.session" { token, user }.
  * - Offline users: "whirled2.users". First register also sets "whirled2.firstUserId".
  * - Offline loft chat: "whirled2.chat.loft" (array of messages).
- * - Facebook Connect (client SDK only): App ID in "whirled2.facebookAppId" (or window.WHIRLED2_FB_APP_ID).
- *   loginWithFacebookProfile / linkFacebook / unlinkFacebook — never invent users without SDK success.
+ * - Shared soundtrack: getRoomMusic / setRoomMusic — HTTP when server; else localStorage
+ *   key "whirled2.roomMusic.loft" (same-tab + multi-tab via storage event only on Pages).
+ * - ENGINE DEV: chrome HTTP / localStorage only — never mounts players in #stage-slot.
  */
 (function (root) {
   "use strict";
@@ -17,7 +18,7 @@
   var KEY = "whirled2.session";
   var USERS_KEY = "whirled2.users";
   var CHAT_KEY = "whirled2.chat.loft";
-  var FB_APP_ID_KEY = "whirled2.facebookAppId";
+  var ROOM_MUSIC_KEY = "whirled2.roomMusic.loft";
 
   function apiBase() {
     return (root.WHIRLED_API || "").replace(/\/$/, "");
@@ -42,48 +43,6 @@
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }
 
-  // How this works: Meta App ID is digits only. Pages deploy owner pastes it once (Account / gate).
-  function getFacebookAppId() {
-    try {
-      var fromLs = localStorage.getItem(FB_APP_ID_KEY);
-      if (fromLs != null && String(fromLs).trim() !== "") {
-        var a = String(fromLs).trim();
-        if (/^\d+$/.test(a)) return a;
-      }
-    } catch (e) {}
-    try {
-      if (root.WHIRLED2_FB_APP_ID != null && String(root.WHIRLED2_FB_APP_ID).trim() !== "") {
-        var b = String(root.WHIRLED2_FB_APP_ID).trim();
-        if (/^\d+$/.test(b)) return b;
-      }
-    } catch (e2) {}
-    return "";
-  }
-
-  function setFacebookAppId(appId) {
-    appId = String(appId || "").trim();
-    if (appId && !/^\d+$/.test(appId)) throw new Error("Facebook App ID must be digits only.");
-    if (appId) localStorage.setItem(FB_APP_ID_KEY, appId);
-    else localStorage.removeItem(FB_APP_ID_KEY);
-    return appId;
-  }
-
-  function hashGuess(password) {
-    return "local:" + password;
-  }
-
-  function findUserByFacebookId(users, fbId) {
-    fbId = String(fbId || "");
-    if (!fbId) return null;
-    var direct = users["fb_" + fbId];
-    if (direct) return direct;
-    for (var k in users) {
-      if (!Object.prototype.hasOwnProperty.call(users, k)) continue;
-      var row = users[k];
-      if (row && String(row.facebookId || "") === fbId) return row;
-    }
-    return null;
-  }
 
   async function request(path, opts) {
     var base = apiBase();
@@ -160,105 +119,6 @@
         return session;
       }
     },
-
-    // How this works: called only after FB.login + FB.api('/me') succeed — never invent profiles.
-    // ENGINE DEV: session shape matches register/login; engine may later read session only.
-    async loginWithFacebookProfile(profile) {
-      profile = profile || {};
-      var fbId = String(profile.id || "").trim();
-      var name = String(profile.name || "").trim().slice(0, 40);
-      var email = profile.email ? String(profile.email).trim().slice(0, 120) : "";
-      if (!fbId) throw new Error("Facebook login failed — no user id from Facebook.");
-      if (!name) name = "Facebook " + fbId.slice(-6);
-      var localId = "fb_" + fbId.replace(/[^a-zA-Z0-9_-]/g, "");
-      if (localId === "fb_") throw new Error("Facebook login failed — invalid user id.");
-
-      // Server path not implemented for FB yet — always localStorage (GitHub Pages).
-      var users = localUsers();
-      var row = findUserByFacebookId(users, fbId);
-      if (row) {
-        row.name = name;
-        row.facebookId = fbId;
-        row.facebookName = name;
-        if (email) row.email = email;
-        row.authProvider = row.authProvider || "facebook";
-        users[row.id] = row;
-        saveLocalUsers(users);
-        var sessionExisting = { token: "local-" + row.id, user: publicUser(row) };
-        saveSession(sessionExisting);
-        return sessionExisting;
-      }
-
-      users[localId] = {
-        id: localId,
-        name: name,
-        password: "fb-oauth",
-        authProvider: "facebook",
-        facebookId: fbId,
-        facebookName: name,
-        email: email,
-        bio: "Home room is the profile.",
-        room: "Studio Loft",
-        coins: 0
-      };
-      saveLocalUsers(users);
-      try {
-        if (!localStorage.getItem("whirled2.firstUserId")) {
-          localStorage.setItem("whirled2.firstUserId", localId);
-        }
-      } catch (eFirst) {}
-      var sessionNew = { token: "local-" + localId, user: publicUser(users[localId]) };
-      saveSession(sessionNew);
-      return sessionNew;
-    },
-
-    // How this works: logged-in user links FB id onto their existing whirled2.users row.
-    async linkFacebook(profile) {
-      var session = loadSession();
-      if (!session || !session.user) throw new Error("Sign in first.");
-      profile = profile || {};
-      var fbId = String(profile.id || "").trim();
-      var name = String(profile.name || "").trim().slice(0, 40);
-      var email = profile.email ? String(profile.email).trim().slice(0, 120) : "";
-      if (!fbId) throw new Error("Facebook link failed — no user id from Facebook.");
-      var users = localUsers();
-      var row = users[session.user.id];
-      if (!row) throw new Error("Missing local profile.");
-      var taken = findUserByFacebookId(users, fbId);
-      if (taken && taken.id !== row.id) {
-        throw new Error("That Facebook account is already linked to another Whirled2 user on this browser.");
-      }
-      row.facebookId = fbId;
-      row.facebookName = name || row.name;
-      if (email) row.email = email;
-      users[row.id] = row;
-      saveLocalUsers(users);
-      session.user = publicUser(row);
-      saveSession(session);
-      return session;
-    },
-
-    async unlinkFacebook() {
-      var session = loadSession();
-      if (!session || !session.user) throw new Error("Sign in first.");
-      var users = localUsers();
-      var row = users[session.user.id];
-      if (!row) throw new Error("Missing local profile.");
-      delete row.facebookId;
-      delete row.facebookName;
-      // Keep authProvider if they registered via FB (id starts with fb_) — unlink just clears link fields.
-      if (row.authProvider === "facebook" && String(row.id).indexOf("fb_") !== 0) {
-        delete row.authProvider;
-      }
-      users[row.id] = row;
-      saveLocalUsers(users);
-      session.user = publicUser(row);
-      saveSession(session);
-      return session;
-    },
-
-    getFacebookAppId: getFacebookAppId,
-    setFacebookAppId: setFacebookAppId,
 
     logout: function () {
       var session = loadSession();
@@ -363,6 +223,91 @@
         return this.occupants(room);
       }
     },
+
+    // How this works: shared loft soundtrack. Server = real multi-phone sync; Pages = local only.
+    // Beginner: owner Set embed → setRoomMusic; everyone polls getRoomMusic ~2–3s.
+    // ENGINE DEV: returns { source, embedUrl, embedSrc, embedTitle, startedAt, loop, ownerId, updatedAt }.
+    async getRoomMusic(room) {
+      room = room || "loft";
+      try {
+        return await request("/api/rooms/" + encodeURIComponent(room) + "/music");
+      } catch (err) {
+        var raw = null;
+        try { raw = JSON.parse(localStorage.getItem(ROOM_MUSIC_KEY) || "null"); } catch (e) {}
+        if (!raw || typeof raw !== "object") {
+          return {
+            source: "",
+            embedUrl: "",
+            embedSrc: "",
+            embedTitle: "",
+            startedAt: 0,
+            loop: true,
+            ownerId: "",
+            updatedAt: 0
+          };
+        }
+        return raw;
+      }
+    },
+
+    // How this works: owner publishes embed. Server resets startedAt when URL changes.
+    // Pages fallback writes whirled2.roomMusic.loft (other tabs hear via storage event only).
+    async setRoomMusic(room, payload) {
+      room = room || "loft";
+      payload = payload || {};
+      try {
+        return await request("/api/rooms/" + encodeURIComponent(room) + "/music", {
+          method: "PUT",
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        if (apiBase() && err.message !== "no-api") throw err;
+        var prev = null;
+        try { prev = JSON.parse(localStorage.getItem(ROOM_MUSIC_KEY) || "null"); } catch (e) {}
+        prev = prev && typeof prev === "object" ? prev : {};
+        var embedSrc = String(payload.embedSrc != null ? payload.embedSrc : (prev.embedSrc || ""));
+        var embedUrl = String(payload.embedUrl != null ? payload.embedUrl : (prev.embedUrl || ""));
+        var urlChanged = embedSrc !== String(prev.embedSrc || "") || embedUrl !== String(prev.embedUrl || "");
+        var startedAt = Number(prev.startedAt || 0) || 0;
+        if (urlChanged || !startedAt) startedAt = Date.now();
+        else if (payload.startedAt != null && Number(payload.startedAt) > 0) startedAt = Number(payload.startedAt);
+        var session = loadSession();
+        var ownerId = String(prev.ownerId || (session && session.user && session.user.id) || "");
+        var next = {
+          source: String(payload.source || prev.source || "youtube"),
+          embedUrl: embedUrl,
+          embedSrc: embedSrc,
+          embedTitle: String(payload.embedTitle != null ? payload.embedTitle : (prev.embedTitle || "")).slice(0, 120),
+          startedAt: startedAt,
+          loop: payload.loop === false ? false : true,
+          ownerId: ownerId,
+          updatedAt: Date.now()
+        };
+        try { localStorage.setItem(ROOM_MUSIC_KEY, JSON.stringify(next)); } catch (eW) {}
+        return next;
+      }
+    },
+
+    // How this works: optional owner bump of startedAt so everyone re-seeks together.
+    async resyncRoomMusic(room) {
+      room = room || "loft";
+      try {
+        return await request("/api/rooms/" + encodeURIComponent(room) + "/music/resync", {
+          method: "POST",
+          body: "{}"
+        });
+      } catch (err) {
+        if (apiBase() && err.message !== "no-api") throw err;
+        var cur = null;
+        try { cur = JSON.parse(localStorage.getItem(ROOM_MUSIC_KEY) || "null"); } catch (e) {}
+        if (!cur || !cur.embedSrc) throw new Error("No room music set.");
+        cur.startedAt = Date.now();
+        cur.updatedAt = Date.now();
+        try { localStorage.setItem(ROOM_MUSIC_KEY, JSON.stringify(cur)); } catch (e2) {}
+        return cur;
+      }
+    },
+
     async pollChat(room, since) {
       try {
         var q = since ? ("?since=" + encodeURIComponent(since)) : "";

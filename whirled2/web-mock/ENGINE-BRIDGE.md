@@ -41,6 +41,12 @@ Cache-bust: assets use `?v=…` (see `LOGO_V` in `app.js` / `index.html`). Hard-
 
 **Embeds / chrome docks:** YouTube/Spotify room music uses `#room-embed-dock` as a **shell host outside `#main`** (after `#main` / before `.bar`, not inside `#stage-slot`) so Pixi stays clear and `paint()` never wipes the iframe. Prefer the same pattern for any future chrome media UI.
 
+**Shared room soundtrack (chrome sync protocol):** GitHub Pages alone cannot sync two phones. With `node server/server.mjs` (`WHIRLED_API` set), clients poll `GET /api/rooms/:id/music` and the owner `PUT`s embed + `startedAt`. Pages localStorage mirror is same-browser / multi-tab only. UI meta must say: “Shared soundtrack syncs when the demo server is running; Pages alone is local-only.” ENGINE DEV: never put the shared player in `#stage-slot`.
+
+**Room preview before enter:** Lobby tiles open `#room-preview-panel` first (`inRoom` stays false). Enter (optional soft curtain) then mounts the loft / `#stage-slot`. Do not early-mount Pixi on preview open.
+
+**Membership tiers:** Me → Club cards are chrome Coming Soon only (`MEMBERSHIP.md`). Never gate Pixi / `#stage-slot` on Free vs Supporter vs Creator vs Studio.
+
 ---
 
 ## 3) How to run your Vite Pixi engine standalone (today)
