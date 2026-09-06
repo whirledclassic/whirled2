@@ -6,7 +6,8 @@
  * - On GitHub Pages, WHIRLED_API is empty — app.js uses WhirledApi offline localStorage instead.
  * - In-memory users + loft chat; not a production database.
  * - Endpoints used by src/api.js: /api/register, /api/login, /api/me,
- *   /api/rooms/:id/chat, occupants, music (+ optional music/resync).
+ *   /api/auth/discord (+ /status, /callback), /api/rooms/:id/chat, occupants,
+ *   music (+ optional music/resync).
  *   Experimental avatar lab: POST /api/media, GET /api/media/:sha1, GET/PUT /api/wardrobe/:memberId
  *   (optional — Pages/lab work without these; not wired to room stage).
  *
@@ -26,6 +27,76 @@ const ROOT = path.resolve(__dirname, "..");
 const DATA = path.join(__dirname, "data.json");
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
+
+// ---------------------------------------------------------------------------
+// Discord OAuth (local demo) — chrome-only; never touches #stage-slot.
+// How this works: Discord redirects back with ?code&state; we exchange code for
+// a token server-side (client secret stays on the server), then create a session.
+// Beginner: set DISCORD_CLIENT_ID + DISCORD_CLIENT_SECRET, then open 127.0.0.1:8787.
+// ENGINE DEV: auth is chrome session only — do not break #stage-slot / Pixi.
+// ---------------------------------------------------------------------------
+function loadEnvFile(filePath) {
+  // Merge KEY=VALUE lines into process.env without overriding existing values.
+  // Never log secret values.
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    for (const line of raw.split(/\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith("#")) continue;
+      const eq = t.indexOf("=");
+      if (eq < 1) continue;
+      const key = t.slice(0, eq).trim();
+      let val = t.slice(eq + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] == null || process.env[key] === "") {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    // optional file — ignore missing
+  }
+}
+loadEnvFile("/home/box/.config/whirled2/discord.env");
+loadEnvFile(path.join(__dirname, ".env.local"));
+
+function discordEnabled() {
+  return !!(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET);
+}
+function discordRedirectUri() {
+  // Purpose: Discord requires an exact redirect match.
+  // How: set DISCORD_REDIRECT_URI for phone tunnels (https://….trycloudflare.com/api/auth/discord/callback).
+  // Why: 127.0.0.1 only works on the same device — iPhone needs the public tunnel URL in Discord + here.
+  if (process.env.DISCORD_REDIRECT_URI) return String(process.env.DISCORD_REDIRECT_URI).trim();
+  return "http://" + HOST + ":" + PORT + "/api/auth/discord/callback";
+}
+function publicOrigin() {
+  // Purpose: browser return URL after Discord (carries ?discord_token=).
+  // How: PUBLIC_ORIGIN for tunnels; else local host:port.
+  if (process.env.PUBLIC_ORIGIN) return String(process.env.PUBLIC_ORIGIN).replace(/\/$/, "");
+  return "http://" + HOST + ":" + PORT;
+}
+// In-memory OAuth state → { at } with 5 min TTL (CSRF protection).
+const oauthStates = new Map();
+function pruneOauthStates() {
+  const now = Date.now();
+  for (const [k, v] of oauthStates) {
+    if (!v || now - v.at > 5 * 60 * 1000) oauthStates.delete(k);
+  }
+}
+function redirect(res, location) {
+  res.writeHead(302, {
+    Location: location,
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS"
+  });
+  res.end();
+}
 
 const MEDIA_DIR = path.join(__dirname, "media");
 function ensureMediaDir() {
@@ -56,7 +127,8 @@ function hashPassword(password, salt) {
   return { salt: useSalt, hash };
 }
 function publicUser(row) {
-  return {
+  // How this works: never expose password hash / client secrets. discord:true = linked.
+  const out = {
     id: row.id,
     name: row.name,
     initials: row.name.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase(),
@@ -64,6 +136,37 @@ function publicUser(row) {
     room: row.room || "Studio Loft",
     coins: row.coins || 0
   };
+  if (row.discordId) {
+    out.discord = true;
+    out.discordId = row.discordId;
+  }
+  if (row.authProvider) out.authProvider = row.authProvider;
+  return out;
+}
+function uniqueDisplayName(db, base) {
+  // Unique-ify display name if another user already has it.
+  let name = String(base || "Discord User").trim().slice(0, 24) || "Discord User";
+  let candidate = name;
+  let n = 2;
+  const taken = (nm) =>
+    Object.values(db.users || {}).some(
+      (u) => String(u.name || "").toLowerCase() === nm.toLowerCase()
+    );
+  while (taken(candidate)) {
+    const suffix = " " + n;
+    candidate = (name.slice(0, Math.max(1, 24 - suffix.length)) + suffix).slice(0, 24);
+    n += 1;
+    if (n > 9999) break;
+  }
+  return candidate;
+}
+function findUserByDiscordId(db, discordId) {
+  const id = "discord-" + discordId;
+  if (db.users[id]) return db.users[id];
+  for (const u of Object.values(db.users || {})) {
+    if (u && u.discordId === discordId) return u;
+  }
+  return null;
 }
 function slug(name) {
   return String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -410,6 +513,101 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+
+    // -------------------------------------------------------------------------
+    // Discord OAuth (local)
+    // How this works: status → authorize redirect → callback code exchange → session.
+    // Beginner: button on gate only shows when both env vars are set (see start-local.sh).
+    // ENGINE DEV: chrome-only auth — never touches #stage-slot.
+    // -------------------------------------------------------------------------
+    if (req.method === "GET" && url.pathname === "/api/auth/discord/status") {
+      return send(res, 200, { enabled: discordEnabled() });
+    }
+    if (req.method === "GET" && url.pathname === "/api/auth/discord") {
+      if (!discordEnabled()) {
+        return send(res, 503, { error: "Discord OAuth disabled (missing DISCORD_CLIENT_ID/SECRET)." });
+      }
+      pruneOauthStates();
+      const state = crypto.randomBytes(16).toString("hex");
+      oauthStates.set(state, { at: Date.now() });
+      const params = new URLSearchParams({
+        client_id: process.env.DISCORD_CLIENT_ID,
+        response_type: "code",
+        scope: "identify",
+        redirect_uri: discordRedirectUri(),
+        state
+      });
+      return redirect(res, "https://discord.com/api/oauth2/authorize?" + params.toString());
+    }
+    if (req.method === "GET" && url.pathname === "/api/auth/discord/callback") {
+      if (!discordEnabled()) {
+        return send(res, 503, { error: "Discord OAuth disabled (missing DISCORD_CLIENT_ID/SECRET)." });
+      }
+      const code = url.searchParams.get("code") || "";
+      const state = url.searchParams.get("state") || "";
+      pruneOauthStates();
+      const st = oauthStates.get(state);
+      if (!code || !state || !st) {
+        return send(res, 400, { error: "Invalid or expired OAuth state." });
+      }
+      oauthStates.delete(state);
+      // Exchange authorization code for access token (form-urlencoded).
+      const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: process.env.DISCORD_CLIENT_ID,
+          client_secret: process.env.DISCORD_CLIENT_SECRET,
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: discordRedirectUri()
+        }).toString()
+      });
+      const tokenBody = await tokenRes.json().catch(() => ({}));
+      if (!tokenRes.ok || !tokenBody.access_token) {
+        return send(res, 502, { error: "Discord token exchange failed." });
+      }
+      const meRes = await fetch("https://discord.com/api/users/@me", {
+        headers: { Authorization: "Bearer " + tokenBody.access_token }
+      });
+      const discordUser = await meRes.json().catch(() => ({}));
+      if (!meRes.ok || !discordUser.id) {
+        return send(res, 502, { error: "Discord profile fetch failed." });
+      }
+      // Create or find user: stable id = discord-<discordId>
+      let user = findUserByDiscordId(db, String(discordUser.id));
+      if (!user) {
+        const id = "discord-" + discordUser.id;
+        const display =
+          (discordUser.global_name && String(discordUser.global_name).trim()) ||
+          (discordUser.username && String(discordUser.username).trim()) ||
+          "Discord User";
+        const unusable = hashPassword(crypto.randomBytes(32).toString("hex"));
+        user = {
+          id,
+          name: uniqueDisplayName(db, display),
+          bio: "Signed in with Discord.",
+          room: "Studio Loft",
+          coins: 0,
+          discordId: String(discordUser.id),
+          authProvider: "discord",
+          ...unusable
+        };
+        db.users[id] = user;
+      } else {
+        // Refresh display name gently if empty; keep discordId linked.
+        user.discordId = String(discordUser.id);
+        user.authProvider = user.authProvider || "discord";
+        db.users[user.id] = user;
+      }
+      const token = crypto.randomBytes(18).toString("hex");
+      db.sessions[token] = { userId: user.id, at: Date.now() };
+      touchPresence(db, user, "loft");
+      save(db);
+      // Strip code from URL via redirect — client reads ?discord_token= and enters shell.
+      return redirect(res, publicOrigin() + "/?discord_token=" + encodeURIComponent(token));
+    }
+
     // logout clears session presence
     if (req.method === "POST" && url.pathname === "/api/logout") {
       const header = req.headers.authorization || "";
@@ -447,4 +645,7 @@ server.listen(PORT, HOST, () => {
   console.log("Whirled 2 demo server");
   console.log("  page   http://" + HOST + ":" + PORT + "/");
   console.log("  data   " + DATA);
+  // Never print secret values — only enabled/disabled.
+  if (discordEnabled()) console.log("Discord OAuth: enabled");
+  else console.log("Discord OAuth: disabled (missing DISCORD_CLIENT_ID/SECRET)");
 });

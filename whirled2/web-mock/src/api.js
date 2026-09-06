@@ -6,6 +6,7 @@
  * - If not (GitHub Pages default), everything falls back to localStorage so the chrome
  *   still works offline in one browser.
  * - Session: localStorage key "whirled2.session" { token, user }.
+ * - Discord (local): discordAuthStatus / discordAuthStartUrl; callback uses ?discord_token=.
  * - Offline users: "whirled2.users". First register also sets "whirled2.firstUserId".
  * - Offline loft chat: "whirled2.chat.loft" (array of messages).
  * - Shared soundtrack: getRoomMusic / setRoomMusic — HTTP when server; else localStorage
@@ -371,6 +372,45 @@
         if (apiBase() && err.message !== "no-api") throw err;
         return wardrobe || { version: 1, avatars: [], activeId: null, offline: true };
       }
+    },
+
+    // -------------------------------------------------------------------------
+    // Discord OAuth helpers (local demo server). Pages alone cannot finish OAuth.
+    // How this works: status → gate button; start URL is full origin + /api/auth/discord.
+    // Beginner: after Discord redirects back with ?discord_token=, boot saves session via me().
+    // ENGINE DEV: chrome-only — never touches #stage-slot.
+    // -------------------------------------------------------------------------
+    async discordAuthStatus() {
+      try {
+        return await request("/api/auth/discord/status");
+      } catch (err) {
+        return { enabled: false };
+      }
+    },
+
+    discordAuthStartUrl: function () {
+      var base = apiBase();
+      if (!base) return "";
+      return base + "/api/auth/discord";
+    },
+
+    async me() {
+      // How this works: refresh public user with Bearer token (used after Discord callback).
+      var body = await request("/api/me");
+      var session = loadSession() || {};
+      if (body && body.user) {
+        session.user = body.user;
+        saveSession(session);
+      }
+      return body;
+    },
+
+    acceptDiscordToken: function (token) {
+      // Save raw token; caller then awaits me() to fill user.
+      token = String(token || "");
+      if (!token) throw new Error("Missing discord token.");
+      saveSession({ token: token, user: null });
+      return token;
     }
   };
 
@@ -384,6 +424,10 @@
       coins: row.coins || 0
     };
     if (row.authProvider) out.authProvider = row.authProvider;
+    if (row.discordId || row.discord) {
+      out.discord = true;
+      if (row.discordId) out.discordId = row.discordId;
+    }
     if (row.facebookId) out.facebookId = row.facebookId;
     if (row.facebookName) out.facebookName = row.facebookName;
     if (row.email) out.email = row.email;

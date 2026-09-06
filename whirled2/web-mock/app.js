@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906ae";
+  var LOGO_V = "20260906af";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -48,7 +48,7 @@
   var MAIL_KEY = "whirled2.mail";
   var PARTIES_KEY = "whirled2.parties";
   var ROOM_LAYOUT_KEY = "whirled2.roomLayout.loft";
-  // How this works (20260906ae): multi-room catalog in whirled2.rooms (object map by id).
+  // How this works (20260906af): multi-room catalog in whirled2.rooms (object map by id).
   // Beginner: Studio Loft stays the default seed; Create Room adds more you own.
   // ENGINE DEV: catalog is chrome/localStorage only — does not remount #stage-slot.
   var ROOMS_CATALOG_KEY = "whirled2.rooms";
@@ -291,6 +291,10 @@
     // Beginner: GitHub Pages leaves this empty → shared soundtrack is local-only.
     try { return !!(window.WHIRLED_API && String(window.WHIRLED_API).replace(/\/$/, "")); }
     catch (e) { return false; }
+  }
+  function isDemoApi() {
+    // Alias: Discord / shared API features need WHIRLED_API (demo server origin).
+    return isWhirledApiLive();
   }
   function musicSyncMetaHtml() {
     // How this works: clear UI meta so players know Pages alone cannot sync two phones.
@@ -798,7 +802,7 @@
     // Beginner: on a phone, tap "Open player" / "Open on YouTube" — those always work even if the tiny iframe play button is hard to hit.
     // ENGINE DEV: #room-embed-dock is created in shell() after #main / before .bar — paint never destroys it.
     // Touch: raise z-index + pointer-events; expand sheet for ~220px tap target on iOS.
-    // How this works (20260906ae mute-safe): when muted, do NOT mount the embed iframe (classic wiki:
+    // How this works (20260906af mute-safe): when muted, do NOT mount the embed iframe (classic wiki:
     // muted → do not load the track — avoids a bad stream breaking the room). Labels still update elsewhere.
     // Beginner: Mute = no YouTube/Spotify load; Unmute remounts from saved playlist embedSrc.
     if (roomAudioMuted) {
@@ -1092,7 +1096,7 @@
     // How this works: local → <audio>; youtube/spotify → #room-embed-dock iframe; pause local when not local.
     // Beginner: closing the Room music modal does NOT call this teardown — only leave/local-switch does.
     // ENGINE DEV: single-track sets audio.loop=true; multi-track uses playlistNext on ended for continuous play.
-    // How this works (20260906ae): mute-safe — when muted, unload local src and skip embed mount (do not fetch).
+    // How this works (20260906af): mute-safe — when muted, unload local src and skip embed mount (do not fetch).
     // Beginner: Mute never breaks the room; Unmute loads music again from the saved playlist.
     var a = ensureRoomAudioEl();
     a.muted = !!roomAudioMuted;
@@ -1322,7 +1326,7 @@
   var helpOpen = false;
   var legalOpen = false; // Help → Legal / Disclaimer
   var musicGestureNeeded = false; // browser blocked autoplay — show Click to play
-  // How this works (20260906ae): mute + volume prefs persist in localStorage.
+  // How this works (20260906af): mute + volume prefs persist in localStorage.
   // Beginner: Mute remembers across reloads; volume slider is 0–100%.
   // ENGINE DEV: mute-safe load skips mounting audio/embed when muted (classic wiki Music).
   var ROOM_MUTE_KEY = "whirled2.roomMute";
@@ -2766,7 +2770,7 @@
     });
   }
   function friendlyPeopleStripHtml() {
-    // How this works (20260906ae): Me home lists Friendly People under Friends Online.
+    // How this works (20260906af): Me home lists Friendly People under Friends Online.
     // Beginner: Friendly helpers auto-accept friend requests. Empty = honest "none yet".
     // ENGINE DEV: only real local users with whirled2.friendly.{id}=1 — never invent NPCs.
     var people = listFriendlyPeople();
@@ -2927,7 +2931,7 @@
   // How this works (20260906q): on phones, Slide's dark panel eats the green stage.
   // Auto-switch to Overlay once for the session preference so the black slab never returns.
   // ---------------------------------------------------------------------------
-  // Mobile landscape immersion (20260906ae) — phone sideways + inRoom
+  // Mobile landscape immersion (20260906af) — phone sideways + inRoom
   // How this works: orientation landscape + inRoom → body.room-immersive hides top tabs,
   // stage fills viewport, Overlay chat docks bottom-corner with thin input bar.
   // Portrait or Exit control restores chrome. Optional Fullscreen API when allowed.
@@ -3096,7 +3100,7 @@
     return arr;
   }
   function shopCard(item) {
-    // How this works (20260906ae): grid card opens detail; ♥ toggles favorite without leaving the grid.
+    // How this works (20260906af): grid card opens detail; ♥ toggles favorite without leaving the grid.
     // Beginner: heart uses the same whirled2.favorites list as the item detail page.
     // ENGINE DEV: div (not button) so the fav control is not nested buttons; click order checks fav first.
     var id = item.id || item.name || "";
@@ -3239,7 +3243,7 @@
   var tourTip = 0;
   var goMenuOpen = false;
   var inRoom = false;
-  // How this works (20260906ae): which room id the stage chrome is showing (default loft).
+  // How this works (20260906af): which room id the stage chrome is showing (default loft).
   // Beginner: leaving to lobby clears immersion; currentRoomId stays last visited until next enter.
   var currentRoomId = "loft";
   var createRoomOpen = false; // Create Room panel (lobby / Me → My Rooms)
@@ -3444,7 +3448,7 @@
       acceptFriendRequest(incoming.id);
       return incoming;
     }
-    // How this works (20260906ae): Friendly People auto-accept incoming friend requests (classic).
+    // How this works (20260906af): Friendly People auto-accept incoming friend requests (classic).
     // Beginner: if they turned on Friendly, you become friends immediately — no Accept wait.
     // ENGINE DEV: same-browser mock; still writes both sides via addFriendForUser.
     if (isFriendly(toId)) {
@@ -4109,7 +4113,7 @@
     var s = session();
     if (s && s.user) {
       var snap = getWalletSnapshot(s.user.id);
-      return {
+      var out = {
         name: s.user.name,
         initials: s.user.initials || s.user.name.slice(0, 1).toUpperCase(),
         bio: s.user.bio || "",
@@ -4118,6 +4122,12 @@
         streakDays: snap.streakDays,
         room: s.user.room || ROOM
       };
+      // Discord link flag from /api/me publicUser (no secrets).
+      if (s.user.discord || s.user.discordId) {
+        out.discord = true;
+        if (s.user.discordId) out.discordId = s.user.discordId;
+      }
+      return out;
     }
     return { name: "Guest", initials: "?", bio: "", coins: 0, bars: 0, streakDays: 0, room: ROOM };
   }
@@ -4239,10 +4249,10 @@
     try {
       if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
     } catch (e) {}
-    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906ae";
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260906af";
   }
   function roomShareUrl() {
-    // How this works (20260906ae): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
+    // How this works (20260906af): share link lands on Rooms lobby (#rooms) so friends can preview/enter.
     // Beginner: same base Pages URL + #rooms — no fake social APIs.
     var base = shareInviteUrl();
     if (base.indexOf("#") >= 0) base = base.split("#")[0];
@@ -4295,7 +4305,7 @@
     if (el) el.remove();
   }
   function volToolbarHtml() {
-    // How this works (20260906ae): classic-ish Volume — mute toggle + slider popover.
+    // How this works (20260906af): classic-ish Volume — mute toggle + slider popover.
     // Beginner: speaker button mutes; open the slider to set loudness (saved on this browser).
     // ENGINE DEV: volume applies to local <audio>; mute-safe skips embed/local load when muted.
     var pct = Math.round((roomAudioVolume || 0) * 100);
@@ -5190,7 +5200,7 @@
     });
   }
   function roomsLobby() {
-    // How this works (20260906ae): Featured = Studio Loft seed; My Rooms = rooms you own + Create.
+    // How this works (20260906af): Featured = Studio Loft seed; My Rooms = rooms you own + Create.
     // Beginner: never invent Hot New catalog rows — empty until a shared server publishes.
     var me = you();
     var sid = session() && session().user && session().user.id;
@@ -5411,7 +5421,7 @@ function helpPage() {
       + '</ul></div>'
       + '<div class="panel"><h2>Concept &amp; Status (spirit)</h2>'
       + '<p class="meta">Whirled = social network + virtual world. Tabs: Me, Stuff, Games, Rooms, Groups, Shop. Pale blue classic chrome — no gold/purple. Engine mounts only in <code>#stage-slot</code> via <code>window.WhirledChrome</code>. No fake NPCs or invented catalog. No private engine in this mock.</p>'
-      + '<p class="meta">This pass: avatar lab deferred (On hold; unlock <code>?avatarLab=1</code>). Cache <code>?v=20260906ae</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
+      + '<p class="meta">This pass: avatar lab deferred (On hold; unlock <code>?avatarLab=1</code>). Cache <code>?v=20260906af</code>. Press <b>?</b> or <b>Ctrl+K</b>.</p>'
       + '<p class="meta"><b>Club</b> — Me → Club shows Free / Supporter / Creator / Studio tier cards (Coming Soon, no payments). See <code>MEMBERSHIP.md</code>.</p>'
       + '<p class="meta"><button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button> — copyright uploads; not affiliated with whirled.club.</p>'
       + '<p class="meta">Live docs: CONCEPT.md / STATUS.md / DEV-NOTES.md — no external secrets.</p>'
@@ -5545,7 +5555,7 @@ function helpPage() {
     return String(w.at || "") + "|" + String(w.fromId || w.who || "") + "|" + String(w.text || "").slice(0, 80);
   }
   function canDeleteWallPost(wallOwnerId, post) {
-    // How this works (20260906ae): profile owner may delete any post on their wall;
+    // How this works (20260906af): profile owner may delete any post on their wall;
     // authors may delete their own posts (classic comment wall).
     // Beginner: if it is your profile OR you wrote the comment, you see Delete.
     var s = session();
@@ -6356,7 +6366,7 @@ function helpPage() {
       ? '<img class="profile-photo" src="' + photo + '" alt="Profile photo" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(me.initials) + '</span></div>';
     wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
-    // How this works (20260906ae): owner sees Delete on every wall post; authors on their own.
+    // How this works (20260906af): owner sees Delete on every wall post; authors on their own.
     var wallHtml = wall.length ? wall.map(function (w) {
       return wallRowHtml(w, sid);
     }).join("") : '<p class="meta">No comments yet.</p>';
@@ -6896,7 +6906,7 @@ function helpPage() {
       +   '<p class="meta">Browser look: <button type="button" class="text-btn" data-me="themes">Themes</button> (CSS presets on this device). Group world themes live on group pages for managers.</p>'
       +   '<button type="button" class="action-btn" disabled title="Not available on Pages">Delete account — not available on Pages</button>'
       + '</div>'
-      // How this works (20260906ae): Friendly People toggle — demo ignores Level 10 / 20-friends gate.
+      // How this works (20260906af): Friendly People toggle — demo ignores Level 10 / 20-friends gate.
       // Beginner: turn on to appear on others' Me → Friendly People and auto-accept friend requests.
       // ENGINE DEV: flag is whirled2.friendly.{userId} only — no invented helpers.
       + '<div class="panel friendly-toggle-panel">'
@@ -6910,7 +6920,9 @@ function helpPage() {
       + '<div class="panel">'
       +   '<h2>Other sign-in</h2>'
       +   '<p class="meta">Username / password is primary (no Meta App ID steps).</p>'
-      +   '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span></p>'
+      +   (me.discord || me.discordId
+            ? '<p class="meta">Discord — <b>Linked</b></p>'
+            : '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span> (link via gate when local demo OAuth env is set).</p>')
       +   '<p class="meta">Google — <span class="club-badge-soon">Coming Soon</span></p>'
       +   '<p class="meta">GitHub / Apple OAuth also need a developer app — none are zero-setup on a static site.</p>'
       + '</div>'
@@ -6934,7 +6946,7 @@ function helpPage() {
       ? '<img class="profile-photo" src="' + photo + '" alt="" width="80" height="60" />'
       : '<div class="profile-photo missing"><span>' + esc(initials) + '</span></div>';
     wall = wall.filter(function (w) { return !w.fromId || !isBlocked(w.fromId); });
-    // How this works (20260906ae): profile owner or comment author can Delete.
+    // How this works (20260906af): profile owner or comment author can Delete.
     var wallHtml = wall.length ? wall.map(function (w) {
       return wallRowHtml(w, id);
     }).join("") : '<p class="meta">No comments yet.</p>';
@@ -7298,7 +7310,7 @@ function helpPage() {
 
 
   function meRooms() {
-    // How this works (20260906ae): Me → My Rooms — owned room tiles + Create Room (classic pay path).
+    // How this works (20260906af): Me → My Rooms — owned room tiles + Create Room (classic pay path).
     // Beginner: first room free; later 10,000 coins OR 1 bar from earn-only wallet.
     // ENGINE DEV: create only writes whirled2.rooms; Enter still mounts via #stage-slot later.
     var sid = session() && session().user && session().user.id;
@@ -7352,12 +7364,12 @@ function helpPage() {
 
   // Facebook Connect removed (?v=20260906ac): Meta App ID setup was required for a static
   // Pages deploy, so Continue with Facebook / Account link-unlink / SDK load paths are gone.
-  // Username/password stays primary. Discord / Google remain Coming Soon labels only.
-  // ENGINE DEV: auth is chrome session only — do not break #stage-slot / syncRoomAudio / ♪ Music.
+  // Username/password stays primary. Local Discord OAuth when demo server env is set (?v=20260906af).
+  // Google remains Coming Soon. ENGINE DEV: auth is chrome session only — do not break #stage-slot.
 
   function gate() {
-    // How this works: Sign Up / Logon with username + password (primary). No Facebook button.
-    // Beginner: social OAuth needs a developer app setup — keep local accounts until a hosted OAuth is chosen.
+    // How this works: Sign Up / Logon with username + password (primary). Discord button fills after status fetch.
+    // Beginner: Pages (no WHIRLED_API) keeps Coming Soon; local server + env → Continue with Discord.
     return ''
       + '<section class="gate"><div class="gate-card">'
       +   logoImg("gate-logo")
@@ -7375,7 +7387,10 @@ function helpPage() {
       +       '<button type="submit">Logon</button></form>'
       +   '</div>'
       +   '<p class="gate-err" id="gate-err"></p>'
-      +   '<p class="meta">Username / password is the primary sign-in. Discord / Google — Coming Soon (need OAuth app setup).</p>'
+      +   '<div id="gate-discord" class="gate-discord">'
+      +     '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span></p>'
+      +   '</div>'
+      +   '<p class="meta">Username / password is the primary sign-in. Google — Coming Soon (need OAuth app setup).</p>'
       +   '<p class="meta">Offline preview stays in this browser. Shared chat + shared soundtrack need server/server.mjs.</p>'
       +   '<p class="gate-legal meta">By continuing you agree not to upload copyrighted material you do not own. '
       +     '<button type="button" class="text-btn" data-legal-open="1">Legal / Disclaimer</button></p>'
@@ -7446,7 +7461,7 @@ function helpPage() {
       +         '<button type="button" data-room-menu="playlist">View room music</button>'
       +         '<button type="button" data-room-share="1">Share / embed room…</button>'
       +         '<button type="button" data-copy-invite="room">Copy room invite link</button>'
-      // How this works (20260906ae): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
+      // How this works (20260906af): wiki Room lock triad — Unlocked / Friends / Locked (owner only).
       // Beginner: room owner picks who may enter. Guests see the current mode but cannot change it.
       // ENGINE DEV: chrome gate via canEnterRoom; does not touch #stage-slot.
       +         '<div class="room-lock-row meta">Room lock (owner)' + (canSetRoomLock(currentRoomId) ? "" : " — view only") + '</div>'
@@ -7491,7 +7506,7 @@ function helpPage() {
     try { claimDailyLogin(); } catch (eDaily) {}
     // 20260906q: phones force Overlay chat so Slide never opens a black slab under the stage.
     try { ensureMobileChatOverlay(); } catch (eMob) {}
-    // 20260906ae: landscape immersion (inRoom + phone landscape) — chrome only around #stage-slot.
+    // 20260906af: landscape immersion (inRoom + phone landscape) — chrome only around #stage-slot.
     try { bindLandscapeImmersionListeners(); updateLandscapeImmersion(); } catch (eImm) {}
     if (!document.getElementById("main")) document.getElementById("app").innerHTML = shell();
     var tabAttr = tab || "rooms";
@@ -7706,6 +7721,33 @@ function helpPage() {
     }
     hook("register-form", window.WhirledApi.register);
     hook("login-form", window.WhirledApi.login);
+    // How this works: if demo API is live, ask server whether Discord OAuth env is set.
+    // Beginner: enabled → Continue with Discord link; else keep Coming Soon (Pages offline too).
+    // ENGINE DEV: chrome-only — never touches #stage-slot.
+    refreshGateDiscord();
+  }
+  function refreshGateDiscord() {
+    var el = document.getElementById("gate-discord");
+    if (!el) return;
+    var soon = '<p class="meta">Discord — <span class="club-badge-soon">Coming Soon</span></p>';
+    if (!isDemoApi() || !window.WhirledApi || !window.WhirledApi.discordAuthStatus) {
+      el.innerHTML = soon;
+      return;
+    }
+    window.WhirledApi.discordAuthStatus().then(function (st) {
+      if (!el.isConnected) return;
+      if (st && st.enabled) {
+        var href = window.WhirledApi.discordAuthStartUrl();
+        el.innerHTML = '<p class="gate-discord-row">'
+          + '<a class="action-btn gate-discord-btn" href="' + href + '">Continue with Discord</a>'
+          + '</p>'
+          + '<p class="meta">Local Discord OAuth — signs you in via the demo server.</p>';
+      } else {
+        el.innerHTML = soon;
+      }
+    }).catch(function () {
+      if (el.isConnected) el.innerHTML = soon;
+    });
   }
   var _decDrag = null;
   function bindDecorateDrag() {
@@ -8216,11 +8258,52 @@ function helpPage() {
     }
     return false;
   }
+  function stripDiscordTokenFromUrl() {
+    try {
+      var u = new URL(location.href);
+      if (!u.searchParams.has("discord_token")) return;
+      u.searchParams.delete("discord_token");
+      var qs = u.searchParams.toString();
+      history.replaceState({}, "", u.pathname + (qs ? "?" + qs : "") + u.hash);
+    } catch (e) {}
+  }
+  function consumeDiscordTokenFromUrl() {
+    // How this works: Discord callback redirects to /?discord_token=TOKEN — save session, strip query, enter shell.
+    // Beginner: same Bearer session token as password login. ENGINE DEV: chrome-only.
+    try {
+      var u = new URL(location.href);
+      return u.searchParams.get("discord_token");
+    } catch (e) { return null; }
+  }
   function boot() {
     // How this works: ?avatarLab=1 unlocks the deferred SWF wardrobe lab for side work only.
+    // Discord: if URL has discord_token, accept it before paint (async me fetch).
     syncAvatarLabFlagFromUrl();
     applyBrowserTheme();
-    if (session()) {
+    var discordTok = consumeDiscordTokenFromUrl();
+    if (discordTok && window.WhirledApi && window.WhirledApi.acceptDiscordToken) {
+      try {
+        window.WhirledApi.acceptDiscordToken(discordTok);
+        stripDiscordTokenFromUrl();
+        window.WhirledApi.me().then(function () {
+          finishBootAfterSession();
+        }).catch(function (err) {
+          try { window.WhirledApi.logout(); } catch (eL) {}
+          stripDiscordTokenFromUrl();
+          paint("");
+          var ge = document.getElementById("gate-err");
+          if (ge) ge.textContent = (err && err.message) ? err.message : "Discord sign-in failed.";
+          try { window.__whirledBoot = true; } catch (e) {}
+        });
+        return;
+      } catch (eDisc) {
+        stripDiscordTokenFromUrl();
+      }
+    }
+    finishBootAfterSession();
+  }
+  function finishBootAfterSession() {
+    if (session() && session().user) {
       stripStuckPokeNotices();
       try { syncFriendsFromPerUser(); } catch (eSF) {}
       try { awayMode = isAway(session().user.id); } catch (eAw) {}
@@ -8229,8 +8312,8 @@ function helpPage() {
     // How this works: a new page load is a new session visit — wipe leftover loft
     // chat from earlier. Do not loadHistory() on boot (that rehydrated old chats).
     clearRoomChatDisplay(true);
-    paint(session() ? "rooms" : "");
-    if (session()) {
+    paint(session() && session().user ? "rooms" : "");
+    if (session() && session().user) {
       startPoll();
       startOccPoll();
       ensureNoticeBar();
@@ -8740,7 +8823,7 @@ function helpPage() {
       paint("");
       return;
     }
-    // How this works (20260906ae): Create Room panel open/close + pay Coins/Bars/free.
+    // How this works (20260906af): Create Room panel open/close + pay Coins/Bars/free.
     // Beginner: first owned room is free; later deduct 10k coins OR 1 bar honestly.
     if (ev.target.closest("[data-create-room-open]") && session()) {
       createRoomOpen = true;
@@ -9734,7 +9817,7 @@ function helpPage() {
       return;
     }
     if (ev.target.closest("[data-room-mute]") && session()) {
-      // How this works (20260906ae): toggle mute, persist, then mute-safe sync (unload when muted).
+      // How this works (20260906af): toggle mute, persist, then mute-safe sync (unload when muted).
       // Beginner: Mute remembers on this browser and does not leave a broken half-loaded track.
       // ENGINE DEV: muted → remove embed dock / clear local audio src; unmute remounts from playlist.
       roomAudioMuted = !roomAudioMuted;
@@ -10133,7 +10216,7 @@ function helpPage() {
   // ENGINE DEV: profile page chrome only; not #stage-slot.
   app.addEventListener("input", function (ev) {
     if (!session() || !ev.target || !ev.target.closest) return;
-    // How this works (20260906ae): live volume slider — persist + apply to local <audio>.
+    // How this works (20260906af): live volume slider — persist + apply to local <audio>.
     // Beginner: drag the slider; music gets quieter/louder. Mute still unloads media safely.
     if (ev.target.getAttribute && ev.target.getAttribute("data-vol-slider") === "1") {
       var pct = Math.max(0, Math.min(100, Number(ev.target.value) || 0));
@@ -10227,7 +10310,7 @@ function helpPage() {
       savePlaylist(plO);
       return;
     }
-    // How this works (20260906ae): Account → Friendly People checkbox.
+    // How this works (20260906af): Account → Friendly People checkbox.
     // Beginner: when checked, you auto-accept friend requests and appear on Me → Friendly People.
     if (ev.target.matches && ev.target.matches("[data-friendly-toggle]") && session()) {
       setFriendly(session().user.id, !!ev.target.checked);

@@ -5,6 +5,21 @@
 **Constraint:** Username/password stays primary. **Facebook Connect stays removed** (Meta App ID / SDK friction). Buttons may remain **Coming Soon** until credentials exist.  
 **Reality check:** Pure static Pages **cannot** safely complete OAuth code↔token exchange (client secret must not ship in the browser). Real social login needs the **demo Node server** (or another tiny callback host) with env vars.
 
+### Local Discord is wired — set env and open 127.0.0.1:8787
+
+As of **`?v=20260906af`**, Discord OAuth works on the **local demo server** when both secrets are present:
+
+1. Create a Discord app → OAuth2 → add redirect  
+   `http://127.0.0.1:8787/api/auth/discord/callback`
+2. Export (or put in `/home/box/.config/whirled2/discord.env` or gitignored `server/.env.local`):
+   - `DISCORD_CLIENT_ID`
+   - `DISCORD_CLIENT_SECRET`
+3. Start: `cd server && ./start-local.sh` (or `node server.mjs`)
+4. Open `http://127.0.0.1:8787/` — gate shows **Continue with Discord** when enabled.
+5. Server logs only `Discord OAuth: enabled` or `… disabled (missing …)` — never prints secrets.
+
+GitHub / Google remain Coming Soon. Pages without `WHIRLED_API` keeps Discord as Coming Soon.
+
 Whirled2 is not affiliated with Three Rings / whirled.club.
 
 ---
@@ -31,7 +46,7 @@ Lowest hassle first. “Hassle” = dashboard clicks + verification + ongoing ac
 ### Ship order
 
 1. **GitHub** — first real social when you turn OAuth on (least owner hassle; credentials live next to the repo you already own).  
-2. **Discord** — second button (community fit). Keep both as **Coming Soon** on the gate until env vars are set.
+2. **Discord** — **local wired** (`?v=20260906af`); gate button live when demo server env is set. Still Coming Soon on plain Pages.
 
 Google can wait. Twitch/X/Apple stay unlabeled or buried “more later”.
 
@@ -74,4 +89,4 @@ All of these need a **server-side** callback (extend `server/server.mjs` or equi
 - Demo API overview: `server/server.mjs` header + `DEV-NOTES.md`.  
 - Do not heavy-edit `app.js` in research passes — wire OAuth in a dedicated auth wave.
 
-*Doc-only — nothing pushed.*
+*Local Discord implementation in `server/server.mjs` + chrome — nothing pushed unless instructed.*
