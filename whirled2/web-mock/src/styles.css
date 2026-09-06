@@ -7240,7 +7240,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 }
 
 
-/* (?v=20260906cc) CRITICAL: empty companion host looked like "no avatar".
+/* (?v=20260906cd) CRITICAL: empty companion host looked like "no avatar".
    Beginner: always show stand/glyph while mounting or companion-pending (on TOP).
    Once DIRECT avatar SWF is playing, put stand BEHIND so the real SWF paints (never cover it).
    Never classic-png-under-swf hide without a visible SWF — see afterMountUi in classic-avatar.js. */

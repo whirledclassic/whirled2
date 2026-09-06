@@ -1,6 +1,6 @@
 # Classic Whirled avatars — without Adobe Flash
 
-**Cache:** `?v=20260906by`  
+**Cache:** `?v=20260906cd`  
 **Audience:** beginners + ENGINE DEV. In-site: Help → **Developers** → *Classic Whirled avatars — without Adobe Flash*. Groups → **Dev Updates** thread.
 
 ---
@@ -82,7 +82,7 @@ From `greyhavens/whirled-api` `AbstractControl.as` / `ActorControl.as` / `Avatar
 1. Stuff → Avatars → **Classic Flash / Whirled avatars** panel.  
 2. Drop your **own** `.swf` (plus optional PNG idle + walk).  
 3. **Analyze** → pick **Wear mode** → **Save** → **Wear & enter loft**.  
-4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906by`.
+4. Walk on the floor; click nameplate/hitbox for emotes. Hard-refresh `?v=20260906cd`.
 
 ---
 
@@ -121,6 +121,20 @@ Whirl starter, chat visit-since, pale-blue chrome, transparent Ruffle, PE-none l
 Stock Wear from IDB uses companion `hostLoadBytes(base64)` → `Loader.loadBytes` (not nested blob URLs). See `FLASH-SYNC-RESEARCH.md`.
 
 
-## How Ruffle is integrated (?v=20260906cc)
+## How Ruffle is integrated (?v=20260906cd)
 
-See **[RUFFLE-INTEGRATION.md](./RUFFLE-INTEGRATION.md)** for the official API recipe (`publicPath`, `player.ruffle().load`, `{data: ArrayBuffer}`, `callExternalInterface`). Opt-in Classic Flash Wear mounts in `#avatar-ruffle-host` only — never `#stage-slot`.
+See **[RUFFLE-INTEGRATION.md](./RUFFLE-INTEGRATION.md)** for the full research summary (Using-Ruffle wiki + js-docs).
+
+| Step | What Whirled2 does |
+|------|--------------------|
+| Self-host | `assets/ruffle/` (ruffle.js + `.wasm`) same-origin on Pages |
+| `publicPath` | Absolute directory URL from `location` (`getRufflePublicPath`) so wasm resolves |
+| Config | `polyfills: false`, transparent stage, autoplay on, no splash |
+| Create | `RufflePlayer.newest().createPlayer()` → append to chrome host |
+| Load | **`player.ruffle().load(...)`** (fallback `player.load`) |
+| IDB SWF | `resolveSwfBytes` → `{ data: ArrayBuffer, swfFileName: "avatar.swf" }` |
+| EI | `player.ruffle().callExternalInterface` for host callbacks |
+| Opt-in | `playbackMode: "ruffle"` + `classicFlashOptIn` — Smooth stays PNG hybrid |
+| Loft | **DIRECT-stable** Wear (no companion auto remount blank loft) |
+
+Opt-in Classic Flash Wear mounts in `#avatar-ruffle-host` only — never `#stage-slot` (Pixi owns the room). Never MySpace. Never AGPL copy.

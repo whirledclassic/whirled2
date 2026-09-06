@@ -1,8 +1,8 @@
-## What shipped (?v=20260906cc)
+## What shipped (?v=20260906cd (config before ruffle.js inject; callExternalInterface first))
 
-- **Ruffle integration (docs-correct):** `publicPath` for self-host wasm; load via `player.ruffle().load`; IDB avatars prefer `{data: ArrayBuffer}`; EI via `callExternalInterface`; `RUFFLE-INTEGRATION.md`
+- **Ruffle integration (docs-correct):** `publicPath` for self-host wasm; load via `player.ruffle().load`; IDB avatars prefer `{data: ArrayBuffer}` via `resolveSwfBytes`; EI via `callExternalInterface` first; `RUFFLE-INTEGRATION.md`
 - Preserve: cb DIRECT-stable Wear (no companion wipe), by self-host pack, Flash opt-in dual modes
-- Cache: **`?v=20260906cc`**.
+- Cache: **`?v=20260906cd`**. Push: `/tmp/push-cc.js` (dry-run default). **Do not push from executor.**
 
 ## What shipped (?v=20260906cb)
 

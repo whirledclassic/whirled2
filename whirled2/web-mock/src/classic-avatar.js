@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906cc
+ * Cache: ?v=20260906cd
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906cc";
+  var VERSION = "20260906cd";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -65,7 +65,7 @@
 
   var RUFFLE_DEMO_SWF = "./assets/ruffle/demo-qa.swf";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906cc): Classic Flash reliability FIRST (blank loft CRITICAL).
+  // How this works (?v=20260906cd): Classic Flash reliability FIRST (blank loft CRITICAL).
   // ROOT BREAK: companion-first mounted transparent empty host.swf + faded stand → NOTHING visible.
   // FIX: loft Wear mounts avatar SWF DIRECT (outer Ruffle; blob: OK) and keeps it — never auto-
   // remount empty companion host after a successful paint. Stand thumb/glyph always present.
@@ -379,7 +379,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Ruffle loader — FIRST-CLASS (?v=20260906cc)
+  // Ruffle loader — FIRST-CLASS (?v=20260906cd)
   // Self-host assets/ruffle/ (GitHub Pages same-origin). Preload on Classic Flash / debug / flashQa.
   // Beginner: loft badge shows Ready / Mounting / Playing / Failed (not vague Experimental).
   // ENGINE DEV: one ensureRuffle shared by Stuff preview + loft Wear. Companion hostLoadBytes still primary.
@@ -486,7 +486,9 @@
     });
   }
   function ensureRuffle() {
-    // How this works (?v=20260906cc): load vendored assets/ruffle/ruffle.js (Pages same-origin).
+    // Official wiki: set window.RufflePlayer.config (incl. publicPath) before/with script.
+    try { applyOfficialRuffleConfig(); } catch (ePre) {}
+    // How this works (?v=20260906cd): load vendored assets/ruffle/ruffle.js (Pages same-origin).
     // Beginner: Stuff preview + loft Wear share this helper; errors show on the loft badge.
     // ENGINE DEV: wasm siblings must sit next to ruffle.js; GitHub Pages serves application/wasm.
     if (global.RufflePlayer && global.RufflePlayer.newest) {
@@ -539,7 +541,9 @@
     // ENGINE DEV: chrome-owned host only (never #stage-slot). Loft enables allowScriptAccess so
     // user-owned SWFs can talk to our minimal AvatarHost shim (EI only — not full sharedEvents).
     opts = opts || {};
-    if (!container || !swfUrl) return Promise.reject(new Error("Missing container or SWF URL."));
+    if (!container || (!swfUrl && !(opts && opts.swfData))) {
+      return Promise.reject(new Error("Missing container or SWF (url or data)."));
+    }
     destroyPlayersIn(container);
     var loftMount = !!(opts.loftMount || (container.id === "avatar-ruffle-host")
       || (container.classList && container.classList.contains("classic-wear-swf-slot")));
@@ -865,7 +869,7 @@
     if (!layer) return;
     var bill = layer.querySelector(".avatar-wear-billboard");
     var host = layer.querySelector("#avatar-ruffle-host, .avatar-ruffle-host");
-    // (?v=20260906cc): Body (uravatar) flips via orient<180 → scaleX=-1. When companion host
+    // (?v=20260906cd): Body (uravatar) flips via orient<180 → scaleX=-1. When companion host
     // is connected, do NOT also CSS-flip the ruffle host (double-flip = moonwalk). Fallback
     // direct-avatar path still uses --wear-face on host bob keyframes (bt).
     var companionFacing = !!(loftUsesCompanionHost && loftHostState.connected);
@@ -966,7 +970,7 @@
    * logs what the SWF tries (?avatarDebug=1). Chrome always moves the billboard + bob.
    */
 
-  // (?v=20260906cc): companion host nest — outer Ruffle = host.swf (http); avatar via hostLoadBytes.
+  // (?v=20260906cd): companion host nest — outer Ruffle = host.swf (http); avatar via hostLoadBytes.
   // Beginner: host.swf is OUR tiny Flash wrapper — not your avatar. It rebuilds your SWF from base64 bytes.
   // ENGINE DEV: nested Loader.load(blob:/data:) FAILS under Ruffle. Use Loader.loadBytes(ByteArray) only.
   // EI cannot pass ByteArray — JS sends base64 (chunked if huge). http(s) may still use hostLoadUrl.
@@ -998,7 +1002,7 @@
     hostMode: false,
     avatarUrl: null
   };
-  // (?v=20260906cc) Walk duration parity + speak/sleep chrome wire (Grey Havens study — no AGPL).
+  // (?v=20260906cd) Walk duration parity + speak/sleep chrome wire (Grey Havens study — no AGPL).
   // Beginner: while you walk across the loft, the SWF stays in "walking" the whole time (not a blink).
   // ENGINE DEV: club WalkAnimation keeps isMoving + lerps _loc; we tick hostWalk(~100ms) with locX from billboard.
   var loftWalkLocTick = 0;
@@ -1035,6 +1039,9 @@
    * Beginner: if nothing is registered, this silently fails — chrome bob/bubble still work.
    */
   function tryCallIntoSwf(names, args) {
+    // Official js-docs: prefer player.ruffle().callExternalInterface(name, ...args).
+    // Beginner: if the SWF never registered the callback, chrome bob/bubble still work.
+    // ENGINE DEV: order = callExternalInterface → ruffle().call → player[name] legacy.
     args = args || [];
     var player = loftActivePlayer;
     if (!player) return { ok: false, reason: "no-player" };
@@ -1045,14 +1052,6 @@
       if (!name) continue;
       tried.push(name);
       try {
-        if (typeof player[name] === "function") {
-          var r1 = player[name].apply(player, args);
-          rememberEi("js→swf", name, args);
-          return { ok: true, via: "player." + name, result: r1 };
-        }
-      } catch (e1) { logAvatarDebug("player." + name + " threw", e1 && e1.message); }
-      try {
-        // ENGINE DEV (?v=20260906cc): prefer callExternalInterface when present.
         var apiR = player.ruffle && player.ruffle();
         if (apiR && typeof apiR.callExternalInterface === "function") {
           var rEi = apiR.callExternalInterface.apply(apiR, [name].concat(args));
@@ -1064,7 +1063,14 @@
           rememberEi("js→swf", name + " (ruffle.call)", args);
           return { ok: true, via: "ruffle.call:" + name, result: r2 };
         }
-      } catch (e2) { logAvatarDebug("ruffle.call " + name + " threw", e2 && e2.message); }
+      } catch (e2) { logAvatarDebug("ruffle EI " + name + " threw", e2 && e2.message); }
+      try {
+        if (typeof player[name] === "function") {
+          var r1 = player[name].apply(player, args);
+          rememberEi("js→swf", name, args);
+          return { ok: true, via: "player." + name, result: r1 };
+        }
+      } catch (e1) { logAvatarDebug("player." + name + " threw", e1 && e1.message); }
     }
     rememberEi("js→swf", "MISS:" + tried.join("|"), args);
     return { ok: false, reason: "no-callback", tried: tried };
@@ -1162,7 +1168,7 @@
   }
 
   /**
-   * (?v=20260906cc) Decide companion load strategy.
+   * (?v=20260906cd) Decide companion load strategy.
    * - blob:/data: → NEVER hostLoadUrl (nested Loader fails). Need base64 → hostLoadBytes, else skip companion.
    * - http(s)/relative → hostLoadUrl OK.
    * Returns { ok, mode: 'bytes'|'url'|'skip', b64?, url?, reason }
@@ -1232,7 +1238,7 @@
   }
 
   function remountDirectAvatarImmediate(reason, slotOpt, urlOpt, wornOpt, loftOptsOpt) {
-    // (?v=20260906cc) CRITICAL: empty companion host → remount the real avatar SWF (blob: OK for outer Ruffle).
+    // (?v=20260906cd) CRITICAL: empty companion host → remount the real avatar SWF (blob: OK for outer Ruffle).
     if (loftFallbackInFlight) {
       logAvatarDebug("remountDirect skipped (in flight)", reason);
       return Promise.resolve(null);
@@ -1268,7 +1274,7 @@
       backgroundColor: null,
       allowScriptAccess: true
     };
-    return mountRuffle(slot, url, loftOpts).then(function (player) {
+    function finishRemount(player) {
       if (gen !== loftMountGeneration) {
         logAvatarDebug("remountDirect stale gen", gen, loftMountGeneration);
         return player;
@@ -1283,12 +1289,22 @@
       } catch (eCl) {}
       logAvatarDebug("remountDirect OK", { hasPlayer: !!player });
       return player;
-    }).catch(function (err) {
+    }
+    function failRemount(err) {
       loftFallbackInFlight = false;
       ensureStandFallback(slot, worn, (err && err.message) || "direct-remount-failed");
       logAvatarDebug("remountDirect FAILED", err && err.message);
       return null;
-    });
+    }
+    // Prefer DataLoadOptions ArrayBuffer (official) over blob: URL for remount too.
+    return resolveSwfBytes(worn).then(function (got) {
+      var o = Object.assign({}, loftOpts);
+      if (got && got.buffer) {
+        o.swfData = got.buffer;
+        o.swfFileName = "avatar.swf";
+      }
+      return mountRuffle(slot, url, o).then(finishRemount);
+    }).catch(failRemount);
   }
 
   function armCompanionWatchdog(gen, reasonTag) {
@@ -1472,7 +1488,7 @@
   }
 
   function callHostWalk(moving, orient, locXOpt) {
-    // (?v=20260906cc) Optional locX (0..1) — club lerps _loc while isMoving; chrome billboard supplies X.
+    // (?v=20260906cd) Optional locX (0..1) — club lerps _loc while isMoving; chrome billboard supplies X.
     loftHostState.moving = !!moving;
     if (typeof orient === "number" && isFinite(orient)) loftHostState.orient = orient;
     var o = loftHostState.orient;
@@ -1503,7 +1519,7 @@
   }
 
   function startWalkLocTick() {
-    // ENGINE DEV (?v=20260906cc): while loftHostState.moving, re-push hostWalk(true,orient,locX) ~100ms.
+    // ENGINE DEV (?v=20260906cd): while loftHostState.moving, re-push hostWalk(true,orient,locX) ~100ms.
     // Beginner: keeps Flash walk frames playing for the whole floor trek, like whirled.club.
     stopWalkLocTick();
     loftWalkLocTick = setInterval(function () {
@@ -1538,7 +1554,7 @@
   }
 
   function callHostSleep(sleeping) {
-    // (?v=20260906cc) hostSleep → appearanceChanged_v2 sleeping bit (AvatarHost stub ready).
+    // (?v=20260906cd) hostSleep → appearanceChanged_v2 sleeping bit (AvatarHost stub ready).
     loftHostState.sleeping = !!sleeping;
     logAvatarDebug("hostSleep", { sleeping: !!sleeping, connected: loftHostState.connected });
     var r = tryCallHostMethod("hostSleep", [!!sleeping]);
@@ -1551,7 +1567,7 @@
   }
 
   function callHostSpoke() {
-    // (?v=20260906cc) loft chat → hostSpoke → userProps.avatarSpoke_v1 (talk anims).
+    // (?v=20260906cd) loft chat → hostSpoke → userProps.avatarSpoke_v1 (talk anims).
     // Beginner: when you send chat, the avatar can mouth / play its speak clip if the SWF supports it.
     noteLoftActivity();
     logAvatarDebug("hostSpoke", { connected: loftHostState.connected });
@@ -1586,7 +1602,7 @@
   }
 
   function noteLoftActivity() {
-    // Beginner (?v=20260906cc): any floor click / chat / walk wakes the avatar (clears Zzz).
+    // Beginner (?v=20260906cd): any floor click / chat / walk wakes the avatar (clears Zzz).
     loftLastActivityAt = Date.now();
     if (loftHostState.sleeping) {
       try { callHostSleep(false); } catch (eW) {}
@@ -1595,7 +1611,7 @@
   }
 
   function handleBridgeSetLocation(payload) {
-    // (?v=20260906cc) Avatar setLocation_v1 → real chrome move (club requestMove parity), not store-only.
+    // (?v=20260906cd) Avatar setLocation_v1 → real chrome move (club requestMove parity), not store-only.
     // ENGINE DEV: bridge payload {x,y,z,orient} logical 0..1; chromeWalkTo uses % of stage.
     var x = 0.5, y = 0, z = 0.5, o = loftHostState.orient;
     try {
@@ -1755,7 +1771,7 @@
   }
 
   function attachLoftAvatarHost(player, container) {
-    // (?v=20260906cc): attach after companion host OR direct-avatar mount.
+    // (?v=20260906cd): attach after companion host OR direct-avatar mount.
     loftActivePlayer = player;
     loftHostState.connected = false;
     installWhirledAvatarHostBridge();
@@ -1817,7 +1833,7 @@
   }
 
   function notifyLoftWalk(moving, orientHint) {
-    // (?v=20260906cc): chrome bob ALWAYS; companion hostWalk drives in-SWF walk scenes.
+    // (?v=20260906cd): chrome bob ALWAYS; companion hostWalk drives in-SWF walk scenes.
     // Beginner: floor click → walking frames for the WHOLE trek; arrive → idle (hostWalk false).
     // ENGINE DEV: hostWalk → appearanceChanged_v2(loc, orient, moving, sleeping) → Body
     // state_<state>_walking. While moving, ~100ms locX ticks match club WalkAnimation _loc lerp.
@@ -1879,7 +1895,7 @@
   }
 
   function notifyLoftEmote(actionName) {
-    // (?v=20260906cc): prefer companion hostEmote → messageReceived_v1(ACTION_TRIGGERED).
+    // (?v=20260906cd): prefer companion hostEmote → messageReceived_v1(ACTION_TRIGGERED).
     actionName = String(actionName || "wave");
     var pretty = actionName.charAt(0).toUpperCase() + actionName.slice(1);
     try {
@@ -1945,7 +1961,7 @@
   // UI fragments — pale-blue classic chrome
   // ---------------------------------------------------------------------------
   function experimentalBadgeHtml() {
-    // (?v=20260906cc): live Ruffle status instead of vague Experimental.
+    // (?v=20260906cd): live Ruffle status instead of vague Experimental.
     return ruffleStatusBadgeHtml({ state: ruffleUiStatus.state === "idle" ? "ready" : ruffleUiStatus.state });
   }
 
@@ -2400,7 +2416,7 @@
   // ---------------------------------------------------------------------------
   function afterPaint() {
     // Called from app.js paint() — soft-fail always.
-    // (?v=20260906cc): preload Ruffle when Classic Flash / debug / flashQa.
+    // (?v=20260906cd): preload Ruffle when Classic Flash / debug / flashQa.
     try { preloadRuffleIfNeeded(); } catch (e0) {}
     try { mountViewerIfNeeded(); } catch (e1) {}
     try { mountWearIfNeeded(); } catch (e2) {}
@@ -2437,7 +2453,7 @@
   }
 
   function ensureStandFallback(slot, worn, reason) {
-    // (?v=20260906cc): always leave SOMETHING visible — thumb, or initial glyph. Never blank loft.
+    // (?v=20260906cd): always leave SOMETHING visible — thumb, or initial glyph. Never blank loft.
     // Beginner: while mounting / DIRECT-first, show stand WITHOUT marking is-failed (that dims Ruffle).
     // ENGINE DEV: only real failures get is-failed + data-mount-fail.
     if (!slot) return;
@@ -2517,7 +2533,7 @@
       function afterMountUi() {
         if (bill) {
           var img = bill.querySelector(".avatar-wear-sprite");
-          // (?v=20260906cc): NEVER classic-png-under-swf (opacity 0) unless companion connected
+          // (?v=20260906cd): NEVER classic-png-under-swf (opacity 0) unless companion connected
           // AND a real SWF is painting — otherwise loft goes blank (stand/PNG were the only paint).
           // Hybrid soft veil OK under Force Ruffle. SWF-only path has stand thumb inside host.
           if (img && itemIsHybrid(worn) && forceRuffleInLoft(worn)) {
@@ -2531,7 +2547,7 @@
           }
         }
       }
-      // (?v=20260906cc) RELIABILITY FIRST + loadBytes walk sync.
+      // (?v=20260906cd) RELIABILITY FIRST + loadBytes walk sync.
       // Beginner: always show your avatar (DIRECT Ruffle + blob). Then, if we can, upgrade to
       // companion host so floor-clicks play real walk scenes inside the SWF (like whirled.club).
       // ENGINE DEV: outer Ruffle blob: OK; nested Loader MUST use loadBytes(base64) via hostLoadBytes.
@@ -2569,24 +2585,29 @@
         loftHostState.hostMode = false;
         loftHostState.connected = false;
         // Official DataLoadOptions when we have bytes (IDB/blob) — more reliable than blob: URL.
+        // Beginner: your uploaded SWF lives in IndexedDB; we hand Ruffle the bytes directly.
+        // ENGINE DEV: resolveSwfBytes → {data}; blob: fetch fallback; else URLLoadOptions.
         function withDataOpts(buf) {
           var o = Object.assign({}, loftOpts);
           if (buf) { o.swfData = buf; o.swfFileName = "avatar.swf"; }
-          return mountRuffle(slot, url, o).then(function (player) {
+          return mountRuffle(slot, url || "avatar.swf", o).then(function (player) {
             afterMountUi();
             try { slot.setAttribute("data-mount-mode", "direct"); } catch (eM) {}
             return player;
           });
         }
-        if (url && String(url).indexOf("blob:") === 0) {
-          return fetch(url).then(function (res) {
-            if (!res.ok) throw new Error("blob fetch " + res.status);
-            return res.arrayBuffer();
-          }).then(function (ab) { return withDataOpts(ab); }).catch(function () {
-            return withDataOpts(null);
-          });
-        }
-        return withDataOpts(null);
+        return resolveSwfBytes(worn).then(function (got) {
+          if (got && got.buffer) return withDataOpts(got.buffer);
+          if (url && String(url).indexOf("blob:") === 0) {
+            return fetch(url).then(function (res) {
+              if (!res.ok) throw new Error("blob fetch " + res.status);
+              return res.arrayBuffer();
+            }).then(function (ab) { return withDataOpts(ab); }).catch(function () {
+              return withDataOpts(null);
+            });
+          }
+          return withDataOpts(null);
+        });
       }
 
       function startCompanionWithPayload(prep) {
@@ -2639,7 +2660,7 @@
         });
       }
 
-      // Strategy (?v=20260906cc) CRITICAL blank-loft fix:
+      // Strategy (?v=20260906cd) CRITICAL blank-loft fix:
       // Companion-first mounted empty transparent host.swf → is-playing → stand faded → NOTHING visible.
       // Beginner: ALWAYS mount your avatar SWF DIRECT (outer Ruffle; blob: OK) and KEEP it.
       // Do NOT remount companion host afterward — that wipes a working paint for a transparent empty
@@ -3049,6 +3070,8 @@
   api.setRuffleStatus = setRuffleStatus;
   api.getRuffleStatus = getRuffleStatus;
   api.paintRuffleStatusBadges = paintRuffleStatusBadges;
+  api.getRufflePublicPath = getRufflePublicPath;
+  api.applyOfficialRuffleConfig = applyOfficialRuffleConfig;
   api.ensureRuffle = ensureRuffle;
   api.preloadRuffleIfNeeded = preloadRuffleIfNeeded;
   api.preloadRuffle = preloadRuffle;
