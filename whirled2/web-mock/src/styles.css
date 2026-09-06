@@ -1753,49 +1753,72 @@ body > .party-panel {
   }
 }
 
-/* ---- 20260906d: mobile room chat dock (classic vibe, phone-friendly) ---- */
+/* ---- 20260906e: mobile chat hood (kill thin black strip under stage) ---- */
 @media (max-width: 700px) {
-  /* How this works: on phones, overlay chats sit ABOVE the black send bar as a
-     full-width bubble strip — no left-side dark rectangle eating the stage. */
+  /* How this works (baby steps):
+     1) On phones we NEVER show #chat-log under the green stage — that dark
+        strip looked like a broken 1-line "hood".
+     2) All room chat on phones uses #chat-overlay, fixed just ABOVE the
+        send bar, as a soft rounded bubble panel.
+     3) Empty chat keeps the panel hidden (no black slab). */
+  .stage-body .chat-log,
+  .stage-body.chat-mode-slide .chat-log,
+  .stage-body.chat-mode-overlay .chat-log {
+    display: none !important;
+  }
+  .stage-body.chat-mode-slide {
+    flex-direction: column !important;
+  }
   .chat-overlay {
     position: fixed !important;
-    left: 8px !important;
-    right: 8px !important;
+    left: 10px !important;
+    right: 10px !important;
     top: auto !important;
-    bottom: calc(52px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
     width: auto !important;
     max-width: none !important;
-    max-height: 34vh !important;
-    z-index: 35 !important;
-    padding: 0 2px !important;
-    background: transparent !important;
+    max-height: 38vh !important;
+    min-height: 0 !important;
+    z-index: 40 !important;
+    padding: 10px 10px 12px !important;
+    gap: 8px !important;
+    border-radius: 14px !important;
+    /* Soft dark glass so bubbles have a real "hood", not a 1px line */
+    background: rgba(8, 16, 24, 0.55) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(180, 210, 230, 0.22) !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28) !important;
     pointer-events: none !important;
+    overflow: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+  }
+  .chat-overlay[hidden],
+  .chat-overlay.is-empty {
+    display: none !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
   }
   .chat-overlay .chat-row {
     pointer-events: auto;
   }
   .chat-overlay .chat-bubble:not(.emote):not(.system) {
-    max-width: min(92vw, 420px);
-    font-size: 13px;
-    padding: 7px 11px;
-    border-radius: 14px;
+    max-width: min(88vw, 400px);
+    font-size: 14px;
+    line-height: 1.35;
+    padding: 9px 13px;
+    border-radius: 16px;
   }
-  .chat-overlay .chat-who { font-size: 12px; color: #e8f4fb; text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
-  .chat-overlay .chat-row time { display: none; } /* quieter on phones */
-  .chat-overlay .chat-row:nth-last-child(n+7) { display: none; } /* only recent */
-  /* Slide mode on mobile: shorter log under stage */
-  .stage-body.chat-mode-slide {
-    flex-direction: column !important;
+  .chat-overlay .chat-who {
+    font-size: 12px;
+    color: #e8f4fb;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.55);
   }
-  .stage-body.chat-mode-slide .chat-log {
-    width: 100% !important;
-    max-height: 28vh !important;
-    min-height: 0 !important;
-    border-radius: 0;
-    border-left: 0;
-    border-top: 1px solid #2a3d4c;
-  }
-  .stage-body.chat-mode-overlay .occupants {
-    max-height: 88px;
-  }
+  .chat-overlay .chat-row time { display: none; }
+  .chat-overlay .chat-row:nth-last-child(n+8) { display: none; }
+  .occupants { max-height: 96px; }
 }

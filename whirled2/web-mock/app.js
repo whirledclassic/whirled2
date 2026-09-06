@@ -18,7 +18,7 @@
   // How this works: brand mark is an SVG (crisp + true transparency).
   // Cache-bust with LOGO_V so phones don't keep an old black-box PNG.
   // Fallbacks: transparent PNG, then classic mark, then tiny svg.
-  var LOGO_V = "20260906c";
+  var LOGO_V = "20260906e";
   var LOGO = "./assets/whirled2-logo.svg?v=" + LOGO_V;
   var LOGO_PNG = "./assets/whirled2-logo.png?v=" + LOGO_V;
   var LOGO_CLASSIC = "./assets/whirled-classic-logo.png?v=" + LOGO_V;
@@ -2985,21 +2985,25 @@ function helpPage() {
     }
     var ov = document.getElementById("chat-overlay");
     if (ov) {
-      // How this works: overlay shows bubbles over the room. On narrow screens we
-      // only render the last few lines so the dock above the send bar stays light.
-      var showOv = ui.mode === "overlay" && !ui.hideHistory && chat.length > 0;
+      // How this works (baby steps):
+      // Desktop: overlay mode only shows #chat-overlay bubbles on the stage.
+      // Phones: ALWAYS use the docked bubble hood above the send bar (even if
+      // Chat Options says "Slide"), because the under-stage #chat-log strip
+      // looked like a broken thin black line. Hide history still wins.
+      var isPhone = false;
+      try {
+        isPhone = !!(window.matchMedia && window.matchMedia("(max-width: 700px)").matches);
+      } catch (ePhone) {}
+      var showOv = !ui.hideHistory && chat.length > 0 && (ui.mode === "overlay" || isPhone);
       if (showOv) {
         ov.hidden = false;
         ov.classList.remove("is-empty");
         var nearB = (ov.scrollHeight - ov.scrollTop - ov.clientHeight) < 48;
         var stickO = !chatPinnedScroll || nearB;
         var ovHtml = html;
-        try {
-          if (window.matchMedia && window.matchMedia("(max-width: 700px)").matches) {
-            var recent = chat.slice(-6).map(chatRow).join("");
-            ovHtml = recent;
-          }
-        } catch (eOv) {}
+        if (isPhone) {
+          ovHtml = chat.slice(-7).map(chatRow).join("");
+        }
         ov.innerHTML = ovHtml;
         if (stickO) ov.scrollTop = ov.scrollHeight;
       } else {
