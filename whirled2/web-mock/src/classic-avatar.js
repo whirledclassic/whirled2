@@ -14,12 +14,12 @@
  *    do NOT copy AGPL code. Full AvatarControl handshake = later Phase 2.
  *
  * Loaded BEFORE app.js from index.html. Exposes window.WhirledClassicAvatar.
- * Cache: ?v=20260906ce
+ * Cache: ?v=20260906cf
  */
 (function (global) {
   "use strict";
 
-  var VERSION = "20260906ce";
+  var VERSION = "20260906cf";
   var MEDIA_IDB_NAME = "whirled2-media";
   var MEDIA_IDB_STORE = "blobs";
   var SWF_MAX_BYTES = 10 * 1024 * 1024; // classic msoy medium upload ~10MB
@@ -65,16 +65,16 @@
 
   var RUFFLE_DEMO_SWF = "./assets/ruffle/demo-qa.swf";
   var OPT_IN_KEY = "whirled2.classicFlashOptIn"; // global preference (optional)
-  // How this works (?v=20260906ce): DIRECT-first paint, THEN safe companion upgrade for walk frames.
-  // ROOT BREAK (cd): companion-first = transparent empty host.swf + faded stand → blank loft.
-  // ROOT BREAK (walk): skipping companion after DIRECT = chrome bob only — stock SWFs never get
-  // appearanceChanged_v2 → Body state_*_walking (need sharedEvents host, not plain EI).
-  // FIX: mount avatar SWF DIRECT (visible) → settle → upgrade to companion hostLoadBytes nest.
-  // Never set loftUsesCompanionHost until bridge "connected". companion-pending keeps stand on TOP.
-  // Watchdog / bridge error → remount DIRECT (never leave empty host). Chrome bob always.
+  // How this works (?v=20260906cf): DIRECT-stable Wear — paint outer avatar SWF and KEEP it.
+  // ROOT BREAK (companion-first / ce auto-upgrade): empty host.swf or companion wipe → blank loft.
+  // Companion nest helpers (startCompanionWithPayload, companion-pending CSS, watchdog) stay in tree
+  // but Wear auto-upgrade is GATED OFF until Ruffle source research says nested sharedEvents /
+  // hostLoadBytes is safe. Chrome bob/emotes keep working. Stand thumb always visible.
+  // Never set loftUsesCompanionHost until bridge "connected". Watchdog → remount DIRECT.
   // LIVE whirled.club: ActorSprite → appearanceChanged_v2 → Body state_*_walking (+ gotControl_v1).
   // Force Ruffle only when user opts in — stock SWFs need AvatarControl host to walk.
-  // SWF-only: transparent Ruffle + companion walk scenes + bob/flip backup — never broken tofu.
+  // SWF-only: transparent Ruffle + bob/flip backup — never broken tofu / never blank loft.
+  var WEAR_AUTO_COMPANION_UPGRADE = false; // (?v=20260906cf) OFF — do not re-enable yet
   var FORCE_RUFFLE_KEY = "whirled2.forceRuffleInLoft";
   var api = {};
 
@@ -1322,7 +1322,7 @@
         companionAttempted: loftCompanionAttempted
       });
       remountDirectAvatarImmediate("watchdog-no-connected");
-    }, 3500); // (?v=20260906ce) loadBytes + controlConnect needs >2s on large IDB SWFs
+    }, 3500); // (?v=20260906cf) loadBytes + controlConnect needs >2s on large IDB SWFs
   }
 
   /**
@@ -1347,7 +1347,7 @@
         logAvatarDebug("host loaded avatar bytes (await controlConnect)");
       }
       if (kind === "connected") {
-        // (?v=20260906ce) ONLY flip companion flags here — never at host mount (blank loft).
+        // (?v=20260906cf) ONLY flip companion flags here — never at host mount (blank loft).
         // Beginner: walk frames work now because host can call appearanceChanged_v2.
         loftHostState.connected = true;
         loftHostState.hostMode = true;
@@ -2553,10 +2553,10 @@
           }
         }
       }
-      // (?v=20260906ce) RELIABILITY FIRST + loadBytes walk sync.
-      // Beginner: always show your avatar (DIRECT Ruffle + blob). Then, if we can, upgrade to
-      // companion host so floor-clicks play real walk scenes inside the SWF (like whirled.club).
-      // ENGINE DEV: outer Ruffle blob: OK; nested Loader MUST use loadBytes(base64) via hostLoadBytes.
+      // (?v=20260906cf) DIRECT-stable Wear — companion auto-upgrade OFF.
+      // Beginner: always show your avatar (DIRECT Ruffle + blob) and KEEP it. Stand thumb visible.
+      // Companion helpers remain below but WEAR_AUTO_COMPANION_UPGRADE is false (ce wiped paint).
+      // ENGINE DEV: outer Ruffle blob: OK; nested Loader research still pending before re-enable.
       // Never set loftUsesCompanionHost until bridge "connected". Watchdog ~3.5s → DIRECT.
       installWhirledAvatarHostBridge();
       loftMountGeneration += 1;
@@ -2666,20 +2666,25 @@
         });
       }
 
-      // Strategy (?v=20260906ce) DIRECT-first THEN safe companion upgrade (walk frames):
-      // Beginner: always show YOUR avatar SWF first (outer Ruffle). After it paints, we quietly
-      // switch to companion host so floor-clicks play real walk scenes inside the SWF.
-      // ENGINE DEV: companion-first blanked loft (empty host + faded stand). Skipping companion
-      // left DIRECT-only — chrome bob moves the sprite but stock Body never leaves idle
-      // (needs appearanceChanged_v2 via sharedEvents). Upgrade ONLY after DIRECT paint;
-      // loftUsesCompanionHost stays false until bridge "connected"; companion-pending CSS
-      // keeps stand thumb on TOP while empty host.swf loads; watchdog → remount DIRECT.
-      ensureStandFallback(slot, worn, "direct-first");
-      return mountDirectPrimary("direct-first-visible").then(function (player) {
+      // Strategy (?v=20260906cf) DIRECT-stable (companion auto-upgrade OFF):
+      // Beginner: paint YOUR avatar SWF on outer Ruffle and keep it. Stand thumb stays visible.
+      // Chrome bob / emotes keep working. startCompanionWithPayload + companion-pending + watchdog
+      // remain coded but Wear does NOT schedule upgrade — ce auto-upgrade regressed visibility
+      // (blank loft / companion wipe). Do NOT re-enable until Ruffle nested sharedEvents /
+      // hostLoadBytes research says safe.
+      ensureStandFallback(slot, worn, "direct-stable");
+      return mountDirectPrimary("direct-stable-visible").then(function (player) {
         if (mountGen !== loftMountGeneration) return player;
-        // DIRECT painted — prepare companion payload, then upgrade for in-SWF walk.
+        // Precompute companion payload for debug / future opt-in — gate blocks auto-upgrade.
         prepareCompanionStrategy(url, worn).then(function (prep) {
           if (mountGen !== loftMountGeneration) return;
+          if (!WEAR_AUTO_COMPANION_UPGRADE) {
+            logAvatarDebug("companion auto-upgrade OFF (cf DIRECT-stable)", prep && {
+              ok: prep && prep.ok, mode: prep && prep.mode, reason: prep && prep.reason,
+              skipped: prep && prep.skipped
+            });
+            return;
+          }
           if (!prep || !prep.ok || prep.skipped || (prep.mode !== "bytes" && prep.mode !== "url")) {
             logAvatarDebug("companion upgrade skipped (no payload — keep DIRECT)", prep && {
               ok: prep && prep.ok, mode: prep && prep.mode, reason: prep && prep.reason
@@ -2690,7 +2695,6 @@
             reason: prep.reason, mode: prep.mode,
             b64Len: prep.b64 ? prep.b64.length : 0
           });
-          // Short settle so user sees DIRECT paint; stand stays during companion-pending.
           setTimeout(function () {
             if (mountGen !== loftMountGeneration) return;
             if (loftHostState.connected || loftCompanionAttempted) return;
@@ -2705,7 +2709,7 @@
             });
           }, 450);
         }).catch(function (prepErr) {
-          logAvatarDebug("companion prep failed (keep DIRECT)", prepErr && prepErr.message);
+          logAvatarDebug("companion prep (debug only / keep DIRECT)", prepErr && prepErr.message);
         });
         return player;
       }).catch(function (err) {

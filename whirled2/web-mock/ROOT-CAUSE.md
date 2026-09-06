@@ -1,4 +1,14 @@
-# ROOT-CAUSE — Classic Flash click-to-walk no animation (?v=20260906ce)
+# ROOT-CAUSE — Classic Flash Wear visibility (?v=20260906cf)
+
+## Short note (cf)
+
+**ce auto-upgrade regressed visibility; cf restores DIRECT-stable while Ruffle source research runs.**
+
+`?v=20260906ce` scheduled a delayed companion nest after DIRECT paint (`startCompanionWithPayload` ~450ms, `companion-pending`, watchdog). In practice that wiped the working outer-avatar SWF again (blank loft / companion wipe — same class of failure as companion-first). **`?v=20260906cf`** keeps Wear on **DIRECT-stable** (paint outer avatar SWF, keep it). Companion code stays in tree but `WEAR_AUTO_COMPANION_UPGRADE = false`. Do **not** re-enable until Ruffle nested `sharedEvents` / `hostLoadBytes` research says safe. Stand thumb + chrome bob/emotes remain.
+
+---
+
+# Historical — click-to-walk no animation (?v=20260906ce)
 
 ## Symptom
 
@@ -12,12 +22,10 @@ Worn Classic Flash (Ruffle) avatars **move** on loft floor click (chrome billboa
 
 3. **`?v=20260906cd` Wear path skipped companion upgrade.** After blank-loft regression (companion-first = transparent empty `host.swf` + faded stand), `mountWearIfNeeded` mounted the avatar **DIRECT** and only precomputed companion payload for debug — comment: *"skipped auto-upgrade"*. Result: DIRECT paint OK, `loftUsesCompanionHost` forever false → floor click = chrome bob only.
 
-## Fix (?v=20260906ce)
+## Attempted fix (?v=20260906ce) — REVERTED visibility path in cf
 
-- Keep **DIRECT-first** (avatar visible immediately; stand thumb never blank).
-- After DIRECT `mountRuffle` resolves, **schedule companion upgrade** (~450ms): `prepareCompanionStrategy` → `startCompanionWithPayload` (`hostLoadBytes` / `hostLoadUrl`).
-- Flip `loftUsesCompanionHost` **only** on bridge `"connected"`; `data-mount-mode=companion-pending` keeps stand on TOP while empty host loads.
-- Watchdog ~3.5s / bridge error → `remountDirectAvatarImmediate` (DIRECT-stable fallback).
+- Kept **DIRECT-first** then **scheduled companion upgrade** (~450ms) for in-SWF walk frames.
+- That upgrade path **regressed loft visibility** again (blank loft / companion wipe) → cf gates it off.
 
 ## Non-goals
 

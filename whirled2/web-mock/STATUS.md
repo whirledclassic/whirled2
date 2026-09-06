@@ -1,3 +1,11 @@
+## What shipped (?v=20260906cf — DIRECT-stable Wear; companion auto-upgrade OFF)
+
+- **Regression:** `?v=20260906ce` auto-upgrade (DIRECT → delayed companion nest) wiped visible Wear again — blank loft / companion wipe (worse than before). See `ROOT-CAUSE.md`.
+- **Fix:** loft Wear paints avatar **DIRECT** on outer Ruffle and **keeps it** (cd/cb DIRECT-stable). `WEAR_AUTO_COMPANION_UPGRADE = false`. Companion helpers (`startCompanionWithPayload`, companion-pending CSS, watchdog) stay gated off for Wear default.
+- Stand thumb stays visible; chrome bob/emotes keep working. Do **not** re-enable companion until Ruffle source research says nested `sharedEvents` / `hostLoadBytes` is safe.
+- Preserve: ce companion code (gated), cd Ruffle config, cb blank-loft safety, by hostLoadBytes, dual Wear, Whirl
+- Cache: **`?v=20260906cf`**. Push: `/tmp/push-cf.js` (`WHIRLED_DO_PUSH=1`).
+
 ## What shipped (?v=20260906ce — DIRECT-first + safe companion upgrade for walk frames)
 
 - **Root cause:** cd Wear skipped companion auto-upgrade → stock SWFs never got `appearanceChanged_v2` walk scenes (chrome bob only). See `ROOT-CAUSE.md`.

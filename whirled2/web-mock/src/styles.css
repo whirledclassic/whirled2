@@ -7240,7 +7240,7 @@ body.room-immersive #app[data-tab="rooms"] .room-strip .room-owner {
 }
 
 
-/* (?v=20260906ce) CRITICAL: empty companion host looked like "no avatar".
+/* (?v=20260906cf) CRITICAL: empty companion host looked like "no avatar".
    Beginner: always show stand/glyph while mounting or companion-pending (on TOP).
    Once DIRECT avatar SWF is playing, put stand BEHIND so the real SWF paints (never cover it).
    After bridge "connected", data-mount-mode=companion + is-companion-connected → stand backup.
