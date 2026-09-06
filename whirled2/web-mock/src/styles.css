@@ -904,3 +904,90 @@ button.card.shop-card {
 @media (max-width: 900px) {
   .games-genre-rail { display: none; }
 }
+
+
+/* Stuff upload + invite + occupant menu (20260905s) */
+.how-stuff-panel h3 { margin: 0 0 6px; color: #1e6fa8; font-size: 15px; }
+.stuff-card { display: block; width: 100%; text-align: left; cursor: pointer; padding: 0; border: 1px solid #c5deee; border-radius: 6px; overflow: hidden; background: #fff; color: inherit; font: inherit; }
+.stuff-card:hover { border-color: #3aa3e0; }
+.stuff-thumb, .stuff-detail-thumb {
+  display: block; width: 100%; height: 110px; object-fit: cover; background: #e8f4fb;
+}
+.stuff-detail-thumb { width: 160px; height: 120px; border-radius: 6px; border: 1px solid #b7d3e8; }
+.stuff-detail-head { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0; }
+.stuff-detail-actions, .invite-them-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.stuff-upload-form label, .stuff-gift-form label { display: block; margin: 8px 0; font-size: 13px; }
+.stuff-upload-form input[type="text"],
+.stuff-upload-form input:not([type]),
+.stuff-upload-form input[type="file"],
+.stuff-upload-form textarea,
+.stuff-upload-form input[readonly],
+#stuff-edit-form input,
+#stuff-edit-form textarea,
+.stuff-gift-form select,
+.invite-link-label input {
+  width: 100%; box-sizing: border-box; margin-top: 4px;
+  border: 1px solid #b7d3e8; border-radius: 4px; padding: 8px;
+  font: 13px var(--ui); color: #16324a; background: #fff;
+}
+.check-row { display: flex !important; align-items: flex-start; gap: 8px; font-size: 12px; color: #4a6a80; }
+.check-row input { width: auto !important; margin-top: 2px; }
+.action-btn.danger { color: #a33; border-color: #e0b0b0; }
+.friends-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.friends-head h2 { margin: 0; }
+.invite-them-panel { margin: 0 0 12px; background: #f7fbfe; }
+.invite-link-label { display: block; margin: 8px 0; font-size: 13px; }
+.invite-them-actions a.action-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.person-wrap { position: relative; }
+.person-wrap.is-open { background: rgba(255,255,255,0.06); }
+.occ-menu {
+  margin: 0 8px 8px; padding: 4px 0; background: #123248; border: 1px solid #2a5570;
+  border-radius: 6px; display: grid; gap: 2px; max-width: 100%;
+}
+.occ-menu-item {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent;
+  color: #d5e6f0; font: 12px var(--ui); padding: 7px 10px; cursor: pointer;
+}
+.occ-menu-item:hover { background: rgba(58,163,224,0.25); color: #fff; }
+.occ-legend {
+  display: flex; flex-wrap: wrap; gap: 6px 10px; padding: 4px 10px 8px;
+  font-size: 10px; color: #7aa0b5;
+}
+.occ-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.occ-legend .lg {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.35);
+}
+.occ-legend .lg.green { background: #3cba5f; }
+.occ-legend .lg.white { background: #eef3f7; }
+.occ-legend .lg.blue { background: #3aa3e0; }
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 60; background: rgba(10,30,45,0.45);
+  display: grid; place-items: center; padding: 16px;
+}
+.modal-card {
+  width: min(420px, 100%); background: #fff; border: 1px solid #9bb8cc;
+  border-radius: 8px; padding: 14px 16px; box-shadow: 0 8px 28px rgba(20,60,90,0.25);
+  color: #16324a; max-height: min(80vh, 520px); overflow: auto;
+}
+.modal-card h2 { margin: 0 0 6px; font-size: 18px; color: #1e6fa8; }
+.modal-card textarea {
+  width: 100%; box-sizing: border-box; border: 1px solid #b7d3e8; border-radius: 4px;
+  padding: 8px; font: 13px var(--ui); color: #16324a; background: #fff; margin: 8px 0;
+}
+@media (max-width: 900px) {
+  .stuff-layout { display: block; }
+  .stuff-rail {
+    width: 100%; max-height: none; border-right: 0; border-bottom: 1px solid #000;
+  }
+  .stuff-cats { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 4px; padding: 6px; }
+  .stuff-cats li { flex: 0 0 auto; }
+  .stuff-main { padding: 10px; min-width: 0; }
+  .stuff-detail-head { flex-direction: column; }
+  .occ-menu { margin-right: 6px; }
+  .modal-card { width: 100%; }
+  .invite-them-actions { flex-direction: column; align-items: stretch; }
+  .friends-head { align-items: flex-start; }
+  .rail { overflow-x: hidden; }
+  .person-wrap { max-width: 100%; }
+}

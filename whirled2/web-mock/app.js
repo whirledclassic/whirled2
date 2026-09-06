@@ -31,6 +31,11 @@
     { id: "videos", label: "Videos", empty: "You have no videos yet." }
   ];
   var stuffCat = "avatars";
+  var stuffItemId = null;
+  var stuffMode = "browse"; // browse | upload | detail | edit
+  var invitePanelOpen = false;
+  var occMenuId = null;
+  var friendInvitePending = null; // {id,name} for buddy request popup
   var shopCat = "avatars";
   var shopSort = "popularity";
   var shopItemId = null;
@@ -385,11 +390,80 @@
   }
   function personRow(p) {
     var id = p.id || "";
-    return '<button type="button" class="person" data-profile="' + esc(id) + '">'
+    var open = occMenuId && occMenuId === id;
+    var menu;
+    if (p.you) {
+      menu = '<div class="occ-menu" role="menu">'
+        + '<button type="button" class="occ-menu-item" data-profile="' + esc(id) + '">View Profile</button>'
+        + '<button type="button" class="occ-menu-item" data-me="profile">Edit profile</button>'
+        + '</div>';
+    } else {
+      menu = '<div class="occ-menu" role="menu">'
+        + '<button type="button" class="occ-menu-item" data-profile="' + esc(id) + '">View Profile</button>'
+        + '<button type="button" class="occ-menu-item" data-invite-buddy="' + esc(id) + '" data-friend-name="' + esc(p.name || id) + '">Invite to be your friend</button>'
+        + '<button type="button" class="occ-menu-item" data-mail-to="' + esc(id) + '" data-mail-name="' + esc(p.name || id) + '">Send Mail</button>'
+        + '<button type="button" class="occ-menu-item" data-enter-room="loft">Visit Home</button>'
+        + '</div>';
+    }
+    return '<div class="person-wrap' + (open ? " is-open" : "") + '">'
+      + '<button type="button" class="person" data-occ-menu="' + esc(id) + '">'
       + '<span class="ava' + (p.you ? " you" : "") + '">' + esc(p.initials || "?") + '</span>'
       + '<span class="person-name">' + esc(p.name) + (p.you ? " <span class=\"sub\">(you)</span>" : "") + '</span>'
       + '<span class="dot' + (p.online ? " on" : "") + '"></span>'
-      + '<span class="sub">' + esc(p.you ? "you" : (p.room || "")) + '</span></button>';
+      + '<span class="sub">' + esc(p.you ? "you" : (p.room || "")) + '</span></button>'
+      + (open ? menu : "")
+      + '</div>';
+  }
+  function occLegend() {
+    return '<div class="occ-legend" title="Starting out glow colors — legend only">'
+      + '<span><i class="lg green"></i> Green door</span>'
+      + '<span><i class="lg white"></i> White game</span>'
+      + '<span><i class="lg blue"></i> Blue player</span>'
+      + '</div>';
+  }
+  function shareInviteUrl() {
+    try {
+      if (location && location.href && location.protocol !== "about:") return String(location.href).split("#")[0];
+    } catch (e) {}
+    return "https://whirledclassic.github.io/whirled2/whirled2/web-mock/?v=20260905s";
+  }
+  function inviteThemPanel() {
+    var url = shareInviteUrl();
+    var subject = encodeURIComponent("Come hang out in Whirled Classic");
+    var body = encodeURIComponent(
+      "Hey! Join me in Whirled Classic — a free social world revival (no payments).\n\n"
+      + "Open: " + url + "\n\n"
+      + "Coins are labels only. See you in the loft!"
+    );
+    return '<div class="panel invite-them-panel" id="invite-them-panel">'
+      + '<div class="room-side-head"><h2>Invite Them!</h2>'
+      +   '<button type="button" class="text-btn" data-invite-close="1">Close</button></div>'
+      + '<p class="meta">Share Whirled Classic with a friend. No email-import from Hotmail etc. — just a link or mailto.</p>'
+      + '<label class="invite-link-label">Share link'
+      +   '<input id="invite-share-url" readonly value="' + esc(url) + '" />'
+      + '</label>'
+      + '<div class="invite-them-actions">'
+      +   '<button type="button" class="action-btn" data-invite-copy="1">Copy link</button>'
+      +   '<a class="action-btn" href="mailto:?subject=' + subject + '&body=' + body + '">Email invite</a>'
+      + '</div>'
+      + '<p class="meta" id="invite-copy-msg"></p>'
+      + '</div>';
+  }
+  function friendInvitePopup() {
+    if (!friendInvitePending) return "";
+    var t = friendInvitePending;
+    return '<div class="modal-backdrop" id="buddy-invite-modal" data-buddy-cancel="1">'
+      + '<div class="modal-card" role="dialog" aria-label="Friend request" onclick="event.stopPropagation()">'
+      +   '<h2>Invite ' + esc(t.name) + '</h2>'
+      +   '<p class="meta">Optional message (sent as a mail note). Default classic text below.</p>'
+      +   '<form id="buddy-invite-form" data-buddy-id="' + esc(t.id) + '" data-buddy-name="' + esc(t.name) + '">'
+      +     '<textarea name="message" rows="3" maxlength="400">Let\'s be buddies!</textarea>'
+      +     '<div class="invite-them-actions">'
+      +       '<button type="submit" class="action-btn">Send request</button>'
+      +       '<button type="button" class="text-btn" data-buddy-cancel="1">Cancel</button>'
+      +     '</div>'
+      +   '</form>'
+      + '</div></div>';
   }
   function feedRow(ev) {
     return '<div class="feed-row"><span class="ava">' + esc(ev.who.slice(0, 1)) + "</span><div><b>" + esc(ev.who) + "</b> " + esc(ev.text) + "<time>" + esc(ev.ago || "just now") + " · " + esc(ev.place || "status") + "</time></div></div>";
@@ -400,20 +474,96 @@
     return '<div class="chat-row"><b>' + esc(msg.who) + "</b> <time>" + esc(stamp) + "</time><div>" + esc(msg.text) + "</div></div>";
   }
   function card(item) {
-    var tone = item.kind === "backdrop" ? "night" : item.kind === "avatar" ? "fox" : "";
-    return '<article class="card"><div class="swatch ' + tone + '"></div><div class="body"><h3>' + esc(item.name) + '</h3><p class="meta">' + esc(item.kind) + " · " + esc(item.creator) + '</p><div class="price">' + (item.owned ? "owned" : item.coins + " coins") + "</div></div></article>";
+    var id = item.id || "";
+    var thumb = item.thumb
+      ? '<img class="stuff-thumb" src="' + item.thumb + '" alt="" />'
+      : '<div class="swatch"></div>';
+    return '<button type="button" class="card stuff-card" data-stuff-item="' + esc(id) + '">'
+      + thumb
+      + '<div class="body"><h3>' + esc(item.name || "Item") + '</h3>'
+      + '<p class="meta">' + esc(item.kind || itemCat(item)) + (item.creator ? (" · " + esc(item.creator)) : "") + '</p>'
+      + '<div class="price">owned</div></div></button>';
+  }
+  function findStuff(id) {
+    var all = loadStuff();
+    for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+    return null;
+  }
+  function stuffUploadForm(meta) {
+    return '<div class="panel stuff-upload-panel">'
+      + '<div class="room-side-head"><h2>Upload / Create — ' + esc(meta.label) + '</h2>'
+      +   '<button type="button" class="text-btn" data-stuff-mode="browse">Cancel</button></div>'
+      + '<p class="meta">Wiki-style stub: name + description + optional thumbnail. SWF / full media arrives with the engine later. Images only for this mock (png/jpg/gif/webp), ~200KB cap.</p>'
+      + '<form id="stuff-upload-form" class="stuff-upload-form">'
+      +   '<label>Name <input name="name" maxlength="80" required placeholder="Item name" /></label>'
+      +   '<label>Description <textarea name="description" rows="3" maxlength="400" placeholder="What is it?"></textarea></label>'
+      +   '<label>Type <input name="type" readonly value="' + esc(meta.label) + '" data-type-id="' + esc(meta.id) + '" /></label>'
+      +   '<input type="hidden" name="typeId" value="' + esc(meta.id) + '" />'
+      +   '<label>Thumbnail / image (optional) <input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" /></label>'
+      +   '<label class="check-row"><input type="checkbox" name="copyright" required /> I confirm I have the right to upload this (copyright).</label>'
+      +   '<button type="submit">Save to Stuff</button>'
+      +   '<p class="meta" id="stuff-upload-msg"></p>'
+      + '</form></div>';
+  }
+  function stuffDetail(item) {
+    if (!item) {
+      return '<div class="panel"><p class="meta">Item not found.</p>'
+        + '<button type="button" class="text-btn" data-stuff-mode="browse">Back</button></div>';
+    }
+    var friends = loadFriends();
+    var friendOpts = friends.map(function (f) {
+      return '<option value="' + esc(f.id) + '">' + esc(f.name) + '</option>';
+    }).join("");
+    var thumb = item.thumb
+      ? '<img class="stuff-detail-thumb" src="' + item.thumb + '" alt="" />'
+      : '<div class="swatch"></div>';
+    var edit = stuffMode === "edit";
+    var body = edit
+      ? ('<form id="stuff-edit-form" data-stuff-edit="' + esc(item.id) + '">'
+        + '<label>Name <input name="name" maxlength="80" required value="' + esc(item.name || "") + '" /></label>'
+        + '<label>Description <textarea name="description" rows="3" maxlength="400">' + esc(item.description || "") + '</textarea></label>'
+        + '<button type="submit">Save</button> '
+        + '<button type="button" class="text-btn" data-stuff-item="' + esc(item.id) + '">Cancel</button>'
+        + '</form>')
+      : ('<p>' + esc(item.description || "No description.") + '</p>'
+        + '<p class="meta">' + esc(item.kind || itemCat(item)) + " · by " + esc(item.creator || "you") + '</p>');
+    return '<div class="panel stuff-detail-panel">'
+      + '<button type="button" class="text-btn" data-stuff-mode="browse">← Back to ' + esc(catMeta(stuffCat).label) + '</button>'
+      + '<div class="stuff-detail-head">' + thumb + '<div><h2>' + esc(item.name || "Item") + '</h2>' + body + '</div></div>'
+      + (edit ? "" : (
+        '<div class="stuff-detail-actions">'
+        + '<button type="button" class="action-btn" data-stuff-edit-open="' + esc(item.id) + '">Edit name/desc</button>'
+        + '<button type="button" class="action-btn danger" data-stuff-delete="' + esc(item.id) + '">Delete</button>'
+        + '</div>'
+        + '<div class="section-label">Send as Gift</div>'
+        + (friends.length
+          ? ('<form id="stuff-gift-form" data-stuff-gift="' + esc(item.id) + '" class="stuff-gift-form">'
+            + '<select name="friendId" required><option value="">— pick a friend —</option>' + friendOpts + '</select>'
+            + '<button type="submit">Send as Gift</button>'
+            + '<p class="meta">Sends a mail note (local). Item stays in your Stuff on this mock.</p>'
+            + '</form>')
+          : '<p class="meta">Add a friend first to send gifts.</p>')
+      ))
+      + '</div>';
   }
   function stuffPage() {
     var meta = catMeta(stuffCat);
     var all = loadStuff();
     var items = filterByCat(all, stuffCat);
+    var how = '<div class="panel how-stuff-panel">'
+      + '<h3>How do I get stuff?</h3>'
+      + '<p class="meta">Create furniture and media yourself (wiki Upload), or earn/buy later. Coins stay labels only — no payments. Nothing is invented for you.</p>'
+      + '<button type="button" class="action-btn" data-stuff-mode="upload">Upload…</button>'
+      + '</div>';
     var body;
-    if (!all.length) {
-      body = '<div class="panel"><p class="meta">Your inventory is empty. Items you create or earn will show up here.</p></div>';
+    if (stuffMode === "upload") {
+      body = stuffUploadForm(meta);
+    } else if ((stuffMode === "detail" || stuffMode === "edit") && stuffItemId) {
+      body = stuffDetail(findStuff(stuffItemId));
     } else if (!items.length) {
-      body = '<div class="panel"><p class="meta">' + esc(meta.empty) + '</p></div>';
+      body = how + '<div class="panel"><p class="meta">' + esc(meta.empty) + (all.length ? "" : " Your inventory starts empty.") + '</p></div>';
     } else {
-      body = '<div class="grid">' + items.map(card).join("") + '</div>';
+      body = how + '<div class="grid">' + items.map(card).join("") + '</div>';
     }
     return '<section class="page stuff-page"><div class="page-head"><div><h1>Stuff</h1><p>What you already own.</p></div></div>'
       + '<div class="stuff-layout">' + catRail("stuff", stuffCat)
@@ -898,6 +1048,7 @@
     return ''
       + '<div class="workspace">'
       +   '<aside class="rail"><h2>In this room</h2>'
+      +     occLegend()
       +     (empty ? '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>' : here.map(personRow).join(''))
       +     '<button type="button" class="text-btn leave-room" data-leave-room="1">Back to Rooms</button>'
       +   '</aside>'
@@ -910,7 +1061,8 @@
       +     '<div class="chat-log" id="chat-log">' + chat.map(chatRow).join('') + '</div>'
       +     (roomPanelOpen ? roomCommentsPanel() : '')
       +   '</section>'
-      + '</div>';
+      + '</div>'
+      + friendInvitePopup();
   }
   function rooms() {
     return inRoom ? roomView() : roomsLobby();
@@ -1312,7 +1464,9 @@
       }).join("");
     }
     return '<section class="page me-page">' + meSubnav()
-      + '<div class="panel"><h2>Friends</h2>'
+      + '<div class="panel"><div class="friends-head"><h2>Friends</h2>'
+      +   '<button type="button" class="action-btn" data-invite-open="1">Invite Them!</button></div>'
+      + (invitePanelOpen ? inviteThemPanel() : '')
       + '<div class="section-label">Search</div>'
       + '<form id="friend-search-form" class="friend-search-form">'
       +   '<input name="q" maxlength="60" placeholder="Search by Whirled name or permaname" value="' + esc(friendSearchQ) + '" />'
@@ -1320,7 +1474,9 @@
       + '</form>'
       + '<div class="friend-search-results">' + searchRows + '</div>'
       + '<div class="section-label">Your friends</div>'
-      + rows + '</div></section>';
+      + rows + '</div>'
+      + friendInvitePopup()
+      + '</section>';
   }
 
   function meMail(composeTo) {
@@ -1669,7 +1825,10 @@
         return p;
       });
     }
-    rail.innerHTML = "<h2>In this room</h2>" + (here.length ? here.map(personRow).join("") : '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>');
+    var leave = '<button type="button" class="text-btn leave-room" data-leave-room="1">Back to Rooms</button>';
+    rail.innerHTML = "<h2>In this room</h2>" + occLegend()
+      + (here.length ? here.map(personRow).join("") : '<p class="sub" style="padding:8px 10px">Nobody here yet.</p>')
+      + leave;
     listeners.occupants.forEach(function (fn) { try { fn(here); } catch (e) {} });
   }
   async function loadOccupants() {
@@ -1834,11 +1993,106 @@
         return;
       }
     }
+    var occBtn = ev.target.closest("[data-occ-menu]");
+    if (occBtn && session() && !ev.target.closest(".occ-menu")) {
+      var oid = occBtn.getAttribute("data-occ-menu") || "";
+      occMenuId = (occMenuId === oid) ? null : oid;
+      if (document.querySelector(".workspace")) refreshOccupantRail();
+      else paint(document.querySelector(".tab.is-on") ? document.querySelector(".tab.is-on").getAttribute("data-tab") : "rooms");
+      return;
+    }
+    if (ev.target.closest("[data-buddy-cancel]")) {
+      friendInvitePending = null;
+      var modal = document.getElementById("buddy-invite-modal");
+      if (modal) modal.remove();
+      else paint(document.querySelector(".tab.is-on") ? document.querySelector(".tab.is-on").getAttribute("data-tab") : "rooms");
+      return;
+    }
+    var invBuddy = ev.target.closest("[data-invite-buddy]");
+    if (invBuddy && session()) {
+      friendInvitePending = {
+        id: invBuddy.getAttribute("data-invite-buddy"),
+        name: invBuddy.getAttribute("data-friend-name") || invBuddy.getAttribute("data-invite-buddy")
+      };
+      occMenuId = null;
+      if (document.querySelector(".workspace")) {
+        refreshOccupantRail();
+        if (!document.getElementById("buddy-invite-modal")) {
+          var wrap = document.createElement("div");
+          wrap.innerHTML = friendInvitePopup();
+          document.getElementById("app").appendChild(wrap.firstChild);
+        }
+      } else paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-invite-open]") && session()) {
+      invitePanelOpen = true;
+      meSub = "friends";
+      viewingId = null;
+      paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-invite-close]") && session()) {
+      invitePanelOpen = false;
+      meSub = "friends";
+      paint("me");
+      return;
+    }
+    if (ev.target.closest("[data-invite-copy]") && session()) {
+      var inp = document.getElementById("invite-share-url");
+      var msg = document.getElementById("invite-copy-msg");
+      var val = inp ? inp.value : shareInviteUrl();
+      function copied() { if (msg) msg.textContent = "Link copied."; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(val).then(copied).catch(function () {
+          if (inp) { inp.select(); try { document.execCommand("copy"); copied(); } catch (e) { if (msg) msg.textContent = val; } }
+        });
+      } else if (inp) {
+        inp.select();
+        try { document.execCommand("copy"); copied(); } catch (e) { if (msg) msg.textContent = val; }
+      }
+      return;
+    }
+    var stuffModeBtn = ev.target.closest("[data-stuff-mode]");
+    if (stuffModeBtn && session()) {
+      stuffMode = stuffModeBtn.getAttribute("data-stuff-mode") || "browse";
+      if (stuffMode === "browse") stuffItemId = null;
+      if (stuffMode === "upload") stuffItemId = null;
+      paint("stuff");
+      return;
+    }
+    var stuffItemBtn = ev.target.closest("[data-stuff-item]");
+    if (stuffItemBtn && session() && !ev.target.closest("form")) {
+      stuffItemId = stuffItemBtn.getAttribute("data-stuff-item") || null;
+      stuffMode = "detail";
+      paint("stuff");
+      return;
+    }
+    var stuffEditOpen = ev.target.closest("[data-stuff-edit-open]");
+    if (stuffEditOpen && session()) {
+      stuffItemId = stuffEditOpen.getAttribute("data-stuff-edit-open");
+      stuffMode = "edit";
+      paint("stuff");
+      return;
+    }
+    var stuffDel = ev.target.closest("[data-stuff-delete]");
+    if (stuffDel && session()) {
+      var delId = stuffDel.getAttribute("data-stuff-delete");
+      if (delId && confirm("Delete this item from your Stuff?")) {
+        saveStuff(loadStuff().filter(function (it) { return it.id !== delId; }));
+        stuffItemId = null;
+        stuffMode = "browse";
+        pushNotice("gray", "Item deleted from Stuff.");
+        paint("stuff");
+      }
+      return;
+    }
     var prof = ev.target.closest("[data-profile]");
     if (prof && session()) {
       viewingId = prof.getAttribute("data-profile") || null;
+      occMenuId = null;
       if (viewingId) {
-        var pname0 = (prof.textContent || "").trim() || viewingId;
+        var pname0 = (prof.getAttribute("data-friend-name") || prof.textContent || "").trim() || viewingId;
         rememberProfile({ id: viewingId, name: pname0.slice(0, 40) });
       }
       meSub = "profile";
@@ -1896,6 +2150,7 @@
         id: mailTo.getAttribute("data-mail-to"),
         name: mailTo.getAttribute("data-mail-name") || ""
       };
+      occMenuId = null;
       meSub = "mail";
       viewingId = null;
       paint("me");
@@ -2124,6 +2379,8 @@
         var stuffCatBtn = ev.target.closest("[data-stuff-cat]");
     if (stuffCatBtn && session()) {
       stuffCat = stuffCatBtn.getAttribute("data-stuff-cat") || "avatars";
+      stuffMode = "browse";
+      stuffItemId = null;
       paint("stuff");
       return;
     }
@@ -2145,6 +2402,7 @@
     if (meBtn && session()) {
       meSub = meBtn.getAttribute("data-me") || "home";
       viewingId = null;
+      occMenuId = null;
       if (meSub !== "mail") window.__mailCompose = null;
       paint("me");
       return;
@@ -2161,11 +2419,14 @@
     var tab = ev.target.closest("[data-tab]");
     if (tab && tab.getAttribute("data-tab") && session()) {
       var t = tab.getAttribute("data-tab");
-      if (t === "me") { meSub = "home"; viewingId = null; }
+      if (t === "me") { meSub = "home"; viewingId = null; invitePanelOpen = false; }
       if (t === "rooms") { /* keep inRoom */ }
       if (t === "shop") { shopItemId = null; }
       if (t === "groups") { groupViewId = null; groupThreadId = null; }
       if (t === "games") { gamesMode = "browse"; gameViewId = null; gameDetailTab = "play"; }
+      if (t === "stuff") { stuffMode = "browse"; stuffItemId = null; }
+      occMenuId = null;
+      friendInvitePending = null;
       paint(t);
     }
   });
@@ -2290,6 +2551,126 @@
       return;
     }
 
+    if (ev.target.id === "buddy-invite-form" && session()) {
+      var bid = ev.target.getAttribute("data-buddy-id");
+      var bname = ev.target.getAttribute("data-buddy-name") || bid;
+      var bfd = new FormData(ev.target);
+      var bmsg = String(bfd.get("message") || "").trim().slice(0, 400) || "Let's be buddies!";
+      addFriend({ id: bid, name: bname });
+      sendMail({
+        toId: bid,
+        toName: bname,
+        subject: "Friend request",
+        body: bmsg
+      });
+      sendMail({
+        toId: session().user.id,
+        toName: session().user.name,
+        fromId: bid,
+        fromName: bname,
+        subject: "Friend request sent",
+        body: "You invited " + bname + ": " + bmsg,
+        read: true
+      });
+      pushNotice("friending", "Friend request sent to " + bname + ".");
+      rememberProfile({ id: bid, name: bname });
+      friendInvitePending = null;
+      occMenuId = null;
+      meSub = "friends";
+      viewingId = null;
+      paint("me");
+      return;
+    }
+    if (ev.target.id === "stuff-upload-form" && session()) {
+      var sud = new FormData(ev.target);
+      var sname = String(sud.get("name") || "").trim().slice(0, 80);
+      var sdesc = String(sud.get("description") || "").trim().slice(0, 400);
+      var stype = String(sud.get("typeId") || stuffCat || "furniture");
+      var msgEl = document.getElementById("stuff-upload-msg");
+      if (!sname) { if (msgEl) msgEl.textContent = "Name required."; return; }
+      if (!sud.get("copyright")) { if (msgEl) msgEl.textContent = "Copyright confirmation required."; return; }
+      var file = ev.target.querySelector('input[name="image"]').files[0];
+      function finishSave(thumb) {
+        var items = loadStuff();
+        var nid = "st" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        items.unshift({
+          id: nid,
+          name: sname,
+          description: sdesc,
+          kind: stype,
+          type: stype,
+          category: stype,
+          creator: session().user.name,
+          ownerId: session().user.id,
+          thumb: thumb || "",
+          owned: true,
+          at: new Date().toISOString()
+        });
+        saveStuff(items);
+        stuffItemId = nid;
+        stuffMode = "detail";
+        pushNotice("green", "Saved “" + sname + "” to Stuff.");
+        paint("stuff");
+      }
+      if (!file) { finishSave(""); return; }
+      var okTypes = { "image/png":1, "image/jpeg":1, "image/jpg":1, "image/gif":1, "image/webp":1 };
+      if (!okTypes[file.type]) {
+        if (msgEl) msgEl.textContent = "Images only for this mock (png/jpg/gif/webp). SWF comes later with the engine.";
+        return;
+      }
+      if (file.size > 200000) {
+        if (msgEl) msgEl.textContent = "Image is larger than ~200KB — please shrink it for this mock.";
+        alert("Keep Stuff thumbnails under ~200KB for this mock.");
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var dataUrl = String(reader.result || "");
+        if (dataUrl.length > 280000) {
+          if (msgEl) msgEl.textContent = "Encoded image too large for localStorage — try a smaller file.";
+          return;
+        }
+        finishSave(dataUrl);
+      };
+      reader.onerror = function () { if (msgEl) msgEl.textContent = "Could not read file."; };
+      reader.readAsDataURL(file);
+      return;
+    }
+    if (ev.target.id === "stuff-edit-form" && session()) {
+      var eid = ev.target.getAttribute("data-stuff-edit");
+      var ed = new FormData(ev.target);
+      var items2 = loadStuff();
+      for (var ei = 0; ei < items2.length; ei++) {
+        if (items2[ei].id === eid) {
+          items2[ei].name = String(ed.get("name") || "").trim().slice(0, 80) || items2[ei].name;
+          items2[ei].description = String(ed.get("description") || "").trim().slice(0, 400);
+          break;
+        }
+      }
+      saveStuff(items2);
+      stuffItemId = eid;
+      stuffMode = "detail";
+      paint("stuff");
+      return;
+    }
+    if (ev.target.id === "stuff-gift-form" && session()) {
+      var gidItem = ev.target.getAttribute("data-stuff-gift");
+      var itemG = findStuff(gidItem);
+      var gd = new FormData(ev.target);
+      var fidG = String(gd.get("friendId") || "").trim();
+      var frG = loadFriends().filter(function (f) { return f.id === fidG; })[0];
+      if (!itemG || !frG) return;
+      sendMail({
+        toId: frG.id,
+        toName: frG.name,
+        subject: "Gift: " + (itemG.name || "item"),
+        body: session().user.name + " sent you “" + (itemG.name || "an item") + "” as a gift (Stuff stub — mail note only on this mock)."
+      });
+      pushNotice("blue", "Gift note sent to " + frG.name + ".");
+      stuffMode = "detail";
+      paint("stuff");
+      return;
+    }
     if (ev.target.id === "friend-search-form" && session()) {
       var fsd = new FormData(ev.target);
       friendSearchQ = String(fsd.get("q") || "").trim().slice(0, 60);
