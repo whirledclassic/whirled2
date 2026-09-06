@@ -96,6 +96,15 @@
     .muted { color: #4a6a80; font-size: .92rem; }
     footer { text-align: center; padding: 20px; color: #4a6a80; font-size: .9rem; }
     .ok { display: none; background: #e7f8ea; border: 1px solid #8dca9a; padding: 12px; border-radius: 6px; }
+    .pay-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    @media (max-width: 700px) { .pay-grid { grid-template-columns: 1fr; } }
+    .pay-opt {
+      display: block; background: #fff; border: 2px solid var(--line);
+      border-radius: 6px; padding: 10px; cursor: pointer; font-weight: normal;
+    }
+    .pay-opt input { width: auto; margin-right: 6px; }
+    .pay-opt strong { display: block; margin-bottom: 4px; }
+    .pay-box { display: none; margin-top: 12px; padding: 12px; background: #fff; border: 1px dashed var(--line); border-radius: 6px; }
   </style>
 </head>
 <body>
@@ -122,86 +131,28 @@
       <p>The website chrome lives in this repo. The room engine is separate. Artists ship into <code>assets/</code>, not into engine source.</p>
       <p>Style target: high-contrast, readable at game scale. Editorial toybox, not casino gacha, not emoji sticker pack. UI chrome should feel like classic whirled.com (blue header, swirl, tabs) — not a different brand skin.</p>
     </section>
-
     <section class="terms" id="terms">
       <h2>What you are getting into</h2>
-      <p><strong>Now:</strong> volunteer / free. No contract hours. No guaranteed paycheck.</p>
-      <p><strong>Later:</strong> if Whirled 2 makes money, Josh pays from that money for work that actually shipped into the live world. Shipping a file is not a paycheck. No money in = no pay.</p>
-      <p><strong>Either way:</strong> credit in the repo and on a credits screen when one exists.</p>
-      <p>One-off paid commissions are rare and only if Josh has a small budget that cycle. Original work only. Credit plus a discount is fine. Do not send original Whirled shop items or ripped Flash assets.</p>
-      <p>You keep the right to show the work in your portfolio. If we ship it, we need a license we can actually use (repo license, or CC-BY, or a short written grant). Say which one on the form.</p>
+      <p><strong>Paid work is on the table.</strong> Volunteer work is also on the table. You choose on the form below. Josh reads the application, the portfolio, and — if you picked paid — the number you wrote.</p>
+      <p><strong>Volunteer</strong> — credit and a seat on the project. No invoice.</p>
+      <p><strong>Paid</strong> — you name a price for the first drop. A yes is a written yes for that drop. It is not a salary and not a retainer unless we later agree to that in writing.</p>
+      <p><strong>Want to stay on long-term?</strong> Say so. For now, long-term still means <em>one-time payments per asset batch</em>. We ship a drop, we pay for that drop, we stay in touch, we do the next drop the same way.</p>
+      <p><strong>Either track:</strong> credit in the repo and on a credits screen when one exists. Applying is not a hire. Shipping a file is not a paycheck until that drop is agreed.</p>
+      <p>Original work only. No original Whirled shop items or ripped Flash assets. You can show shipped work in your portfolio. We need a license we can actually use (repo license, CC-BY, or a short written grant).</p>
     </section>
-
     <section id="roles">
       <h2>Roles — apply for the ones you actually do</h2>
       <div class="roles">
-        <article class="role" id="avatar">
-          <h3>Avatar artist</h3>
-          <p>One humanoid (or readable creature) that works in a room.</p>
-          <ul>
-            <li>Idle + 4-direction walk</li>
-            <li>Consistent pixel size / pivot</li>
-            <li>Optional: sit, wave, talk</li>
-          </ul>
-        </article>
-        <article class="role" id="room">
-          <h3>Room / environment</h3>
-          <p>A walkable space, not a painting.</p>
-          <ul>
-            <li>Floor + backdrop or two walls</li>
-            <li>Collision-friendly layout</li>
-            <li>First need: one complete room (Studio Loft energy)</li>
-          </ul>
-        </article>
-        <article class="role" id="props">
-          <h3>Furniture / props</h3>
-          <p>Things you can place in a room.</p>
-          <ul>
-            <li>Chair, table, plant, lamp first</li>
-            <li>4–8 pieces, same scale as the avatar</li>
-            <li>Clean edges, readable silhouette</li>
-          </ul>
-        </article>
-        <article class="role" id="ui">
-          <h3>UI / chrome</h3>
-          <p>Buttons, tabs, panels, icons for the website shell.</p>
-          <ul>
-            <li>Me / Stuff / Games / Rooms / Groups / Shop feel</li>
-            <li>Must match classic blue Whirled chrome</li>
-            <li>SVG or crisp PNG @1x and @2x</li>
-          </ul>
-        </article>
-        <article class="role" id="shop">
-          <h3>Shop / item art</h3>
-          <p>Wearables, toys, badges — new originals only.</p>
-          <ul>
-            <li>Icon + in-world view if it sits in a room</li>
-            <li>No copies of old catalog SKUs</li>
-          </ul>
-        </article>
-        <article class="role" id="motion">
-          <h3>Animator</h3>
-          <p>If you can take a still sheet and make it walk.</p>
-          <ul>
-            <li>Sprite sheets or short loops</li>
-            <li>Frame list + pivot notes</li>
-          </ul>
-        </article>
-        <article class="role" id="audio">
-          <h3>Music / SFX</h3>
-          <p>Original loops and tiny UI sounds.</p>
-          <ul>
-            <li>Room ambience, click, chat ping</li>
-            <li>No copyrighted samples you cannot grant</li>
-          </ul>
-        </article>
-        <article class="role" id="other">
-          <h3>Something else</h3>
-          <p>Logo lockups, loading screens, marketing stills, pixel fonts. Say it on the form.</p>
-        </article>
+        <article class="role"><h3>Avatar artist</h3><p>One humanoid (or readable creature) that works in a room.</p><ul><li>Idle + 4-direction walk</li><li>Consistent pixel size / pivot</li><li>Optional: sit, wave, talk</li></ul></article>
+        <article class="role"><h3>Room / environment</h3><p>A walkable space, not a painting.</p><ul><li>Floor + backdrop or two walls</li><li>Collision-friendly layout</li><li>First need: one complete room (Studio Loft energy)</li></ul></article>
+        <article class="role"><h3>Furniture / props</h3><p>Things you can place in a room.</p><ul><li>Chair, table, plant, lamp first</li><li>4–8 pieces, same scale as the avatar</li><li>Clean edges, readable silhouette</li></ul></article>
+        <article class="role"><h3>UI / chrome</h3><p>Buttons, tabs, panels, icons for the website shell.</p><ul><li>Me / Stuff / Games / Rooms / Groups / Shop feel</li><li>Must match classic blue Whirled chrome</li><li>SVG or crisp PNG @1x and @2x</li></ul></article>
+        <article class="role"><h3>Shop / item art</h3><p>Wearables, toys, badges — new originals only.</p><ul><li>Icon + in-world view if it sits in a room</li><li>No copies of old catalog SKUs</li></ul></article>
+        <article class="role"><h3>Animator</h3><p>If you can take a still sheet and make it walk.</p><ul><li>Sprite sheets or short loops</li><li>Frame list + pivot notes</li></ul></article>
+        <article class="role"><h3>Music / SFX</h3><p>Original loops and tiny UI sounds.</p><ul><li>Room ambience, click, chat ping</li><li>No copyrighted samples you cannot grant</li></ul></article>
+        <article class="role"><h3>Something else</h3><p>Logo lockups, loading screens, marketing stills, pixel fonts. Say it on the form.</p></article>
       </div>
     </section>
-
     <section>
       <h2>How files should arrive</h2>
       <ul>
@@ -211,7 +162,6 @@
         <li>One job per drop. A walk cycle is one drop. A whole world is not a first drop.</li>
       </ul>
     </section>
-
     <section id="apply">
       <h2>Apply</h2>
       <p class="muted">This form emails Josh and can also open a GitHub issue so the application is filed on the repo. First FormSubmit email needs a one-time confirm in his inbox.</p>
@@ -222,19 +172,14 @@
         <input type="hidden" name="_captcha" value="false" />
         <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off" />
         <input type="hidden" name="_next" value="https://whirledclassic.github.io/whirled2/whirled2/web-mock/artists.html?sent=1" />
-
         <label for="name">Name / handle</label>
         <input id="name" name="name" required />
-
         <label for="email">Email</label>
         <input id="email" name="email" type="email" required />
-
         <label for="discord">Discord (optional)</label>
         <input id="discord" name="discord" />
-
         <label for="portfolio">Portfolio / examples link</label>
         <input id="portfolio" name="portfolio" type="url" placeholder="https://" required />
-
         <label>Roles you want (pick any)</label>
         <div class="checks">
           <label><input type="checkbox" name="roles[]" value="avatar" /> Avatar artist</label>
@@ -246,13 +191,28 @@
           <label><input type="checkbox" name="roles[]" value="audio" /> Music / SFX</label>
           <label><input type="checkbox" name="roles[]" value="other" /> Other</label>
         </div>
-
         <label for="other_role">If other, what?</label>
         <input id="other_role" name="other_role" />
-
+        <label>Track — pick one</label>
+        <div class="pay-grid">
+          <label class="pay-opt"><input type="radio" name="track" value="volunteer" required /><strong>Volunteer</strong>Credit, no invoice. Fine if you want in and money is not the point.</label>
+          <label class="pay-opt"><input type="radio" name="track" value="paid" /><strong>Paid spot</strong>Quote your rate. Josh says yes or no on a specific drop.</label>
+          <label class="pay-opt"><input type="radio" name="track" value="either" /><strong>Open to either</strong>Prefer paid if the budget is there; will volunteer if it is not.</label>
+        </div>
+        <div class="pay-box" id="pay-box">
+          <label for="rate">What do you want to charge for the first drop?</label>
+          <input id="rate" name="rate" placeholder="Example: $80 for one walk cycle, or $40 per prop" />
+          <label for="pay_shape">How do you want to get paid?</label>
+          <select id="pay_shape" name="pay_shape">
+            <option value="">Choose…</option>
+            <option>One-time payment for this drop only</option>
+            <option>Long-term — but I get that it is still one-time payments per batch for now</option>
+            <option>Would discuss a retainer later if the project can carry it</option>
+          </select>
+          <p class="muted">Long-term here means we keep working together. It does not mean a monthly salary yet. Next assets = next one-time payment unless we write something else down.</p>
+        </div>
         <label for="first_drop">What would your first drop be?</label>
         <textarea id="first_drop" name="first_drop" required placeholder="Example: one loft backdrop + 4 props, or one walk cycle."></textarea>
-
         <label for="license">License you can grant if we ship it</label>
         <select id="license" name="license" required>
           <option value="">Choose…</option>
@@ -262,53 +222,50 @@
           <option>Written grant, ask me first</option>
           <option>Not sure yet</option>
         </select>
-
-        <label for="terms_ok">Money line</label>
+        <label for="terms_ok">I read the terms</label>
         <div class="checks">
-          <label><input type="checkbox" name="terms_ok" value="yes" required /> I read the terms. Volunteer now. Credit always. Pay only if the project makes money and the work shipped.</label>
+          <label><input type="checkbox" name="terms_ok" value="yes" required /> I understand paid vs volunteer, that applying is not a hire, and that long-term paid work is still one-time payments per asset drop unless we agree otherwise in writing.</label>
         </div>
-
         <label for="notes">Anything else</label>
         <textarea id="notes" name="notes" placeholder="Time zone, weekly hours you can spare, tools you use…"></textarea>
-
         <button type="submit">Send application to Josh</button>
         <button type="button" class="btn" id="gh-btn" style="background:#16324a;margin-left:8px;">Also open a GitHub issue</button>
       </form>
     </section>
   </main>
-  <footer>
-    Whirled 2 · <a href="https://github.com/whirledclassic/whirled2">github.com/whirledclassic/whirled2</a>
-  </footer>
+  <footer>Whirled 2 · <a href="https://github.com/whirledclassic/whirled2">github.com/whirledclassic/whirled2</a></footer>
   <script>
-    if (/sent=1/.test(location.search)) {
-      document.getElementById("ok").style.display = "block";
+    if (/sent=1/.test(location.search)) document.getElementById("ok").style.display = "block";
+    function selectedTrack() {
+      var el = document.querySelector("input[name='track']:checked");
+      return el ? el.value : "";
     }
+    function togglePayBox() {
+      var t = selectedTrack();
+      document.getElementById("pay-box").style.display = (t === "paid" || t === "either") ? "block" : "none";
+    }
+    document.querySelectorAll("input[name='track']").forEach(function (el) { el.addEventListener("change", togglePayBox); });
     document.getElementById("gh-btn").addEventListener("click", function () {
       var name = document.getElementById("name").value || "(name)";
       var roles = Array.prototype.slice.call(document.querySelectorAll("input[name='roles[]']:checked")).map(function (el) { return el.value; }).join(", ") || "(none checked)";
       var nl = "\n";
       var body = [
-        "### Artist application",
-        "",
+        "### Artist application", "",
         "- Name: " + name,
         "- Email: " + (document.getElementById("email").value || ""),
         "- Discord: " + (document.getElementById("discord").value || ""),
         "- Portfolio: " + (document.getElementById("portfolio").value || ""),
         "- Roles: " + roles,
         "- Other role: " + (document.getElementById("other_role").value || ""),
+        "- Track: " + (selectedTrack() || "(not selected)"),
+        "- Rate: " + (document.getElementById("rate").value || ""),
+        "- Pay shape: " + (document.getElementById("pay_shape").value || ""),
         "- License: " + (document.getElementById("license").value || ""),
-        "",
-        "### First drop",
-        document.getElementById("first_drop").value || "",
-        "",
-        "### Notes",
-        document.getElementById("notes").value || "",
-        "",
-        "I read ARTISTS.md. Volunteer now, credit always, pay only from real revenue later."
+        "", "### First drop", document.getElementById("first_drop").value || "",
+        "", "### Notes", document.getElementById("notes").value || ""
       ].join(nl);
       var url = "https://github.com/whirledclassic/whirled2/issues/new?labels=artist,whirled2&title=" +
-        encodeURIComponent("[artist] " + name + " — " + roles) +
-        "&body=" + encodeURIComponent(body);
+        encodeURIComponent("[artist] " + name + " — " + roles) + "&body=" + encodeURIComponent(body);
       window.open(url, "_blank");
     });
   </script>
