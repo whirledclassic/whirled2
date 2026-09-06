@@ -1,7 +1,7 @@
 # QA-PAGES — Whirled2 web-mock page matrix
 
 **Date:** 2026-09-06 (America/New_York)  
-**Build:** `?v=20260906al` (`LOGO_V` in `app.js` / `index.html`)  
+**Build:** `?v=20260906ao` (`LOGO_V` in `app.js` / `index.html`)  
 **Method:** Fresh user via demo API (`http://127.0.0.1:8787/`), Playwright click-through + handler review.  
 **Constraints kept:** pale-blue chrome; no MySpace wording; Avatar SWF lab **locked** (sprite Wear path OK; Ruffle on hold); do **not** push.
 
