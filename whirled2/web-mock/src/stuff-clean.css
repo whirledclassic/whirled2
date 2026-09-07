@@ -1,0 +1,41 @@
+/* Stuff shelf cleanup ?v=20260907c */
+#app[data-tab="stuff"] .page-head p,
+#app[data-tab="stuff"] .stuff-themed-note,
+#app[data-tab="stuff"] .stuff-cat-how,
+#app[data-tab="stuff"] .how-stuff-panel p,
+#app[data-tab="stuff"] .avatar-lab-hold-panel,
+#app[data-tab="stuff"] .classic-hold-bridge,
+#app[data-tab="stuff"] .legal-embed-note { display: none !important; }
+#app[data-tab="stuff"] .page-head { padding: 8px 0 4px; }
+#app[data-tab="stuff"] .page-head h1 { font-size: 20px; margin: 0; }
+#app[data-tab="stuff"] .stuff-cat-title { margin: 0 0 8px; font-size: 15px; }
+#app[data-tab="stuff"] .how-stuff-panel {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; margin: 0 0 10px; background: #f4fbff; border: 1px solid #c5deee; border-radius: 10px;
+}
+#app[data-tab="stuff"] .how-stuff-panel h3 { display: none; }
+#app[data-tab="stuff"] .grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px;
+}
+#app[data-tab="stuff"] .card, #app[data-tab="stuff"] .stuff-card {
+  background: #fff; border: 1px solid #c5deee; border-radius: 10px; padding: 8px; min-height: 0;
+}
+#app[data-tab="stuff"] .card p, #app[data-tab="stuff"] .card .meta { display: none; }
+#app[data-tab="stuff"] .card h3, #app[data-tab="stuff"] .card b {
+  font-size: 13px; margin: 6px 0 0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#app[data-tab="stuff"] .card img, #app[data-tab="stuff"] .card .thumb {
+  width: 100%; aspect-ratio: 1; object-fit: contain; background: #e8f4fb; border-radius: 8px;
+}
+.w2-stuff-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 10px;
+}
+.w2-stuff-bar a, .w2-stuff-bar button {
+  font: 700 13px Trebuchet MS, sans-serif; color: #1e6fa8; background: #fff;
+  border: 1px solid #c5deee; border-radius: 999px; padding: 6px 10px; text-decoration: none; cursor: pointer;
+}
+#app[data-tab="stuff"] .w2-avatar-gate { padding: 10px 12px; margin: 0 0 10px; }
+#app[data-tab="stuff"] .w2-avatar-gate p { margin: 4px 0 0; }
+@media (max-width: 700px) {
+  #app[data-tab="stuff"] .grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+}
