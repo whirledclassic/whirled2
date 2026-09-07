@@ -4,30 +4,25 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>Whirled2 07a</title>
+  <title>Whirled2 07b</title>
   <style>
     .brand .logo, img.logo { width: 120px !important; height: 48px !important; max-width: 120px !important; max-height: 48px !important; object-fit: contain; display: block; }
     body { margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; background: #89C6E3; color: #16324a; }
     #app[data-tab]:not([data-tab="rooms"]) .bar { display: none; }
     .person { width: 100%; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer; }
     #room-enter-curtain, .room-enter-curtain, .loft-hint-engine-waiting, .avatar-engine-waiting-note { display: none !important; }
-    .stage-host, #stage-slot {
-      min-height: 42vh;
-      background: linear-gradient(180deg,#5fa8cc 0 56%, #c9a36a 56% 100%);
-      position: relative;
-    }
+    .stage-host, #stage-slot { min-height: 42vh; background: linear-gradient(180deg,#5fa8cc 0 56%, #c9a36a 56% 100%); position: relative; }
     html.w2-room-fs .stage-host, html.w2-room-fs #stage-slot,
-    body.room-immersive .stage-host, body.room-immersive #stage-slot {
-      min-height: 100% !important;
-      height: 100% !important;
-    }
+    html.w2-land-room .stage-host, html.w2-land-room #stage-slot,
+    body.room-immersive .stage-host, body.room-immersive #stage-slot { min-height: 100% !important; height: 100% !important; }
     #stage-slot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
   </style>
-  <link rel="stylesheet" href="./src/styles.css?v=20260907a" />
-  <link rel="stylesheet" href="./src/demo.css?v=20260907a" />
-  <link rel="stylesheet" href="./src/bar-fix.css?v=20260907a" />
-  <link rel="stylesheet" href="./src/mobile-polish.css?v=20260907a" />
-  <link rel="stylesheet" href="./src/room-view-modes.css?v=20260907a" />
+  <link rel="stylesheet" href="./src/styles.css?v=20260907b" />
+  <link rel="stylesheet" href="./src/demo.css?v=20260907b" />
+  <link rel="stylesheet" href="./src/bar-fix.css?v=20260907b" />
+  <link rel="stylesheet" href="./src/mobile-polish.css?v=20260907b" />
+  <link rel="stylesheet" href="./src/room-view-modes.css?v=20260907b" />
+  <link rel="stylesheet" href="./src/membership.css?v=20260907b" />
   <script>
     (function () {
       function syncDevice() {
@@ -35,7 +30,8 @@
         try { coarse = window.matchMedia("(pointer: coarse)").matches; } catch (e) {}
         var narrow = window.innerWidth <= 700;
         var midTouch = coarse && window.innerWidth <= 900;
-        var phone = narrow || midTouch;
+        var short = window.innerHeight <= 640;
+        var phone = narrow || midTouch || (coarse && short);
         var root = document.documentElement;
         root.classList.toggle("w2-phone", phone);
         root.classList.toggle("w2-desktop", !phone);
@@ -59,7 +55,7 @@
       if (/127\.0\.0\.1|localhost/.test(ls)) localStorage.removeItem("whirled2.engineSrc");
     } catch (e) {}
   </script>
-  <script src="./src/api.js?v=20260907a"></script>
+  <script src="./src/api.js?v=20260907b"></script>
   <script>
     (function () {
       if (!window.WhirledApi || !window.WhirledApi.login) return;
@@ -68,10 +64,7 @@
         name = String(name || "").trim();
         password = String(password || "");
         if (name.toLowerCase() === "test" && /^(test|whirled)$/i.test(password)) {
-          var session = {
-            token: "local-test",
-            user: { id: "test", name: "Test", initials: "T", bio: "", room: "Studio Loft", coins: 180 }
-          };
+          var session = { token: "local-test", user: { id: "test", name: "Test", initials: "T", bio: "", room: "Studio Loft", coins: 180 } };
           try { localStorage.setItem("whirled2.session", JSON.stringify(session)); } catch (e) {}
           return Promise.resolve(session);
         }
@@ -79,17 +72,17 @@
       };
     })();
   </script>
-  <script src="./src/classic-avatar.js?v=20260907a"></script>
-  <script src="./src/pixi-bridge.js?v=20260907a"></script>
-  <script src="./app.js?v=20260907a"></script>
-  <script src="./src/room-view-modes.js?v=20260907a"></script>
+  <script src="./src/classic-avatar.js?v=20260907b"></script>
+  <script src="./src/pixi-bridge.js?v=20260907b"></script>
+  <script src="./app.js?v=20260907b"></script>
+  <script src="./src/room-view-modes.js?v=20260907b"></script>
+  <script src="./src/landscape-fix.js?v=20260907b"></script>
+  <script src="./src/membership.js?v=20260907b"></script>
   <script>
     (function () {
       function drawLoft(host) {
         if (!host || host.querySelector("canvas")) return;
-        if (typeof window.mountWhirledEngine === "function") {
-          try { window.mountWhirledEngine(host); } catch (e) {}
-        }
+        if (typeof window.mountWhirledEngine === "function") { try { window.mountWhirledEngine(host); } catch (e) {} }
         if (host.querySelector("canvas")) return;
         var c = document.createElement("canvas");
         c.setAttribute("data-whirled-stage", "1");
@@ -97,10 +90,7 @@
         host.appendChild(c);
         host.setAttribute("data-whirled-engine", "1");
       }
-      function tick() {
-        var host = document.getElementById("stage-slot");
-        if (host) drawLoft(host);
-      }
+      function tick() { var host = document.getElementById("stage-slot"); if (host) drawLoft(host); }
       document.addEventListener("whirled:ready", tick);
       setInterval(tick, 400);
     })();
