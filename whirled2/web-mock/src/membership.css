@@ -1,0 +1,30 @@
+/* membership + landscape fill ?v=20260907b */
+.w2-pay-locked,.club-tier-cta:disabled,button.w2-pay-locked{opacity:.45!important;filter:grayscale(.35);pointer-events:auto;cursor:not-allowed!important}
+.w2-member-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(12px);background:#16324a;color:#e8f4fb;padding:8px 12px;border-radius:8px;font:700 13px/1.3 Trebuchet MS,sans-serif;z-index:400;opacity:0;pointer-events:none;max-width:90vw}
+.w2-member-toast.is-on{opacity:1;transform:translateX(-50%) translateY(0)}
+.w2-staff-grant label{display:block;margin:8px 0}
+html.w2-land-room,html.w2-land-room body{height:100%;overflow:hidden}
+html.w2-land-room #app[data-tab="rooms"]>.topbar,
+html.w2-land-room #app[data-tab="rooms"] .occ-rail,
+html.w2-land-room #app[data-tab="rooms"] .chat-tabs,
+html.w2-land-room #app[data-tab="rooms"] .chat-log,
+html.w2-land-room #app[data-tab="rooms"] .room-invite-row,
+html.w2-land-room #app[data-tab="rooms"]>#room-embed-dock,
+html.w2-land-room #room-embed-dock,
+html.w2-land-room .room-embed-dock,
+html.w2-land-room #app[data-tab="rooms"] .room-strip,
+html.w2-land-room .room-immersive-exit{display:none!important}
+html.w2-land-room #app[data-tab="rooms"]>#main{position:fixed!important;inset:0!important;z-index:40;margin:0!important;padding:0!important;max-width:none!important;background:#6eb7d8!important}
+html.w2-land-room #app[data-tab="rooms"] .workspace,
+html.w2-land-room #app[data-tab="rooms"] .stage-wrap,
+html.w2-land-room #app[data-tab="rooms"] .stage-host,
+html.w2-land-room #app[data-tab="rooms"] #stage-slot,
+html.w2-land-room #app[data-tab="rooms"] .stage-body{height:100%!important;min-height:100%!important;max-height:none!important;width:100%!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important}
+html.w2-land-room #app[data-tab="rooms"] #stage-slot canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
+#w2-view-float{display:none}
+html.w2-land-room #w2-view-float{display:flex;position:fixed;top:8px;right:8px;z-index:120;background:rgba(10,20,30,.55);border-radius:10px;padding:4px}
+html.w2-land-room #w2-view-float .room-view-label{display:none}
+html.w2-land-room #w2-view-float button{min-height:28px;padding:4px 7px;font-size:11px}
+html.w2-land-room #app[data-tab="rooms"]>.bar{position:fixed!important;left:8px;right:8px;bottom:6px;z-index:110;background:rgba(8,16,24,.55)!important;border:0!important;border-radius:12px;padding:4px 8px max(4px,env(safe-area-inset-bottom))!important}
+html.w2-land-room #app[data-tab="rooms"]>.bar .toolbar,
+html.w2-land-room #app[data-tab="rooms"]>.bar .chat-opts-wrap{display:none!important}
