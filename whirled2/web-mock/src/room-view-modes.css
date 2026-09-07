@@ -1,11 +1,11 @@
-/* whirled2/web-mock/src/room-view-modes.css ?v=20260907a */
+/* whirled2/web-mock/src/room-view-modes.css ?v=20260907d */
 .room-view-cluster{display:flex;align-items:center;gap:4px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .room-view-cluster .room-view-label{font:700 10px/1 Trebuchet MS,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#1e6fa8;margin-right:2px}
 .room-view-cluster button{appearance:none;border:1px solid #7eb3d4;background:linear-gradient(180deg,#f7fbfe,#d7ebf8);color:#16324a;font:700 11px/1 Trebuchet MS,sans-serif;padding:5px 8px;border-radius:8px;cursor:pointer;min-height:28px}
 .room-view-cluster button[aria-pressed="true"]{background:linear-gradient(180deg,#7ec8f0,#3aa3e0);border-color:#2b87c0;color:#fff}
 .room-view-cluster button.room-view-fs{min-width:32px}
 .room-view-cluster button:focus-visible{outline:2px solid #3aa3e0;outline-offset:2px}
-#app[data-tab="rooms"] #stage-slot.w2-fit-slot{position:relative;flex:0 0 auto;max-width:none;box-sizing:border-box}
+#app[data-tab="rooms"] #stage-slot.w2-fit-slot{position:relative;flex:0 0 auto;max-width:none;box-sizing:border-box;will-change:transform}
 html[data-view-mode="letterbox"] #app[data-tab="rooms"] .stage-host{background:#0b1520!important;display:flex;align-items:center;justify-content:center}
 html[data-view-mode="shrink"] #app[data-tab="rooms"] .stage-host{background:#cfe4f4!important;display:flex;align-items:center;justify-content:center}
 html[data-view-mode="full-height"] #app[data-tab="rooms"] .stage-host{background:#0b1520!important;display:flex;align-items:stretch;justify-content:center;overflow:hidden!important}
