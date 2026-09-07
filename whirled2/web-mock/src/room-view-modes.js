@@ -1,5 +1,5 @@
 /* whirled2/web-mock/src/room-view-modes.js
- * ?v=20260907a
+ * ?v=20260907d
  * Chrome-only. Fit modes live outside #stage-slot.
  * ENGINE DEV: do not remount Pixi when fit / fullscreen / orientation changes.
  */
@@ -16,6 +16,8 @@
     "full-height": "Full height"
   };
   var ROOM_AR = 2.4;
+  var ENGINE_W = 960;
+  var ENGINE_H = 400;
 
   function loadMode() {
     try {
@@ -108,29 +110,27 @@
     var box = host.getBoundingClientRect();
     var W = Math.max(120, box.width);
     var H = Math.max(120, box.height);
-    var ar = ROOM_AR;
-    var w;
-    var h;
+    var baseW = ENGINE_W;
+    var baseH = ENGINE_H;
+    var nextW = baseW + "px";
+    var nextH = baseH + "px";
+    var scale;
     if (mode === "full-height") {
-      h = H;
-      w = Math.round(h * ar);
+      scale = H / baseH;
     } else {
-      if (W / H > ar) {
-        h = H;
-        w = Math.round(h * ar);
-      } else {
-        w = W;
-        h = Math.round(w / ar);
-      }
+      scale = Math.min(W / baseW, H / baseH);
     }
-    var nextW = w + "px";
-    var nextH = h + "px";
-    var nextMax = mode === "full-height" ? "none" : "100%";
-    var changed = slot.style.width !== nextW || slot.style.height !== nextH;
+    if (!isFinite(scale) || scale <= 0) scale = 1;
+    var nextScale = "scale(" + scale + ")";
+    var sizeChanged = slot.style.width !== nextW || slot.style.height !== nextH;
     slot.style.width = nextW;
     slot.style.height = nextH;
-    slot.style.maxWidth = nextMax;
-    if (changed) {
+    slot.style.maxWidth = "none";
+    slot.style.maxHeight = "none";
+    slot.style.transformOrigin = "center center";
+    slot.style.transform = nextScale;
+    host.style.overflow = "hidden";
+    if (sizeChanged) {
       try { window.dispatchEvent(new Event("whirled:viewFit")); } catch (e) {}
     }
   }
