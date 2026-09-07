@@ -1,0 +1,37 @@
+/* classic /broadcast captions — cream stacked bars over the loft */
+.chat-row.is-broadcast .chat-bubble.broadcast,
+.classic-bc-stack .chat-bubble.broadcast {
+  background: #f3e6c4;
+  border: 1px solid #c9b27a;
+  border-radius: 2px;
+  color: #2a2418;
+  box-shadow: 1px 1px 0 rgba(255,255,255,.55) inset, 0 1px 2px rgba(40,30,10,.18);
+  font: 13px/1.25 "Trebuchet MS", "Segoe UI", sans-serif;
+  padding: 3px 8px 4px;
+}
+.chat-row.is-broadcast .chat-who,
+.chat-row.is-broadcast time,
+.chat-row.is-broadcast .role-badge,
+.chat-row.is-broadcast .reaction-bar,
+.chat-row.is-broadcast .reaction-pills { display: none !important; }
+.broadcast-tag { display: none !important; }
+.chat-bubble.broadcast .broadcast-who,
+.classic-bc-stack .broadcast-who {
+  color: #165a92;
+  text-decoration: underline;
+  font-weight: 700;
+  cursor: pointer;
+}
+.classic-bc-stack {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  pointer-events: none;
+  max-width: min(72%, 420px);
+}
+.classic-bc-stack .chat-bubble.broadcast { pointer-events: auto; }
